@@ -1,0 +1,45 @@
+# Working on Helriders (for AI agents: Claude, Grok, others)
+
+The owner works from a phone and has no computer, so nobody opens the Godot editor. Every change must be correct as plain text and verified headless. CI is the only build machine.
+
+## Source of truth
+
+- `docs/DESIGN.md` is the design. Systems marked "locked" are locked. Enemy vehicle archetypes are the main open area.
+- `scripts/tuning.gd` holds every balance number, color and collision layer. Tune there, not inside gameplay scripts.
+
+## Engine rules
+
+- **Godot 4.7.2**, pinned in `.github/workflows/android.yml` and `project.godot` features. Bump both together.
+- **Compatibility renderer only** (`gl_compatibility`). Don't switch to Forward+ or Mobile (Vulkan). Older Android Vulkan drivers are unreliable and the target is 2020-era 3–4 GB phones.
+- **Code-first scenes.** Nodes are built in GDScript (`main.gd` assembles everything). Keep `.tscn` files minimal. Hand-written scene files with resource IDs break silently without an editor.
+- **Static typing everywhere.** Use `:=` or explicit types. Values from a `Dictionary` need an explicit type (`var x: float = d.key`), because `:=` can't infer from a Variant.
+- **`preload` constants instead of `class_name`**, for example `const Zombie := preload("res://scripts/zombie.gd")`. They work in headless runs before the class cache exists, and they can be used as types.
+- **Don't shadow native classes.** Godot 4.7 has a native `VirtualJoystick`, which is why ours is `ThumbStick`. Import fails on a clash.
+- Commit the `.uid` and `.import` files Godot generates next to scripts and assets.
+
+## Performance rules (mobile budget)
+
+- Caps from the design: 25–30 zombies (`ZOMBIE_CAP`), at most 3 enemy vehicles, limited projectiles.
+- Pool everything that spawns in combat. Don't call `new()` or `queue_free()` in the combat loop.
+- Many small things go in one node with packed arrays and one `_draw()`, like `bullet_pool.gd`, `fx.gd` and `splats.gd`. Never one node per bullet or particle.
+- Swarms are steered from one loop (`zombie_director.gd`), not a script per zombie.
+- Collision layers: world = 1, vehicle = 2, zombie = 4. Zombies don't collide with each other.
+- Static art is drawn once. Only call `queue_redraw()` when something changes.
+
+## Verify before pushing
+
+```sh
+godot --headless --path . --import                  # must print no "SCRIPT ERROR"
+godot --headless --fixed-fps 60 --path . -s res://tests/smoke_test.gd   # must end "SMOKE TEST PASSED"
+```
+
+- Godot's import exits 0 even with script errors, so read the output.
+- Extend `tests/smoke_test.gd` when you add a core mechanic (new enemy, lock-on, part swap). It drives the game by setting `hud.left_stick.output` and `hud.right_stick.output` directly.
+- For visual checks without a GPU: `xvfb-run godot --rendering-driver opengl3 ...` with a script that saves `root.get_texture().get_image()` to PNG.
+
+## Build and delivery
+
+Pushing to `main` runs `.github/workflows/android.yml`. It imports the project, runs the smoke test, exports a debug APK, and replaces the `latest-build` release. The owner installs from:
+https://github.com/Asmogius/helriders-game/releases/download/latest-build/helriders.apk
+
+If the workflow fails, the owner gets no build. Check the run and fix it before moving on.

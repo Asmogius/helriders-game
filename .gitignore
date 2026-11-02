@@ -1,0 +1,15 @@
+# Godot
+.godot/
+/android/
+*.translation
+
+# Build output
+build/
+*.apk
+*.aab
+*.idsig
+
+# Logs from CI-style local runs
+import.log
+smoke.log
+export.log

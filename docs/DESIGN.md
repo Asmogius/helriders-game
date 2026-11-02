@@ -1,0 +1,193 @@
+# Helriders — Design Briefing
+
+Implementation-ready design document for a top-down arcade roguelike mobile game. The player assembles a crew and builds one customizable Twisted Metal-style armored vehicle to run missions in a gritty urban zombie wasteland, extracting parts and scrap. No microtransactions.
+
+All systems below are locked unless explicitly marked for later refinement.
+
+# 1. High-Level Vision
+
+Core fantasy: Armored Core-style vehicle building applied to wheeled wasteland machines, experienced through readable top-down arcade combat. The garage is the persistent progression layer; combat is how you feed it. Crew are a supporting but higher-stakes investment.
+
+Session target: 4–7 minutes from mission select to back in the garage. Daily structure (one mission per day) keeps the management layer relevant without slowing the action.
+
+# 2. Setting and Tone
+
+Years after a city-wide collapse. Ruined streets, collapsed infrastructure, and rival scavenger crews compete for salvage while zombie hordes move through the districts. The player runs a fortified garage compound (core workshop + Saloon + Inn) on the edge of a safer zone and pushes deeper for better parts.
+
+Tone is harsh, industrial, and opportunistic. Vehicles are scavenged and weaponized, not heroic. Atmosphere is rust, concrete dust, practical cyan/orange lighting, engine noise, and constant risk calculation. Dark practicality is welcome; clean military sci-fi or grand prophecy is not.
+
+# 3. Core Loop
+
+1. Start day in garage. Stations refresh as appropriate.
+
+2. Open Comms Hub. Choose 1 of 3+ clearly labeled missions.
+
+3. Assign crew from Inn roster to vehicle roles. Load or edit preset.
+
+4. Launch. Top-down combat against zombies + enemy vehicles.
+
+5. Success: return with scrap, parts, crew XP (possible injuries). Failure (vehicle destroyed): dramatic wreck, scrap penalty scaled to build cost, assigned crew permanently lost.
+
+6. Land in garage. Upgrade parts via Research, manage roster/injuries/expeditions, upgrade stations, prepare next day.
+
+Persistent power: better parts (rarity + level), higher-level crew you protect, light station upgrades, and district access via weighted parts score.
+
+# 4. Vehicle Customization
+
+Exactly one physical vehicle. Freely editable between missions using owned parts. Presets save full loadouts but only include parts the player currently possesses.
+
+## Part Categories and Tradeoffs
+
+- Chassis/Frame: Light/Medium/Heavy. Sets hardpoint count, mass capacity, crew slots, base mobility ceiling.
+
+- Power Plant/Engine: Power budget. Overload reduces mobility or disables systems. Affects acceleration.
+
+- Drive System: Wheels/tracks/hybrids. Directly drives turn radius, drift amount, and recovery. Primary mobility feel.
+
+- Armor Sections: Front/side/rear (roof optional). Weight lowers mobility. Front-heavy favors ramming; flanks become vulnerable.
+
+- Weapon Hardpoints: Fixed (aim with vehicle), turrets (fire while moving), ramming/spikes. Limited by chassis + power.
+
+- Utility Slots: Smoke, mines, speed burst, emergency repair, etc. Lower power draw.
+
+- Internal Systems: Cooling, ammo feeds, targeting, structural bracing. Passive modifiers, occupy internal capacity.
+
+Example builds for testing: Light Flanker (high mobility, fixed guns, smoke), Heavy Rammer (mass + front plate + spikes), Balanced Turret Boat (medium mobility, dual turrets).
+
+## Research and Leveling
+
+Research Station only levels parts the player already owns. Blueprints/new part types come from mission loot, enemy vehicle destruction, or Saloon purchases.
+
+Max level by rarity: Common 5, Uncommon 8, Rare 12, Epic 16, Legendary 20. Unique Legendary bonus unlocks at high or max level. Station upgrades improve scrap cost efficiency and leveling speed only—they do not raise the cap.
+
+Vehicle loss applies a scrap penalty scaled to the cost of the lost build. Chassis/ability to reassemble remains. Parts on the destroyed vehicle are lost (or heavily reduced).
+
+# 5. Garage Systems and UI
+
+Navigation: persistent footer tabs — Garage, Research, Saloon, Inn, Comms. Active tab highlighted with cyan/orange accent. All interactables clearly framed or glowing.
+
+## Station Details
+
+- Garage (core): Centered rotatable vehicle with outlined hardpoints. Part inventory sheet. Preset buttons. Upgrade panel for cost efficiency, max part level influence (via rarity), loot quality.
+
+- Research: Select owned part, spend scrap to level. Shows cost, current/max level, stat preview.
+
+- Saloon: Hire cards (free Common basics always present). Upgrades: more options, better rarity odds, higher starting level, lower cost.
+
+- Inn: Roster with assign/rest status. Expeditions for reserve crew (passive scrap + crew XP, failure = reduced/no reward, no crew loss). Upgrades: more slots, XP share, rest time reduction, late small cheat-death chance, expedition capacity/success. Unlocks early-midgame.
+
+- Comms: Daily mission board with clear labels and threat/reward. District progress bars. Upgrades: better mission quality, more choices.
+
+All stations use short upgrade tracks and the single scrap currency. No secondary resources.
+
+# 6. Crew System
+
+Four classes. Small number assigned per mission (typically 2–3). Higher rarity = better stats and stronger/ more effects on abilities.
+
+## Abilities (Common baseline; improve with level and rarity)
+
+- Driver: Passive +mobility (turn/drift recovery). Triggered short handling boost. Epic+ can add speed spike.
+
+- Gunner: Passive accuracy/tracking. Triggered overcharge (fire rate + damage). Epic+ can extend lock range.
+
+- Mechanic: Passive armor integrity. Triggered emergency patch (restore armor + clear one status). Epic+ short damage reduction.
+
+- Spotter: Passive utility duration/cooldown. Triggered mark (highlight + damage amp on priority target).
+
+Injury: chance on any combat. Injured crew have ~50% passive effectiveness and weakened/disabled triggered ability. Must rest in Inn for a set number of days (Inn upgrades can shorten). Cannot be assigned or sent on expeditions while resting.
+
+Permanent loss: only on vehicle destruction. Free Common basics always available at Saloon to prevent soft-lock. Expeditions level reserve crew passively.
+
+# 7. Missions, Districts, and Progression
+
+Comms offers clearly labeled missions each day. Most are short single-zone fights. Specials appear less often.
+
+- Standard: Clear, Survive, Hunt.
+
+- Courier: Timed route. Better time = slightly better rewards. Fail time = no/reduced rewards. Generally lower combat risk.
+
+- Escort / Retrieve-and-extract: Primary objective + optional deeper loot for extra risk.
+
+## District Unlock
+
+Districts: Outer Blocks (start) → Midtown Ruins → Industrial Spine → Core Collapse. Gated by collected parts score. Only successfully extracted parts count.
+
+Weighting example: Common 1 pt/level, Uncommon 2, Rare 4, Epic 7, Legendary 12. Thresholds tunable (e.g. 40 / 120 / 300). Progress bar visible on locked districts in Comms. Higher districts raise rarity floor/ceiling of loot and crew.
+
+No forced ending. Core Collapse remains open for continued refinement.
+
+# 8. Combat Design
+
+Arcade top-down. Mobility is a felt stat (turn radius + drift). Builds express immediately. Zombies are shared environmental pressure; enemy vehicles are the primary killers and best part source.
+
+## Zombie Variants
+
+- Shambler: Slow swarm, chip damage, clog movement.
+
+- Brute: Armored, needs sustained fire or ram.
+
+- Tank: Stronger Brute with charge that shoves vehicles.
+
+- Boomer: Bile zone that attracts and frenzies nearby zombies.
+
+- Slimer: Slippery mucus streak; vehicles lose traction.
+
+- Hunter: Fast, latches for DoT. Remove by ramming obstacle, scraping, or shooting.
+
+## Enemy Vehicles
+
+Archetypes (refine later): Outrider (light flanker), Bulwark (heavy frontal), Gunner Rig (turret), Scrapper (utility), Convoy Lead (rarer mixed). Spawn with simple roles; react opportunistically (focus damaged targets, screen allies, deal with zombies). Max 3 active. Destroying them is primary source of better parts.
+
+# 9. Controls, Camera, and HUD
+
+- Left virtual joystick: acceleration, braking/reverse, steering. Mobility scales responsiveness and drift.
+
+- Right aim stick: independent aiming for fixed weapons and turret influence.
+
+- Target lock button: toggles lock. Range and whether lock is available are per-weapon stats.
+
+- Utility button(s).
+
+Camera: tight slightly angled top-down, light dynamic zoom on speed or multi-vehicle threats, subtle look-ahead. Rotation-locked by default for clarity.
+
+Combat HUD minimal: joysticks in corners, lock/utility on right, thin armor/power bar, small reticle and cooldown pips. Vehicle remains visual focus.
+
+# 10. Economy
+
+Single currency: scrap. Spent on part leveling, station upgrades, crew hires, and vehicle-loss penalties. Income from missions (scaled to threat), enemy vehicle destruction (best parts), expeditions (trickle). Early upgrades fast; later ones optional polish. Free basics + reassembly prevent soft-locks.
+
+# 11. Presentation
+
+## Visual
+
+Pixel-voxel style. Chunky modular vehicles and parts. Gritty urban Twisted Metal aesthetic. High contrast: cyan/orange edge lights and accents so vehicles pop against muted concrete and wreckage. Strong silhouettes for build and role readability on mobile.
+
+## Audio / Soundtrack
+
+Sparse industrial. Distorted bass, metallic percussion, detuned synths, low drones. Garage: low-energy “Yard Idle”. Combat layers: Street Clear (low) → Contact (mid) → Crossfire (high), crossfading. Special: tighter pulse for Courier, near-silence + drone for wreck, dry confirmation for results. No heroic or melodic swells.
+
+## Wreck Sequence
+
+Dramatic and short: final hit, voxel plates explode, fire/dust, zombies swarm inside and haul crew out. Then results card and one-tap return. Injury on success is lighter (icon + rest timer only).
+
+## Onboarding
+
+Start with basic pre-built vehicle + two free Common crew. One scripted low-threat Clear teaches stick movement, aim/fire, target lock, and one part swap on return. Subsequent days introduce stations naturally. Clear statement that crew are lost only on vehicle destruction.
+
+# 12. Mobile Performance and Scope
+
+- Target: stable 30 fps on ~2020 3–4 GB Android devices; 60 fps mid-range+. iOS equivalent from iPhone 8 era.
+
+- Caps: 25–30 zombies, max 3 enemy vehicles, limited active zones/projectiles.
+
+- Pause screen: Low / Medium / High / Ultra presets (frame cap, effects, density, shake). Auto-detected default, player override.
+
+- Vertical slice goal: one Outer Blocks Clear, functional Garage + Comms, 4–6 parts across categories, Driver + Gunner, full controls + dramatic wreck + return, 4–7 minute sessions, final-readability pixel-voxel art.
+
+Art pipeline note: modular voxel attachments on shared chassis bases; zombie variants via palette + minor geometry. Keep draw calls and overdraw low.
+
+# 13. Vertical Slice Definition
+
+Prove the loop: Comms select Clear → assign Driver+Gunner → tight urban block with Shamblers, one Hunter, one enemy vehicle → clear → return with scrap + part (possible injury flag) → swap the new part → ready for next day. Must show build feel in first 30 seconds, readable threats, and quick recovery from loss.
+
+This briefing is the source of truth for implementation. Enemy vehicle archetype details are the primary area left for later refinement. All other systems are specified to the level required to begin production of the vertical slice and full game.
