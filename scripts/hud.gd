@@ -1,8 +1,10 @@
 extends CanvasLayer
-## Minimal combat HUD: armor bar, objective, FPS readout, twin sticks, and the
-## results card. The vehicle stays the visual focus.
+## Minimal combat HUD: armor bar, objective, FPS readout, twin sticks, lock
+## button, event banners, threat arrows, and the results card. The vehicle
+## stays the visual focus.
 
 signal restart_requested
+signal lock_toggled(on: bool)
 
 const T := preload("res://scripts/tuning.gd")
 const ThumbStick := preload("res://scripts/thumb_stick.gd")
@@ -13,14 +15,19 @@ var right_stick: ThumbStick
 var _root: Control
 var _armor_bar: ArmorBar
 var _arrows: ThreatArrows
+var _lock_button: LockButton
 var _status: Label
 var _fps: Label
 var _hint: Label
+var _banner: Label
+var _banner_tween: Tween
+var _alert: Label
 var _overlay: Control
 var _title: Label
 var _subtitle: Label
 var _button: Button
 var _fps_timer := 0.0
+var _alert_t := 0.0
 
 
 func _ready() -> void:
@@ -48,17 +55,22 @@ func _ready() -> void:
 	_fps.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_root.add_child(_fps)
 
-	_hint = _label(24, Color(0.85, 0.83, 0.78))
-	_hint.text = "LEFT THUMB  DRIVE        RIGHT THUMB  AIM + FIRE"
+	_banner = _centered_label(30, T.COL_ORANGE, 96.0)
+	_banner.modulate.a = 0.0
+	_alert = _centered_label(26, T.COL_ENEMY, 140.0)
+	_alert.visible = false
+
+	_hint = _label(22, Color(0.85, 0.83, 0.78))
+	_hint.text = "LEFT THUMB  DRIVE      RIGHT THUMB  AIM + FIRE      LOCK  AUTO-AIM"
 	_hint.anchor_left = 0.0
 	_hint.anchor_right = 1.0
 	_hint.anchor_top = 1.0
 	_hint.anchor_bottom = 1.0
-	_hint.offset_top = -60.0
+	_hint.offset_top = -56.0
 	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_root.add_child(_hint)
 	var fade := create_tween()
-	fade.tween_interval(6.0)
+	fade.tween_interval(7.0)
 	fade.tween_property(_hint, "modulate:a", 0.0, 1.0)
 
 	_arrows = ThreatArrows.new()
@@ -73,6 +85,20 @@ func _ready() -> void:
 	right_stick.left_side = false
 	_root.add_child(right_stick)
 
+	# Above the right stick, in reach of the right thumb.
+	_lock_button = LockButton.new()
+	_lock_button.anchor_left = 1.0
+	_lock_button.anchor_right = 1.0
+	_lock_button.anchor_top = 1.0
+	_lock_button.anchor_bottom = 1.0
+	_lock_button.offset_left = -170.0
+	_lock_button.offset_right = -60.0
+	_lock_button.offset_top = -450.0
+	_lock_button.offset_bottom = -340.0
+	_lock_button.toggled.connect(func(on: bool) -> void: lock_toggled.emit(on))
+	_root.add_child(_lock_button)
+	right_stick.blockers.append(_lock_button)
+
 	_build_overlay()
 
 
@@ -80,13 +106,41 @@ func set_armor(ratio: float) -> void:
 	_armor_bar.set_ratio(ratio)
 
 
-## Screen-space positions of threats to point at when they're off-screen.
-func set_threats(points: PackedVector2Array) -> void:
-	_arrows.set_points(points)
-
-
 func set_status(kills: int, target: int, scrap: int) -> void:
 	_status.text = "CLEAR  %d / %d      SCRAP  %d" % [kills, target, scrap]
+
+
+## Screen-space positions (and colors) of threats to point at when off-screen.
+func set_threats(points: PackedVector2Array, colors: PackedColorArray) -> void:
+	_arrows.set_points(points, colors)
+
+
+## Lock state as the game sees it (on/off, and whether something is locked).
+func set_lock_state(on: bool, has_target: bool) -> void:
+	_lock_button.set_state(on, has_target)
+
+
+## Test/keyboard hook: same as tapping the lock button.
+func press_lock() -> void:
+	_lock_button.press()
+
+
+## A short message that fades out (enemy inbound, salvage picked up...).
+func banner(text: String, color: Color, seconds := 2.5) -> void:
+	_banner.text = text
+	_banner.add_theme_color_override("font_color", color)
+	if _banner_tween != null:
+		_banner_tween.kill()
+	_banner.modulate.a = 1.0
+	_banner_tween = create_tween()
+	_banner_tween.tween_interval(seconds)
+	_banner_tween.tween_property(_banner, "modulate:a", 0.0, 0.6)
+
+
+## A warning that stays (and pulses) until cleared with an empty string.
+func set_alert(text: String) -> void:
+	_alert.text = text
+	_alert.visible = text != ""
 
 
 func _process(delta: float) -> void:
@@ -95,11 +149,16 @@ func _process(delta: float) -> void:
 		_fps_timer = 0.25
 		var version := str(ProjectSettings.get_setting("application/config/version", ""))
 		_fps.text = "%d FPS   v%s" % [Engine.get_frames_per_second(), version]
+	if _alert.visible:
+		_alert_t += delta
+		_alert.modulate.a = 0.6 + 0.4 * sin(_alert_t * 10.0)
 
 
 func show_result(title: String, subtitle: String, button_text: String, accent: Color) -> void:
 	left_stick.enabled = false
 	right_stick.enabled = false
+	_lock_button.visible = false
+	set_alert("")
 	_title.text = title
 	_title.add_theme_color_override("font_color", accent)
 	_subtitle.text = subtitle
@@ -111,6 +170,10 @@ func show_result(title: String, subtitle: String, button_text: String, accent: C
 
 func is_result_visible() -> bool:
 	return _overlay.visible
+
+
+func result_text() -> String:
+	return _title.text + " | " + _subtitle.text
 
 
 func _build_overlay() -> void:
@@ -163,6 +226,16 @@ func _label(font_size: int, color: Color) -> Label:
 	return label
 
 
+func _centered_label(font_size: int, color: Color, top: float) -> Label:
+	var label := _label(font_size, color)
+	label.anchor_left = 0.0
+	label.anchor_right = 1.0
+	label.offset_top = top
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_root.add_child(label)
+	return label
+
+
 func _box(fill: Color, border: Color) -> StyleBoxFlat:
 	var box := StyleBoxFlat.new()
 	box.bg_color = fill
@@ -171,22 +244,71 @@ func _box(fill: Color, border: Color) -> StyleBoxFlat:
 	return box
 
 
-class ThreatArrows extends Control:
-	## Orange chevrons on the screen edge pointing at off-screen stragglers.
+class LockButton extends Control:
+	## Round toggle. Handles its own touches; the right stick ignores this area.
+	signal toggled(on: bool)
 	const T := preload("res://scripts/tuning.gd")
+	var on := false
+	var has_target := false
+
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func press() -> void:
+		on = not on
+		toggled.emit(on)
+		queue_redraw()
+
+	func set_state(value: bool, target: bool) -> void:
+		if value != on or target != has_target:
+			on = value
+			has_target = target
+			queue_redraw()
+
+	func _input(event: InputEvent) -> void:
+		if not visible or not event is InputEventScreenTouch:
+			return
+		var touch := event as InputEventScreenTouch
+		if touch.pressed and get_global_rect().has_point(touch.position):
+			press()
+			get_viewport().set_input_as_handled()
+
+	func _draw() -> void:
+		var c := size * 0.5
+		var r := minf(size.x, size.y) * 0.5 - 4.0
+		var accent := T.COL_ORANGE if on else Color(0.7, 0.68, 0.64)
+		draw_circle(c, r, Color(0.0, 0.0, 0.0, 0.55 if on else 0.35))
+		draw_arc(c, r, 0.0, TAU, 40, Color(accent, 0.9 if on else 0.5), 4.0 if on else 2.5)
+		# Crosshair brackets.
+		var s := r * 0.45
+		for corner: Vector2 in [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)]:
+			var p := c + corner * s
+			draw_line(p, p - Vector2(corner.x * 9.0, 0.0), accent, 3.0)
+			draw_line(p, p - Vector2(0.0, corner.y * 9.0), accent, 3.0)
+		if on and has_target:
+			draw_circle(c, 5.0, accent)
+		var font := ThemeDB.fallback_font
+		draw_string(font, Vector2(0.0, size.y + 18.0), "LOCK", HORIZONTAL_ALIGNMENT_CENTER, size.x, 18, Color(accent, 0.9))
+
+
+class ThreatArrows extends Control:
+	## Chevrons on the screen edge pointing at off-screen threats.
 	const MARGIN := 48.0
 	var points := PackedVector2Array()
+	var colors := PackedColorArray()
 
-	func set_points(value: PackedVector2Array) -> void:
+	func set_points(value: PackedVector2Array, tint: PackedColorArray) -> void:
 		if value.is_empty() and points.is_empty():
 			return
 		points = value
+		colors = tint
 		queue_redraw()
 
 	func _draw() -> void:
 		var area := Rect2(Vector2.ZERO, size).grow(-MARGIN)
 		var center := area.get_center()
-		for p in points:
+		for i in points.size():
+			var p := points[i]
 			if area.grow(MARGIN).has_point(p):
 				continue  # on screen already
 			var dir := (p - center).normalized()
@@ -195,7 +317,8 @@ class ThreatArrows extends Control:
 			var ty := INF if is_zero_approx(dir.y) else (area.size.y * 0.5) / absf(dir.y)
 			var tip := center + dir * minf(tx, ty)
 			var side := dir.orthogonal() * 12.0
-			draw_colored_polygon(PackedVector2Array([tip + dir * 14.0, tip - dir * 8.0 + side, tip - dir * 8.0 - side]), Color(T.COL_ORANGE, 0.85))
+			var color := colors[i] if i < colors.size() else Color(1, 0.5, 0.2)
+			draw_colored_polygon(PackedVector2Array([tip + dir * 14.0, tip - dir * 8.0 + side, tip - dir * 8.0 - side]), Color(color, 0.85))
 
 
 class ArmorBar extends Control:

@@ -11,6 +11,7 @@ const TOP_STRIP := 90.0  # reserved for HUD, never starts a stick
 var radius := 100.0
 var deadzone := 0.12
 var output := Vector2.ZERO
+var blockers: Array[Control] = []  # buttons inside our zone that own their touches
 var enabled := true:
 	set(value):
 		enabled = value
@@ -61,6 +62,9 @@ func _in_zone(point: Vector2) -> bool:
 	var size := get_viewport_rect().size
 	if point.y < TOP_STRIP:
 		return false
+	for blocker in blockers:
+		if blocker.visible and blocker.get_global_rect().grow(12.0).has_point(point):
+			return false
 	if left_side:
 		return point.x < size.x * 0.5
 	return point.x >= size.x * 0.5

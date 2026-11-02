@@ -14,17 +14,20 @@ Every push to `main` builds a fresh APK.
 
 All builds are listed on the [latest-build release page](https://github.com/Asmogius/helriders-game/releases/tag/latest-build). The build number appears in the top-right corner of the game, next to the FPS counter.
 
-## Current state: Phase 0 prototype
+## Current state: Phase 1 prototype
 
-One "Clear" mission in an Outer Blocks city block.
+One "Clear" mission in an Outer Blocks city block: 40 shamblers, one Hunter, and one enemy rig.
 
 - **Left thumb:** drive. Point where you want to go. Pull behind you while slow to reverse. Hard turns at speed drift.
-- **Right thumb:** aim the turret. Push past halfway to fire.
-- **Ramming:** fast hits kill shamblers. Slow pushes get you clogged in the crowd.
-- Kill 40 shamblers to clear the block. Orange edge arrows point to the last few.
-- Armor at zero wrecks the rig: explosion, burning wreck, then the results card.
+- **Right thumb:** aim the turret. Push past halfway to fire. Manual aim always overrides lock.
+- **LOCK button** (above the right stick): toggles target lock. While on, the turret picks the most dangerous target in range, leads it, and fires by itself. Priority: a Hunter on your hull, then enemy rigs, then Hunters, then the nearest shambler.
+- **Ramming:** fast hits kill shamblers and Hunters. Slow pushes get you clogged in the crowd.
+- **Hunter:** shows up 25 seconds in (or after 10 kills). It pulses red before it leaps. If it latches on, it chews armor until you crush it into a wall, scrape it along one, or shoot it.
+- **Outrider:** a fast enemy rig with forward guns. It arrives 45 seconds in (or after 20 kills) and makes strafing passes. Wreck it and it drops a salvage part; drive over the crate to grab it.
+- Edge arrows point at off-screen threats: red for the Outrider, rust for the Hunter, cyan for salvage, orange for the last few shamblers.
+- The results card lists salvage you extracted. If you get wrecked, it's lost.
 
-Shamblers spawn in packs from off-screen, block the rig, and chip armor on contact. Parking and shooting gets you swarmed. Keep moving.
+Shamblers spawn in packs from off-screen, path around buildings, block the rig, and chip armor on contact. Parking gets you swarmed. Keep moving.
 
 ## Tech
 
@@ -40,6 +43,7 @@ Performance choices so far:
 - Bullets, particles and ground stains each live in one node with packed arrays, so there's one draw pass and no per-object nodes.
 - Zombies come from a fixed pool of 28, and one director loop steers all of them.
 - Zombies don't collide with each other. A cheap separation pass spaces them out instead.
+- Pathing uses Godot's native `AStarGrid2D` on a 40 px grid. Each zombie re-plans a few times a second, and only when a building blocks its line of sight.
 - The static arena is drawn once.
 
 ## Layout
@@ -51,14 +55,20 @@ scenes/main.tscn        entry scene (just runs scripts/main.gd)
 scripts/
   main.gd               builds and runs the mission
   tuning.gd             all balance numbers, colors, collision layers
-  vehicle.gd            the rig: drift handling, turret, ramming, armor
+  vehicle.gd            any rig: drift handling, weapons, lock-on, ramming, armor
+  enemy_rig.gd          Outrider AI (extends vehicle.gd)
+  hostile.gd            shared base for shamblers and Hunters
   zombie.gd             pooled shambler
+  hunter.gd             the Hunter: chase, pounce, latch
   zombie_director.gd    zombie pool, pack spawning, steering
-  bullet_pool.gd        all bullets in one node
+  nav_grid.gd           A* grid for pathing around buildings
+  bullet_pool.gd        every bullet, both teams, in one node
   fx.gd / splats.gd     particles and ground stains
+  pickup.gd / parts.gd  salvage crates and part definitions
+  lock_reticle.gd       brackets on the locked target
   arena.gd              the city block and its collision
   chase_camera.gd       follow camera
-  hud.gd                HUD, results card, threat arrows
+  hud.gd                HUD, lock button, banners, results card, threat arrows
   thumb_stick.gd        floating touch joystick
 tests/smoke_test.gd     headless test run in CI
 .github/workflows/      Android build
@@ -85,9 +95,9 @@ From DESIGN §13:
 - [x] Shamblers with pooling, spawn packs, contact damage
 - [x] Clear objective, wreck sequence, results card, quick restart
 - [x] Android build pipeline
-- [ ] Target lock button (per-weapon lock range)
-- [ ] Hunter zombie (fast, latches for damage over time)
-- [ ] One enemy vehicle (Outrider) that drops a part
+- [x] Target lock button (per-weapon lock range)
+- [x] Hunter zombie (fast, latches for damage over time)
+- [x] One enemy vehicle (Outrider) that drops a part
 - [ ] Garage screen: swap a part between runs
 - [ ] Comms screen: pick the mission
 - [ ] Driver + Gunner crew with passive and triggered abilities

@@ -6,10 +6,12 @@ signal zombie_killed(at: Vector2)
 
 const T := preload("res://scripts/tuning.gd")
 const Zombie := preload("res://scripts/zombie.gd")
+const NavGrid := preload("res://scripts/nav_grid.gd")
 
 var target: Node2D
+var nav: NavGrid
 var spawn_points: Array[Vector2] = []
-var spawn_budget := T.CLEAR_TARGET
+var spawn_budget := T.CLEAR_SHAMBLERS
 
 var _pool: Array[Zombie] = []
 var _active: Array[Zombie] = []
@@ -38,6 +40,22 @@ func active_positions() -> PackedVector2Array:
 	return out
 
 
+func active_zombies() -> Array[Zombie]:
+	return _active
+
+
+## Shamblers still to kill: alive now plus not yet spawned.
+func remaining() -> int:
+	return _active.size() + spawn_budget
+
+
+## Removes every live shambler without counting kills (mission end, tests).
+func clear_all() -> void:
+	for zombie in _active:
+		zombie.deactivate()
+	_active.clear()
+
+
 func _physics_process(delta: float) -> void:
 	_elapsed += delta
 	_spawn_timer -= delta
@@ -52,12 +70,23 @@ func _steer(delta: float) -> void:
 	if target == null:
 		return
 	var goal := target.position
+	var space := get_world_2d().direct_space_state
 	var sep_dist := T.SHAMBLER_SEPARATION
 	var sep_dist2 := sep_dist * sep_dist
 	var count := _active.size()
 	for a in count:
 		var zombie := _active[a]
-		var to_goal := goal - zombie.position
+		# Re-plan a few times a second (staggered): straight at the target when
+		# it's in sight, otherwise along the nav grid around buildings.
+		zombie.nav_timer -= delta
+		var reached := not zombie.nav_direct and zombie.position.distance_squared_to(zombie.nav_point) < 576.0
+		if nav != null and (zombie.nav_timer <= 0.0 or reached):
+			zombie.nav_timer = randf_range(0.35, 0.55)
+			var waypoint := nav.next_waypoint(space, zombie.position, goal)
+			zombie.nav_direct = waypoint == goal
+			zombie.nav_point = waypoint
+		var aim := goal if zombie.nav_direct else zombie.nav_point
+		var to_goal := aim - zombie.position
 		var desired := Vector2.ZERO
 		if to_goal.length_squared() > 400.0:
 			desired = to_goal.normalized() * zombie.speed
@@ -79,7 +108,7 @@ func _steer(delta: float) -> void:
 func _spawn_pack(limit: int) -> void:
 	if spawn_points.is_empty():
 		return
-	var at := _pick_spawn_point()
+	var at := pick_spawn_point()
 	var size := randi_range(T.HORDE_SIZE.x, T.HORDE_SIZE.y)
 	for i in size:
 		if spawn_budget <= 0 or _active.size() >= limit:
@@ -96,7 +125,7 @@ func _spawn_pack(limit: int) -> void:
 		spawn_budget -= 1
 
 
-func _pick_spawn_point() -> Vector2:
+func pick_spawn_point() -> Vector2:
 	var from := target.position if target != null else T.WORLD_SIZE * 0.5
 	var far: Array[Vector2] = []
 	var best := spawn_points[0]

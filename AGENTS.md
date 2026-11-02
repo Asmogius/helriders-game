@@ -23,8 +23,16 @@ The owner works from a phone and has no computer, so nobody opens the Godot edit
 - Pool everything that spawns in combat. Don't call `new()` or `queue_free()` in the combat loop.
 - Many small things go in one node with packed arrays and one `_draw()`, like `bullet_pool.gd`, `fx.gd` and `splats.gd`. Never one node per bullet or particle.
 - Swarms are steered from one loop (`zombie_director.gd`), not a script per zombie.
-- Collision layers: world = 1, vehicle = 2, zombie = 4. Zombies don't collide with each other.
+- Collision layers: world = 1, player rig = 2, zombie/hunter = 4, enemy rig = 8. Zombies don't collide with each other.
+- Pathing: ask `nav_grid.gd` for the next waypoint a few times a second (staggered), never every tick. It skips A* when there's a clear line.
 - Static art is drawn once. Only call `queue_redraw()` when something changes.
+
+## How enemies are built
+
+- Anything shootable that isn't a rig extends `hostile.gd` (`take_hit`, `is_targetable`, `lock_priority`, `died`). Pool it.
+- Enemy rigs extend `vehicle.gd` and only decide stick inputs (`drive_input`, `fire_trigger`), the way `enemy_rig.gd` does. They share the player's driving model, so builds feel the same on both sides.
+- Bullets carry a team (`bullet_pool.gd`). Each team's ray mask decides what it can hit, so nobody shoots their own side.
+- New mission-level enemies get a `spawn_*` function in `main.gd` that tests can call directly (`auto_spawn_specials = false`).
 
 ## Verify before pushing
 

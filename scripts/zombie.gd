@@ -1,17 +1,17 @@
-extends CharacterBody2D
+extends "res://scripts/hostile.gd"
 ## Shambler. Pooled: the ZombieDirector activates, steers, and recycles these.
 ## Zombies don't collide with each other (the director keeps them apart with a
 ## cheap separation pass), but they do block the rig, which is what clogs
 ## movement in a crowd.
 
-signal died(at: Vector2)
-
-const T := preload("res://scripts/tuning.gd")
 const CONTACT_DISTANCE := 40.0
 
-var active := false
-var hp := 0.0
 var speed := T.SHAMBLER_SPEED
+
+# Path following, driven by the director.
+var nav_timer := 0.0
+var nav_point := Vector2.ZERO
+var nav_direct := true
 
 var _shape: CollisionShape2D
 var _knock := Vector2.ZERO
@@ -42,11 +42,13 @@ func activate(at: Vector2) -> void:
 	_flash = 0.0
 	_stuck_time = 0.0
 	_detour_time = 0.0
+	nav_timer = 0.0
+	nav_direct = true
 	_detour_sign = 1.0 if randf() < 0.5 else -1.0
 	active = true
 	visible = true
 	collision_layer = T.LAYER_ZOMBIE
-	collision_mask = T.LAYER_WORLD | T.LAYER_VEHICLE
+	collision_mask = T.LAYER_WORLD | T.LAYER_VEHICLE | T.LAYER_ENEMY
 	_shape.set_deferred("disabled", false)
 	queue_redraw()
 
@@ -102,17 +104,10 @@ func step(delta: float, desired: Vector2, target: Node2D) -> void:
 		queue_redraw()
 
 
-func take_hit(damage: float, impulse: Vector2) -> void:
-	if not active:
-		return
-	hp -= damage
+func _on_hit(_damage: float, impulse: Vector2) -> void:
 	_knock += impulse
 	_flash = 1.0
 	queue_redraw()
-	if hp <= 0.0:
-		var at := global_position
-		deactivate()
-		died.emit(at)
 
 
 func _draw() -> void:
