@@ -23,6 +23,7 @@ var radius := T.SHAMBLER_RADIUS
 var frenzy := false          # set by the director: bile pool or a marked rig nearby
 var slime_timer := 0.0       # Slimer: seconds to the next trail blob (director)
 var burst := false           # Boomer reached the rig: the director pops it after the loop
+var oiled := false           # set by the director: wading through oil
 
 # Path following, driven by the director.
 var nav_timer := 0.0
@@ -76,6 +77,7 @@ func activate(at: Vector2, as_kind := "shambler") -> void:
 	nav_timer = 0.0
 	nav_direct = true
 	frenzy = false
+	oiled = false
 	burst = false
 	slime_timer = randf() * T.SLIME_DROP_EVERY
 	charge = Charge.WALK
@@ -126,6 +128,8 @@ func step(delta: float, desired: Vector2, target: Node2D) -> void:
 	desired *= speed_mult()
 	if frenzy:
 		desired *= T.BILE_FRENZY
+	if oiled:
+		desired *= T.OIL_ZOMBIE_SPEED
 	# Walking around a building: hold a wall-following direction for a while.
 	if _detour_time > 0.0:
 		_detour_time -= delta

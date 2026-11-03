@@ -149,6 +149,7 @@ func _steer(delta: float) -> void:
 		desired += push * zombie.speed * 0.9
 		if hazards != null:
 			zombie.frenzy = (marked and zombie.position.distance_squared_to(goal) < mark_range2) or hazards.bile_at(zombie.position)
+			zombie.oiled = hazards.oil_at(zombie.position)
 			if zombie.kind == "slimer":
 				zombie.slime_timer -= delta
 				if zombie.slime_timer <= 0.0:

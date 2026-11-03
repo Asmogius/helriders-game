@@ -110,6 +110,7 @@ var latched: Array[Node2D] = []    # Hunters on the hull
 var bullets: Node2D                # BulletPool
 var fx: Node2D                     # Fx
 var mines: Node2D                  # MinePool, for the Mine Dropper
+var hazards: Node2D                # GroundHazards, for the Oil Slick
 
 var _turret: Node2D                # the first turret, if any
 var _turrets: Array[Node2D] = []   # one per weapon; null for fixed guns
@@ -856,6 +857,10 @@ func use_ability(index: int) -> bool:
 			armor = minf(armor + float(a.heal) * float(crew_mods.patch) * float(crew_mods.repair), armor_max)
 			if fx != null:
 				fx.call("repair", global_position)
+		"oil":
+			if hazards != null:
+				var back := -Vector2.RIGHT.rotated(rotation)
+				hazards.call("add_oil", global_position + back * (body_len * 0.5 + float(a.oil_radius) * 0.6), float(a.oil_radius), float(a.oil_time))
 		"mines":
 			if mines != null:
 				var back := -Vector2.RIGHT.rotated(rotation)

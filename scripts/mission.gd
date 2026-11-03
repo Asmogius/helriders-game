@@ -21,6 +21,7 @@ const Vehicle := preload("res://scripts/vehicle.gd")
 const EnemyRig := preload("res://scripts/enemy_rig.gd")
 const BulwarkRig := preload("res://scripts/bulwark_rig.gd")
 const GunnerRig := preload("res://scripts/gunner_rig.gd")
+const ScrapperRig := preload("res://scripts/scrapper_rig.gd")
 const Crew := preload("res://scripts/crew.gd")
 const Hunter := preload("res://scripts/hunter.gd")
 const BulletPool := preload("res://scripts/bullet_pool.gd")
@@ -65,6 +66,9 @@ var bulwarks: Array[EnemyRig] = []    # heavy rammers, built up front like Outri
 var bulwark: BulwarkRig          # the first Bulwark (tests use it)
 var gunners: Array[EnemyRig] = []     # standoff turret rigs, built up front too
 var gunner: GunnerRig            # the first Gunner Rig (tests use it)
+var scrappers: Array[EnemyRig] = []   # trap layers, built up front too
+var scrapper: ScrapperRig        # the first Scrapper (tests use it)
+var enemy_mines: MinePool        # the Scrappers' mines (hurt you and zombies)
 var marked: Node2D               # the last target a Spotter marked (tests)
 var bullets: BulletPool
 var mines: MinePool
@@ -117,6 +121,8 @@ func _ready() -> void:
 	bullets = BulletPool.new()
 	bullets.z_index = 4
 	mines = MinePool.new()
+	enemy_mines = MinePool.new()
+	enemy_mines.enemy = true
 	fx = Fx.new()
 	fx.z_index = 5
 	pickups = Node2D.new()
@@ -140,6 +146,7 @@ func _ready() -> void:
 	vehicle.rotation = -PI / 2.0
 	vehicle.bullets = bullets
 	vehicle.mines = mines
+	vehicle.hazards = hazards
 	vehicle.fx = fx
 	vehicle.lock_candidates = lock_candidates
 	for rig: EnemyRig in _all_enemy_rigs():
@@ -153,6 +160,7 @@ func _ready() -> void:
 	zombies.hazards = hazards
 	bullets.fx = fx
 	mines.fx = fx
+	enemy_mines.fx = fx
 	zombies.target = vehicle
 	zombies.spawn_points = arena.spawn_points
 	camera.target = vehicle
@@ -162,7 +170,7 @@ func _ready() -> void:
 	# Tree order is also physics order:
 	# inputs (here) -> zombies -> player rig -> enemy rigs -> hunters -> bullets.
 	# Hunters run after the rig so they see this tick's wall contact.
-	for node: Node in [arena, splats, hazards, markers, mines, pickups, zombies, vehicle, rigs]:
+	for node: Node in [arena, splats, hazards, markers, mines, enemy_mines, pickups, zombies, vehicle, rigs]:
 		add_child(node)
 	for h in hunters:
 		add_child(h)
@@ -189,6 +197,8 @@ func _ready() -> void:
 		rig.wrecked.connect(_on_bulwark_wrecked.bind(rig))
 	for rig in gunners:
 		rig.wrecked.connect(_on_gunner_wrecked.bind(rig))
+	for rig in scrappers:
+		rig.wrecked.connect(_on_scrapper_wrecked.bind(rig))
 	if elite != null:
 		elite.wrecked.connect(_on_elite_wrecked)
 	hud.restart_requested.connect(return_to_garage)
@@ -209,6 +219,7 @@ func _configure_mission() -> void:
 	var outrider_count := 0
 	var bulwark_count := 0
 	var gunner_count := 0
+	var scrapper_count := 0
 	match mission_type:
 		"clear":
 			var shamblers: int = Missions.stat(spec, "shamblers")
@@ -216,9 +227,12 @@ func _configure_mission() -> void:
 			outrider_count = Missions.stat(spec, "outriders")
 			bulwark_count = Missions.stat(spec, "bulwarks")
 			gunner_count = Missions.stat(spec, "gunners")
+			scrapper_count = Missions.stat(spec, "scrappers")
 			zombies.spawn_budget = shamblers
 			zombies.start_count = mini(T.ZOMBIE_START, cap)
-			target_kills = shamblers + hunter_count + outrider_count + bulwark_count + gunner_count
+			target_kills = shamblers + hunter_count + outrider_count + bulwark_count + gunner_count + scrapper_count
+			for i in scrapper_count:
+				_events.append([T.SCRAPPER_SPAWN_TIME + 40.0 * i, "scrapper", T.SCRAPPER_SPAWN_KILLS if i == 0 else -1, false])
 			for i in gunner_count:
 				_events.append([T.GUNNER_SPAWN_TIME + 40.0 * i, "gunner", T.GUNNER_SPAWN_KILLS if i == 0 else -1, false])
 			for i in bulwark_count:
@@ -239,6 +253,8 @@ func _configure_mission() -> void:
 					bulwark_count += 1
 				elif e[1] == "gunner":
 					gunner_count += 1
+				elif e[1] == "scrapper":
+					scrapper_count += 1
 		"hunt":
 			zombies.spawn_budget = 1000000
 			zombies.start_count = mini(8, cap)
@@ -269,6 +285,9 @@ func _configure_mission() -> void:
 			gunner_count = Missions.stat(spec, "gunners")
 			for i in gunner_count:
 				_events.append([3.0, "gunner_guard", -1, false])
+			scrapper_count = Missions.stat(spec, "scrappers")
+			for i in scrapper_count:
+				_events.append([20.0, "scrapper", -1, false])
 	# Always keep one Outrider ready (tests spawn one by hand); never more
 	# rigs than the design's cap of three.
 	var room := T.MAX_ENEMY_RIGS - (1 if elite != null else 0)
@@ -283,6 +302,9 @@ func _configure_mission() -> void:
 	for i in maxi(gunner_count, 1):
 		gunners.append(GunnerRig.new())
 	gunner = gunners[0] as GunnerRig
+	for i in maxi(scrapper_count, 1):
+		scrappers.append(ScrapperRig.new())
+	scrapper = scrappers[0] as ScrapperRig
 
 
 func _physics_process(delta: float) -> void:
@@ -439,6 +461,7 @@ func _all_enemy_rigs() -> Array[EnemyRig]:
 	var all: Array[EnemyRig] = outriders.duplicate()
 	all.append_array(bulwarks)
 	all.append_array(gunners)
+	all.append_array(scrappers)
 	if elite != null:
 		all.append(elite)
 	return all
@@ -471,6 +494,8 @@ func _run_events() -> void:
 				e[3] = spawn_bulwark(near) != null
 			"gunner":
 				e[3] = spawn_gunner(zombies.pick_spawn_point()) != null
+			"scrapper":
+				e[3] = spawn_scrapper(zombies.pick_spawn_point()) != null
 			"gunner_escort":
 				var near: Vector2 = elite.global_position + Vector2(randf_range(-160, 160), randf_range(-160, 160)) if elite.is_inside_tree() else zombies.pick_spawn_point()
 				e[3] = spawn_gunner(near) != null
@@ -529,6 +554,23 @@ func spawn_gunner(at: Vector2, announce := true) -> EnemyRig:
 			rigs.add_child(rig)
 			if announce:
 				hud.banner("GUNNER RIG INBOUND  -  KEEP MOVING", T.COL_ENEMY)
+			return rig
+	return null
+
+
+## Sends in the next Scrapper, if there's room under the rig cap.
+func spawn_scrapper(at: Vector2) -> EnemyRig:
+	if active_rig_count() >= T.MAX_ENEMY_RIGS:
+		return null
+	for rig in scrappers:
+		if not rig.is_inside_tree():
+			var s := rig as ScrapperRig
+			s.enemy_mines = enemy_mines
+			s.hazards = hazards
+			rig.position = at
+			rig.rotation = (vehicle.global_position - at).angle()
+			rigs.add_child(rig)
+			hud.banner("SCRAPPER INBOUND  -  WATCH FOR TRAPS", T.COL_ENEMY)
 			return rig
 	return null
 
@@ -714,12 +756,12 @@ func _on_zombie_killed(at: Vector2, kind: String) -> void:
 				hud.banner("BILE!  THE HORDE IS COMING", T.COL_BOOMER, 2.0)
 
 
-## Every rig on slime loses grip (the player's and the enemy rigs alike).
+## Every rig on slime or oil loses grip (the player's and the enemy rigs alike).
 func _apply_slime(delta: float) -> void:
-	vehicle.set_on_slime(hazards.slime_at(vehicle.global_position), delta)
+	vehicle.set_on_slime(hazards.slick_at(vehicle.global_position), delta)
 	for rig in rigs.get_children():
 		if rig.has_method("set_on_slime"):
-			rig.call("set_on_slime", hazards.slime_at((rig as Node2D).global_position), delta)
+			rig.call("set_on_slime", hazards.slick_at((rig as Node2D).global_position), delta)
 
 
 ## A scrap crate at `at` (a Tank's), scaled like other caches.
@@ -787,6 +829,14 @@ func _on_gunner_wrecked(rig: EnemyRig) -> void:
 	_drop(rig.global_position, "gunner", false, T.GUNNER_SCRAP_CACHE)
 	hud.banner("GUNNER RIG DOWN  -  GRAB THE SALVAGE", T.COL_CYAN)
 	_add_kill(T.GUNNER_SCRAP, true)
+	_salvage_plating()
+
+
+func _on_scrapper_wrecked(rig: EnemyRig) -> void:
+	camera.shake(0.5)
+	_drop(rig.global_position, "scrapper", false, T.SCRAPPER_SCRAP_CACHE)
+	hud.banner("SCRAPPER DOWN  -  GRAB THE SALVAGE", T.COL_CYAN)
+	_add_kill(T.SCRAPPER_SCRAP, true)
 	_salvage_plating()
 
 

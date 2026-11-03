@@ -812,6 +812,8 @@ static func effect_text(part: Dictionary) -> String:
 			bits.append("REPAIR %d" % int(part.heal))
 		"mines":
 			bits.append("%d MINES x%d" % [int(part.mines), int(part.mine_damage)])
+		"oil":
+			bits.append("SLICK %d WIDE, %dS" % [int(float(part.oil_radius) * 2.0), int(part.oil_time)])
 	return "  ".join(bits)
 
 

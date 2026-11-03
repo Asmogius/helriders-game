@@ -116,6 +116,7 @@ static func threats_text(mission: Dictionary) -> String:
 	var rigs := _count(mission, "outriders") + _count(mission, "escorts")
 	var heavies := _count(mission, "bulwarks") + _count(mission, "bulwark_escorts")
 	var gunners := _count(mission, "gunners") + _count(mission, "gunner_escorts")
+	var scrappers := _count(mission, "scrappers")
 	if hunters > 0:
 		bits.append("%d Hunter%s" % [hunters, "" if hunters == 1 else "s"])
 	if rigs > 0:
@@ -124,6 +125,8 @@ static func threats_text(mission: Dictionary) -> String:
 		bits.append("%d Bulwark%s" % [heavies, "" if heavies == 1 else "s"])
 	if gunners > 0:
 		bits.append("%d Gunner Rig%s" % [gunners, "" if gunners == 1 else "s"])
+	if scrappers > 0:
+		bits.append("%d Scrapper%s" % [scrappers, "" if scrappers == 1 else "s"])
 	var kinds := zombie_kinds_text(mission)
 	if kinds != "":
 		bits.append(kinds)
@@ -149,7 +152,7 @@ static func _count(mission: Dictionary, key: String) -> int:
 	if str(mission.type) == "survive":
 		var n := 0
 		for e: Array in stat(mission, "events"):
-			if (key == "hunters" and e[1] == "hunter") or (key == "outriders" and e[1] == "outrider") or (key == "bulwarks" and e[1] == "bulwark") or (key == "gunners" and e[1] == "gunner"):
+			if (key == "hunters" and e[1] == "hunter") or (key == "outriders" and e[1] == "outrider") or (key == "bulwarks" and e[1] == "bulwark") or (key == "gunners" and e[1] == "gunner") or (key == "scrappers" and e[1] == "scrapper"):
 				n += 1
 		return n
 	return int(stat(mission, key)) if has_stat(mission, key) else 0

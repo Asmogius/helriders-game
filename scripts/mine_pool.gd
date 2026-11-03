@@ -1,8 +1,9 @@
 extends Node2D
-## Every mine on the map lives in this one node (Mine Dropper utility): packed
-## arrays, a staggered proximity check, one draw pass. No per-mine nodes.
-## Mines are the player's: they only trigger on and hurt zombies, Hunters and
-## enemy rigs.
+## Every mine on the map lives in this one node: packed arrays, a staggered
+## proximity check, one draw pass. No per-mine nodes. The player's pool (Mine
+## Dropper) triggers on and hurts zombies, Hunters and enemy rigs; an enemy
+## pool (`enemy = true`, the Scrapper's) triggers on and hurts the player's rig
+## and zombies.
 
 const T := preload("res://scripts/tuning.gd")
 
@@ -10,8 +11,10 @@ const MAX_MINES := 12
 const TRIGGER_RADIUS := 34.0   # how close a hostile must get to set one off
 const CHECK_INTERVAL := 3      # proximity check every N physics ticks
 const MASK := T.LAYER_ZOMBIE | T.LAYER_ENEMY
+const ENEMY_MASK := T.LAYER_ZOMBIE | T.LAYER_VEHICLE
 
 var fx: Node2D
+var enemy := false     # set before adding to the tree
 var detonations := 0   # tests and stats
 
 var _pos := PackedVector2Array()
@@ -35,9 +38,9 @@ func _ready() -> void:
 	_life.resize(MAX_MINES)
 	_trigger_shape.radius = TRIGGER_RADIUS
 	_trigger.shape = _trigger_shape
-	_trigger.collision_mask = MASK
+	_trigger.collision_mask = ENEMY_MASK if enemy else MASK
 	_blast.shape = _blast_shape
-	_blast.collision_mask = MASK
+	_blast.collision_mask = ENEMY_MASK if enemy else MASK
 
 
 func drop(at: Vector2, damage: float, radius: float, arm: float, life: float) -> void:
@@ -121,6 +124,8 @@ func _draw() -> void:
 	for i in _count:
 		var p := _pos[i]
 		draw_circle(p, 9.0, Color(0.1, 0.1, 0.1))
-		draw_circle(p, 7.0, Color(0.32, 0.3, 0.26))
+		draw_circle(p, 7.0, Color(0.4, 0.2, 0.15) if enemy else Color(0.32, 0.3, 0.26))
+		if enemy:
+			draw_arc(p, 11.0, 0.0, TAU, 14, Color(T.COL_ENEMY, 0.6), 1.5)
 		# Red light once armed.
 		draw_circle(p, 3.0, T.COL_ENEMY if _arm[i] <= 0.0 else Color(0.4, 0.4, 0.38))

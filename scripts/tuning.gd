@@ -53,6 +53,7 @@ const MISSIONS := {
 		"outriders": [0, 0, 0, 1, 2, 2],
 		"bulwarks": [0, 0, 1, 1, 1, 1],
 		"gunners": [0, 0, 1, 1, 1, 1],
+		"scrappers": [0, 1, 1, 1, 1, 1],
 		"cap": [24, 26, 27, 28, 28, 28],
 	},
 	"survive": {
@@ -65,10 +66,10 @@ const MISSIONS := {
 		"events": [
 			[[60, "hunter"]],
 			[[55, "hunter"], [105, "hunter"]],
-			[[45, "hunter"], [90, "bulwark"]],
-			[[45, "hunter"], [90, "outrider"], [100, "gunner"], [110, "hunter"], [130, "bulwark"]],
-			[[35, "hunter"], [70, "outrider"], [85, "gunner"], [100, "hunter"], [120, "bulwark"], [140, "hunter"]],
-			[[30, "hunter"], [60, "outrider"], [80, "gunner"], [95, "hunter"], [120, "outrider"], [150, "bulwark"]],
+			[[45, "hunter"], [70, "scrapper"], [90, "bulwark"]],
+			[[45, "hunter"], [65, "scrapper"], [90, "outrider"], [100, "gunner"], [110, "hunter"], [130, "bulwark"]],
+			[[35, "hunter"], [55, "scrapper"], [70, "outrider"], [85, "gunner"], [100, "hunter"], [120, "bulwark"], [140, "hunter"]],
+			[[30, "hunter"], [50, "scrapper"], [60, "outrider"], [80, "gunner"], [95, "hunter"], [120, "outrider"], [150, "bulwark"]],
 		],
 	},
 	"hunt": {
@@ -90,6 +91,7 @@ const MISSIONS := {
 		"hunters": [0, 0, 1, 1, 1, 1],
 		"outriders": [0, 0, 0, 0, 1, 1],
 		"gunners": [0, 0, 0, 1, 1, 1],          # parks by a checkpoint and covers it
+		"scrappers": [0, 1, 1, 1, 1, 1],        # lays traps along your route
 	},
 }
 const MISSION_NAMES := {
@@ -233,6 +235,28 @@ const GUNNER_SCRAP := 30
 const GUNNER_SCRAP_CACHE := 30      # dropped instead of a schematic
 const GUNNER_SPAWN_TIME := 75.0     # Clear: seconds in, or...
 const GUNNER_SPAWN_KILLS := 30      # ...after this many kills
+
+# --- Scrapper (enemy rig: trap layer; agreed with the owner) ------------------
+# Fast and light. Circles you at 250-400 px, cutting across your path, and
+# every 6 s drops a trap behind it: a mine, then an oil slick, alternating.
+# One weak turret. Drops the Oil Slick utility.
+const SCRAPPER_RANGE_MIN := 250.0
+const SCRAPPER_RANGE_MAX := 400.0
+const SCRAPPER_TRAP_EVERY := 6.0
+const SCRAPPER_MINE_DAMAGE := 40.0
+const SCRAPPER_MINE_RADIUS := 70.0
+const SCRAPPER_MINE_ARM := 0.6
+const SCRAPPER_MINE_LIFE := 25.0
+const SCRAPPER_SCRAP := 25
+const SCRAPPER_SCRAP_CACHE := 25
+const SCRAPPER_SPAWN_TIME := 60.0   # Clear: seconds in, or...
+const SCRAPPER_SPAWN_KILLS := 20    # ...after this many kills
+# Oil (the Scrapper's slicks and your Oil Slick utility): rigs on it keep
+# SLIME_GRIP, zombies in it move at OIL_ZOMBIE_SPEED.
+const OIL_RADIUS := 70.0            # 140 wide
+const OIL_TIME_SCRAPPER := 15.0
+const OIL_ZOMBIE_SPEED := 0.5
+const COL_OIL := Color(0.05, 0.05, 0.06, 0.6)
 
 # --- Economy (scrap is the only currency) --------------------------------------
 const START_SCRAP := 60
@@ -382,6 +406,27 @@ const GUNNER := {
 	"bullet_speed": 1600.0,    # reach ~610 px, past the edge of its standoff ring
 	"spread_deg": 3.0,
 	"turret_turn_rate": 2.5,   # fast sideways driving outruns its aim
+	"lock_range": 0.0,
+}
+
+const SCRAPPER := {
+	"name": "Scrapper",
+	"max_speed": 580.0,
+	"reverse_speed": 260.0,
+	"acceleration": 680.0,
+	"brake": 1500.0,
+	"coast": 280.0,
+	"turn_rate": 3.5,
+	"grip": 6.5,
+	"armor": 200.0,
+	"ram_damage": 30.0,
+	"mount": 0,                # one weak turret
+	"gun_id": "scrapper",
+	"fire_rate": 2.0,
+	"bullet_damage": 5.0,      # about 10 damage/s
+	"bullet_speed": 1400.0,    # reach ~530 px
+	"spread_deg": 4.0,
+	"turret_turn_rate": 3.0,
 	"lock_range": 0.0,
 }
 

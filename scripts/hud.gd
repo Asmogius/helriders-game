@@ -536,8 +536,8 @@ class AbilityButton extends Control:
 	## the right stick ignores this area.
 	signal pressed
 	const T := preload("res://scripts/tuning.gd")
-	const LABELS := {"patch": "PATCH", "mines": "MINES", "hard_line": "HARD LINE", "overcharge": "OVERCHARGE"}
-	var kind := ""      # "hard_line", "overcharge", "patch" or "mines"
+	const LABELS := {"patch": "PATCH", "mines": "MINES", "oil": "OIL", "hard_line": "HARD LINE", "overcharge": "OVERCHARGE"}
+	var kind := ""      # "hard_line", "overcharge", "patch", "mines" or "oil"
 	var charge := 0.0   # 0 ready, 1 just used
 	var disabled := false
 
@@ -598,6 +598,11 @@ class AbilityButton extends Control:
 					var p := c + Vector2(-16.0 + k * 16.0, 0.0)
 					draw_circle(p, 6.0, tint)
 					draw_circle(p, 2.0, Color(0, 0, 0, 0.7))
+			"oil":
+				# A drop over a puddle.
+				draw_colored_polygon(PackedVector2Array([c + Vector2(0, -18), c + Vector2(8, -2), c + Vector2(-8, -2)]), tint)
+				draw_circle(c + Vector2(0, -2), 8.0, tint)
+				draw_arc(c + Vector2(0, 14), 14.0, PI + 0.4, TAU - 0.4, 12, tint, 3.0)
 			"hard_line":
 				# Two chevrons: a sharp line through the turn.
 				for k in 2:

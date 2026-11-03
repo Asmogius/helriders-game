@@ -177,6 +177,10 @@ const CATALOG := {
 		"name": "Emergency Patch", "category": "Utility", "rarity": "Rare", "cost": 150, "power": 12.0, "weight": 10.0,
 		"ability": "patch", "cooldown": 25.0, "heal": 35.0,
 	},
+	"oil_slick": {
+		"name": "Oil Slick", "category": "Utility", "rarity": "Uncommon", "cost": 90, "power": 10.0, "weight": 10.0,
+		"ability": "oil", "cooldown": 14.0, "oil_radius": 70.0, "oil_time": 12.0,
+	},
 	"mine_dropper": {
 		"name": "Mine Dropper", "category": "Utility", "rarity": "Rare", "cost": 160, "power": 15.0, "weight": 15.0,
 		"ability": "mines", "cooldown": 15.0, "mines": 3, "mine_damage": 60.0, "mine_radius": 90.0,
@@ -213,6 +217,7 @@ const DROP_POOLS := {
 	"courier": ["courier_frame", "turbo_four", "off_road_tires"],
 	"bulwark": ["riot_plating", "spiked_ram_plate", "structural_bracing", "roll_cage"],
 	"gunner": ["burst_turret", "belt_feed", "coolant_loop"],
+	"scrapper": ["oil_slick", "mine_dropper", "off_road_tires"],
 }
 
 
