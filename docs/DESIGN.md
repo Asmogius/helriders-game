@@ -338,3 +338,30 @@ Replaces the single armor pool (§4 Armor Sections, §8 Bulwark front rule).
 ## Ammo Assignment (first pass, case by case)
 
 Pintle Turret: magazine. Outrider Twin Guns: heat. Scattergun Turret: magazine. Heavy MG Turret: heat. Burst Turret: magazine. Harpoon: magazine (1). Mortar: small magazine.
+
+## New Parts (first pass)
+
+Shield sizes are relative to a medium frame's front armor.
+
+| Part | Rarity / source | Power / weight | Key stats | Minor | Major | Signature |
+|---|---|---|---|---|---|---|
+| Junk Emitter (shield) | Common / start | 25 / 5 | ~20% shield, 3 s delay, refill ~5 s | Static Skin: shield up -> SLICK and GOOPED build 25% slower | - | - |
+| Capacitor Bank (shield) | Uncommon / Patcher | 35 / 5 | ~40% shield, 4 s delay, refill ~6 s | Deep Cells: +10% max shield | Discharge: breaking releases a short shock pulse | - |
+| Flux Coil (shield) | Uncommon / Patcher | 30 / 5 | ~25% shield, 2.5 s delay, refill ~1 s | Clean Coil: delay -0.3 s | Surge: full recharge adds +20% over max for 3 s | - |
+| Reflex Emitter (shield) | Rare / Hunt Elite | 40 / 5 | ~25% shield, 1 s delay, refill ~3 s | Quick Reset: delay -0.2 s | Second Skin: first break each mission refills to 50% | Phase Cycle: recharges under fire while DRIFTING |
+| EMP-Hardened Computer | Uncommon / Gunner Rig | 30 / 5 | Aims turrets without a Gunner (no LOCK); High shock resistance | Faraday Cage: STUNNED 30% shorter | Grounded: no shock bonus against your shield | - |
+| Harpoon (fixed weapon) | Rare / Bulwark | 40 / 20 | Mag 1, 2.5 s reload, 600 px range, 500 px cable | Barbed Tip: +20% to pierced zombies | Power Winch: reel 30% faster | Wrecking Ball: tethered rig slammed into wall, rig or barrel takes 2x collision damage |
+| Mortar (turret) | Uncommon / Gunner Rig | 45 / 25 | Mag 3, 4 s reload, 300-1200 px, ~1.2 s flight, 90 px blast | Heavy Charge: +20% blast radius | Cluster Shell: splits into 3 blasts | - |
+| Shock Pulse (utility) | Uncommon / Outrider | 20 / 10 | 18 s cooldown, 180 px, heavy shock buildup | Wide Field: +20% radius | Drain Arc: strips 50% of enemy shields | - |
+| Oil Slick Dropper (utility) | Uncommon / Scrapper | 15 / 15 | 14 s cooldown, 12 s oil pool, enemy-only | Wide Spill: +25% pool size | Pilot Light: self-ignites after 2 s | - |
+| Spike Strip Dropper (utility) | Uncommon / Scrapper | 15 / 15 | 12 s cooldown, 15 s strip; rigs slowed, zombies hurt and slowed | Long Strip: +30% length | Shredder: crossing rigs take armor damage | - |
+
+## Armor Resistance Profiles
+
+| Armor | Shock | Fire | Acid | Toxic | Slime / Goop |
+|---|---|---|---|---|---|
+| Scrap Plating | Low | Low | Low | Low | Low |
+| Outrider Light Plating | Medium | Low | Low | Medium | Medium |
+| Riot Plating | High | Medium | Low | Low | Medium |
+| Zed Sled (front only) | Low | Medium | Medium | Low | High |
+| Composite Plating (costs power) | Medium | High | High | Medium | Low |
