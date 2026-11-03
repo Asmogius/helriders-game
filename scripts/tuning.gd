@@ -114,7 +114,7 @@ const COURIER_TIER_PAY := {"gold": 1.0, "silver": 0.75, "bronze": 0.5, "late": 0
 const COURIER_RADIUS := 90.0
 
 # --- Districts (DESIGN §7) ----------------------------------------------------
-# Unlocked by parts score: extracted schematics, rarity points x level.
+# Unlocked by parts score: extracted schematics, rarity points x Research level.
 const RARITY_POINTS := {"Common": 1, "Uncommon": 2, "Rare": 4, "Epic": 7, "Legendary": 12}
 # Each district's board rolls jobs inside its skull band.
 const DISTRICTS := [
@@ -182,6 +182,27 @@ const UPGRADES := {
 	# Comms station (DESIGN §5: more choices, better mission quality).
 	"choices": {"name": "Wider Net", "costs": [150, 400], "per_level": 1},
 	"quality": {"name": "Better Leads", "costs": [120, 300, 600], "per_level": 0.15},
+	# Research station (DESIGN §4: cost efficiency and levelling speed only).
+	"research_discount": {"name": "Bench Discount", "costs": [150, 350, 700], "per_level": 0.10},
+	"research_speed": {"name": "Second Shift", "costs": [200, 450], "per_level": 1},
+}
+
+# --- Research (DESIGN §4; agreed with the owner) --------------------------------
+# Levels belong to the schematic: every copy you build has it, and a wreck
+# never takes it away. Build cost and the wreck penalty ignore levels.
+const RESEARCH_MAX_LEVEL := {"Common": 5, "Uncommon": 8, "Rare": 12, "Epic": 16, "Legendary": 20}
+const RESEARCH_GROWTH := 0.04          # each level past 1: +4% to the part's main stats
+# A level costs base x the level you're buying (Common L2 = 30, Rare L12 = 720).
+const RESEARCH_COST_BASE := {"Common": 15, "Uncommon": 30, "Rare": 60, "Epic": 110, "Legendary": 180}
+const RESEARCH_DAILY_CAP := 3          # levels you can buy per day (Second Shift adds 1 each)
+# Which stats grow, by category. Power draw and weight never change.
+# Internal parts grow their modifier instead (see Parts.at_level).
+const RESEARCH_STATS := {
+	"Chassis": ["armor", "weight_capacity"],
+	"Engine": ["power_output", "acceleration"],
+	"Drive": ["turn_mult", "grip"],
+	"Armor": ["armor"],
+	"Weapon": ["bullet_damage"],
 }
 
 # --- Crew (DESIGN §6; role tables live in crew.gd) ----------------------------

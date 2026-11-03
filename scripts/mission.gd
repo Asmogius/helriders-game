@@ -123,7 +123,7 @@ func _ready() -> void:
 
 	# The rig from the garage. Tests (or a missing rig) fall back to the starter.
 	var loadout: Dictionary = profile.rig if profile.has_rig() else Parts.STARTER_LOADOUT
-	vehicle.apply_stats(Loadout.build(loadout))
+	vehicle.apply_stats(profile.build_stats(loadout))
 	vehicle.set_crew(crew_override if not crew_override.is_empty() else profile.seated_crew())
 	profile.start_run()
 

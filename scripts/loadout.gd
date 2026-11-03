@@ -7,6 +7,9 @@ extends RefCounted
 ##   chassis / engine / drive / armor: one part id each
 ##   weapons / utility / internal: arrays of part ids, limited by the chassis
 ##
+## `levels` maps part id -> Research level (Profile.levels); parts not in it
+## are level 1. Enemy rigs and tests can leave it out.
+##
 ## The stats keep the first weapon's numbers at the top level (fire_rate,
 ## bullet_damage...) for simple readers, and list every weapon in "weapons".
 
@@ -37,17 +40,17 @@ static func total_dps(stats: Dictionary) -> float:
 	return dps
 
 
-static func build(loadout: Dictionary) -> Dictionary:
-	var chassis := Parts.get_part(loadout.get("chassis", ""))
-	var engine := Parts.get_part(loadout.get("engine", ""))
-	var drive := Parts.get_part(loadout.get("drive", ""))
-	var armor := Parts.get_part(loadout.get("armor", ""))
+static func build(loadout: Dictionary, levels: Dictionary = {}) -> Dictionary:
+	var chassis := _part(str(loadout.get("chassis", "")), levels)
+	var engine := _part(str(loadout.get("engine", "")), levels)
+	var drive := _part(str(loadout.get("drive", "")), levels)
+	var armor := _part(str(loadout.get("armor", "")), levels)
 
 	# Slotted parts: keep what fits the chassis, report what didn't.
 	var dropped: Array[String] = []
-	var weapon_parts := _fit(loadout.get("weapons", []), "Weapon", int(chassis.get("hardpoints", 0)), dropped)
-	var utility := _fit(loadout.get("utility", []), "Utility", int(chassis.get("utility_slots", 0)), dropped)
-	var internal := _fit(loadout.get("internal", []), "Internal", int(chassis.get("internal_slots", 0)), dropped)
+	var weapon_parts := _fit(loadout.get("weapons", []), "Weapon", int(chassis.get("hardpoints", 0)), dropped, levels)
+	var utility := _fit(loadout.get("utility", []), "Utility", int(chassis.get("utility_slots", 0)), dropped, levels)
+	var internal := _fit(loadout.get("internal", []), "Internal", int(chassis.get("internal_slots", 0)), dropped, levels)
 	if not dropped.is_empty():
 		push_warning("Loadout: no slot for %s" % ", ".join(dropped))
 
@@ -154,10 +157,15 @@ static func build(loadout: Dictionary) -> Dictionary:
 	}
 
 
-static func _fit(ids: Array, category: String, slots: int, dropped: Array[String]) -> Array[Dictionary]:
+## A part at its Research level, or {} if unknown.
+static func _part(id: String, levels: Dictionary) -> Dictionary:
+	return Parts.at_level(Parts.get_part(id), int(levels.get(id, 1)))
+
+
+static func _fit(ids: Array, category: String, slots: int, dropped: Array[String], levels: Dictionary) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	for id: String in ids:
-		var part := Parts.get_part(id)
+		var part := _part(id, levels)
 		if part.is_empty() or part.category != category:
 			push_warning("Loadout: %s is not a %s part" % [id, category])
 			continue

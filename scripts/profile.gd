@@ -14,6 +14,14 @@ extends Node
 ##   survive. Scrap and schematics picked up during that run are lost.
 ## - You never get a schematic you already own: drops skip known ones.
 ##
+## Research rules (decided with the owner):
+## - A level belongs to the schematic, so every copy you build has it and a
+##   wreck never takes it away. Build cost and the wreck penalty ignore it.
+## - A level costs T.RESEARCH_COST_BASE[rarity] x the level you're buying,
+##   less the Bench Discount. It's instant, but only T.RESEARCH_DAILY_CAP
+##   levels a day (Second Shift adds one per step).
+## - Max level by rarity is T.RESEARCH_MAX_LEVEL; upgrades never raise it.
+##
 ## Crew rules (decided with the owner, "Helriders: Crew Draft" doc):
 ## - Seats depend on the frame: Driver and Gunner seats, plus open seats any
 ##   other class can take, one of each class aboard. A Driver is required to
@@ -49,7 +57,9 @@ var storage := {}                   # part id -> number of built spares
 var rig := {}                       # the loadout in the garage (may be incomplete)
 var plan := {}                      # the last complete rig, for one-tap rebuild
 var presets: Array = []             # loadout dictionaries or null
-var upgrades := {"fabrication": 0, "loot": 0, "salvage": 0, "choices": 0, "quality": 0}
+var upgrades := _no_upgrades()
+var levels := {}                    # schematic id -> Research level (absent = 1)
+var research_today := 0             # levels bought today (daily cap)
 var record := {"runs": 0, "clears": 0, "wrecks": 0}
 var day := 1
 var board: Array = []               # today's missions on the Comms board
@@ -85,7 +95,9 @@ func new_game() -> void:
 	plan = rig.duplicate(true)
 	presets = []
 	presets.resize(T.PRESET_COUNT)
-	upgrades = {"fabrication": 0, "loot": 0, "salvage": 0, "choices": 0, "quality": 0}
+	upgrades = _no_upgrades()
+	levels = {}
+	research_today = 0
 	record = {"runs": 0, "clears": 0, "wrecks": 0}
 	notice = ""
 	day = 1
@@ -96,6 +108,13 @@ func new_game() -> void:
 	saloon_day = 0
 	ensure_saloon()
 	save_game()
+
+
+static func _no_upgrades() -> Dictionary:
+	var out := {}
+	for key: String in T.UPGRADES:
+		out[key] = 0
+	return out
 
 
 ## DESIGN §11: a new game starts with a free Common Driver and Gunner, seated.
@@ -316,6 +335,7 @@ func finish_day() -> void:
 	for m: Dictionary in crew:
 		m.rest = maxi(int(m.rest) - 1, 0)
 	day += 1
+	research_today = 0
 	active_mission = {}
 	board = Missions.make_board(day, board_size(), int(upgrades.get("quality", 0)))
 	ensure_saloon()
@@ -324,15 +344,79 @@ func finish_day() -> void:
 
 
 ## DESIGN §7: extracted parts only (starter schematics don't count),
-## rarity points x level. Every schematic is level 1 until Research.
+## rarity points x Research level.
 func district_score() -> int:
 	var starter: Array = Parts.STARTER_SCHEMATICS
 	var score := 0
 	for id in schematics:
 		if starter.has(id):
 			continue
-		score += int(T.RARITY_POINTS.get(str(Parts.get_part(id).get("rarity", "")), 0))
+		score += int(T.RARITY_POINTS.get(str(Parts.get_part(id).get("rarity", "")), 0)) * part_level(id)
 	return score
+
+
+# --- Research -------------------------------------------------------------------
+
+## A schematic's Research level (1 until researched).
+func part_level(id: String) -> int:
+	return int(levels.get(id, 1))
+
+
+## The part as you'd build it: its stats at your Research level.
+func part(id: String) -> Dictionary:
+	return Parts.at_level(Parts.get_part(id), part_level(id))
+
+
+## Rig stats for `loadout` with your Research levels applied.
+func build_stats(loadout: Dictionary) -> Dictionary:
+	return Loadout.build(loadout, levels)
+
+
+func research_cap() -> int:
+	return T.RESEARCH_DAILY_CAP + int(T.UPGRADES.research_speed.per_level) * upgrade_level("research_speed")
+
+
+func research_left() -> int:
+	return maxi(research_cap() - research_today, 0)
+
+
+## Scrap for the next level of `id`, or -1 if it can't go higher.
+func research_cost(id: String) -> int:
+	var p := Parts.get_part(id)
+	var next := part_level(id) + 1
+	if not Parts.can_level(p) or next > Parts.max_level(p):
+		return -1
+	var base := float(T.RESEARCH_COST_BASE.get(str(p.rarity), 0))
+	var discount := float(T.UPGRADES.research_discount.per_level) * upgrade_level("research_discount")
+	return roundi(base * next * (1.0 - discount))
+
+
+## Why `id` can't be levelled right now, or "".
+func research_block(id: String) -> String:
+	if not schematics.has(id):
+		return "NOT OWNED"
+	var p := Parts.get_part(id)
+	if not Parts.can_level(p):
+		return "NOTHING TO IMPROVE"
+	if part_level(id) >= Parts.max_level(p):
+		return "MAX LEVEL"
+	if research_left() <= 0:
+		return "DONE FOR TODAY"
+	if research_cost(id) > scrap:
+		return "NEED %d SCRAP" % research_cost(id)
+	return ""
+
+
+## Level `id` up by one. Returns success.
+func research(id: String) -> bool:
+	if research_block(id) != "":
+		return false
+	scrap -= research_cost(id)
+	levels[id] = part_level(id) + 1
+	research_today += 1
+	save_game()
+	changed.emit()
+	return true
 
 
 func is_district_open(index: int) -> bool:
@@ -519,7 +603,7 @@ func _auto_seat(m: Dictionary) -> void:
 func deploy_block() -> String:
 	if seated_in("driver").is_empty():
 		return "No Driver seated. Seat one at the Inn, or hire a free one at the Saloon."
-	var stats := Loadout.build(rig)
+	var stats := build_stats(rig)
 	if bool(stats.has_turret) and not bool(stats.manual_aim) and seated_in("gunner").is_empty():
 		return "The turret has no one to aim it. Seat a Gunner, or fit a Targeting Computer."
 	return ""
@@ -726,6 +810,8 @@ func save_game() -> void:
 		"plan": plan,
 		"presets": presets,
 		"upgrades": upgrades,
+		"levels": levels,
+		"research_today": research_today,
 		"record": record,
 		"notice": notice,
 		"day": day,
@@ -772,8 +858,18 @@ func load_game() -> bool:
 		if saved_presets[i] is Dictionary:
 			presets[i] = _clean_loadout(saved_presets[i])
 	var saved_upgrades: Dictionary = data.get("upgrades", {})
+	upgrades = _no_upgrades()
 	for key: String in upgrades:
 		upgrades[key] = clampi(int(saved_upgrades.get(key, 0)), 0, (T.UPGRADES[key].costs as Array).size())
+	# Saves from before Research load with every schematic at level 1.
+	levels = {}
+	var saved_levels: Dictionary = data.get("levels", {})
+	for id: String in saved_levels:
+		if Parts.CATALOG.has(id):
+			var lv := clampi(int(saved_levels[id]), 1, Parts.max_level(Parts.get_part(id)))
+			if lv > 1:
+				levels[id] = lv
+	research_today = maxi(int(data.get("research_today", 0)), 0)
 	var saved_record: Dictionary = data.get("record", {})
 	for key: String in record:
 		record[key] = int(saved_record.get(key, 0))

@@ -10,6 +10,8 @@ The owner works from a phone and has no computer, so nobody opens the Godot edit
 - Utility parts are abilities: `vehicle.gd` `use_ability(i)` runs them, `hud.gd` shows a button each. A new utility needs a case there and, if it spawns things, a pooled single-node drawer like `mine_pool.gd`.
 - Crew: `scripts/crew.gd` holds the eight classes, specialties and their abilities, rarities, level curve, passives, injury debuffs and perks (numbers approved in the "Helriders: Crew Draft" and "Helriders: Crew Expansion Draft" docs; don't change them without asking). `Crew.compute_mods()` is the only place crew turn into rig modifiers; the Garage stat sheet and `vehicle.gd` both call it. `profile.gd` owns the roster, seats (Driver, Gunner, open seats with one of each class), perk offers and picks, Saloon offers, XP and rest; `vehicle.gd` applies crew live (`set_crew`, `crew_mod()`, `use_crew_ability`, `injure_crew`). A new ability needs a case in `Crew._apply_active` (timed modifiers) or `vehicle.use_crew_ability` (instant effects), or `mission._on_crew_ability` if it reaches past the rig. Crew abilities fire from the HUD crew wheel (`hud.open_crew_wheel`, `pick_crew`), which slows the game while open; utilities keep their own buttons.
 
+- Research: a level belongs to the schematic (`Profile.levels`). `Parts.at_level()` is the only per-level math; `Loadout.build(loadout, levels)` applies it, so game code builds the player's rig with `profile.build_stats()` and shows parts with `profile.part(id)`. Numbers (growth, max levels, costs, daily cap, the two Research upgrades) live in `tuning.gd` and were agreed with the owner; don't change them without asking. `scripts/research.gd` is the station screen.
+
 - `scripts/profile.gd` (autoload `Profile`) is the save game: scrap, schematics, storage, the rig, presets, upgrades. Every change saves to `user://`. Economy rules agreed with the owner are listed at the top of that file; don't change them without asking.
 
 ## Engine rules
@@ -49,6 +51,7 @@ godot --headless --fixed-fps 60 --path . -s res://tests/smoke_test.gd   # must e
 godot --headless --fixed-fps 60 --path . -s res://tests/garage_test.gd  # must end "GARAGE TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/missions_test.gd # must end "MISSIONS TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/crew_test.gd     # must end "CREW TEST PASSED"
+godot --headless --fixed-fps 60 --path . -s res://tests/research_test.gd # must end "RESEARCH TEST PASSED"
 ```
 
 - Tests must call `Profile.new_game()` with `persist = false` first, so they never touch a real save.
