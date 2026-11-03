@@ -114,6 +114,8 @@ var mines: Node2D                  # MinePool, for the Mine Dropper
 var _turret: Node2D                # the first turret, if any
 var _turrets: Array[Node2D] = []   # one per weapon; null for fixed guns
 var _cooldowns: Array[float] = []
+var _burst_left: Array[int] = []     # rounds still to go in each gun's burst
+var _burst_gap: Array[float] = []
 var _fire_cooldown := 0.0
 var _flash := 0.0
 var _reversing := false
@@ -171,14 +173,19 @@ func apply_stats(s: Dictionary) -> void:
 			gun_stats.append(w)
 	elif float(s.fire_rate) > 0.0:
 		gun_stats.append({
-			"id": "", "mount": int(s.mount), "fire_rate": float(s.fire_rate),
+			"id": str(s.get("gun_id", "")), "mount": int(s.mount), "fire_rate": float(s.fire_rate),
 			"bullet_damage": float(s.bullet_damage), "bullet_speed": float(s.bullet_speed),
 			"spread_deg": float(s.spread_deg), "turret_turn_rate": float(s.turret_turn_rate),
 			"lock_range": float(s.lock_range), "pellets": int(s.get("pellets", 1)),
+			"burst": int(s.get("burst", 1)), "burst_rate": float(s.get("burst_rate", 0.0)),
 		})
 	_cooldowns.clear()
+	_burst_left.clear()
+	_burst_gap.clear()
 	for w in gun_stats:
 		_cooldowns.append(0.0)
+		_burst_left.append(0)
+		_burst_gap.append(0.0)
 	abilities.clear()
 	for a: Dictionary in s.get("abilities", []):
 		var copy := a.duplicate()
@@ -218,6 +225,7 @@ func _sync_parts() -> void:
 			continue
 		var sprite := TurretSprite.new()
 		sprite.kind = str(w.get("id", ""))
+		sprite.enemy = team != BulletPool.TEAM_PLAYER
 		sprite.position = turret_position(i, count)
 		add_child(sprite)
 		_turrets.append(sprite)
@@ -781,7 +789,22 @@ func _weapons(delta: float) -> void:
 				wants_fire = absf(forward.angle_to(lock_target.global_position - global_position)) < 0.2
 			# Twin fixed guns alternate barrels.
 			muzzle += forward.orthogonal() * 9.0 * _barrel_side
-		if wants_fire and _cooldowns[i] <= 0.0:
+		var burst := int(w.get("burst", 1))
+		if burst > 1:
+			# Burst guns: one pull fires `burst` rounds a beat apart; the burst
+			# finishes even if the trigger lets go. The cooldown runs from its start.
+			if _burst_left[i] > 0:
+				_burst_gap[i] -= delta
+				if _burst_gap[i] <= 0.0:
+					_burst_left[i] -= 1
+					_burst_gap[i] = 1.0 / maxf(float(w.burst_rate), 1.0)
+					_shoot(w, muzzle, direction)
+			elif wants_fire and _cooldowns[i] <= 0.0:
+				_cooldowns[i] = 1.0 / (float(w.fire_rate) * crew_fire)
+				_burst_left[i] = burst - 1
+				_burst_gap[i] = 1.0 / maxf(float(w.burst_rate), 1.0)
+				_shoot(w, muzzle, direction)
+		elif wants_fire and _cooldowns[i] <= 0.0:
 			_cooldowns[i] = 1.0 / (float(w.fire_rate) * crew_fire)
 			if turret == null:
 				_barrel_side = -_barrel_side
@@ -1031,6 +1054,7 @@ class TurretSprite extends Node2D:
 	const T := preload("res://scripts/tuning.gd")
 	var kind := ""   # weapon part id: changes the barrel
 	var hot := false # Overcharge: white-hot muzzle
+	var enemy := false  # enemy turrets wear red
 
 	func _draw() -> void:
 		match kind:
@@ -1038,6 +1062,11 @@ class TurretSprite extends Node2D:
 				# Short, wide, flared.
 				draw_rect(Rect2(0.0, -5.0, 20.0, 10.0), Color(0.18, 0.18, 0.19))
 				draw_colored_polygon(PackedVector2Array([Vector2(18, -5), Vector2(25, -8), Vector2(25, 8), Vector2(18, 5)]), T.COL_ORANGE.darkened(0.2))
+			"burst_turret", "gunner_rig":
+				# Twin slim barrels with a muzzle brake.
+				draw_rect(Rect2(0.0, -5.0, 32.0, 3.0), Color(0.17, 0.17, 0.18))
+				draw_rect(Rect2(0.0, 2.0, 32.0, 3.0), Color(0.17, 0.17, 0.18))
+				draw_rect(Rect2(30.0, -6.0, 4.0, 12.0), T.COL_ENEMY if enemy else T.COL_ORANGE)
 			"heavy_mg_turret":
 				# Long and thick, with a cooling jacket.
 				draw_rect(Rect2(0.0, -4.0, 38.0, 8.0), Color(0.16, 0.16, 0.17))
@@ -1052,5 +1081,5 @@ class TurretSprite extends Node2D:
 			var tip := {"scattergun_turret": 25.0, "heavy_mg_turret": 38.0}.get(kind, 30.0) as float
 			draw_rect(Rect2(tip - 5.0, -4.0, 6.0, 8.0), Color(1.0, 0.95, 0.8))
 		draw_circle(Vector2.ZERO, 11.0, Color(0.22, 0.225, 0.235))
-		draw_arc(Vector2.ZERO, 11.0, 0.0, TAU, 20, T.COL_CYAN, 2.0)
+		draw_arc(Vector2.ZERO, 11.0, 0.0, TAU, 20, T.COL_ENEMY if enemy else T.COL_CYAN, 2.0)
 		draw_rect(Rect2(-4.0, -4.0, 8.0, 8.0), Color(0.14, 0.14, 0.15))

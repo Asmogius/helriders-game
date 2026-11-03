@@ -156,7 +156,9 @@ Agreed details: Brute 200 HP, bullets do half (rams full), speed 70, 8 dmg/s, sh
 
 ## Enemy Vehicles
 
-Archetypes (refine later): Outrider (light flanker), Bulwark (heavy frontal), Gunner Rig (turret), Scrapper (utility), Convoy Lead (rarer mixed). Spawn with simple roles; react opportunistically (focus damaged targets, screen allies, deal with zombies). Max 3 active. Destroying them is primary source of better parts.
+Archetypes (refine later): Outrider (light flanker), Bulwark (heavy frontal), Gunner Rig (turret), Scrapper (utility), Convoy Lead (rarer mixed).
+
+Gunner Rig (agreed): a standoff turret rig. 340 armor, speed 500, ram 40. Keeps 350-550 px from the player, circling, backing off when closed on. A slow turret (2.5 rad/s) fires 4-round bursts of 7 every 1.4 s (~20 damage/s); it turns on zombies within 120 px of it first. Clear: 1 from 3 skulls; Survive: one joins the waves from 4 skulls; Hunt: escorts the Elite at 5-6 skulls (when there's room under the 3-rig cap); Courier: from 4 skulls it guards a checkpoint halfway along the route. Pays 30 scrap; drops the Burst Turret, Belt Feed or Coolant Loop, or a 30-scrap cache. Burst Turret (new Uncommon weapon): 4-round bursts of 14 every 0.9 s (~62 DPS), spread 1.5, bullet speed 1800, turret turn 8, lock 600, 40 power, 15 weight, 110 scrap. Spawn with simple roles; react opportunistically (focus damaged targets, screen allies, deal with zombies). Max 3 active. Destroying them is primary source of better parts.
 
 # 9. Controls, Camera, and HUD
 

@@ -780,8 +780,9 @@ func _headline(part: Dictionary) -> String:
 		"Armor":
 			return "ARMOR +%d  RAM %d  WT %d" % [int(part.armor), int(part.ram_damage), int(part.weight)]
 		"Weapon":
-			var dps := float(part.fire_rate) * float(part.bullet_damage) * int(part.get("pellets", 1))
-			return "DPS %d  PWR %d  WT %d%s" % [roundi(dps), int(part.power), int(part.weight), "  LOCK" if float(part.lock_range) > 0.0 else ""]
+			var dps := float(part.fire_rate) * float(part.bullet_damage) * int(part.get("pellets", 1)) * int(part.get("burst", 1))
+			var burst := "  x%d BURST" % int(part.burst) if int(part.get("burst", 1)) > 1 else ""
+			return "DPS %d  PWR %d  WT %d%s%s" % [roundi(dps), int(part.power), int(part.weight), burst, "  LOCK" if float(part.lock_range) > 0.0 else ""]
 		"Internal":
 			return "PWR %d  WT %d  %s" % [int(part.power), int(part.weight), effect_text(part)]
 		"Utility":
@@ -1205,7 +1206,7 @@ class StatSheet extends Control:
 			"dps": Loadout.total_dps(s),
 			"damage": float(w.get("bullet_damage", 0.0)) * pellets,
 			"pellets": float(pellets) if armed else 0.0,
-			"rate": float(w.get("fire_rate", 0.0)),
+			"rate": float(w.get("fire_rate", 0.0)) * int(w.get("burst", 1)),
 			"range": float(w.get("bullet_speed", 0.0)) * BulletPool.LIFETIME if armed else 0.0,
 			"spread": float(w.get("spread_deg", 0.0)) if armed else 0.0,
 			"aim": rad_to_deg(float(w.turret_turn_rate)) if armed and int(w.mount) == 0 else -1.0,

@@ -299,7 +299,7 @@ static func stat_rows(now: Dictionary, next: Dictionary) -> Array:
 
 
 static func _dps(p: Dictionary) -> float:
-	return float(p.get("fire_rate", 0.0)) * float(p.get("bullet_damage", 0.0)) * int(p.get("pellets", 1))
+	return float(p.get("fire_rate", 0.0)) * float(p.get("bullet_damage", 0.0)) * int(p.get("pellets", 1)) * int(p.get("burst", 1))
 
 
 static func _num(v: float) -> String:

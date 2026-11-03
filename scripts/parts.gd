@@ -139,6 +139,14 @@ const CATALOG := {
 		"mount": 0, "fire_rate": 9.0, "bullet_damage": 11.0, "bullet_speed": 1700.0,
 		"spread_deg": 2.5, "turret_turn_rate": 6.5, "lock_range": 600.0, "pellets": 1,
 	},
+	# Burst weapons: `fire_rate` is bursts per second; each burst is `burst`
+	# rounds, `burst_rate` rounds per second. Approved with the Gunner Rig.
+	"burst_turret": {
+		"name": "Burst Turret", "category": "Weapon", "rarity": "Uncommon", "cost": 110, "power": 40.0, "weight": 15.0,
+		"mount": 0, "fire_rate": 1.0 / 0.9, "bullet_damage": 14.0, "bullet_speed": 1800.0,
+		"spread_deg": 1.5, "turret_turn_rate": 8.0, "lock_range": 600.0, "pellets": 1,
+		"burst": 4, "burst_rate": 12.0,
+	},
 	# --- Internal systems (passive, take internal capacity) -----------------------
 	"targeting_computer": {
 		"name": "Targeting Computer", "category": "Internal", "rarity": "Common", "cost": 30, "power": 25.0, "weight": 5.0,
@@ -204,6 +212,7 @@ const DROP_POOLS := {
 	"survive": ["structural_bracing", "belt_feed", "patched_v8", "emergency_patch"],
 	"courier": ["courier_frame", "turbo_four", "off_road_tires"],
 	"bulwark": ["riot_plating", "spiked_ram_plate", "structural_bracing", "roll_cage"],
+	"gunner": ["burst_turret", "belt_feed", "coolant_loop"],
 }
 
 

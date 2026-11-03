@@ -3,7 +3,7 @@ extends SceneTree
 ## input, and checks each core mechanic in its own short scenario:
 ## driving, lock-on, the Hunter (latch, shoot off, crush), the Outrider
 ## (hunts and shoots you, drops salvage), the Bulwark (charges, rams, armored
-## front, drops salvage), a Brute's armor, power and weight overload, two
+## front, drops salvage), a Brute's armor, the Gunner Rig, power and weight overload, two
 ## weapons with pellets, fixed guns, the utilities, crew (passives, the crew
 ## wheel, Hard Line, Overcharge, big-hit injuries, turret aim rule), and the
 ## wreck.
@@ -364,6 +364,10 @@ func _process(_delta: float) -> bool:
 		var kills_before := main.kills
 		brute.take_hit(500.0, Vector2.ZERO, "rammed")
 		_check(not brute.active and main.kills == kills_before + 1, "a ram finishes a Brute and it counts as a kill")
+		var gun := main.spawn_gunner(rig.global_position + Vector2(0, 900))
+		_check(gun != null and gun.has_weapon() and int(gun.gun_stats[0].burst) == 4, "a Gunner Rig rolls in with a burst-firing turret")
+		gun.take_damage(100000.0)
+		_check(gun.is_wrecked and main.kills == kills_before + 2, "a wrecked Gunner Rig counts as a kill")
 
 	# --- Wreck -------------------------------------------------------------------
 	if frame == 2790:

@@ -39,7 +39,7 @@ The owner works from a phone and has no computer, so nobody opens the Godot edit
 ## How enemies are built
 
 - Anything shootable that isn't a rig extends `hostile.gd` (`take_hit`, `is_targetable`, `lock_priority`, `died`). Pool it.
-- Enemy rigs extend `vehicle.gd` and only decide stick inputs (`drive_input`, `fire_trigger`), the way `enemy_rig.gd` (Outrider) and `bulwark_rig.gd` (Bulwark) do. They share the player's driving model, so builds feel the same on both sides. Their flat stat sheets live in `tuning.gd` (`OUTRIDER`, `BULWARK`). Armor that blunts hits implements `deflects(at)` so bullets throw grey sparks.
+- Enemy rigs extend `vehicle.gd` and only decide stick inputs (`drive_input`, `fire_trigger`, and `aim_input` for turrets), the way `enemy_rig.gd` (Outrider), `bulwark_rig.gd` (Bulwark) and `gunner_rig.gd` (Gunner Rig) do. They share the player's driving model, so builds feel the same on both sides. Their flat stat sheets live in `tuning.gd` (`OUTRIDER`, `BULWARK`, `GUNNER`). Weapons may fire bursts (`burst`, `burst_rate`; `fire_rate` is then bursts per second). Rig spawns that would pass the 3-rig cap return null and their event retries (`spawn_gunner`). Armor that blunts hits implements `deflects(at)` so bullets throw grey sparks.
 - Zombie variants (Shambler, Brute, Tank, Boomer, Slimer) are one pooled `zombie.gd` with a `kind`; stats in `T.ZOMBIE_KINDS`, the horde mix by skulls in `T.ZOMBIE_MIX`. `zombie_director.gd` picks kinds per pack (`set_mix`), lays Slimer trails, pops Boomers and frenzies zombies. Slime and bile live in one pooled drawer, `ground_hazards.gd`; rigs on slime lose grip through `vehicle.set_on_slime()`. Agreed numbers; don't change them without asking.
 - Bullets carry a team (`bullet_pool.gd`). Each team's ray mask decides what it can hit, so nobody shoots their own side.
 - New mission-level enemies get a `spawn_*` function in `mission.gd` that tests can call directly (`auto_spawn_specials = false`).
@@ -57,6 +57,7 @@ godot --headless --fixed-fps 60 --path . -s res://tests/crew_test.gd     # must 
 godot --headless --fixed-fps 60 --path . -s res://tests/research_test.gd # must end "RESEARCH TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/expedition_test.gd # must end "EXPEDITION TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/zombie_test.gd     # must end "ZOMBIE TEST PASSED"
+godot --headless --fixed-fps 60 --path . -s res://tests/gunner_test.gd     # must end "GUNNER TEST PASSED"
 ```
 
 - Tests must call `Profile.new_game()` with `persist = false` first, so they never touch a real save.

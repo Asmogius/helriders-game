@@ -52,6 +52,7 @@ const MISSIONS := {
 		"hunters": [1, 1, 1, 1, 2, 2],
 		"outriders": [0, 0, 0, 1, 2, 2],
 		"bulwarks": [0, 0, 1, 1, 1, 1],
+		"gunners": [0, 0, 1, 1, 1, 1],
 		"cap": [24, 26, 27, 28, 28, 28],
 	},
 	"survive": {
@@ -65,9 +66,9 @@ const MISSIONS := {
 			[[60, "hunter"]],
 			[[55, "hunter"], [105, "hunter"]],
 			[[45, "hunter"], [90, "bulwark"]],
-			[[45, "hunter"], [90, "outrider"], [110, "hunter"], [130, "bulwark"]],
-			[[35, "hunter"], [70, "outrider"], [100, "hunter"], [120, "bulwark"], [140, "hunter"]],
-			[[30, "hunter"], [60, "outrider"], [95, "hunter"], [120, "outrider"], [150, "bulwark"]],
+			[[45, "hunter"], [90, "outrider"], [100, "gunner"], [110, "hunter"], [130, "bulwark"]],
+			[[35, "hunter"], [70, "outrider"], [85, "gunner"], [100, "hunter"], [120, "bulwark"], [140, "hunter"]],
+			[[30, "hunter"], [60, "outrider"], [80, "gunner"], [95, "hunter"], [120, "outrider"], [150, "bulwark"]],
 		],
 	},
 	"hunt": {
@@ -77,6 +78,7 @@ const MISSIONS := {
 		"elite_damage": [1.0, 1.1, 1.15, 1.25, 1.3, 1.4],
 		"escorts": [0, 0, 0, 0, 1, 1],
 		"bulwark_escorts": [0, 0, 1, 1, 1, 1],
+		"gunner_escorts": [0, 0, 0, 0, 1, 1],    # joins when there's room under the rig cap
 		"hunters": [0, 0, 1, 1, 1, 1],
 		"cap": [12, 14, 15, 17, 18, 20],
 	},
@@ -87,6 +89,7 @@ const MISSIONS := {
 		"cap": [8, 10, 11, 13, 14, 16],
 		"hunters": [0, 0, 1, 1, 1, 1],
 		"outriders": [0, 0, 0, 0, 1, 1],
+		"gunners": [0, 0, 0, 1, 1, 1],          # parks by a checkpoint and covers it
 	},
 }
 const MISSION_NAMES := {
@@ -217,6 +220,20 @@ const BULWARK_SCRAP_CACHE := 40     # dropped instead of a schematic
 const BULWARK_SPAWN_TIME := 60.0    # Clear: seconds in, or...
 const BULWARK_SPAWN_KILLS := 25     # ...after this many kills
 
+# --- Gunner Rig (enemy rig: standoff turret; agreed with the owner) -----------
+# Keeps its distance and works you over with a slow turret firing bursts. It
+# turns the turret on zombies that get close to it. Drops the Burst Turret.
+const GUNNER_RANGE_MIN := 350.0     # backs off if you get closer...
+const GUNNER_RANGE_MAX := 550.0     # ...closes in if you're further
+const GUNNER_GUARD_RADIUS := 300.0  # Courier: stays this close to its checkpoint
+const GUNNER_GUARD_LEASH := 700.0   # ...and only engages you this close to it
+const GUNNER_SELF_DEFENSE := 120.0  # zombies this close get the turret
+const GUNNER_FIRE_CONE := 0.12      # radians: turret this close to the target to fire
+const GUNNER_SCRAP := 30
+const GUNNER_SCRAP_CACHE := 30      # dropped instead of a schematic
+const GUNNER_SPAWN_TIME := 75.0     # Clear: seconds in, or...
+const GUNNER_SPAWN_KILLS := 30      # ...after this many kills
+
 # --- Economy (scrap is the only currency) --------------------------------------
 const START_SCRAP := 60
 const SCHEMATIC_DROP_CHANCE := 0.5     # a wrecked Outrider drops a schematic, else a scrap cache
@@ -342,6 +359,29 @@ const OUTRIDER := {
 	"bullet_speed": 1200.0,
 	"spread_deg": 4.0,
 	"turret_turn_rate": 0.0,
+	"lock_range": 0.0,
+}
+
+const GUNNER := {
+	"name": "Gunner Rig",
+	"max_speed": 500.0,
+	"reverse_speed": 260.0,
+	"acceleration": 600.0,
+	"brake": 1500.0,
+	"coast": 280.0,
+	"turn_rate": 3.0,
+	"grip": 7.0,
+	"armor": 340.0,
+	"ram_damage": 40.0,
+	"mount": 0,                # turret on top
+	"gun_id": "gunner_rig",
+	"fire_rate": 1.0 / 1.4,    # a burst every 1.4 s...
+	"burst": 4,                # ...of 4 rounds...
+	"burst_rate": 10.0,
+	"bullet_damage": 7.0,      # ...of 7 damage: about 20 damage/s
+	"bullet_speed": 1600.0,    # reach ~610 px, past the edge of its standoff ring
+	"spread_deg": 3.0,
+	"turret_turn_rate": 2.5,   # fast sideways driving outruns its aim
 	"lock_range": 0.0,
 }
 

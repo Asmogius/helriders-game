@@ -36,7 +36,7 @@ static func mobility(stats: Dictionary) -> float:
 static func total_dps(stats: Dictionary) -> float:
 	var dps := 0.0
 	for w: Dictionary in stats.get("weapons", []):
-		dps += float(w.fire_rate) * float(w.bullet_damage) * int(w.get("pellets", 1))
+		dps += float(w.fire_rate) * float(w.bullet_damage) * int(w.get("pellets", 1)) * int(w.get("burst", 1))
 	return dps
 
 
@@ -90,6 +90,8 @@ static func build(loadout: Dictionary, levels: Dictionary = {}) -> Dictionary:
 			"turret_turn_rate": float(part.get("turret_turn_rate", 0.0)) * aim_mult,
 			"lock_range": float(part.get("lock_range", 0.0)) * lock_mult,
 			"pellets": int(part.get("pellets", 1)),
+			"burst": int(part.get("burst", 1)),
+			"burst_rate": float(part.get("burst_rate", 0.0)),
 		}
 		weapons.append(w)
 		if has_targeting:
