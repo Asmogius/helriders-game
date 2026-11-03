@@ -365,3 +365,28 @@ Shield sizes are relative to a medium frame's front armor.
 | Riot Plating | High | Medium | Low | Low | Medium |
 | Zed Sled (front only) | Low | Medium | Medium | Low | High |
 | Composite Plating (costs power) | Medium | High | High | Medium | Low |
+
+## Part Mods: Remaining Existing Parts
+
+Approved one by one through Pintle Turret; Targeting Computer onward were finished by Claude at the owner's request and await review.
+
+| Part | Minor | Major | Signature |
+|---|---|---|---|
+| Scrap Frame (Common; HP medium-low) | Spare Bolts: +5% max HP | - | - |
+| Courier Frame (Uncommon; HP low) | Deep Pockets: utility cooldowns -10% | Low Rider: above half speed, side hits -20% | - |
+| Bulwark Frame (Rare; HP high) | Reinforced Ribs: +8% max HP | Crew Bunker: crew injury chance -25% | Command Deck: crew ability cooldowns -15% |
+| Junk V6 (Common) | Spare Pistons: +5% acceleration | - | - |
+| Patched V8 (Uncommon) | Big Block: +5% power output | Backfire: letting off at full speed blasts flame out the back (fire, ignites oil), once per 6 s | - |
+| Street Wheels (Common) | Fresh Tread: +5% grip | - | - |
+| Off-Road Tires (Uncommon) | Chunky Tread: +10% grip in hard turns | All-Terrain: ground hazards affect you 50% less | - |
+| Scrap Plating (Common) | Easy Patch: +10% repair on its facings | - | - |
+| Riot Plating (Uncommon) | Riot Grille: zombies clawing it take light damage | Hard Shell: -15% kinetic damage to its facing | - |
+| Composite Plating (Rare) | Layered: +5% armor on its facings | Neutralizer: CORRODED and TOXIC last 30% shorter | Reactive Layer: once per mission per facing, a stripping hit leaves 25% |
+| Pintle Turret (Common) | Steady Mount: -10% spread | - | - |
+| Targeting Computer (Common) | Quick Track: turret turn +5% | - | - |
+| Coolant Loop (Uncommon) | Chill Lines: heat builds 10% slower | Flash Cool: overheats end 40% faster | - |
+| Belt Feed (Uncommon) | Fast Feed: reloads 10% faster | Extended Belt: magazines +25% | - |
+| Structural Bracing (Uncommon; now raises max HP) | Cross Braces: a further +5% max HP | Load Path: collision damage taken -15% | - |
+| Roll Cage (Uncommon) | Padding: injured crew rest 1 day less | Safety Cell: splash damage can't injure crew | - |
+| Emergency Patch (Rare) | Bigger Patch: +20% armor restored | Quick Fit: -20% cooldown | Full Spread: also restores half the amount to every other facing |
+| Mine Dropper (Rare) | Wide Blast: +20% blast radius | Extra Mine: drops 4 mines | Seeker Mines: armed mines creep toward the nearest enemy rig |
