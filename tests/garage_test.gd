@@ -33,6 +33,14 @@ func _process(_delta: float) -> bool:
 	if frame == 3:
 		_run_checks()
 	if frame == 4:
+		# No job yet: DEPLOY sends you to Comms instead of launching.
+		garage.deploy()
+		_check(garage._comms.visible and garage.is_inside_tree() and current_scene == null, "DEPLOY without a job opens Comms")
+		var cards := garage._comms._cards.get_children().size()
+		_check(cards == profile.board_size(), "Comms shows today's board (%d jobs)" % cards)
+		garage._comms.select(0)
+		_check(garage._comms.take_selected() and profile.has_mission(), "TAKE JOB sets the mission")
+		_check(not garage._comms.visible and garage._job.text.begins_with("JOB:"), "taking a job returns to the Garage with the job shown")
 		garage.deploy()
 	if frame == 30:
 		var mission := current_scene

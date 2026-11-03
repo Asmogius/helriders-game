@@ -85,6 +85,17 @@ const STARTER_LOADOUT := {
 # What an Outrider can drop when you wreck it.
 const OUTRIDER_DROPS := ["outrider_twin_guns", "outrider_light_plating", "outrider_sport_wheels"]
 
+# Schematic pools by source. Mission rewards and the Hunt Elite get their own
+# parts once the new-parts draft is approved; until then the Elite draws from
+# the Outrider pool and mission rewards are scrap only.
+const DROP_POOLS := {
+	"outrider": OUTRIDER_DROPS,
+	"elite": OUTRIDER_DROPS,
+	"clear": [],
+	"survive": [],
+	"courier": [],
+}
+
 
 ## A copy of a part's schematic with its id attached, or {} if unknown.
 static func get_part(id: String) -> Dictionary:

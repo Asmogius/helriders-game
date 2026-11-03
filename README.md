@@ -14,9 +14,21 @@ Every push to `main` builds a fresh APK.
 
 All builds are listed on the [latest-build release page](https://github.com/Asmogius/helriders-game/releases/tag/latest-build). The build number appears in the top-right corner of the game, next to the FPS counter.
 
-## Current state: Phase 2 prototype
+## Current state: Phase 3 prototype
 
-The game opens in the **Garage**. Build your rig, tap **DEPLOY**, run one "Clear" mission in an Outer Blocks city block (40 shamblers, one Hunter, one enemy rig), and come back to the Garage with what you extracted. Progress is saved on the phone.
+The day loop works: open **COMMS**, take one of today's jobs, tune your rig in the **Garage**, tap **DEPLOY**, and come back with what you extracted. One job per day. Progress is saved on the phone.
+
+### Comms
+
+- Three jobs a day, each with a type, threat (1 to 3), what's in the block, and its pay. Tap a card, then **TAKE JOB**. The board stays the same all day and changes when the day ends.
+- Job types:
+  - **Clear:** kill every shambler, Hunter and Outrider on the list (threat 1: 30 shamblers and a Hunter; threat 3: 50 shamblers, 2 Hunters, 2 Outriders).
+  - **Survive:** hold out for 2:00 to 3:00 while the crowd grows; Hunters and Outriders arrive on a schedule.
+  - **Hunt:** a named Elite Outrider (gold stripe, 1.6x to 2.5x armor). Wreck it and grab the schematic it always drops.
+  - **Courier:** 5 to 7 checkpoints in order. Gold, silver and bronze par times pay 100%, 75% and 50%; late pays 25%.
+- Every job ends the day: success, wreck, or closing the app mid-run (that costs the day, nothing else).
+- **Districts** along the bottom fill with your parts score (extracted schematics: Uncommon 2, Rare 4). Midtown opens at 40.
+- **Comms upgrades:** Wider Net (a 4th and 5th job), Better Leads (+15% pay per level).
 
 ### Garage
 
@@ -36,10 +48,10 @@ The game opens in the **Garage**. Build your rig, tap **DEPLOY**, run one "Clear
 - **Lock comes from a part.** The Targeting Computer schematic sits in one of the chassis's internal slots, and the weapon has to support lock (the turret does, fixed guns don't). Without both, there's no LOCK button.
 - **Power** works like Armored Core's energy load. Every installed part draws power all the time, against the engine's output. The thin bar under armor shows the total. The starter rig sits at exactly 100/100, and the Targeting Computer is 25 of that, so lock is a build decision. Pull the computer to free 25 power for something else. Go over budget and the rig is overloaded: acceleration and top speed drop until the build fits again. Switching lock on or off costs nothing extra.
 - **Ramming:** fast hits kill shamblers and Hunters. Slow pushes get you clogged in the crowd.
-- **Hunter:** shows up 25 seconds in (or after 10 kills). It pulses red before it leaps. If it latches on, it chews armor until you crush it into a wall, scrape it along one, or shoot it.
-- **Outrider:** a fast enemy rig with forward guns. It arrives 45 seconds in (or after 20 kills) and makes strafing passes. Wreck it and it drops a schematic you don't own yet, or a scrap cache once you have them all. Drive over the crate to grab it.
+- **Hunter:** it pulses red before it leaps. If it latches on, it chews armor until you crush it into a wall, scrape it along one, or shoot it.
+- **Outrider:** a fast enemy rig with forward guns that makes strafing passes. Wreck it and it drops a schematic you don't own yet, or a scrap cache once you have them all. Drive over the crate to grab it.
 - Edge arrows point at off-screen threats: red for the Outrider, rust for the Hunter, cyan for salvage, orange for the last few shamblers.
-- Clearing the block banks the run's scrap and schematics. A wreck loses them.
+- Success banks the run's kill scrap, the job's pay and any schematics. A wreck loses them.
 
 Shamblers spawn in packs from off-screen, path around buildings, block the rig, and chip armor on contact. Parking gets you swarmed. Keep moving.
 
@@ -50,7 +62,7 @@ Shamblers spawn in packs from off-screen, path around buildings, block the rig, 
 | Engine | Godot 4.7.2, GDScript |
 | Renderer | Compatibility (OpenGL ES 3) for 2020-era Android phones |
 | Target | Stable 30 fps on 3–4 GB Android phones, 60 fps mid-range |
-| Build | GitHub Actions: import, smoke test, garage test, debug APK, publish |
+| Build | GitHub Actions: import, three headless tests, debug APK, publish |
 
 Performance choices so far:
 
@@ -69,9 +81,11 @@ scenes/garage.tscn      start screen (runs scripts/garage.gd)
 scenes/mission.tscn     the mission (runs scripts/mission.gd)
 scripts/
   garage.gd             Garage: slots, part cards, stat sheet, presets, upgrades
+  comms.gd              Comms: job board, districts, Comms upgrades
+  missions.gd           daily board and per-job setup (types, threat, pay)
   profile.gd            save game (autoload "Profile"): scrap, schematics, rig, economy rules
   ui_theme.gd           shared menu look
-  mission.gd            builds and runs the mission
+  mission.gd            builds and runs any job type
   tuning.gd             all balance numbers, colors, collision layers
   vehicle.gd            any rig: drift handling, weapons, lock-on, ramming, armor
   enemy_rig.gd          Outrider AI (extends vehicle.gd)
@@ -92,6 +106,7 @@ scripts/
   thumb_stick.gd        floating touch joystick
 tests/smoke_test.gd     headless mission test, run in CI
 tests/garage_test.gd    headless Garage and economy test, run in CI
+tests/missions_test.gd  headless board, districts and mission-type test, run in CI
 .github/workflows/      Android build
 ci/debug.keystore       debug-only signing key (see below)
 ```
@@ -102,6 +117,7 @@ ci/debug.keystore       debug-only signing key (see below)
 godot --headless --path . --import
 godot --headless --fixed-fps 60 --path . -s res://tests/smoke_test.gd
 godot --headless --fixed-fps 60 --path . -s res://tests/garage_test.gd
+godot --headless --fixed-fps 60 --path . -s res://tests/missions_test.gd
 godot --path .   # play on desktop; mouse acts as a single touch
 ```
 
@@ -122,7 +138,7 @@ From DESIGN §13:
 - [x] One enemy vehicle (Outrider) that drops a part
 - [x] Parts, slots and an Armored Core-style power budget (lock needs the Targeting Computer)
 - [x] Garage screen: swap parts between runs, presets, upgrades, saved progress
-- [ ] Comms screen: pick the mission
+- [x] Comms screen: daily job board with Clear, Survive, Hunt and Courier; districts
 - [ ] Driver + Gunner crew with passive and triggered abilities
 - [ ] Pixel-voxel art pipeline (voxel models rendered to sprite sheets)
 - [ ] Pause menu with Low / Medium / High / Ultra presets

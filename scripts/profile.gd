@@ -19,6 +19,7 @@ signal changed
 const T := preload("res://scripts/tuning.gd")
 const Parts := preload("res://scripts/parts.gd")
 const Loadout := preload("res://scripts/loadout.gd")
+const Missions := preload("res://scripts/missions.gd")
 
 const SAVE_VERSION := 1
 const SINGLE_SLOTS := ["chassis", "engine", "drive", "armor"]
@@ -33,8 +34,12 @@ var storage := {}                   # part id -> number of built spares
 var rig := {}                       # the loadout in the garage (may be incomplete)
 var plan := {}                      # the last complete rig, for one-tap rebuild
 var presets: Array = []             # loadout dictionaries or null
-var upgrades := {"fabrication": 0, "loot": 0, "salvage": 0}
+var upgrades := {"fabrication": 0, "loot": 0, "salvage": 0, "choices": 0, "quality": 0}
 var record := {"runs": 0, "clears": 0, "wrecks": 0}
+var day := 1
+var board: Array = []               # today's missions on the Comms board
+var active_mission := {}            # the one you took; DEPLOY runs it
+var run_active := false             # a mission is under way (saved, so a quit counts)
 var notice := ""                    # one-time message for the garage to show
 var _ready_state := false           # set once a game is loaded or started
 
@@ -43,6 +48,11 @@ func _ready() -> void:
 	# Tests may have started a game before the autoload is ready; keep it.
 	if not _ready_state and not load_game():
 		new_game()
+	# The app was closed during a mission: the crew pulled out. No loot, no
+	# penalty, rig intact, but the day is gone.
+	if run_active:
+		notice = "You pulled out of yesterday's job. No loot, no penalty, and the day passed."
+		finish_day()
 
 
 func new_game() -> void:
@@ -57,9 +67,13 @@ func new_game() -> void:
 	plan = rig.duplicate(true)
 	presets = []
 	presets.resize(T.PRESET_COUNT)
-	upgrades = {"fabrication": 0, "loot": 0, "salvage": 0}
+	upgrades = {"fabrication": 0, "loot": 0, "salvage": 0, "choices": 0, "quality": 0}
 	record = {"runs": 0, "clears": 0, "wrecks": 0}
 	notice = ""
+	day = 1
+	active_mission = {}
+	run_active = false
+	board = Missions.make_board(day, board_size(), 0)
 	save_game()
 
 
@@ -235,7 +249,58 @@ func apply_loadout(target: Dictionary) -> bool:
 
 func start_run() -> void:
 	record.runs = int(record.runs) + 1
+	run_active = true
 	save_game()
+
+
+# --- Days, the board, districts --------------------------------------------------
+
+func board_size() -> int:
+	return T.BOARD_SIZE + int(upgrades.get("choices", 0))
+
+
+func ensure_board() -> void:
+	if board.size() != board_size():
+		board = Missions.make_board(day, board_size(), int(upgrades.get("quality", 0)))
+
+
+func choose_mission(index: int) -> void:
+	ensure_board()
+	if index < 0 or index >= board.size():
+		return
+	active_mission = (board[index] as Dictionary).duplicate(true)
+	save_game()
+	changed.emit()
+
+
+func has_mission() -> bool:
+	return not active_mission.is_empty()
+
+
+## A mission ended (cleared, wrecked or abandoned): one day per mission.
+func finish_day() -> void:
+	run_active = false
+	day += 1
+	active_mission = {}
+	board = Missions.make_board(day, board_size(), int(upgrades.get("quality", 0)))
+	save_game()
+	changed.emit()
+
+
+## DESIGN §7: extracted parts only (starter schematics don't count),
+## rarity points x level. Every schematic is level 1 until Research.
+func district_score() -> int:
+	var starter := parts_in(Parts.STARTER_LOADOUT)
+	var score := 0
+	for id in schematics:
+		if starter.has(id):
+			continue
+		score += int(T.RARITY_POINTS.get(str(Parts.get_part(id).get("rarity", "")), 0))
+	return score
+
+
+func is_district_open(index: int) -> bool:
+	return district_score() >= int(T.DISTRICTS[index].need)
 
 
 ## Extracted: bank the run's scrap and schematics. Returns a report for the
@@ -286,6 +351,9 @@ func buy_upgrade(key: String) -> bool:
 		return false
 	scrap -= cost
 	upgrades[key] = upgrade_level(key) + 1
+	if key == "choices" or key == "quality":
+		# Same seed, so today's missions stay; more of them, or better paid.
+		board = Missions.make_board(day, board_size(), int(upgrades.quality))
 	save_game()
 	changed.emit()
 	return true
@@ -327,6 +395,10 @@ func save_game() -> void:
 		"upgrades": upgrades,
 		"record": record,
 		"notice": notice,
+		"day": day,
+		"board": board,
+		"active_mission": active_mission,
+		"run_active": run_active,
 	}
 	var file := FileAccess.open(save_path, FileAccess.WRITE)
 	if file == null:
@@ -369,7 +441,34 @@ func load_game() -> bool:
 	for key: String in record:
 		record[key] = int(saved_record.get(key, 0))
 	notice = str(data.get("notice", ""))
+	day = maxi(1, int(data.get("day", 1)))
+	board = []
+	for m: Variant in data.get("board", []):
+		var clean := _clean_mission(m)
+		if not clean.is_empty():
+			board.append(clean)
+	active_mission = _clean_mission(data.get("active_mission", {}))
+	run_active = bool(data.get("run_active", false))
+	ensure_board()
 	return true
+
+
+## JSON turns ints into floats; put a mission back in shape, or {} if unusable.
+static func _clean_mission(raw: Variant) -> Dictionary:
+	if not raw is Dictionary:
+		return {}
+	var d: Dictionary = raw
+	var type := str(d.get("type", ""))
+	if not T.MISSIONS.has(type):
+		return {}
+	return {
+		"id": str(d.get("id", "")),
+		"type": type,
+		"threat": clampi(int(d.get("threat", 1)), 1, 3),
+		"name": str(d.get("name", "")),
+		"seed": int(d.get("seed", 1)),
+		"reward": int(d.get("reward", 0)),
+	}
 
 
 ## JSON gives back untyped data; rebuild a loadout with only known part ids.

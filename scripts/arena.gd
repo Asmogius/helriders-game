@@ -39,6 +39,15 @@ const PROPS := [
 const ROADS_H := [Vector2(620, 820), Vector2(1600, 1800)]
 const ROADS_V := [Vector2(640, 860), Vector2(2120, 2360)]
 
+# Courier checkpoints: open road and lots, clear of buildings and props.
+const CHECKPOINTS := [
+	Vector2(150, 720), Vector2(750, 720), Vector2(1450, 720), Vector2(2240, 720), Vector2(3050, 720),
+	Vector2(150, 1700), Vector2(750, 1700), Vector2(1550, 1700), Vector2(2240, 1700), Vector2(3050, 1700),
+	Vector2(750, 170), Vector2(750, 1400), Vector2(750, 2260),
+	Vector2(2240, 170), Vector2(2240, 1250), Vector2(2240, 2260),
+	Vector2(1350, 1250), Vector2(1950, 1150),
+]
+
 var spawn_points: Array[Vector2] = [
 	Vector2(60, 720), Vector2(60, 1700), Vector2(3140, 720), Vector2(3140, 1700),
 	Vector2(750, 60), Vector2(820, 2340), Vector2(2240, 60), Vector2(2240, 2340),

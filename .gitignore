@@ -13,4 +13,5 @@ build/
 import.log
 smoke.log
 garage.log
+missions.log
 export.log

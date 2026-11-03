@@ -92,6 +92,13 @@ jobs:
             echo "::error::Script errors during garage test"; exit 1
           fi
 
+      - name: Comms and mission types test
+        run: |
+          godot --headless --fixed-fps 60 --path . -s res://tests/missions_test.gd 2>&1 | tee missions.log
+          if grep -q "SCRIPT ERROR" missions.log; then
+            echo "::error::Script errors during missions test"; exit 1
+          fi
+
       - name: Configure Android export
         run: |
           SETTINGS=$(ls ~/.config/godot/editor_settings-*.tres 2>/dev/null | head -n 1)

@@ -11,7 +11,11 @@ const NavGrid := preload("res://scripts/nav_grid.gd")
 var target: Node2D
 var nav: NavGrid
 var spawn_points: Array[Vector2] = []
-var spawn_budget := T.CLEAR_SHAMBLERS
+var spawn_budget := T.CLEAR_SHAMBLERS   # shamblers left to spawn this mission
+# Crowd shape; the mission sets these before the director enters the tree.
+var cap := T.ZOMBIE_CAP                  # most alive at once (pool size)
+var start_count := T.ZOMBIE_START        # alive at the start
+var ramp_seconds := T.ZOMBIE_RAMP_SECONDS  # +1 allowed alive every N seconds
 
 var _pool: Array[Zombie] = []
 var _active: Array[Zombie] = []
@@ -20,13 +24,14 @@ var _spawn_timer := 0.0
 
 
 func _ready() -> void:
-	for i in T.ZOMBIE_CAP:
+	for i in cap:
 		var zombie := Zombie.new()
 		add_child(zombie)
 		zombie.died.connect(_on_zombie_died.bind(zombie))
 		_pool.append(zombie)
-	while _active.size() < T.ZOMBIE_START and spawn_budget > 0:
-		_spawn_pack(T.ZOMBIE_START)
+	var opening := mini(start_count, cap)
+	while _active.size() < opening and spawn_budget > 0:
+		_spawn_pack(opening)
 
 
 func active_count() -> int:
@@ -59,7 +64,7 @@ func clear_all() -> void:
 func _physics_process(delta: float) -> void:
 	_elapsed += delta
 	_spawn_timer -= delta
-	var allowed := mini(T.ZOMBIE_CAP, T.ZOMBIE_START + int(_elapsed / T.ZOMBIE_RAMP_SECONDS))
+	var allowed := mini(cap, start_count + int(_elapsed / ramp_seconds))
 	if _spawn_timer <= 0.0 and _active.size() < allowed and spawn_budget > 0:
 		_spawn_timer = 2.5
 		_spawn_pack(allowed)

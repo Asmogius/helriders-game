@@ -13,6 +13,8 @@ const Loadout := preload("res://scripts/loadout.gd")
 const Vehicle := preload("res://scripts/vehicle.gd")
 const UI := preload("res://scripts/ui_theme.gd")
 const ProfileScript := preload("res://scripts/profile.gd")
+const Comms := preload("res://scripts/comms.gd")
+const Missions := preload("res://scripts/missions.gd")
 const MISSION_SCENE := "res://scenes/mission.tscn"
 
 # Slot tags: the loadout slot, where its line points on the rig (rig-local
@@ -69,6 +71,8 @@ var _cards: HBoxContainer
 var _sheet_scroll: ScrollContainer
 var _overlay: Control
 var _tab_buttons: Array[Button] = []
+var _comms: Comms
+var _job: Label
 
 
 func _ready() -> void:
@@ -88,6 +92,14 @@ func _ready() -> void:
 	_build_tags()
 	_build_sheet()
 	_build_footer()
+
+	_comms = Comms.new()
+	_comms.anchor_right = 1.0
+	_comms.anchor_bottom = 1.0
+	_comms.offset_bottom = -FOOTER_H
+	_comms.visible = false
+	_comms.job_taken.connect(_on_job_taken)
+	add_child(_comms)
 
 	_toast = UI.label("", 22, T.COL_ORANGE)
 	_toast.anchor_right = 1.0
@@ -137,6 +149,7 @@ func close_sheet() -> void:
 func _show_stat_sheet(on: bool) -> void:
 	_stat_sheet.visible = on
 	_hint.visible = not on
+	_job.visible = not on
 	_power_meter.visible = not on and profile.has_rig()
 	_no_rig.visible = not on and not profile.has_rig()
 	_rig_holder.visible = not on
@@ -196,9 +209,26 @@ func rebuild() -> bool:
 	return true
 
 
+## Launch today's job. No job yet: off to Comms to pick one.
 func deploy() -> void:
-	if profile.has_rig():
-		get_tree().change_scene_to_file(MISSION_SCENE)
+	if not profile.has_rig():
+		return
+	if not profile.has_mission():
+		show_tab("COMMS")
+		toast("Take a job in Comms first")
+		return
+	get_tree().change_scene_to_file(MISSION_SCENE)
+
+
+## Switch station: GARAGE, COMMS, or a placeholder for the others.
+func show_tab(tab_name: String) -> void:
+	_on_tab(tab_name)
+
+
+func _on_job_taken() -> void:
+	show_tab("GARAGE")
+	var m := profile.active_mission
+	toast("Job taken: %s - %s. Tune your rig, then DEPLOY." % [Missions.label(m), str(m.name)], 3.5)
 
 
 func rotate_rig(amount: float) -> void:
@@ -289,6 +319,14 @@ func _build_rig_area() -> void:
 	_stat_sheet.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_stat_sheet.visible = false
 	add_child(_stat_sheet)
+
+	_job = UI.label("", 20, T.COL_ORANGE)
+	_job.anchor_right = 1.0
+	_job.anchor_top = 1.0
+	_job.anchor_bottom = 1.0
+	_job.offset_top = -(FOOTER_H + 82.0)
+	_job.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	add_child(_job)
 
 	_hint = UI.label("Tap a slot to change parts.  Drag the rig to turn it.", 18, UI.TEXT_DIM)
 	_hint.anchor_right = 1.0
@@ -445,7 +483,13 @@ func _layout() -> void:
 # --- Refresh ---------------------------------------------------------------------
 
 func _refresh() -> void:
-	_scrap_label.text = "SCRAP  %d" % profile.scrap
+	_scrap_label.text = "SCRAP  %d     DAY %d" % [profile.scrap, profile.day]
+	if profile.has_mission():
+		var m := profile.active_mission
+		_job.text = "JOB:  %s  -  %s     THREAT %d     PAYS %d" % [Missions.label(m), str(m.name), int(m.threat), int(m.reward)]
+	else:
+		_job.text = "No job taken. Open COMMS to pick today's job."
+	_job.visible = selected < 0
 	var has_rig := profile.has_rig()
 	var shown: Dictionary = profile.rig
 	var any_part := not profile.parts_in(profile.rig).is_empty()
@@ -804,8 +848,16 @@ func _upgrade_effect(key: String) -> String:
 
 
 func _on_tab(tab_name: String) -> void:
+	_comms.visible = tab_name == "COMMS"
 	if tab_name == "GARAGE":
 		_close_overlay()
+		return
+	if tab_name == "COMMS":
+		_close_overlay()
+		close_sheet()
+		_comms.selected = -1
+		_comms.refresh()
+		_highlight_tab("COMMS")
 		return
 	var body := VBoxContainer.new()
 	body.add_child(UI.label(COMING_SOON[tab_name], 22, UI.TEXT))

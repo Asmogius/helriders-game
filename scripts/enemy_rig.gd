@@ -12,6 +12,7 @@ const FIRE_CONE := 0.22      # radians off the nose it will still shoot at
 
 var player: Node2D            # the player's rig
 var mode := Mode.ATTACK
+var elite_name := ""         # set on a Hunt target; empty for a regular Outrider
 
 var _mode_time := 0.0
 var _side := 1.0
@@ -26,6 +27,24 @@ func _init() -> void:
 	body_len = 68.0
 	body_wid = 30.0
 	lock_priority = 3
+
+
+## Turn this rig into a named Hunt target: tougher, harder-hitting, gold-marked,
+## and first in line for the player's lock after a Hunter on the hull.
+func make_elite(title: String, armor_mult: float, damage_mult: float) -> void:
+	var s: Dictionary = T.OUTRIDER.duplicate()
+	s.armor = float(s.armor) * armor_mult
+	s.bullet_damage = float(s.bullet_damage) * damage_mult
+	apply_stats(s)
+	elite_name = title
+	lock_priority = 4
+	lock_radius = 46.0
+	body_len = 74.0
+	body_wid = 32.0
+
+
+func is_elite() -> bool:
+	return elite_name != ""
 
 
 func _physics_process(delta: float) -> void:
@@ -139,6 +158,10 @@ func _draw() -> void:
 	draw_rect(Rect2(-half_l + 4.0, -half_w + 3.0, body_len - 22.0, 2.0), T.COL_ENEMY)
 	draw_rect(Rect2(-half_l + 4.0, half_w - 5.0, body_len - 22.0, 2.0), T.COL_ENEMY)
 	draw_rect(Rect2(-half_l - 1.0, -4.0, 3.0, 8.0), T.COL_ENEMY)
+	# A Hunt target wears gold: a stripe down the spine and a nose chevron.
+	if is_elite():
+		draw_rect(Rect2(-half_l + 2.0, -2.0, body_len - 14.0, 4.0), T.COL_ELITE)
+		draw_colored_polygon(PackedVector2Array([Vector2(half_l - 22.0, -6.0), Vector2(half_l - 12.0, 0.0), Vector2(half_l - 22.0, 6.0)]), T.COL_ELITE)
 	# Spikes along the flanks.
 	for i in 3:
 		var x := -half_l + 14.0 + i * 14.0

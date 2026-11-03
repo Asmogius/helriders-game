@@ -126,6 +126,11 @@ func set_status(kills: int, target: int, scrap: int) -> void:
 	_status.text = "CLEAR  %d / %d      SCRAP  %d" % [kills, target, scrap]
 
 
+## The objective line under the bars; each mission type writes its own.
+func set_status_text(text: String) -> void:
+	_status.text = text
+
+
 ## Screen-space positions (and colors) of threats to point at when off-screen.
 func set_threats(points: PackedVector2Array, colors: PackedColorArray) -> void:
 	_arrows.set_points(points, colors)

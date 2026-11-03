@@ -36,6 +36,8 @@ The owner works from a phone and has no computer, so nobody opens the Godot edit
 - Enemy rigs extend `vehicle.gd` and only decide stick inputs (`drive_input`, `fire_trigger`), the way `enemy_rig.gd` does. They share the player's driving model, so builds feel the same on both sides.
 - Bullets carry a team (`bullet_pool.gd`). Each team's ray mask decides what it can hit, so nobody shoots their own side.
 - New mission-level enemies get a `spawn_*` function in `mission.gd` that tests can call directly (`auto_spawn_specials = false`).
+- Mission types and their threat tables live in `tuning.gd` (`MISSIONS`); `missions.gd` builds the daily board; `mission.gd` runs any type. Tests set `mission_override` to run a specific mission.
+- Schematic drop pools by source are `Parts.DROP_POOLS`. Drops never repeat a schematic the player owns.
 
 ## Verify before pushing
 
@@ -43,6 +45,7 @@ The owner works from a phone and has no computer, so nobody opens the Godot edit
 godot --headless --path . --import                  # must print no "SCRIPT ERROR"
 godot --headless --fixed-fps 60 --path . -s res://tests/smoke_test.gd   # must end "SMOKE TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/garage_test.gd  # must end "GARAGE TEST PASSED"
+godot --headless --fixed-fps 60 --path . -s res://tests/missions_test.gd # must end "MISSIONS TEST PASSED"
 ```
 
 - Tests must call `Profile.new_game()` with `persist = false` first, so they never touch a real save.
