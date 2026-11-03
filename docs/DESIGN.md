@@ -285,3 +285,29 @@ Spiked Ram Plate is renamed Zed Sled (code rename pending). Unlock levels: Minor
 | Burst Turret (Uncommon) | Tight Grouping: 25% tighter spread per BURST | Live Tip: last round of each BURST deals shock | - |
 | Heavy MG Turret (Rare) | Spin-Up: fire rate climbs to +20% over 3 s | Suppression: rig under fire 2 s drives 20% slower, turret turns half as fast | Tracer Belt: every 5th round is incendiary |
 | Advanced Targeting Computer (Rare) | Fast Solve: LOCK range +10% | Priority Override: LOCK takes MARKED and STUNNED first | Weak Point Solver: locked turrets aim at exposed sides or rear, +20% damage |
+
+## Defense Layers: Shield, Directional Armor, HP
+
+Replaces the single armor pool (§4 Armor Sections, §8 Bulwark front rule).
+
+- Three layers for player and enemy rigs: shield (recharges) -> armor (directional, never regenerates) -> HP (structure; zero = wreck).
+- HP comes from the chassis, plus some parts that raise max HP (e.g., Structural Bracing).
+- Three armor slots: Front, Sides (one part covers both flanks), Rear. Any armor part fits any slot except front-only ram plates (Zed Sled). All count against weight.
+- Hit facing: four 90-degree arcs (front, left, right, rear). A hit drains that arc's armor; a stripped facing passes hits to HP. Status buildup ignores facing.
+- Explosions: full damage to the nearest facing plus 25% to each adjacent facing. Splash never reduces HP while any armor remains; HP takes damage only from direct hits on a stripped facing, or from splash once all armor is gone.
+- Repairs restore armor only, most damaged facing first. HP restores only between missions (rare part/perk exceptions later).
+- Enemy rigs use the same model. The Bulwark's half-damage front becomes a very heavy front plate.
+- HUD: a small top-down rig icon. Plates show each facing's armor, a ring shows the shield, the central body block drains as HP drops. Buildup bars beside it, only while building.
+
+## Ammo Models
+
+- Each weapon uses a magazine (fire until empty, then reload) or heat (firing fills a bar; at max it overheats and locks until the bar drains to empty). Assignment per weapon: to decide.
+
+## Crew Perks: First Draft
+
+| Specialty | Minor | Minor | Major | Major | Signature | Signature |
+|---|---|---|---|---|---|---|
+| Wheelman (Hard Line) | Long Line: +20% duration | Sure Footing: SLICK builds 50% slower during it | Clean Exit: ending a DRIFT during it takes 1 s off cooldown | Threading: shamblers brushed aside without slowing you | Immovable Line: no shoves from Tank or Bulwark during it | Racing Line: each near-miss shot extends it 0.5 s |
+| Speedster (Floor It) | Deep Tank: +20% duration | Quick Fuse: -15% cooldown | Battering Speed: RAMs +30% during it | Open Road: above 80% top speed, restore 1% max armor/s | Afterburn: burning trail (fire, BURNING, ignites oil) | Clean Run: no damage taken -> half cooldown refunded |
+| Bootlegger (Bootleg Turn) | Tight Swing: -15% cooldown | Shake Off: throws off a latched Hunter | Tail Swipe: rear counts as a RAM while swinging | About Face: fixed guns +25% for 2 s after | Double Back: 2 charges | Oil Spin: enemy-only oil ring |
+| Gunslinger (Overcharge) | Hot Barrels: +1 s | Quick Draw: -15% cooldown | Bottomless: no ammo use or heat during it | Red Hot: shots also deal fire, build BURNING | Siphon: 10% of damage refills shield | Full Auto: turrets turn 2x fast, no spread |
