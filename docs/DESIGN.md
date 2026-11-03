@@ -426,3 +426,17 @@ Status bars: always 100 points. Resistance 0-100; buildup taken = hit buildup x 
 | TOXIC | 8 s | 4/s to HP, floor 10%, shield blocks | 4/s |
 | SLICK | 3 s | Grip 35% | Slowed |
 | GOOPED | 6 s | Zombies within 500 px rush at +60% | Frenzied |
+
+Enemy rigs (same total toughness as today). Shields from 4 skulls: Gunner Rigs carry 30. Hunt Elite 1.6-2.5x applies to every layer.
+
+| Rig | HP | Front | Each side | Rear | Shock | Fire | Acid | Toxic | Slime | Goop |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Outrider | 100 | 40 | 40 | 40 | 45 | 50 | 50 | 50 | 35 | 50 |
+| Gunner Rig | 120 | 60 | 55 | 55 | 35 | 55 | 50 | 50 | 55 | 50 |
+| Bulwark | 180 | 180 | 55 | 50 | 60 | 60 | 35 | 55 | 70 | 50 |
+| Scrapper | 90 | 35 | 35 | 35 | 50 | 30 | 50 | 50 | 90 | 50 |
+| Patcher | 80 | 30 | 30 | 30 | 35 | 50 | 50 | 40 | 50 | 50 |
+
+Patcher: speed 540; cable 400 px; repairs 12 armor/s to the ally's most damaged facing; hook range 450 px; re-hook 3 s; revive 4 s to 10% HP; 35 scrap. Never repairs itself (self-repair reserved for possible stronger enemies).
+
+Scrapper: speed 580; one hazard every 3 s, alternating oil and spikes; max 6 active (oldest vanish first); oil 90 px wide, 12 s; spike strip 120 px long, 15 s, crossing rigs -30% speed for 3 s; 25 scrap.
