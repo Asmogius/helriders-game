@@ -7,9 +7,13 @@ config_version=5
 
 config/name="Helriders"
 config/version="0.1.0-dev"
-run/main_scene="res://scenes/main.tscn"
+run/main_scene="res://scenes/garage.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.svg"
+
+[autoload]
+
+Profile="*res://scripts/profile.gd"
 
 [display]
 

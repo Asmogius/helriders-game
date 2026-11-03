@@ -7,7 +7,7 @@ extends SceneTree
 ## Run:  godot --headless --fixed-fps 60 --path . -s res://tests/smoke_test.gd
 ## Exit code 0 = pass, 1 = fail. CI also fails on any "SCRIPT ERROR" output.
 
-const Main := preload("res://scripts/main.gd")
+const Main := preload("res://scripts/mission.gd")
 const Hunter := preload("res://scripts/hunter.gd")
 const Vehicle := preload("res://scripts/vehicle.gd")
 const Parts := preload("res://scripts/parts.gd")
@@ -30,9 +30,14 @@ var free_run := 0.0
 
 
 func _initialize() -> void:
-	var scene: PackedScene = load("res://scenes/main.tscn")
+	# Fresh in-memory profile: never touch a real save file.
+	var profile: Node = root.get_node("Profile")
+	profile.set("persist", false)
+	profile.call("new_game")
+	var scene: PackedScene = load("res://scenes/mission.tscn")
 	main = scene.instantiate() as Main
 	main.auto_spawn_specials = false  # this test places the Hunter and Outrider
+	main.always_drop_schematic = true
 	root.add_child(main)
 
 
@@ -140,7 +145,7 @@ func _process(_delta: float) -> bool:
 		if main.pickups.get_child_count() > 0:
 			rig.global_position = (main.pickups.get_child(0) as Node2D).global_position
 	if frame == 2215:
-		_check(main.salvage.size() == 1, "driving over salvage collects it")
+		_check(main.salvage.size() == 1, "driving over a schematic collects it")
 
 	# --- Overload is felt: same straight run as the start, over-budget build ---------
 	if frame == 2220:
@@ -165,6 +170,9 @@ func _process(_delta: float) -> bool:
 	if frame == 2490:
 		_check(main.hud.is_result_visible(), "results card shown")
 		_check(main.hud.result_text().contains("Salvage lost"), "results card reports lost salvage")
+		var profile: Node = root.get_node("Profile")
+		_check(not profile.call("has_rig"), "the wreck destroyed the rig")
+		_check(main.hud.result_text().contains("Wreck penalty"), "results card shows the wreck penalty")
 		var cost_ms := (Time.get_ticks_usec() - started_usec) / 1000.0 / (frame - 30)
 		print("  avg CPU cost %.2f ms/frame (headless, no rendering, this machine)" % cost_ms)
 		_finish()

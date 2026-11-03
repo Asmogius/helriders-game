@@ -1,11 +1,13 @@
 extends Node2D
-## Prototype "Clear" mission in the Outer Blocks: drive, shoot, ram. Clear 40
-## shamblers, the Hunter that shows up partway in, and the Outrider rig that
-## comes looking for you; grab the part it drops. Or get wrecked.
+## "Clear" mission in the Outer Blocks: drive, shoot, ram. Clear 40 shamblers,
+## the Hunter that shows up partway in, and the Outrider rig that comes looking
+## for you; grab what it drops. Clearing banks the run's scrap and schematics
+## into the profile. A wreck destroys the rig and loses the run's loot.
 ## Builds the whole scene in code (see AGENTS.md).
 
 const T := preload("res://scripts/tuning.gd")
 const Parts := preload("res://scripts/parts.gd")
+const Loadout := preload("res://scripts/loadout.gd")
 const Arena := preload("res://scripts/arena.gd")
 const Splats := preload("res://scripts/splats.gd")
 const ZombieDirector := preload("res://scripts/zombie_director.gd")
@@ -19,11 +21,15 @@ const LockReticle := preload("res://scripts/lock_reticle.gd")
 const ChaseCamera := preload("res://scripts/chase_camera.gd")
 const Hud := preload("res://scripts/hud.gd")
 const NavGrid := preload("res://scripts/nav_grid.gd")
+const ProfileScript := preload("res://scripts/profile.gd")
+const GARAGE_SCENE := "res://scenes/garage.tscn"
 
 enum State { RUNNING, WRECKED, CLEARED }
 
 ## Off for tests that want to place the Hunter and Outrider themselves.
 var auto_spawn_specials := true
+## Tests: make every Outrider drop a schematic instead of rolling for it.
+var always_drop_schematic := false
 
 var arena: Arena
 var splats: Splats
@@ -40,16 +46,19 @@ var camera: ChaseCamera
 var hud: Hud
 
 var state := State.RUNNING
+var profile: ProfileScript          # the /root/Profile autoload
 var kills := 0
-var scrap := 0
+var scrap := 0.0                 # this run's scrap; only banked if you clear
 var elapsed := 0.0
 var salvage: Array[Dictionary] = []
+var bank_report := {}
 
 var _hunter_spawned := false
 var _outrider_spawned := false
 
 
 func _ready() -> void:
+	profile = get_node("/root/Profile")
 	arena = Arena.new()
 	splats = Splats.new()
 	splats.z_index = -5
@@ -66,6 +75,11 @@ func _ready() -> void:
 	reticle = LockReticle.new()
 	camera = ChaseCamera.new()
 	hud = Hud.new()
+
+	# The rig from the garage. Tests (or a missing rig) fall back to the starter.
+	var loadout: Dictionary = profile.rig if profile.has_rig() else Parts.STARTER_LOADOUT
+	vehicle.apply_stats(Loadout.build(loadout))
+	profile.start_run()
 
 	# Wire references before adding to the tree so every _ready() sees them.
 	vehicle.position = Arena.PLAYER_START
@@ -103,7 +117,7 @@ func _ready() -> void:
 	hunter.latched_on.connect(func() -> void: hud.set_alert("HUNTER ON THE HULL  -  SCRAPE IT ON A WALL"))
 	hunter.let_go.connect(func() -> void: hud.set_alert(""))
 	outrider.wrecked.connect(_on_outrider_wrecked)
-	hud.restart_requested.connect(restart)
+	hud.restart_requested.connect(return_to_garage)
 	hud.lock_toggled.connect(func(on: bool) -> void: vehicle.lock_enabled = on)
 	hud.set_lock_available(vehicle.can_lock())
 	_refresh_hud()
@@ -129,8 +143,8 @@ func _process(_delta: float) -> void:
 	_refresh_hud()
 
 
-func restart() -> void:
-	get_tree().reload_current_scene()
+func return_to_garage() -> void:
+	get_tree().change_scene_to_file(GARAGE_SCENE)
 
 
 func _exit_tree() -> void:
@@ -169,7 +183,7 @@ func lock_candidates() -> Array[Node2D]:
 func _refresh_hud() -> void:
 	hud.set_armor(vehicle.armor / vehicle.armor_max)
 	hud.set_power(vehicle.power_load(), vehicle.power_output)
-	hud.set_status(kills, T.CLEAR_TARGET, scrap)
+	hud.set_status(kills, T.CLEAR_TARGET, int(scrap))
 	hud.set_lock_state(vehicle.lock_enabled, vehicle.lock_target != null)
 	# Edge arrows: the Hunter and enemy rigs always, the last few shamblers too.
 	var points := PackedVector2Array()
@@ -195,7 +209,7 @@ func _refresh_hud() -> void:
 
 func _add_kill(points: int) -> void:
 	kills += 1
-	scrap += points
+	scrap += points * profile.salvage_mult()
 	if state == State.RUNNING and kills >= T.CLEAR_TARGET:
 		_on_cleared()
 
@@ -218,7 +232,16 @@ func _on_hunter_died(at: Vector2) -> void:
 func _on_outrider_wrecked() -> void:
 	camera.shake(0.6)
 	var pickup := Pickup.new()
-	pickup.part = Parts.get_part(Parts.OUTRIDER_DROPS.pick_random())
+	# Loot quality raises the odds of a schematic over a plain scrap cache.
+	# Only schematics you don't own yet drop; once you have them all, scrap.
+	var pending: Array[String] = []
+	for part in salvage:
+		pending.append(str(part.id))
+	var unknown := profile.unknown_schematics(Parts.OUTRIDER_DROPS, pending)
+	if not unknown.is_empty() and (always_drop_schematic or randf() < profile.schematic_chance()):
+		pickup.part = Parts.get_part(unknown.pick_random())
+	else:
+		pickup.scrap_value = T.SCRAP_CACHE
 	# Drop it beside the burning wreck, toward the player.
 	var away := (vehicle.global_position - outrider.global_position).normalized()
 	pickup.position = outrider.global_position + away * 70.0
@@ -235,8 +258,12 @@ func _collect_pickups() -> void:
 
 
 func _take_salvage(pickup: Pickup) -> void:
-	salvage.append(pickup.part)
-	hud.banner("SALVAGED: " + Parts.describe(pickup.part).to_upper(), Parts.color_of(pickup.part), 3.0)
+	if pickup.part.is_empty():
+		scrap += pickup.scrap_value
+		hud.banner("SCRAP CACHE  +%d" % pickup.scrap_value, T.COL_ORANGE, 2.0)
+	else:
+		salvage.append(pickup.part)
+		hud.banner("SCHEMATIC: " + Parts.describe(pickup.part).to_upper(), Parts.color_of(pickup.part), 3.0)
 	# Out of the tree now, so a second physics tick this frame can't collect it twice.
 	pickups.remove_child(pickup)
 	pickup.queue_free()
@@ -252,11 +279,15 @@ func _on_cleared() -> void:
 	# The block is yours: anything still on the ground gets hauled home.
 	for p in pickups.get_children():
 		_take_salvage(p as Pickup)
-	var time := "%d:%02d" % [int(elapsed / 60.0), int(elapsed) % 60]
-	var lines := "Scrap +%d    Time %s" % [scrap, time]
+	var ids: Array[String] = []
 	for part in salvage:
-		lines += "\nSalvage: " + Parts.describe(part)
-	hud.show_result("BLOCK CLEARED", lines, "RUN IT AGAIN", T.COL_CYAN)
+		ids.append(str(part.id))
+	bank_report = profile.bank_run(int(scrap), ids)
+	var time := "%d:%02d" % [int(elapsed / 60.0), int(elapsed) % 60]
+	var lines := "Scrap banked +%d    Time %s" % [int(scrap), time]
+	for id: String in bank_report.unlocked:
+		lines += "\nNew schematic: " + Parts.describe(Parts.get_part(id))
+	hud.show_result("BLOCK CLEARED", lines, "RETURN TO GARAGE", T.COL_CYAN)
 
 
 func _on_wrecked() -> void:
@@ -264,9 +295,15 @@ func _on_wrecked() -> void:
 		return
 	state = State.WRECKED
 	camera.shake(1.0)
-	var lines := "Rig destroyed. Crew lost."
-	if not salvage.is_empty():
-		lines += "\nSalvage lost with the rig."
+	var penalty := profile.record_wreck()
+	var lines := "Rig destroyed with every part on it. Crew lost."
+	if penalty > 0:
+		lines += "\nWreck penalty: -%d scrap." % penalty
+	if scrap >= 1.0 or not salvage.is_empty():
+		lines += "\nSalvage lost with the rig: %d scrap" % int(scrap)
+		if not salvage.is_empty():
+			lines += ", %d schematic%s" % [salvage.size(), "" if salvage.size() == 1 else "s"]
+		lines += "."
 	# Let the wreck burn for a beat before the results card.
 	await get_tree().create_timer(1.6).timeout
-	hud.show_result("WRECKED", lines, "RUN IT BACK", T.COL_ORANGE)
+	hud.show_result("WRECKED", lines, "BACK TO THE YARD", T.COL_ORANGE)

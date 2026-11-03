@@ -46,6 +46,7 @@ var turret_turn_rate := 0.0
 var lock_range := 0.0             # 0 = no lock (weapon can't, or no targeting system)
 var power_output := 0.0            # engine budget (0 = no power model, e.g. enemy rigs)
 var power_draw := 0.0              # constant draw of everything installed
+var look := {}                     # which parts are installed, for drawing
 
 var team := BulletPool.TEAM_PLAYER
 var armor := 0.0
@@ -54,7 +55,7 @@ var is_wrecked := false
 var lock_priority := 3             # when someone else locks onto this rig
 var lock_radius := 40.0
 
-# Inputs, set every tick by the player (main.gd) or the AI (enemy_rig.gd).
+# Inputs, set every tick by the player (mission.gd) or the AI (enemy_rig.gd).
 var drive_input := Vector2.ZERO
 var aim_input := Vector2.ZERO
 var fire_trigger := false          # fixed-mount weapons
@@ -111,9 +112,29 @@ func apply_stats(s: Dictionary) -> void:
 	lock_range = s.lock_range
 	power_output = s.get("power_output", 0.0)
 	power_draw = s.get("power_draw", 0.0)
+	look = s.get("look", {})
 	armor = armor_max
 	if not can_lock():
 		lock_enabled = false
+	if is_inside_tree():
+		_sync_parts()
+
+
+func has_weapon() -> bool:
+	return fire_rate > 0.0
+
+
+## Add or remove the turret to match the weapon, and redraw the parts.
+func _sync_parts() -> void:
+	var wants_turret := mount == Mount.TURRET and has_weapon()
+	if wants_turret and _turret == null:
+		_turret = TurretSprite.new()
+		_turret.position = Vector2(-4.0, 0.0)
+		add_child(_turret)
+	elif not wants_turret and _turret != null:
+		_turret.queue_free()
+		_turret = null
+	queue_redraw()
 
 
 func can_lock() -> bool:
@@ -131,9 +152,7 @@ func is_overloaded() -> bool:
 
 ## 1.0 within budget; less when overloaded (scales top speed and acceleration).
 func mobility() -> float:
-	if not is_overloaded():
-		return 1.0
-	return clampf(pow(power_output / power_load(), T.OVERLOAD_EXPONENT), T.OVERLOAD_MIN_MOBILITY, 1.0)
+	return Loadout.mobility_factor(power_load(), power_output)
 
 
 func _ready() -> void:
@@ -152,10 +171,7 @@ func _ready() -> void:
 	shape.shape = capsule
 	shape.rotation = PI / 2.0
 	add_child(shape)
-	if mount == Mount.TURRET:
-		_turret = TurretSprite.new()
-		_turret.position = Vector2(-4.0, 0.0)
-		add_child(_turret)
+	_sync_parts()
 
 
 func is_targetable() -> bool:
@@ -356,7 +372,7 @@ func _has_los(to: Vector2) -> bool:
 
 func _weapons(delta: float) -> void:
 	_fire_cooldown = maxf(_fire_cooldown - delta, 0.0)
-	if bullets == null:
+	if bullets == null or not has_weapon():
 		return
 	var wants_fire := false
 	var direction := Vector2.RIGHT.rotated(rotation)
@@ -476,20 +492,39 @@ func _draw() -> void:
 	elif _flash > 0.0:
 		hull = hull.lerp(Color(1.0, 0.85, 0.7), _flash * 0.6)
 
-	# Wheels first so the hull overlaps them.
+	# Wheels first so the hull overlaps them. Sport wheels get orange rims.
 	var tyre := Color(0.07, 0.07, 0.075)
+	var sport: bool = look.get("drive", "") == "outrider_sport_wheels"
 	for sx: float in [-1.0, 1.0]:
 		for sy: float in [-1.0, 1.0]:
-			draw_rect(Rect2(Vector2(sx * half_l * 0.55 - 8.0, sy * half_w - 5.0), Vector2(16.0, 10.0)), tyre)
+			var wheel := Rect2(Vector2(sx * half_l * 0.55 - 8.0, sy * half_w - 5.0), Vector2(16.0, 10.0))
+			draw_rect(wheel, tyre)
+			if sport:
+				draw_rect(wheel.grow(-3.0), T.COL_ORANGE.darkened(0.2))
 
 	draw_rect(Rect2(-half_l, -half_w + 3.0, body_len, body_wid - 6.0), hull)
 	if is_wrecked:
 		draw_rect(Rect2(-10.0, -8.0, 22.0, 16.0), Color(0.05, 0.04, 0.04))
 		return
-	# Cab and armor details.
+	# Cab.
 	draw_rect(Rect2(-half_l + 8.0, -half_w + 7.0, 26.0, body_wid - 14.0), hull.darkened(0.25))
-	draw_rect(Rect2(half_l - 11.0, -half_w + 2.0, 11.0, body_wid - 4.0), T.COL_RUST)
-	draw_rect(Rect2(half_l - 4.0, -half_w + 2.0, 4.0, body_wid - 4.0), T.COL_RUST.darkened(0.3))
+	# Front armor: heavy rust plate, a thin light plate, or bare.
+	match str(look.get("armor", "scrap_plating")):
+		"scrap_plating":
+			draw_rect(Rect2(half_l - 11.0, -half_w + 2.0, 11.0, body_wid - 4.0), T.COL_RUST)
+			draw_rect(Rect2(half_l - 4.0, -half_w + 2.0, 4.0, body_wid - 4.0), T.COL_RUST.darkened(0.3))
+		"outrider_light_plating":
+			draw_rect(Rect2(half_l - 7.0, -half_w + 3.0, 7.0, body_wid - 6.0), Color(0.3, 0.2, 0.16))
+			draw_rect(Rect2(half_l - 7.0, -1.0, 7.0, 2.0), T.COL_ENEMY)
+	# Fixed guns on the nose instead of a turret.
+	if mount == Mount.FIXED and has_weapon():
+		draw_rect(Rect2(half_l - 16.0, -12.0, 22.0, 4.0), Color(0.15, 0.15, 0.16))
+		draw_rect(Rect2(half_l - 16.0, 8.0, 22.0, 4.0), Color(0.15, 0.15, 0.16))
+	# Targeting computer: a sensor dish behind the cab.
+	var internal: Array = look.get("internal", [])
+	if internal.has("targeting_computer"):
+		draw_rect(Rect2(-half_l + 2.0, -5.0, 7.0, 10.0), Color(0.16, 0.17, 0.18))
+		draw_circle(Vector2(-half_l + 5.5, 0.0), 2.5, T.COL_CYAN)
 	# Practical lights: cyan edge strips, white headlights, orange tail lights.
 	draw_rect(Rect2(-half_l + 6.0, -half_w + 3.0, body_len - 20.0, 2.0), T.COL_CYAN)
 	draw_rect(Rect2(-half_l + 6.0, half_w - 5.0, body_len - 20.0, 2.0), T.COL_CYAN)

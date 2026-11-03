@@ -6,6 +6,12 @@ extends RefCounted
 ## the budget, and every part's `power` is drawn all the time it's installed.
 ## Fitting a part is the cost, not using it. Going over budget is an overload:
 ## the rig loses mobility (tuning.gd), so it's a build decision.
+##
+## Scrap: owning a part's schematic lets you build that part any time for its
+## `cost` in scrap (profile.gd). Common parts are free to build, so you can
+## always put a basic rig together. `cost` is still a Common part's value when
+## a wreck's scrap penalty is worked out. Schematics are never lost; built
+## parts are.
 
 const RARITY_COLORS := {
 	"Common": Color(0.75, 0.75, 0.72),
@@ -18,47 +24,47 @@ const RARITY_COLORS := {
 const CATALOG := {
 	# --- Chassis: slots and base handling --------------------------------------
 	"scrap_frame": {
-		"name": "Scrap Frame", "category": "Chassis", "rarity": "Common", "power": 15.0,
+		"name": "Scrap Frame", "category": "Chassis", "rarity": "Common", "cost": 50, "power": 15.0,
 		"hardpoints": 1, "utility_slots": 1, "internal_slots": 2,
 		"armor": 60.0, "max_speed": 560.0, "reverse_speed": 230.0, "coast": 280.0, "turn_rate": 3.4,
 	},
 	# --- Engine: acceleration and the power budget --------------------------------
 	"junk_v6": {
-		"name": "Junk V6", "category": "Engine", "rarity": "Common", "power": 0.0,
+		"name": "Junk V6", "category": "Engine", "rarity": "Common", "cost": 40, "power": 0.0,
 		"power_output": 100.0, "acceleration": 640.0,
 	},
 	# --- Drive: grip, braking, handling ----------------------------------------
 	"street_wheels": {
-		"name": "Street Wheels", "category": "Drive", "rarity": "Common", "power": 10.0,
+		"name": "Street Wheels", "category": "Drive", "rarity": "Common", "cost": 20, "power": 10.0,
 		"grip": 5.5, "brake": 1500.0, "speed_mult": 1.0, "turn_mult": 1.0,
 	},
 	"outrider_sport_wheels": {
-		"name": "Outrider Sport Wheels", "category": "Drive", "rarity": "Uncommon", "power": 20.0,
+		"name": "Outrider Sport Wheels", "category": "Drive", "rarity": "Uncommon", "cost": 70, "power": 20.0,
 		"grip": 6.5, "brake": 1500.0, "speed_mult": 1.07, "turn_mult": 1.06,
 	},
 	# --- Armor ---------------------------------------------------------------------
 	"scrap_plating": {
-		"name": "Scrap Plating", "category": "Armor", "rarity": "Common", "power": 0.0,
+		"name": "Scrap Plating", "category": "Armor", "rarity": "Common", "cost": 30, "power": 0.0,
 		"armor": 90.0, "ram_damage": 70.0,
 	},
 	"outrider_light_plating": {
-		"name": "Outrider Light Plating", "category": "Armor", "rarity": "Uncommon", "power": 0.0,
+		"name": "Outrider Light Plating", "category": "Armor", "rarity": "Uncommon", "cost": 60, "power": 0.0,
 		"armor": 70.0, "ram_damage": 45.0,
 	},
 	# --- Weapons (hardpoints). lock_range 0 = this weapon can't be locked ---------
 	"pintle_turret": {
-		"name": "Pintle Turret", "category": "Weapon", "rarity": "Common", "power": 50.0,
+		"name": "Pintle Turret", "category": "Weapon", "rarity": "Common", "cost": 40, "power": 50.0,
 		"mount": 0, "fire_rate": 7.0, "bullet_damage": 9.0, "bullet_speed": 1500.0,
 		"spread_deg": 3.0, "turret_turn_rate": 9.0, "lock_range": 520.0,
 	},
 	"outrider_twin_guns": {
-		"name": "Outrider Twin Guns", "category": "Weapon", "rarity": "Uncommon", "power": 35.0,
+		"name": "Outrider Twin Guns", "category": "Weapon", "rarity": "Uncommon", "cost": 80, "power": 35.0,
 		"mount": 1, "fire_rate": 8.0, "bullet_damage": 6.0, "bullet_speed": 1200.0,
 		"spread_deg": 4.0, "turret_turn_rate": 0.0, "lock_range": 0.0,
 	},
 	# --- Internal systems (passive, take internal capacity) -----------------------
 	"targeting_computer": {
-		"name": "Targeting Computer", "category": "Internal", "rarity": "Common", "power": 25.0,
+		"name": "Targeting Computer", "category": "Internal", "rarity": "Common", "cost": 30, "power": 25.0,
 		"enables_lock": true,
 	},
 }

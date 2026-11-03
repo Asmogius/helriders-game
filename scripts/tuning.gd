@@ -67,6 +67,20 @@ const OUTRIDER_SPAWN_TIME := 45.0
 const OUTRIDER_SPAWN_KILLS := 20
 const OUTRIDER_SCRAP := 25
 
+# --- Economy (scrap is the only currency) --------------------------------------
+const START_SCRAP := 60
+const SCHEMATIC_DROP_CHANCE := 0.5     # a wrecked Outrider drops a schematic, else a scrap cache
+const SCRAP_CACHE := 20                # scrap in a cache crate
+const WRECK_PENALTY := 0.25            # a wreck costs this x the lost build's value in scrap
+const PRESET_COUNT := 3
+
+# Garage upgrade tracks: 3 levels each, bought with scrap.
+const UPGRADES := {
+	"fabrication": {"name": "Fabrication Discount", "costs": [120, 300, 600], "per_level": 0.10},
+	"loot": {"name": "Loot Quality", "costs": [150, 350, 700], "per_level": 0.15},
+	"salvage": {"name": "Salvage Yield", "costs": [100, 250, 500], "per_level": 0.15},
+}
+
 # --- Rigs ----------------------------------------------------------------------
 # The player's rig is built from parts: see parts.gd (schematics and the
 # starter loadout) and loadout.gd (how parts combine into these stats).

@@ -85,6 +85,13 @@ jobs:
             echo "::error::Script errors during smoke test"; exit 1
           fi
 
+      - name: Garage and economy test
+        run: |
+          godot --headless --fixed-fps 60 --path . -s res://tests/garage_test.gd 2>&1 | tee garage.log
+          if grep -q "SCRIPT ERROR" garage.log; then
+            echo "::error::Script errors during garage test"; exit 1
+          fi
+
       - name: Configure Android export
         run: |
           SETTINGS=$(ls ~/.config/godot/editor_settings-*.tres 2>/dev/null | head -n 1)

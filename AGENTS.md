@@ -8,11 +8,13 @@ The owner works from a phone and has no computer, so nobody opens the Godot edit
 - `scripts/tuning.gd` holds every balance number, color and collision layer. Tune there, not inside gameplay scripts.
 - `scripts/parts.gd` holds part schematics (stats, slots, power costs) and the starter loadout. `scripts/loadout.gd` is the only place that combines parts into rig stats. Player capabilities come from parts: for example, lock exists only with a Targeting Computer in an internal slot and a weapon whose `lock_range` > 0.
 
+- `scripts/profile.gd` (autoload `Profile`) is the save game: scrap, schematics, storage, the rig, presets, upgrades. Every change saves to `user://`. Economy rules agreed with the owner are listed at the top of that file; don't change them without asking.
+
 ## Engine rules
 
 - **Godot 4.7.2**, pinned in `.github/workflows/android.yml` and `project.godot` features. Bump both together.
 - **Compatibility renderer only** (`gl_compatibility`). Don't switch to Forward+ or Mobile (Vulkan). Older Android Vulkan drivers are unreliable and the target is 2020-era 3–4 GB phones.
-- **Code-first scenes.** Nodes are built in GDScript (`main.gd` assembles everything). Keep `.tscn` files minimal. Hand-written scene files with resource IDs break silently without an editor.
+- **Code-first scenes.** Nodes are built in GDScript (`garage.gd` and `mission.gd` assemble their screens). Keep `.tscn` files minimal. Hand-written scene files with resource IDs break silently without an editor.
 - **Static typing everywhere.** Use `:=` or explicit types. Values from a `Dictionary` need an explicit type (`var x: float = d.key`), because `:=` can't infer from a Variant.
 - **`preload` constants instead of `class_name`**, for example `const Zombie := preload("res://scripts/zombie.gd")`. They work in headless runs before the class cache exists, and they can be used as types.
 - **Don't shadow native classes.** Godot 4.7 has a native `VirtualJoystick`, which is why ours is `ThumbStick`. Import fails on a clash.
@@ -33,14 +35,17 @@ The owner works from a phone and has no computer, so nobody opens the Godot edit
 - Anything shootable that isn't a rig extends `hostile.gd` (`take_hit`, `is_targetable`, `lock_priority`, `died`). Pool it.
 - Enemy rigs extend `vehicle.gd` and only decide stick inputs (`drive_input`, `fire_trigger`), the way `enemy_rig.gd` does. They share the player's driving model, so builds feel the same on both sides.
 - Bullets carry a team (`bullet_pool.gd`). Each team's ray mask decides what it can hit, so nobody shoots their own side.
-- New mission-level enemies get a `spawn_*` function in `main.gd` that tests can call directly (`auto_spawn_specials = false`).
+- New mission-level enemies get a `spawn_*` function in `mission.gd` that tests can call directly (`auto_spawn_specials = false`).
 
 ## Verify before pushing
 
 ```sh
 godot --headless --path . --import                  # must print no "SCRIPT ERROR"
 godot --headless --fixed-fps 60 --path . -s res://tests/smoke_test.gd   # must end "SMOKE TEST PASSED"
+godot --headless --fixed-fps 60 --path . -s res://tests/garage_test.gd  # must end "GARAGE TEST PASSED"
 ```
+
+- Tests must call `Profile.new_game()` with `persist = false` first, so they never touch a real save.
 
 - Godot's import exits 0 even with script errors, so read the output.
 - Extend `tests/smoke_test.gd` when you add a core mechanic (new enemy, lock-on, part swap). It drives the game by setting `hud.left_stick.output` and `hud.right_stick.output` directly.

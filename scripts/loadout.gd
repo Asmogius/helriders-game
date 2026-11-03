@@ -8,6 +8,15 @@ extends RefCounted
 ##   weapons / utility / internal: arrays of part ids, limited by the chassis
 
 const Parts := preload("res://scripts/parts.gd")
+const T := preload("res://scripts/tuning.gd")
+
+
+## Speed/acceleration multiplier for a build drawing `used` power from an
+## engine making `output`. 1.0 within budget; lower when overloaded.
+static func mobility_factor(used: float, output: float) -> float:
+	if output <= 0.0 or used <= output:
+		return 1.0
+	return clampf(pow(output / used, T.OVERLOAD_EXPONENT), T.OVERLOAD_MIN_MOBILITY, 1.0)
 
 
 static func build(loadout: Dictionary) -> Dictionary:
@@ -48,6 +57,15 @@ static func build(loadout: Dictionary) -> Dictionary:
 		"power_output": float(engine.get("power_output", 0.0)),
 		"power_draw": 0.0,
 		"dropped": dropped,
+		# Which parts are on, so the rig can draw them.
+		"look": {
+			"chassis": chassis.get("id", ""),
+			"drive": drive.get("id", ""),
+			"armor": armor.get("id", ""),
+			"weapon": weapon.get("id", ""),
+			"internal": internal.map(func(p: Dictionary) -> String: return str(p.id)),
+			"utility": utility.map(func(p: Dictionary) -> String: return str(p.id)),
+		},
 	}
 
 	# Constant draw from everything bolted on.

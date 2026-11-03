@@ -12,4 +12,5 @@ build/
 # Logs from CI-style local runs
 import.log
 smoke.log
+garage.log
 export.log
