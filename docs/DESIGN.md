@@ -440,3 +440,7 @@ Enemy rigs (same total toughness as today). Shields from 4 skulls: Gunner Rigs c
 Patcher: speed 540; cable 400 px; repairs 12 armor/s to the ally's most damaged facing; hook range 450 px; re-hook 3 s; revive 4 s to 10% HP; 35 scrap. Never repairs itself (self-repair reserved for possible stronger enemies).
 
 Scrapper: speed 580; one hazard every 3 s, alternating oil and spikes; max 6 active (oldest vanish first); oil 90 px wide, 12 s; spike strip 120 px long, 15 s, crossing rigs -30% speed for 3 s; 25 scrap.
+
+Ammo: Pintle Turret 28 rounds, 2 s reload. Scattergun 6 shells, 2.5 s. Burst Turret 6 bursts, 2.2 s. Outrider Twin Guns overheat after 6 s nonstop, 3 s lockout, cool 25%/s idle. Heavy MG overheats after 8 s, 4 s lockout, cools 20%/s idle. Harpoon 1 shot, 2.5 s. Mortar 3 shells, 4 s.
+
+Barrels: 20 HP; any ram sets them off; blasts chain. Explosive: 140 px, 60 damage, strong shove. Fire: 140 px, 25 damage, ground burns 6 s (heavy BURNING buildup, ignites oil). Acid: 140 px, 20 damage + 80 acid buildup. Slime: 160 px pool, 10 s. Boomer: 160 px, fills the GOOPED bar instantly.
