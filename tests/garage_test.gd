@@ -222,7 +222,7 @@ func _run_checks() -> void:
 	var penalty := profile.record_wreck()
 	print("  lost build worth %d, wreck penalty %d" % [value, penalty])
 	_check(penalty == roundi(value * 0.25) and profile.scrap == before - penalty, "a wreck costs 25% of the lost build's value")
-	_check(aboard == 2 and profile.crew.size() == roster - 2 and profile.seated_crew().is_empty(), "a wreck kills the seated crew; the Inn's crew survive")
+	_check(aboard >= 2 and profile.crew.size() == roster - aboard and profile.seated_crew().is_empty(), "a wreck kills the seated crew; the Inn's crew survive")
 	garage._refresh()
 	_check(not profile.has_rig() and garage._deploy.disabled, "a wreck leaves no rig; DEPLOY is off")
 	_check(garage._rebuild.visible and profile.plan == plan, "REBUILD offers your last build")

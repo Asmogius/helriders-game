@@ -55,6 +55,7 @@ func activate(at: Vector2) -> void:
 	_detour_time = 0.0
 	_nav_timer = 0.0
 	_detour_sign = 1.0 if randf() < 0.5 else -1.0
+	clear_status()
 	active = true
 	visible = true
 	z_index = 0
@@ -97,6 +98,7 @@ func _physics_process(delta: float) -> void:
 		return
 	_anim += delta
 	_flash = maxf(_flash - delta * 5.0, 0.0)
+	tick_status(delta)
 	_knock = _knock.move_toward(Vector2.ZERO, 900.0 * delta)
 	match state:
 		State.CHASE:
@@ -144,10 +146,10 @@ func _chase(delta: float) -> void:
 	var to_point := _nav_point - global_position
 	if nav == null or _nav_point.distance_squared_to(target.global_position) < 1.0:
 		to_point = to_target  # in sight: go straight for it
-	var desired := to_point.normalized() * T.HUNTER_SPEED
+	var desired := to_point.normalized() * T.HUNTER_SPEED * speed_mult()
 	if _detour_time > 0.0:
 		_detour_time -= delta
-		desired = _detour * T.HUNTER_SPEED
+		desired = _detour * T.HUNTER_SPEED * speed_mult()
 	velocity = desired + _knock
 	rotation = lerp_angle(rotation, desired.angle(), 1.0 - exp(-10.0 * delta))
 	move_and_slide()
@@ -215,7 +217,7 @@ func _hold_on(delta: float) -> void:
 		_knock_off(Vector2.RIGHT.rotated(randf() * TAU))
 		return
 	_follow_rig()
-	target.take_damage(T.HUNTER_DPS * delta)
+	target.take_damage(T.HUNTER_DPS * delta * float(target.get("latch_mult")))
 
 	# The rig ran this tick already, so its wall contact is current.
 	if target.touching_wall:
@@ -229,6 +231,12 @@ func _hold_on(delta: float) -> void:
 				target.fx.call("sparks", global_position, target.wall_normal)
 		elif target.wall_impact > T.HUNTER_JOLT_SPEED:
 			_knock_off(side)
+
+
+## Thrown off the hull (a Mechanic's Field Repair, a Bruiser's ram).
+func knock_off(direction: Vector2) -> void:
+	if state == State.LATCHED:
+		_knock_off(direction)
 
 
 func _knock_off(direction: Vector2) -> void:
@@ -277,3 +285,4 @@ func _draw() -> void:
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	if state == State.WINDUP:
 		draw_arc(Vector2.ZERO, 28.0, 0.0, TAU, 24, Color(T.COL_ENEMY, 0.4 + 0.5 * _flash), 3.0)
+	draw_status(24.0)

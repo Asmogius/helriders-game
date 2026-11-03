@@ -37,8 +37,7 @@ func _draw() -> void:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(rarity, 0.35), false, 2.0)
 	var a := 0.5 if dim else 1.0
 	var w := size.x - 32.0
-	var role := str(member.role)
-	var role_color := T.COL_CYAN if role == "driver" else Color(1.0, 0.85, 0.55)
+	var role_color := Crew.role_color(member)
 	# Portrait chip: initials on the role color.
 	var chip := Rect2(16, 22, 46, 46)
 	draw_rect(chip, Color(role_color, 0.25 * a))
@@ -49,7 +48,11 @@ func _draw() -> void:
 			initials += part.substr(0, 1)
 	draw_string(font, Vector2(16, 54), initials, HORIZONTAL_ALIGNMENT_CENTER, 46, 20, Color(UI.TEXT, a))
 	draw_string(font, Vector2(74, 40), Crew.role_name(member).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, w - 58, 18, Color(role_color, a))
-	draw_string(font, Vector2(74, 62), str(member.rarity), HORIZONTAL_ALIGNMENT_LEFT, w - 58, 15, Color(rarity, a))
+	draw_string(font, Vector2(74, 62), "%s - %s" % [member.rarity, Crew.specialty_name(member)], HORIZONTAL_ALIGNMENT_LEFT, w - 58, 14, Color(rarity, a))
+	if Crew.perks_due(member) > 0:
+		var badge := Rect2(size.x - 104.0, 14.0, 92.0, 22.0)
+		draw_rect(badge, T.COL_ORANGE)
+		draw_string(font, badge.position + Vector2(0, 16), "PERK READY", HORIZONTAL_ALIGNMENT_CENTER, badge.size.x, 13, Color(0.08, 0.08, 0.09))
 	draw_string(font, Vector2(16, 98), str(member.name), HORIZONTAL_ALIGNMENT_LEFT, w, 22, Color(UI.TEXT, a))
 	# Level and XP.
 	var lv := Crew.level(member)
@@ -64,5 +67,11 @@ func _draw() -> void:
 	for line in halves:
 		draw_string(font, Vector2(16, y), line, HORIZONTAL_ALIGNMENT_LEFT, w, 14, Color(UI.TEXT, a))
 		y += 20.0
+	var perks: Array = member.get("perks", [])
+	if not perks.is_empty():
+		var names: Array[String] = []
+		for p: String in perks:
+			names.append(Crew.perk_name(p))
+		draw_string(font, Vector2(16, y + 6.0), "PERKS  " + ", ".join(names), HORIZONTAL_ALIGNMENT_LEFT, w, 13, Color(T.COL_CYAN, 0.9 * a))
 	if status != "":
 		draw_string(font, Vector2(16, size.y - 16), status, HORIZONTAL_ALIGNMENT_LEFT, w, 17, status_color)

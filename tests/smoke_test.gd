@@ -4,8 +4,9 @@ extends SceneTree
 ## driving, lock-on, the Hunter (latch, shoot off, crush), the Outrider
 ## (hunts and shoots you, drops salvage), the Bulwark (charges, rams, armored
 ## front, drops salvage), power and weight overload, two
-## weapons with pellets, fixed guns, the utilities, crew (passives, Hard
-## Line, Overcharge, big-hit injuries, turret aim rule), and the wreck.
+## weapons with pellets, fixed guns, the utilities, crew (passives, the crew
+## wheel, Hard Line, Overcharge, big-hit injuries, turret aim rule), and the
+## wreck.
 ##
 ## Run:  godot --headless --fixed-fps 60 --path . -s res://tests/smoke_test.gd
 ## Exit code 0 = pass, 1 = fail. CI also fails on any "SCRIPT ERROR" output.
@@ -15,6 +16,7 @@ const Hunter := preload("res://scripts/hunter.gd")
 const Vehicle := preload("res://scripts/vehicle.gd")
 const Parts := preload("res://scripts/parts.gd")
 const Loadout := preload("res://scripts/loadout.gd")
+const T := preload("res://scripts/tuning.gd")
 
 const OPEN_SPOT := Vector2(1600, 1200)     # clear ground around the start
 const ROAD_WEST := Vector2(400, 720)       # straight run west to the boundary wall
@@ -240,13 +242,13 @@ func _process(_delta: float) -> bool:
 		main.call("_sync_hud_to_rig")
 		_reset_rig(OPEN_SPOT, 0.0)
 		main.zombies.clear_all()
-		_check(main.hud.ability_count() == 3, "Driver + two utilities: three HUD buttons")
+		_check(main.hud.ability_count() == 2 and main.hud.has_crew_button() and main.hud.crew_wheel_size() == 1, "two utilities: two HUD buttons, plus CREW for the Driver")
 		rig.armor = 20.0
-		main.hud.press_ability(1)
+		main.hud.press_ability(0)
 		_check(is_equal_approx(rig.armor, 55.0), "Emergency Patch restores 35 armor")
-		main.hud.press_ability(1)
+		main.hud.press_ability(0)
 		_check(is_equal_approx(rig.armor, 55.0) and rig.ability_charge(0) > 0.9, "the patch has to cool down before it works again")
-		main.hud.press_ability(2)
+		main.hud.press_ability(1)
 		_check(main.mines.active_count() == 3, "Mine Dropper lays three mines")
 		mark = main.mines._pos[1]
 		_check(mark.x < rig.global_position.x, "mines go down behind the rig")
@@ -307,13 +309,24 @@ func _process(_delta: float) -> bool:
 		print("  crew: turn x%.2f, grip +%.1f, turret aim x%.2f, spread x%.2f" % [rig.crew_turn, rig.crew_grip, rig.crew_aim, rig.crew_spread])
 		_check(rig.crew.size() == 2 and rig.crew_turn > 1.0 and rig.crew_grip > 0.0, "the seated Driver sharpens steering and grip")
 		_check(rig.crew_aim > 1.0 and rig.crew_spread < 1.0, "the seated Gunner speeds turret aim and tightens spread")
-		_check(main.hud.ability_count() == 2 and main.hud.is_lock_button_visible(), "crew buttons sit beside LOCK")
+		_check(main.hud.ability_count() == 0 and main.hud.has_crew_button() and main.hud.is_lock_button_visible(), "the CREW button sits beside LOCK")
+		# The crew wheel: slow motion while it's open, pick or close, then a short cooldown.
+		_check(main.hud.open_crew_wheel() and main.hud.is_crew_wheel_open() and is_equal_approx(Engine.time_scale, T.CREW_WHEEL_SLOWMO), "opening the crew wheel slows the fight to 25%")
 		var turn_before := rig.crew_turn
-		main.hud.press_ability(0)
+		_check(main.hud.pick_crew(0) and not main.hud.is_crew_wheel_open() and is_equal_approx(Engine.time_scale, 1.0), "picking a crew ability closes the wheel at full speed")
 		_check(rig.hard_line_active() and rig.crew_turn > turn_before and rig.crew_grip >= 3.0, "Hard Line boosts turn and grip")
-		main.hud.press_ability(1)
+		_check(not main.hud.open_crew_wheel() and main.hud.crew_wheel_cooldown > 0.0, "the wheel has a short cooldown after it closes")
+		main.hud.crew_wheel_cooldown = 0.0
+		main.hud.open_crew_wheel()
+		_check(not main.hud.pick_crew(0) and main.hud.is_crew_wheel_open(), "a cooling-down crew ability can't be picked")
+		main.hud.pick_crew(1)
 		_check(rig.overcharge_active() and rig.crew_fire > 1.3 and rig.crew_damage > 1.1, "Overcharge boosts fire rate and damage")
 		_check(not rig.use_crew_ability(0), "Hard Line has a cooldown")
+		main.hud.crew_wheel_cooldown = 0.0
+		main.hud.open_crew_wheel()
+		main.hud.close_crew_wheel()
+		_check(not main.hud.is_crew_wheel_open() and is_equal_approx(Engine.time_scale, 1.0) and main.hud.crew_wheel_cooldown > 0.0, "closing the wheel without a pick restores speed and still cools down")
+		main.hud.crew_wheel_cooldown = 0.0
 		# Chip damage isn't a big hit; a burst over 15% of max armor is.
 		var hits_before := rig.big_hits
 		rig._dmg_buckets.fill(0.0)
@@ -327,7 +340,8 @@ func _process(_delta: float) -> bool:
 		rig.injure_crew(1)
 		print("  injured Gunner: turret aim x%.2f (was x%.2f)" % [rig.crew_aim, aim_before])
 		_check(is_equal_approx(rig.crew_aim, 0.5) and is_equal_approx(rig.crew_spread, 1.0), "an injured Gunner halves turret aim and loses their bonus")
-		_check(not rig.overcharge_active() and main.hud.is_ability_disabled(1) and not rig.use_crew_ability(1), "an injured Gunner's Overcharge stops and greys out")
+		main.call("_refresh_hud")
+		_check(not rig.overcharge_active() and main.hud.is_crew_disabled(1) and not rig.use_crew_ability(1), "an injured Gunner's Overcharge stops and greys out on the wheel")
 		rig.injure_crew(0)
 		_check(is_equal_approx(rig.crew_turn, 0.5) and is_equal_approx(rig.crew_grip, 0.0), "an injured Driver halves turn rate")
 		_check(main.injured_crew_ids().size() == 2, "the run remembers who was hurt")

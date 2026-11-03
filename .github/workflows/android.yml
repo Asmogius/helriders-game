@@ -99,6 +99,13 @@ jobs:
             echo "::error::Script errors during missions test"; exit 1
           fi
 
+      - name: Crew test
+        run: |
+          godot --headless --fixed-fps 60 --path . -s res://tests/crew_test.gd 2>&1 | tee crew.log
+          if grep -q "SCRIPT ERROR" crew.log; then
+            echo "::error::Script errors during crew test"; exit 1
+          fi
+
       - name: Configure Android export
         run: |
           SETTINGS=$(ls ~/.config/godot/editor_settings-*.tres 2>/dev/null | head -n 1)

@@ -195,6 +195,8 @@ const SALOON_OFFERS := 3               # paid hires on offer each day
 # Daily offer odds (percent) and prices by rarity. Common hires are always on
 # offer for free.
 const SALOON_ODDS := {"Uncommon": 60.0, "Rare": 28.0, "Epic": 9.0, "Legendary": 2.5, "Mythic": 0.5}
+const CREW_WHEEL_SLOWMO := 0.25       # game speed while the crew wheel is open
+const CREW_WHEEL_COOLDOWN := 3.0       # seconds after it closes before it opens again
 const CREW_PRICES := {"Common": 0, "Uncommon": 80, "Rare": 200, "Epic": 450, "Legendary": 900, "Mythic": 1600}
 
 # --- Rigs ----------------------------------------------------------------------

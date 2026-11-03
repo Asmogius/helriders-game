@@ -45,6 +45,7 @@ func activate(at: Vector2) -> void:
 	nav_timer = 0.0
 	nav_direct = true
 	_detour_sign = 1.0 if randf() < 0.5 else -1.0
+	clear_status()
 	active = true
 	visible = true
 	collision_layer = T.LAYER_ZOMBIE
@@ -66,6 +67,8 @@ func deactivate() -> void:
 ## `target` is the player rig (duck-typed: needs take_damage(amount)).
 func step(delta: float, desired: Vector2, target: Node2D) -> void:
 	_knock = _knock.move_toward(Vector2.ZERO, 900.0 * delta)
+	tick_status(delta)
+	desired *= speed_mult()
 	# Walking around a building: hold a wall-following direction for a while.
 	if _detour_time > 0.0:
 		_detour_time -= delta
@@ -118,3 +121,4 @@ func _draw() -> void:
 	draw_rect(Rect2(-3.0, -6.0, 11.0, 12.0), skin)                # head
 	draw_rect(Rect2(4.0, -3.0, 3.0, 2.0), Color(0.12, 0.08, 0.06))
 	draw_rect(Rect2(4.0, 1.0, 3.0, 2.0), Color(0.12, 0.08, 0.06))
+	draw_status(17.0)

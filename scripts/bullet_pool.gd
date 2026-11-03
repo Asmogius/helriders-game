@@ -19,6 +19,8 @@ const MASKS := [
 ]
 
 var fx: Node2D
+var big_game := 1.0       # player bullets vs Hunters and rigs (Gunner perk)
+var pierced := 0          # shamblers passed through (tests)
 var shots_fired := 0      # player shots (tests and stats)
 var hits := 0             # player hits on anything that bleeds
 var enemy_shots := 0
@@ -28,6 +30,7 @@ var _vel := PackedVector2Array()
 var _dmg := PackedFloat32Array()
 var _life := PackedFloat32Array()
 var _team := PackedByteArray()
+var _pierce := PackedByteArray()   # shamblers it can still pass through
 var _count := 0
 var _query := PhysicsRayQueryParameters2D.new()
 
@@ -40,9 +43,10 @@ func _ready() -> void:
 	_dmg.resize(MAX_BULLETS)
 	_life.resize(MAX_BULLETS)
 	_team.resize(MAX_BULLETS)
+	_pierce.resize(MAX_BULLETS)
 
 
-func fire(origin: Vector2, velocity: Vector2, damage: float, team := TEAM_PLAYER) -> void:
+func fire(origin: Vector2, velocity: Vector2, damage: float, team := TEAM_PLAYER, pierce := 0) -> void:
 	if team == TEAM_PLAYER:
 		shots_fired += 1
 	else:
@@ -54,6 +58,7 @@ func fire(origin: Vector2, velocity: Vector2, damage: float, team := TEAM_PLAYER
 	_dmg[_count] = damage
 	_life[_count] = LIFETIME
 	_team[_count] = team
+	_pierce[_count] = clampi(pierce, 0, 255)
 	_count += 1
 
 
@@ -83,9 +88,22 @@ func _physics_process(delta: float) -> void:
 		if not hit.is_empty():
 			var collider: Object = hit.collider
 			if collider != null and collider.has_method("take_hit"):
-				collider.call("take_hit", _dmg[i], _vel[i].normalized() * 140.0)
+				var dmg := _dmg[i]
+				var priority := int(collider.get("lock_priority")) if collider.get("lock_priority") != null else 0
+				if _team[i] == TEAM_PLAYER and priority >= 2:
+					dmg *= big_game  # Hunters and rigs
+				collider.call("take_hit", dmg, _vel[i].normalized() * 140.0)
 				if _team[i] == TEAM_PLAYER:
 					hits += 1
+				# Piercing Rounds: carry on through a shambler.
+				if _pierce[i] > 0 and priority == 1:
+					_pierce[i] -= 1
+					pierced += 1
+					if fx != null:
+						fx.sparks(hit.position, hit.normal)
+					_pos[i] = hit.position + _vel[i].normalized() * 30.0
+					i += 1
+					continue
 			if fx != null:
 				# Armor that blunts the hit (a Bulwark's front) throws grey sparks.
 				if collider != null and collider.has_method("deflects") and collider.call("deflects", hit.position):
@@ -109,6 +127,7 @@ func _remove(i: int) -> void:
 	_dmg[i] = _dmg[_count]
 	_life[i] = _life[_count]
 	_team[i] = _team[_count]
+	_pierce[i] = _pierce[_count]
 	if _count == 0:
 		queue_redraw()
 

@@ -15,8 +15,11 @@ extends Node
 ## - You never get a schematic you already own: drops skip known ones.
 ##
 ## Crew rules (decided with the owner, "Helriders: Crew Draft" doc):
-## - Seats depend on the frame. A Driver is required to deploy; a turret needs
-##   a seated Gunner or a targeting computer to aim.
+## - Seats depend on the frame: Driver and Gunner seats, plus open seats any
+##   other class can take, one of each class aboard. A Driver is required to
+##   deploy; a turret needs a seated Gunner or a targeting computer to aim.
+## - Every 3rd level a crew member offers 3 random perks from their class
+##   pool; you pick 1.
 ## - A job's XP (its skulls) is split evenly among the crew on the rig.
 ## - Big hits mid-fight can injure crew; injured crew rest at the Inn after
 ##   the run and can't be seated until healed.
@@ -101,8 +104,8 @@ func _starter_crew() -> void:
 	next_crew_id = 1
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash("helriders-starter-crew")
-	for role: String in ["driver", "gunner"]:
-		var m := _add_crew(Crew.make(role, "Common", rng))
+	for pair: Array in [["driver", "wheelman"], ["gunner", "gunslinger"]]:
+		var m := _add_crew(Crew.make(pair[0], "Common", rng, pair[1]))
 		m.seated = true
 
 
@@ -388,12 +391,12 @@ func member(id: int) -> Dictionary:
 	return {}
 
 
-## Seats the rig's frame offers.
+## Seats the rig's frame offers: "driver", "gunner", "open".
 func seats(loadout: Dictionary = {}) -> Array[String]:
 	return Crew.seats_for(rig if loadout.is_empty() else loadout)
 
 
-## Who rides in `role`'s seat, or {}.
+## Who rides as `role` (any class), or {}.
 func seated_in(role: String) -> Dictionary:
 	for m: Dictionary in crew:
 		if bool(m.seated) and str(m.role) == role:
@@ -401,16 +404,32 @@ func seated_in(role: String) -> Dictionary:
 	return {}
 
 
-## Crew riding the rig, in seat order. With `loadout`, only those whose seat
-## that frame has (the Garage previews a frame swap with this).
+## Crew riding the rig, in seat order: Driver, Gunner, then the open seats
+## (by class order). With `loadout`, only those that frame has seats for (the
+## Garage previews a frame swap with this).
 func seated_crew(loadout: Dictionary = {}) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	var open := seats(loadout)
-	for role: String in Crew.SEAT_ORDER:
+	var free := open.count("open")
+	for role: String in Crew.CLASSES:
 		var m := seated_in(role)
-		if not m.is_empty() and open.has(role):
+		if m.is_empty():
+			continue
+		if role in ["driver", "gunner"]:
+			if open.has(role):
+				out.append(m)
+		elif free > 0:
 			out.append(m)
+			free -= 1
 	return out
+
+
+func open_seats_used() -> int:
+	var used := 0
+	for m: Dictionary in crew:
+		if bool(m.seated) and Crew.OPEN_CLASSES.has(str(m.role)):
+			used += 1
+	return used
 
 
 func is_resting(m: Dictionary) -> bool:
@@ -421,11 +440,28 @@ func roster_full() -> bool:
 	return crew.size() >= T.ROSTER_SIZE
 
 
-## Put crew member `id` in their role's seat (whoever sat there goes back to
-## the Inn). Fails if the frame has no such seat or they're resting.
+## Why crew member `m` can't be seated on this frame, or "".
+func seat_block(m: Dictionary) -> String:
+	if is_resting(m):
+		return "RESTING"
+	var role := str(m.role)
+	var open := seats()
+	if role in ["driver", "gunner"]:
+		return "" if open.has(role) else "NO %s SEAT" % role.to_upper()
+	if open.count("open") == 0:
+		return "NO OPEN SEAT"
+	if seated_in(role).is_empty() and open_seats_used() >= open.count("open"):
+		return "OPEN SEATS FULL"
+	return ""
+
+
+## Put crew member `id` on the rig. A Driver or Gunner takes that seat; any
+## other class takes an open seat, swapping out a seated crew member of the
+## same class (one of each class aboard). Fails if there's no seat for them
+## or they're resting.
 func seat_member(id: int) -> bool:
 	var m := member(id)
-	if m.is_empty() or is_resting(m) or not seats().has(str(m.role)):
+	if m.is_empty() or seat_block(m) != "":
 		return false
 	var current := seated_in(str(m.role))
 	if not current.is_empty():
@@ -459,14 +495,23 @@ func dismiss(id: int) -> bool:
 ## Seats the new frame doesn't have send their crew back to the Inn.
 func _fit_seats() -> void:
 	var open := seats()
-	for m: Dictionary in crew:
-		if bool(m.seated) and not open.has(str(m.role)):
+	var free := open.count("open")
+	for role: String in Crew.CLASSES:
+		var m := seated_in(role)
+		if m.is_empty():
+			continue
+		if role in ["driver", "gunner"]:
+			if not open.has(role):
+				m.seated = false
+		elif free > 0:
+			free -= 1
+		else:
 			m.seated = false
 
 
-## A fresh hire takes an empty seat of their role, if the frame has one.
+## A fresh hire takes an empty seat for their class, if the frame has one.
 func _auto_seat(m: Dictionary) -> void:
-	if seats().has(str(m.role)) and seated_in(str(m.role)).is_empty():
+	if seated_in(str(m.role)).is_empty() and seat_block(m) == "":
 		m.seated = true
 
 
@@ -480,6 +525,40 @@ func deploy_block() -> String:
 	return ""
 
 
+# --- Perks ---
+
+## The 3 perks on offer for `m`, rolling them if a pick is due; [] if none.
+func perk_offer(m: Dictionary) -> Array[String]:
+	var out: Array[String] = []
+	if Crew.perks_due(m) <= 0:
+		return out
+	if (m.get("perk_offer", []) as Array).is_empty():
+		m.perk_offer = Crew.roll_perk_offer(m)
+		save_game()
+	for p: String in m.perk_offer:
+		out.append(p)
+	return out
+
+
+## Take perk `perk` from crew member `id`'s current offer.
+func choose_perk(id: int, perk: String) -> bool:
+	var m := member(id)
+	if m.is_empty() or not perk_offer(m).has(perk):
+		return false
+	(m.perks as Array).append(perk)
+	m.perk_offer = []
+	save_game()
+	changed.emit()
+	return true
+
+
+func perks_waiting() -> int:
+	var n := 0
+	for m: Dictionary in crew:
+		n += Crew.perks_due(m)
+	return n
+
+
 ## Today's Saloon offers (seeded by the day, like the job board).
 func ensure_saloon() -> void:
 	if saloon_day == day and saloon.size() == T.SALOON_OFFERS:
@@ -489,7 +568,7 @@ func ensure_saloon() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash("helriders-saloon-%d" % day)
 	for i in T.SALOON_OFFERS:
-		var role: String = Crew.ROLES[rng.randi_range(0, Crew.ROLES.size() - 1)]
+		var role: String = Crew.CLASSES[rng.randi_range(0, Crew.CLASSES.size() - 1)]
 		var rarity := _roll_rarity(rng)
 		var m := Crew.make(role, rarity, rng)
 		m["price"] = int(T.CREW_PRICES[rarity])
@@ -509,15 +588,26 @@ static func _roll_rarity(rng: RandomNumberGenerator) -> String:
 	return "Uncommon"
 
 
+## What hiring `offer` costs: its price, less 10% while a Scavenger with
+## Haggler is on the roster.
+func hire_price(offer: Dictionary) -> int:
+	var price := int(offer.get("price", 0))
+	for m: Dictionary in crew:
+		if str(m.role) == "scavenger" and Crew.has_perk(m, "haggler"):
+			return roundi(price * 0.9)
+	return price
+
+
 ## Hire today's offer `index`. Needs the scrap and a free roster slot.
 func hire_offer(index: int) -> bool:
 	ensure_saloon()
 	if index < 0 or index >= saloon.size() or roster_full():
 		return false
 	var offer: Dictionary = saloon[index]
-	if bool(offer.hired) or int(offer.price) > scrap:
+	var price := hire_price(offer)
+	if bool(offer.hired) or price > scrap:
 		return false
-	scrap -= int(offer.price)
+	scrap -= price
 	offer.hired = true
 	_auto_seat(_add_crew(offer))
 	save_game()
@@ -538,9 +628,10 @@ func hire_basic(role: String) -> bool:
 
 
 ## A job was finished: the crew on it split the skulls as XP, and anyone
-## injured goes to the Inn to rest. Call after finish_day(), so tonight's
-## rest doesn't count. Returns lines for the results card.
-func bank_crew(skulls: int, injured_ids: Array) -> Array[String]:
+## injured goes to the Inn to rest (a day less with Tough, or with a Medic's
+## Triage on the run). Call after finish_day(), so tonight's rest doesn't
+## count. Returns lines for the results card.
+func bank_crew(skulls: int, injured_ids: Array, triage := false) -> Array[String]:
 	var lines: Array[String] = []
 	var riders := seated_crew()
 	if riders.is_empty():
@@ -553,10 +644,17 @@ func bank_crew(skulls: int, injured_ids: Array) -> Array[String]:
 		var line := "%s +%s XP" % [m.name, _num(share)]
 		if after > before:
 			line += ", level %d" % after
+			if Crew.perks_due(m) > 0:
+				line += ", PERK READY"
 		if injured_ids.has(int(m.id)):
-			m.rest = T.CREW_REST_DAYS_HARD if skulls >= 5 else T.CREW_REST_DAYS
+			var days := T.CREW_REST_DAYS_HARD if skulls >= 5 else T.CREW_REST_DAYS
+			if Crew.has_perk(m, "tough"):
+				days -= 1
+			if triage:
+				days -= 1
+			m.rest = maxi(days, 1)
 			m.seated = false
-			line += ", injured: resting %d days" % int(m.rest)
+			line += ", injured: resting %d day%s" % [int(m.rest), "" if int(m.rest) == 1 else "s"]
 		lines.append(line)
 	save_game()
 	changed.emit()
@@ -721,17 +819,30 @@ static func _clean_member(raw: Variant) -> Dictionary:
 	var d: Dictionary = raw
 	var role := str(d.get("role", ""))
 	var rarity := str(d.get("rarity", ""))
-	if not Crew.ROLES.has(role) or not Crew.RARITIES.has(rarity):
+	if not Crew.CLASSES.has(role) or not Crew.RARITIES.has(rarity):
 		return {}
-	return {
+	var out := {
 		"id": int(d.get("id", 0)),
 		"name": str(d.get("name", "Crew")),
 		"role": role,
+		"specialty": str(d.get("specialty", "")),
 		"rarity": rarity,
 		"xp": maxf(float(d.get("xp", 0.0)), 0.0),
+		"perks": [],
+		"perk_offer": [],
 		"rest": maxi(int(d.get("rest", 0)), 0),
 		"seated": bool(d.get("seated", false)),
 	}
+	# Crew from before specialties keep their ability: Wheelman, Gunslinger.
+	out.specialty = Crew.specialty(out)
+	var pool := Crew.perk_pool(out)
+	for p: Variant in d.get("perks", []):
+		if pool.has(str(p)) and not (out.perks as Array).has(str(p)):
+			(out.perks as Array).append(str(p))
+	for p: Variant in d.get("perk_offer", []):
+		if pool.has(str(p)):
+			(out.perk_offer as Array).append(str(p))
+	return out
 
 
 ## JSON turns ints into floats; put a mission back in shape, or {} if unusable.

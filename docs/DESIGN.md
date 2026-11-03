@@ -82,21 +82,35 @@ All stations use short upgrade tracks and the single scrap currency. No secondar
 
 # 6. Crew System
 
-Four classes. Small number assigned per mission (typically 2–3). Higher rarity = better stats and stronger/ more effects on abilities.
+Eight classes (expanded with the owner's approval; exact numbers live in the "Helriders: Crew Draft" and "Helriders: Crew Expansion Draft" docs and `scripts/crew.gd`). Driver and Gunner have their own seats. Mechanic, Spotter, Engineer, Medic, Scavenger and Bruiser take a frame's open seats, one of each class aboard (Courier 1, Scrap Frame 1, Bulwark 2). Higher rarity = higher level cap, better passive, stronger ability, and more perks.
 
 ## Abilities (Common baseline; improve with level and rarity)
 
-- Driver: Passive +mobility (turn/drift recovery). Triggered short handling boost. Epic+ can add speed spike.
+Each class has a passive, and each hire rolls a specialty within the class that sets their triggered ability.
 
-- Gunner: Passive accuracy/tracking. Triggered overcharge (fire rate + damage). Epic+ can extend lock range.
+- Driver: Passive turn/grip. Wheelman: Hard Line (handling boost; Epic+ speed spike). Speedster: Floor It. Bootlegger: Bootleg Turn.
 
-- Mechanic: Passive armor integrity. Triggered emergency patch (restore armor + clear one status). Epic+ short damage reduction.
+- Gunner: Passive spread/turret aim (Epic+ lock range). Gunslinger: Overcharge. Marksman: Deadeye. Breacher: Piercing Rounds.
 
-- Spotter: Passive utility duration/cooldown. Triggered mark (highlight + damage amp on priority target).
+- Mechanic: Passive damage reduction. Patcher: Field Repair (armor, throws off Hunters; Epic+ short damage reduction). Welder: Weld Plates.
 
-Injury: chance on any combat. Injured crew have ~50% passive effectiveness and weakened/disabled triggered ability. Must rest in Inn for a set number of days (Inn upgrades can shorten). Cannot be assigned or sent on expeditions while resting.
+- Spotter: Passive utility cooldowns. Marker: Mark (damage amp on the priority target). Scout: Flare (slow and amp shamblers nearby).
 
-Permanent loss: only on vehicle destruction. Free Common basics always available at Saloon to prevent soft-lock. Expeditions level reserve crew passively.
+- Engineer: Passive power output. Overclocker: Overclock. Tinkerer: Reroute.
+
+- Medic: Passive crew injury chance. Field Medic: Field Dressing. Combat Medic: Stim.
+
+- Scavenger: Passive kill scrap and schematic odds. Magpie: Magnet. Salvager: Gold Rush.
+
+- Bruiser: Passive ram dealt and taken. Bracer: Brace. Breaker: Shockwave.
+
+Leveling: level caps 5 / 8 / 11 / 14 / 17 / 20 by rarity. XP is the job's skulls, split among the crew on the rig. At every 3rd level the player picks 1 of 3 random perks from the class's pool (4 shared + 4 class perks), no repeats.
+
+In a mission, crew abilities fire from a crew wheel. The fight slows to 25% while it's open; the player picks an ability or closes it, and the wheel has a short cooldown.
+
+Injury: a small chance on a big hit during a fight. An injured crew member loses their passive, perks and ability for the run, and the rig takes a class-specific penalty. Must rest in Inn for a set number of days (Inn upgrades can shorten). Cannot be assigned or sent on expeditions while resting.
+
+Permanent loss: only on vehicle destruction. Free Common basics (Driver, Gunner) always available at Saloon to prevent soft-lock. Expeditions level reserve crew passively.
 
 # 7. Missions, Districts, and Progression
 

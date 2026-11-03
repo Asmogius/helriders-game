@@ -47,13 +47,38 @@ The day loop works: open **COMMS**, take one of today's jobs, tune your rig in t
 
 ### Crew (Inn and Saloon)
 
-- Seats depend on the frame: Courier seats a Driver; Scrap Frame a Driver and a Gunner; Bulwark both, plus a Mechanic seat for later. You need a **Driver** to deploy.
+- **Eight classes.** Driver and Gunner have their own seats. Mechanic, Spotter, Engineer, Medic, Scavenger and Bruiser take a frame's **open seats**, one of each class aboard. Courier: Driver + 1 open. Scrap Frame: Driver, Gunner + 1 open. Bulwark: Driver, Gunner + 2 open. You need a **Driver** to deploy.
 - A turret needs someone to aim it: a seated **Gunner**, or a targeting computer. The **Targeting Computer** (free Common) aims turrets with no Gunner. The **Advanced Targeting Computer** (Rare) does that and is the only source of **LOCK**. Fixed guns need neither.
-- **Driver:** turn rate and grip bonus; **Hard Line** button boosts turn and grip for a few seconds (Epic and up also add a speed spike). **Gunner:** less spread and faster turret aim; **Overcharge** button boosts fire rate and damage (Epic and up also extend lock range).
-- Six rarities, Common to Mythic, with level caps 5 / 8 / 11 / 14 / 17 / 20. A finished job's XP (its skulls) is split evenly among the crew on the rig.
-- **Injuries:** taking more than 15% of max armor inside a second is a big hit, with a 20% chance to injure a random crew member (10% with a Roll Cage). An injured Driver halves turn rate, an injured Gunner halves turret aim, and either one loses their bonus and button for the run. After the run they rest at the Inn for 2 days (3 after a 5- or 6-skull job).
+- **Passives** (Common to Mythic, at level 1; each level adds a little):
+
+  | Class | Passive | Injured |
+  |---|---|---|
+  | Driver | turn +4-14%, grip +0.3-1.3 | turn rate halved |
+  | Gunner | spread -10-35%, turret aim +5-18% (Epic+: lock range) | turret aim halved |
+  | Mechanic | damage taken -4-9% | repairs halved |
+  | Spotter | utility cooldowns -8-18% | utility cooldowns x1.5 |
+  | Engineer | power output +5-15% | power output x0.8 |
+  | Medic | crew injury chance -15-40% | injury chance x1.5 |
+  | Scavenger | kill scrap +10-35%, schematic odds +2-7 pts | kill scrap halved |
+  | Bruiser | ram +10-35%, ram taken -10-25% | ram taken x1.5 |
+
+- **Specialties:** each hire rolls a specialty in their class, and the specialty sets their triggered ability. Higher rarity: +10% effect and duration and 1 s less cooldown per step.
+
+  | Class | Specialties (ability) |
+  |---|---|
+  | Driver | Wheelman (Hard Line), Speedster (Floor It: speed +35%, accel +50%), Bootlegger (Bootleg Turn: swing round, keep speed) |
+  | Gunner | Gunslinger (Overcharge), Marksman (Deadeye: no spread, faster bullets, +25% damage), Breacher (Piercing Rounds: through 3 shamblers) |
+  | Mechanic | Patcher (Field Repair: 30 armor, throws off Hunters; Epic+ also 3 s of -30% damage), Welder (Weld Plates: damage taken -50%) |
+  | Spotter | Marker (Mark: nearest Hunter or rig takes +30%), Scout (Flare: shamblers within 600 px slowed 40%, take +20%) |
+  | Engineer | Overclocker (Overclock: ignore overload, speed +20%), Tinkerer (Reroute: utility cooldowns cut in half) |
+  | Medic | Field Medic (Field Dressing: an injured crew member is back in the fight), Combat Medic (Stim: no injuries, passives +50%) |
+  | Scavenger | Magpie (Magnet: pulls salvage within 900 px), Salvager (Gold Rush: triple kill scrap) |
+  | Bruiser | Bracer (Brace: damage taken -60%, ram +50%), Breaker (Shockwave: 40 damage within 150 px) |
+
+- **Levels and perks:** six rarities, Common to Mythic, with level caps 5 / 8 / 11 / 14 / 17 / 20. A finished job's XP (its skulls) is split evenly among the crew on the rig. At levels 3, 6, 9, 12, 15 and 18 you pick 1 of 3 random perks from the class's pool (4 shared: Veteran, Quick Hands, Endurance, Tough; plus 4 for the class). A Common earns 1 perk, a Mythic 6. Pick at the Inn: tap a **PERK READY** card, then **PICK PERK**.
+- **Injuries:** taking more than 15% of max armor inside a second is a big hit, with a 20% chance to injure a random crew member (10% with a Roll Cage; a Medic lowers it). An injured crew member loses their passive, perks and ability for the run, and the rig takes their class's penalty. After the run they rest at the Inn for 2 days (3 after a 5- or 6-skull job).
 - **Wrecks** kill everyone seated. Crew at the Inn are safe.
-- **Inn:** your roster (up to 6): seat, unseat or dismiss. **Saloon:** 3 hires a day (Uncommon 80 scrap 60%, Rare 200 28%, Epic 450 9%, Legendary 900 2.5%, Mythic 1600 0.5%) plus a free Common Driver and Gunner who are always there.
+- **Inn:** your roster (up to 6): seat, unseat, dismiss, pick perks. **Saloon:** 3 hires a day, any class (Uncommon 80 scrap 60%, Rare 200 28%, Epic 450 9%, Legendary 900 2.5%, Mythic 1600 0.5%), plus a free Common Driver and Gunner who are always there. A Scavenger with Haggler takes 10% off.
 
 ### Mission
 
@@ -63,8 +88,8 @@ The day loop works: open **COMMS**, take one of today's jobs, tune your rig in t
 - **Lock comes from a part.** The Advanced Targeting Computer sits in one of the chassis's internal slots, and the weapon has to support lock (turrets do, fixed guns don't). Without both, there's no LOCK button. The starter rig has none.
 - **Power** works like Armored Core's energy load. Every installed part draws power all the time, against the engine's output. The thin bar under armor shows the total. The starter rig sits at 75/100; the Advanced Targeting Computer draws 30, so LOCK on the starter wants a bigger engine. Go over budget and the rig is overloaded: acceleration and top speed drop until the build fits again. Switching lock on or off costs nothing extra.
 - **Weight** works the same way against the frame's capacity. The starter weighs 80 of 100; Riot Plating takes it to 100.
-- **Crew buttons** sit next to LOCK (Hard Line, Overcharge), before the utility buttons.
-- **Utility buttons** sit left of LOCK, one per utility part, with a cooldown sweep. **Emergency Patch** restores 35 armor (25 s). **Mine Dropper** drops 3 mines behind you (15 s); each arms after 0.5 s, does 60 damage in a small blast when anything hostile touches it, and lasts 20 s. Your mines never hurt you.
+- **CREW button** sits next to LOCK. It opens the **crew wheel**: one slice per crew member with their ability and its cooldown. The fight runs at 25% speed while the wheel is open; pick an ability or close the wheel. The wheel then takes 3 s to cool down. Injured crew grey out.
+- **Utility buttons** sit left of CREW, one per utility part, with a cooldown sweep. **Emergency Patch** restores 35 armor (25 s). **Mine Dropper** drops 3 mines behind you (15 s); each arms after 0.5 s, does 60 damage in a small blast when anything hostile touches it, and lasts 20 s. Your mines never hurt you.
 - **Ramming:** fast hits kill shamblers and Hunters. Slow pushes get you clogged in the crowd.
 - **Hunter:** it pulses red before it leaps. If it latches on, it chews armor until you crush it into a wall, scrape it along one, or shoot it.
 - **Outrider:** a fast enemy rig with forward guns that makes strafing passes. Wreck it and it drops a schematic you don't own yet, or a scrap cache once you have them all. Drive over the crate to grab it.
@@ -81,7 +106,7 @@ Shamblers spawn in packs from off-screen, path around buildings, block the rig, 
 | Engine | Godot 4.7.2, GDScript |
 | Renderer | Compatibility (OpenGL ES 3) for 2020-era Android phones |
 | Target | Stable 30 fps on 3–4 GB Android phones, 60 fps mid-range |
-| Build | GitHub Actions: import, three headless tests, debug APK, publish |
+| Build | GitHub Actions: import, four headless tests, debug APK, publish |
 
 Performance choices so far:
 
@@ -101,9 +126,9 @@ scenes/mission.tscn     the mission (runs scripts/mission.gd)
 scripts/
   garage.gd             Garage: slots, part cards, stat sheet, presets, upgrades, crew line
   comms.gd              Comms: job board, districts, Comms upgrades
-  inn.gd                Inn: crew roster, seats
+  inn.gd                Inn: crew roster, seats, perk picks
   saloon.gd             Saloon: daily hires and free basics
-  crew.gd               crew roles, rarities, levels, passives and abilities
+  crew.gd               crew classes, specialties, rarities, levels, perks, modifiers
   crew_card.gd          a crew member as a card
   missions.gd           daily board and per-job setup (types, skulls, pay)
   profile.gd            save game (autoload "Profile"): scrap, schematics, rig, economy rules
@@ -127,11 +152,12 @@ scripts/
   lock_reticle.gd       brackets on the locked target
   arena.gd              the city block and its collision
   chase_camera.gd       follow camera
-  hud.gd                HUD, lock and utility buttons, banners, results card, threat arrows
+  hud.gd                HUD, lock, crew wheel and utility buttons, banners, results card, threat arrows
   thumb_stick.gd        floating touch joystick
 tests/smoke_test.gd     headless mission test, run in CI
 tests/garage_test.gd    headless Garage and economy test, run in CI
 tests/missions_test.gd  headless board, districts and mission-type test, run in CI
+tests/crew_test.gd      headless crew classes, specialties, perks and seats test, run in CI
 .github/workflows/      Android build
 ci/debug.keystore       debug-only signing key (see below)
 ```
@@ -143,6 +169,7 @@ godot --headless --path . --import
 godot --headless --fixed-fps 60 --path . -s res://tests/smoke_test.gd
 godot --headless --fixed-fps 60 --path . -s res://tests/garage_test.gd
 godot --headless --fixed-fps 60 --path . -s res://tests/missions_test.gd
+godot --headless --fixed-fps 60 --path . -s res://tests/crew_test.gd
 godot --path .   # play on desktop; mouse acts as a single touch
 ```
 
@@ -166,5 +193,6 @@ From DESIGN §13:
 - [x] Comms screen: daily job board with Clear, Survive, Hunt and Courier; districts
 - [x] First parts batch: 18 new schematics, weight, two hardpoints, pellets, Emergency Patch and Mine Dropper, 1-6 skull jobs
 - [x] Driver + Gunner crew with passive and triggered abilities, Inn and Saloon
+- [x] Crew expansion: eight classes, specialties, perks, open seats, crew wheel
 - [ ] Pixel-voxel art pipeline (voxel models rendered to sprite sheets)
 - [ ] Pause menu with Low / Medium / High / Ultra presets

@@ -13,6 +13,8 @@ extends CharacterBody2D
 signal wrecked
 signal damaged(amount: float)
 signal crew_injured(index: int)
+signal crew_healed(index: int)
+signal crew_ability_used(kind: String, ability: Dictionary)   # Mark, Flare, Magnet: the mission acts
 
 const T := preload("res://scripts/tuning.gd")
 const Hostile := preload("res://scripts/hostile.gd")
@@ -64,6 +66,11 @@ var injury_mult := 1.0             # crew injury chance multiplier (Roll Cage)
 var crew: Array[Dictionary] = []
 var big_hits := 0                  # big hits taken (tests and stats)
 # Live crew modifiers, rebuilt by _refresh_crew_mods() when anything changes.
+var crew_mods: Dictionary = Crew.base_mods()
+var latch_mult := 1.0              # latched Hunter damage (hunter.gd reads it)
+var vuln := 1.0                    # damage taken while marked (enemy rigs)
+var vuln_left := 0.0
+var crew_accel := 1.0
 var crew_turn := 1.0
 var crew_grip := 0.0
 var crew_speed := 1.0
@@ -115,10 +122,8 @@ var _barrel_side := 1.0
 var _lock_check := 0.0
 var _lock_blind := 0.0
 var _ray := PhysicsRayQueryParameters2D.new()
-var _hard_line_left := 0.0
-var _hard_line := {}
-var _overcharge_left := 0.0
-var _overcharge := {}
+var _active := {}                  # crew ability kind -> its numbers + "left"
+var _base_armor := 0.0
 var _streak_timer := 0.0
 # Damage taken per 0.1 s over the last second (big-hit check). No allocation.
 var _dmg_buckets := PackedFloat32Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
@@ -138,7 +143,8 @@ func apply_stats(s: Dictionary) -> void:
 	coast = s.coast
 	turn_rate = s.turn_rate
 	grip = s.grip
-	armor_max = s.armor
+	_base_armor = s.armor
+	armor_max = _base_armor * float(crew_mods.armor)   # Reinforced keeps across a part swap
 	ram_damage = s.ram_damage
 	mount = s.mount
 	fire_rate = s.fire_rate
@@ -244,55 +250,46 @@ func can_aim_turrets() -> bool:
 func set_crew(members: Array) -> void:
 	crew.clear()
 	for m: Dictionary in members:
-		crew.append({
-			"id": int(m.id), "name": str(m.name), "role": str(m.role),
-			"injured": false, "passive": Crew.passive(m), "ability": Crew.ability(m), "ready_in": 0.0,
-		})
-	_hard_line_left = 0.0
-	_overcharge_left = 0.0
+		var e := Crew.entry(m)
+		e.merge({"id": int(m.id), "name": str(m.name), "specialty": Crew.specialty(m),
+			"tough": Crew.has_perk(m, "tough"), "ability": Crew.ability(m), "ready_in": 0.0})
+		crew.append(e)
+	_active.clear()
 	_refresh_crew_mods()
+	armor = armor_max
 
 
 func _refresh_crew_mods() -> void:
-	crew_turn = 1.0
-	crew_grip = 0.0
-	crew_speed = 1.0
-	crew_aim = 1.0
-	crew_spread = 1.0
-	crew_lock = 1.0
-	crew_fire = 1.0
-	crew_damage = 1.0
-	for c in crew:
-		var p: Dictionary = c.passive
-		match str(c.role):
-			"driver":
-				if bool(c.injured):
-					crew_turn *= T.CREW_INJURED_MULT
-				else:
-					crew_turn *= 1.0 + float(p.turn)
-					crew_grip += float(p.grip)
-			"gunner":
-				if bool(c.injured):
-					crew_aim *= T.CREW_INJURED_MULT
-				else:
-					crew_spread *= 1.0 - float(p.spread)
-					crew_aim *= 1.0 + float(p.aim)
-					crew_lock *= 1.0 + float(p.lock)
-	if _hard_line_left > 0.0:
-		crew_turn *= 1.0 + float(_hard_line.turn)
-		crew_grip += float(_hard_line.grip)
-		crew_speed *= 1.0 + float(_hard_line.speed)
-	if _overcharge_left > 0.0:
-		crew_fire *= 1.0 + float(_overcharge.fire)
-		crew_damage *= 1.0 + float(_overcharge.damage)
+	var active := {}
+	for kind: String in _active:
+		active[kind] = _active[kind]
+	crew_mods = Crew.compute_mods(crew, active)
+	crew_turn = float(crew_mods.turn)
+	crew_grip = float(crew_mods.grip)
+	crew_speed = float(crew_mods.speed)
+	crew_accel = float(crew_mods.accel)
+	crew_aim = float(crew_mods.aim)
+	crew_spread = float(crew_mods.spread)
+	crew_lock = float(crew_mods.lock)
+	crew_fire = float(crew_mods.fire)
+	crew_damage = float(crew_mods.damage)
+	latch_mult = float(crew_mods.latch)
+	if _base_armor > 0.0:
+		armor_max = _base_armor * float(crew_mods.armor)
+		armor = minf(armor, armor_max)
 	for t in _turrets:
 		if t != null:
-			t.set("hot", _overcharge_left > 0.0)
+			t.set("hot", _active.has("overcharge") or _active.has("deadeye"))
 			t.queue_redraw()
 	queue_redraw()
 
 
-## Fire crew member `index`'s triggered ability (their HUD button).
+## A crew modifier by name (see Crew.base_mods()).
+func crew_mod(key: String) -> Variant:
+	return crew_mods.get(key, Crew.base_mods().get(key))
+
+
+## Fire crew member `index`'s triggered ability (from the crew wheel).
 func use_crew_ability(index: int) -> bool:
 	if is_wrecked or index < 0 or index >= crew.size():
 		return false
@@ -300,14 +297,48 @@ func use_crew_ability(index: int) -> bool:
 	if bool(c.injured) or float(c.ready_in) > 0.0:
 		return false
 	var a: Dictionary = c.ability
+	var kind := str(a.kind)
+	match kind:
+		"field_dressing":
+			# Only with someone to treat.
+			var patient := -1
+			for i in crew.size():
+				if bool(crew[i].injured):
+					patient = i
+					break
+			if patient < 0:
+				return false
+			crew[patient].injured = false
+			crew_healed.emit(patient)
+		"field_repair":
+			armor = minf(armor + float(a.heal) * float(crew_mods.repair), armor_max)
+			throw_off_hunters()
+			if fx != null:
+				fx.call("repair", global_position)
+			if bool(a.get("epic", false)):
+				_active["repair_guard"] = {"dr": float(a.epic_dr), "left": float(a.epic_time)}
+		"bootleg":
+			# Snap to face the left stick (or swing round), keeping speed.
+			var heading := drive_input.angle() if drive_input.length() > 0.2 else rotation + PI
+			var speed := velocity.length()
+			rotation = heading
+			velocity = Vector2.RIGHT.rotated(heading) * speed
+		"reroute":
+			for u in abilities:
+				u.ready_in = float(u.ready_in) * (1.0 - minf(float(a.cut), 0.95))
+		"shockwave":
+			_shockwave(float(a.damage), float(a.radius))
+		"mark", "flare", "magnet":
+			crew_ability_used.emit(kind, a)
+			if a.time > 0.0:
+				var timed := a.duplicate()
+				timed.left = float(a.time)
+				_active[kind] = timed
+		_:
+			var timed := a.duplicate()
+			timed.left = float(a.time)
+			_active[kind] = timed
 	c.ready_in = float(a.cooldown)
-	match str(a.kind):
-		"hard_line":
-			_hard_line = a
-			_hard_line_left = float(a.time)
-		"overcharge":
-			_overcharge = a
-			_overcharge_left = float(a.time)
 	_refresh_crew_mods()
 	return true
 
@@ -324,48 +355,85 @@ func is_crew_injured(index: int) -> bool:
 	return index >= 0 and index < crew.size() and bool(crew[index].injured)
 
 
+func ability_active(kind: String) -> bool:
+	return _active.has(kind)
+
+
 func hard_line_active() -> bool:
-	return _hard_line_left > 0.0
+	return _active.has("hard_line")
 
 
 func overcharge_active() -> bool:
-	return _overcharge_left > 0.0
+	return _active.has("overcharge")
 
 
-## Injure crew member `index` now: their passive and button are gone for the
-## run, and the rig takes their role's debuff.
+## Throw every Hunter off the hull (Field Repair, Shake It Off).
+func throw_off_hunters() -> void:
+	for h: Node2D in latched.duplicate():
+		var away := (h.global_position - global_position).normalized()
+		h.call("knock_off", away if away != Vector2.ZERO else Vector2.RIGHT)
+
+
+func _shockwave(damage: float, radius: float) -> void:
+	var shape := CircleShape2D.new()
+	shape.radius = radius
+	var query := PhysicsShapeQueryParameters2D.new()
+	query.shape = shape
+	query.transform = Transform2D(0.0, global_position)
+	query.collision_mask = T.LAYER_ZOMBIE | (T.LAYER_ENEMY if team == BulletPool.TEAM_PLAYER else T.LAYER_VEHICLE)
+	for hit: Dictionary in get_world_2d().direct_space_state.intersect_shape(query, 32):
+		var body: Object = hit.collider
+		if body != null and body != self and body.has_method("take_hit"):
+			var away: Vector2 = ((body as Node2D).global_position - global_position).normalized()
+			body.call("take_hit", damage, away * 500.0, "shockwave")
+	throw_off_hunters()
+	if fx != null:
+		fx.call("blast", global_position, radius)
+
+
+## Injure crew member `index` now: their passive, perks and ability are gone
+## for the run, and the rig takes their class's debuff.
 func injure_crew(index: int) -> void:
 	if index < 0 or index >= crew.size() or bool(crew[index].injured):
 		return
 	var c := crew[index]
 	c.injured = true
-	match str(c.role):
-		"driver":
-			_hard_line_left = 0.0
-		"gunner":
-			_overcharge_left = 0.0
+	_active.erase(str(c.ability.kind))
+	if str(c.ability.kind) == "field_repair":
+		_active.erase("repair_guard")
 	_refresh_crew_mods()
 	crew_injured.emit(index)
 
 
-## A big hit (over CREW_BIG_HIT of max armor inside a second) may injure a
-## random crew member who isn't hurt yet.
+## A big hit (over the big-hit share of max armor inside a second) may injure
+## a random crew member who isn't hurt yet. Tough crew are half as likely to
+## be the one.
 func _check_big_hit() -> void:
 	var total := 0.0
 	for v in _dmg_buckets:
 		total += v
-	if total <= armor_max * T.CREW_BIG_HIT:
+	if total <= armor_max * float(crew_mods.big_hit):
 		return
 	big_hits += 1
 	_dmg_buckets.fill(0.0)
-	if randf() >= T.CREW_INJURY_CHANCE * injury_mult:
+	if bool(crew_mods.immune):
 		return
-	var fit: Array[int] = []
+	if randf() >= T.CREW_INJURY_CHANCE * injury_mult * float(crew_mods.injury):
+		return
+	var weights := 0.0
+	for c in crew:
+		if not bool(c.injured):
+			weights += 0.5 if bool(c.tough) else 1.0
+	if weights <= 0.0:
+		return
+	var roll := randf() * weights
 	for i in crew.size():
-		if not bool(crew[i].injured):
-			fit.append(i)
-	if not fit.is_empty():
-		injure_crew(fit[randi_range(0, fit.size() - 1)])
+		if bool(crew[i].injured):
+			continue
+		roll -= 0.5 if bool(crew[i].tough) else 1.0
+		if roll <= 0.0:
+			injure_crew(i)
+			return
 
 
 func _tick_crew(delta: float) -> void:
@@ -377,28 +445,43 @@ func _tick_crew(delta: float) -> void:
 		_dmg_buckets[_bucket_i] = 0.0
 	for c in crew:
 		c.ready_in = maxf(float(c.ready_in) - delta, 0.0)
-	var ended := false
-	if _hard_line_left > 0.0:
-		_hard_line_left -= delta
-		ended = ended or _hard_line_left <= 0.0
-		# Cyan streaks off the rear tyres.
+	if _active.is_empty():
+		return
+	var ended: Array[String] = []
+	for kind: String in _active:
+		var a: Dictionary = _active[kind]
+		a.left = float(a.left) - delta
+		if float(a.left) <= 0.0:
+			ended.append(kind)
+	# Tyre streaks while a driving ability runs: cyan Hard Line, orange Floor It.
+	var streak := T.COL_CYAN if _active.has("hard_line") else (T.COL_ORANGE if _active.has("floor_it") or _active.has("overclock") else Color.TRANSPARENT)
+	if streak.a > 0.0:
 		_streak_timer -= delta
 		if fx != null and _streak_timer <= 0.0 and velocity.length() > 120.0:
 			_streak_timer = 0.04
 			var back := -Vector2.RIGHT.rotated(rotation) * body_len * 0.4
 			var side := Vector2.RIGHT.rotated(rotation).orthogonal() * body_wid * 0.5
 			for s: float in [-1.0, 1.0]:
-				fx.call("emit", global_position + back + side * s, -velocity * 0.1, 0.35, 4.0, T.COL_CYAN, 4.0)
-	if _overcharge_left > 0.0:
-		_overcharge_left -= delta
-		ended = ended or _overcharge_left <= 0.0
-	if ended:
+				fx.call("emit", global_position + back + side * s, -velocity * 0.1, 0.35, 4.0, streak, 4.0)
+	if not ended.is_empty():
+		for kind in ended:
+			_active.erase(kind)
 		_refresh_crew_mods()
 
 
-## Power drawn by the build. Fixed by what's installed, not by what's switched on.
+## Power drawn by the build (crew can trim it). Fixed by what's installed,
+## not by what's switched on.
 func power_load() -> float:
-	return power_draw
+	return power_draw * float(crew_mods.draw)
+
+
+## The engine's output with crew bonuses (Engineer).
+func power_capacity() -> float:
+	return power_output * float(crew_mods.power)
+
+
+func weight_limit() -> float:
+	return weight_capacity * float(crew_mods.weight_cap)
 
 
 func is_overloaded() -> bool:
@@ -406,18 +489,20 @@ func is_overloaded() -> bool:
 
 
 func is_power_overloaded() -> bool:
-	return power_output > 0.0 and power_load() > power_output
+	return power_output > 0.0 and power_load() > power_capacity()
 
 
 func is_weight_overloaded() -> bool:
-	return weight_capacity > 0.0 and weight_load > weight_capacity
+	return weight_capacity > 0.0 and weight_load > weight_limit()
 
 
 ## 1.0 within budget; less when overloaded on power or weight (scales top
-## speed and acceleration).
+## speed and acceleration). Overclock ignores overload while it runs.
 func mobility() -> float:
-	return Loadout.mobility({"power_draw": power_load(), "power_output": power_output,
-		"weight": weight_load, "weight_capacity": weight_capacity})
+	if bool(crew_mods.ignore_overload):
+		return 1.0
+	return Loadout.mobility({"power_draw": power_load(), "power_output": power_capacity(),
+		"weight": weight_load, "weight_capacity": weight_limit()})
 
 
 func _ready() -> void:
@@ -457,6 +542,10 @@ func _physics_process(delta: float) -> void:
 		return
 	if not crew.is_empty():
 		_tick_crew(delta)
+	if vuln_left > 0.0:
+		vuln_left -= delta
+		if vuln_left <= 0.0:
+			queue_redraw()
 	_drive(delta)
 	_update_lock(delta)
 	_weapons(delta)
@@ -504,12 +593,12 @@ func _drive(delta: float) -> void:
 	var power := mobility()
 	if throttle > 0.0:
 		var target := throttle * max_speed * power * crew_speed
-		var rate := acceleration * power if fwd_speed < target else coast
+		var rate := acceleration * power * crew_accel if fwd_speed < target else coast
 		if fwd_speed < 0.0:
 			rate = brake
 		fwd_speed = move_toward(fwd_speed, target, rate * delta)
 	elif throttle < 0.0:
-		var rate := brake if fwd_speed > 0.0 else acceleration * power
+		var rate := brake if fwd_speed > 0.0 else acceleration * power * crew_accel
 		fwd_speed = move_toward(fwd_speed, throttle * reverse_speed * power, rate * delta)
 	else:
 		fwd_speed = move_toward(fwd_speed, 0.0, coast * delta)
@@ -537,8 +626,10 @@ func _resolve_collisions(pre_velocity: Vector2) -> void:
 			if already_hit.has(hostile) or impact < RAM_MIN_SPEED:
 				continue
 			already_hit.append(hostile)
-			var damage := ram_damage * clampf(impact / max_speed, 0.0, 1.2)
+			var damage := ram_damage * float(crew_mods.ram) * clampf(impact / max_speed, 0.0, 1.2)
 			hostile.take_hit(damage, pre_velocity.normalized() * impact * 0.6, "rammed")
+			if bool(crew_mods.shake_off):
+				throw_off_hunters()
 			if not hostile.active:
 				plowed_through = true
 		elif other != null and other.has_method("receive_ram"):
@@ -546,7 +637,9 @@ func _resolve_collisions(pre_velocity: Vector2) -> void:
 			if already_hit.has(other) or impact < RAM_MIN_SPEED:
 				continue
 			already_hit.append(other)
-			other.call("receive_ram", ram_damage * clampf(impact / max_speed, 0.0, 1.2))
+			other.call("receive_ram", ram_damage * float(crew_mods.ram) * clampf(impact / max_speed, 0.0, 1.2))
+			if bool(crew_mods.shake_off):
+				throw_off_hunters()
 		else:
 			hit_wall = true
 			normal = collision.get_normal()
@@ -555,13 +648,13 @@ func _resolve_collisions(pre_velocity: Vector2) -> void:
 	# Only a fresh crash counts as an impact; grinding along a wall doesn't.
 	wall_impact = impact_max if hit_wall and not touching_wall else 0.0
 	if wall_impact > WALL_DAMAGE_SPEED:
-		take_damage((wall_impact - WALL_DAMAGE_SPEED) * 0.05)
+		take_damage((wall_impact - WALL_DAMAGE_SPEED) * 0.05 * float(crew_mods.wall))
 	touching_wall = hit_wall
 	wall_normal = normal
 
 	if plowed_through and not hit_wall:
 		# Plowing through a body that died shouldn't stop the rig dead.
-		velocity = pre_velocity * 0.88
+		velocity = pre_velocity * (1.0 if bool(crew_mods.plow) else 0.88)
 	else:
 		# Keep only the speed we actually achieved, so pinning the rig against
 		# a wall doesn't leave phantom speed in the model.
@@ -717,9 +810,11 @@ func _shoot(w: Dictionary, muzzle: Vector2, direction: Vector2) -> void:
 			bullets.record_direct_hit()
 			return
 	var cone := deg_to_rad(float(w.spread_deg) * crew_spread)
+	var speed := float(w.bullet_speed) * float(crew_mods.bullet_speed)
+	var pierce := int(crew_mods.pierce)
 	for p in pellets:
 		var dir := direction.rotated(randf_range(-cone, cone))
-		bullets.fire(muzzle, dir * float(w.bullet_speed) * randf_range(0.95, 1.05) if pellets > 1 else dir * float(w.bullet_speed), damage, team)
+		bullets.fire(muzzle, dir * speed * randf_range(0.95, 1.05) if pellets > 1 else dir * speed, damage, team, pierce)
 
 
 # --- Utilities ---------------------------------------------------------------------
@@ -731,10 +826,10 @@ func use_ability(index: int) -> bool:
 	var a := abilities[index]
 	if float(a.ready_in) > 0.0:
 		return false
-	a.ready_in = float(a.cooldown)
+	a.ready_in = float(a.cooldown) * float(crew_mods.util_cd)
 	match str(a.ability):
 		"patch":
-			armor = minf(armor + float(a.heal), armor_max)
+			armor = minf(armor + float(a.heal) * float(crew_mods.patch) * float(crew_mods.repair), armor_max)
 			if fx != null:
 				fx.call("repair", global_position)
 		"mines":
@@ -744,7 +839,7 @@ func use_ability(index: int) -> bool:
 				for m in count:
 					var side := (float(m) - (count - 1) * 0.5) * 34.0
 					var at := global_position + back * (body_len * 0.5 + 18.0) + back.orthogonal() * side
-					mines.call("drop", at, float(a.mine_damage), float(a.mine_radius), float(a.mine_arm), float(a.mine_life))
+					mines.call("drop", at, float(a.mine_damage) * float(crew_mods.mine), float(a.mine_radius), float(a.mine_arm), float(a.mine_life))
 	return true
 
 
@@ -753,7 +848,7 @@ func ability_charge(index: int) -> float:
 	if index < 0 or index >= abilities.size():
 		return 0.0
 	var a := abilities[index]
-	return clampf(float(a.ready_in) / maxf(float(a.cooldown), 0.01), 0.0, 1.0)
+	return clampf(float(a.ready_in) / maxf(float(a.cooldown) * float(crew_mods.util_cd), 0.01), 0.0, 1.0)
 
 
 # --- Damage ----------------------------------------------------------------------
@@ -761,16 +856,26 @@ func ability_charge(index: int) -> float:
 func take_hit(damage: float, impulse: Vector2, _cause := "shot") -> void:
 	if not is_wrecked:
 		velocity += impulse * 0.15
+	if vuln_left > 0.0:
+		damage *= vuln
 	take_damage(damage)
 
 
 func receive_ram(damage: float) -> void:
-	take_damage(damage)
+	take_damage(damage * float(crew_mods.ram_taken))
+
+
+## Marked by a Spotter: takes `mult` damage for `seconds`.
+func apply_status(mult: float, _slow: float, seconds: float) -> void:
+	vuln = mult
+	vuln_left = seconds
+	queue_redraw()
 
 
 func take_damage(amount: float) -> void:
 	if is_wrecked or amount <= 0.0:
 		return
+	amount *= float(crew_mods.taken)
 	armor -= amount
 	if amount >= 2.0:
 		_flash = 1.0
@@ -880,7 +985,7 @@ func _draw() -> void:
 		if int(w.mount) == Mount.FIXED:
 			draw_rect(Rect2(half_l - 16.0, -12.0, 22.0, 4.0), Color(0.15, 0.15, 0.16))
 			draw_rect(Rect2(half_l - 16.0, 8.0, 22.0, 4.0), Color(0.15, 0.15, 0.16))
-			if _overcharge_left > 0.0:
+			if _active.has("overcharge") or _active.has("deadeye"):
 				draw_rect(Rect2(half_l + 2.0, -12.0, 4.0, 4.0), Color(1.0, 0.95, 0.8))
 				draw_rect(Rect2(half_l + 2.0, 8.0, 4.0, 4.0), Color(1.0, 0.95, 0.8))
 			break

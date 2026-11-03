@@ -8,7 +8,7 @@ The owner works from a phone and has no computer, so nobody opens the Godot edit
 - `scripts/tuning.gd` holds every balance number, color and collision layer. Tune there, not inside gameplay scripts.
 - `scripts/parts.gd` holds part schematics (stats, slots, power, weight), the drop pools and the starter loadout. Part numbers were approved by the owner in the "Helriders: New Parts Draft" doc; don't change them without asking. `scripts/loadout.gd` is the only place that combines parts into rig stats (weapons list, internal modifiers, abilities, power and weight budgets). Player capabilities come from parts and crew: for example, lock exists only with the Advanced Targeting Computer in an internal slot and a weapon whose `lock_range` > 0, and a turret aims only with a seated Gunner or a targeting computer.
 - Utility parts are abilities: `vehicle.gd` `use_ability(i)` runs them, `hud.gd` shows a button each. A new utility needs a case there and, if it spawns things, a pooled single-node drawer like `mine_pool.gd`.
-- Crew: `scripts/crew.gd` holds the roles, rarities, level curve, passives and triggered abilities (numbers approved in the "Helriders: Crew Draft" doc; don't change them without asking). `profile.gd` owns the roster, seats, Saloon offers, XP and rest; `vehicle.gd` applies crew live (`set_crew`, `crew_*` modifiers, `injure_crew`). HUD buttons are crew first, then utilities.
+- Crew: `scripts/crew.gd` holds the eight classes, specialties and their abilities, rarities, level curve, passives, injury debuffs and perks (numbers approved in the "Helriders: Crew Draft" and "Helriders: Crew Expansion Draft" docs; don't change them without asking). `Crew.compute_mods()` is the only place crew turn into rig modifiers; the Garage stat sheet and `vehicle.gd` both call it. `profile.gd` owns the roster, seats (Driver, Gunner, open seats with one of each class), perk offers and picks, Saloon offers, XP and rest; `vehicle.gd` applies crew live (`set_crew`, `crew_mod()`, `use_crew_ability`, `injure_crew`). A new ability needs a case in `Crew._apply_active` (timed modifiers) or `vehicle.use_crew_ability` (instant effects), or `mission._on_crew_ability` if it reaches past the rig. Crew abilities fire from the HUD crew wheel (`hud.open_crew_wheel`, `pick_crew`), which slows the game while open; utilities keep their own buttons.
 
 - `scripts/profile.gd` (autoload `Profile`) is the save game: scrap, schematics, storage, the rig, presets, upgrades. Every change saves to `user://`. Economy rules agreed with the owner are listed at the top of that file; don't change them without asking.
 
@@ -48,6 +48,7 @@ godot --headless --path . --import                  # must print no "SCRIPT ERRO
 godot --headless --fixed-fps 60 --path . -s res://tests/smoke_test.gd   # must end "SMOKE TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/garage_test.gd  # must end "GARAGE TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/missions_test.gd # must end "MISSIONS TEST PASSED"
+godot --headless --fixed-fps 60 --path . -s res://tests/crew_test.gd     # must end "CREW TEST PASSED"
 ```
 
 - Tests must call `Profile.new_game()` with `persist = false` first, so they never touch a real save.

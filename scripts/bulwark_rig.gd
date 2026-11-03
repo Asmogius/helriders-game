@@ -149,6 +149,8 @@ func _draw() -> void:
 		draw_colored_polygon(PackedVector2Array([Vector2(half_l + 2.0, y - 3.0), Vector2(half_l + 11.0, y), Vector2(half_l + 2.0, y + 3.0)]), Color(0.72, 0.68, 0.6))
 	# The light gun, centered on the nose.
 	draw_rect(Rect2(half_l - 24.0, -2.5, 26.0, 5.0), Color(0.12, 0.12, 0.13))
+	if vuln_left > 0.0:
+		draw_arc(Vector2.ZERO, half_l + 10.0, 0.0, TAU, 28, Color(0.95, 0.3, 0.25, 0.85), 2.5)
 	# Cab, and red lights: enemies read red.
 	draw_rect(Rect2(-10.0, -9.0, 22.0, 18.0), hull.darkened(0.45))
 	draw_rect(Rect2(-half_l + 4.0, -half_w + 4.0, body_len - 30.0, 2.0), T.COL_ENEMY)

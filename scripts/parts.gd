@@ -23,7 +23,8 @@ extends RefCounted
 ## at all. LOCK (auto-aim) comes only from a part with `enables_lock` (the
 ## Advanced Targeting Computer) and a weapon whose lock_range > 0.
 ##
-## Chassis `seats` lists the crew seats the frame has (crew.gd).
+## Chassis `seats` lists the crew seats the frame has (crew.gd): "driver",
+## "gunner", and "open" seats any other class can take (one of each class).
 
 const RARITY_COLORS := {
 	"Common": Color(0.75, 0.75, 0.72),
@@ -39,19 +40,19 @@ const CATALOG := {
 		"name": "Scrap Frame", "category": "Chassis", "rarity": "Common", "cost": 50, "power": 15.0,
 		"hardpoints": 1, "utility_slots": 1, "internal_slots": 2, "weight_capacity": 100.0,
 		"armor": 60.0, "max_speed": 560.0, "reverse_speed": 230.0, "coast": 280.0, "turn_rate": 3.4,
-		"body": [64.0, 36.0], "seats": ["driver", "gunner"],
+		"body": [64.0, 36.0], "seats": ["driver", "gunner", "open"],
 	},
 	"courier_frame": {
 		"name": "Courier Frame", "category": "Chassis", "rarity": "Uncommon", "cost": 90, "power": 12.0,
 		"hardpoints": 1, "utility_slots": 2, "internal_slots": 1, "weight_capacity": 80.0,
 		"armor": 45.0, "max_speed": 610.0, "reverse_speed": 250.0, "coast": 260.0, "turn_rate": 3.8,
-		"body": [66.0, 32.0], "seats": ["driver"],
+		"body": [66.0, 32.0], "seats": ["driver", "open"],
 	},
 	"bulwark_frame": {
 		"name": "Bulwark Frame", "category": "Chassis", "rarity": "Rare", "cost": 180, "power": 20.0,
 		"hardpoints": 2, "utility_slots": 1, "internal_slots": 2, "weight_capacity": 160.0,
 		"armor": 110.0, "max_speed": 500.0, "reverse_speed": 210.0, "coast": 300.0, "turn_rate": 3.0,
-		"body": [76.0, 42.0], "seats": ["driver", "gunner", "mechanic"],
+		"body": [76.0, 42.0], "seats": ["driver", "gunner", "open", "open"],
 	},
 	# --- Engines: acceleration and the power budget -------------------------------
 	"junk_v6": {

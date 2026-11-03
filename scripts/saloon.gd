@@ -65,7 +65,7 @@ func _ready() -> void:
 	_cards.add_theme_constant_override("separation", 14)
 	scroll.add_child(_cards)
 
-	var note := UI.label("New hires start at level 1. Offers change when the day ends. Free Common hires are always here, so you can never get stuck without a Driver.", 18, UI.TEXT_DIM)
+	var note := UI.label("New hires start at level 1 with a random specialty. Offers can be any class and change when the day ends. Free Common Drivers and Gunners are always here, so you can never get stuck without a Driver.", 18, UI.TEXT_DIM)
 	note.anchor_right = 1.0
 	note.offset_left = 24.0
 	note.offset_right = -24.0
@@ -90,7 +90,7 @@ func refresh() -> void:
 		var card := CrewCard.new()
 		card.member = m
 		card.selected = i == selected
-		var price := int(m.get("price", 0))
+		var price := profile.hire_price(m)
 		if bool(m.get("hired", false)):
 			card.status = "HIRED"
 			card.status_color = T.COL_CYAN
@@ -118,7 +118,7 @@ func offer(i: int) -> Dictionary:
 		return profile.saloon[i]
 	var role: String = FREE_ROLES[i - profile.saloon.size()]
 	return {"id": 0, "name": "Free %s" % Crew.ROLE_NAMES[role], "role": role, "rarity": "Common",
-		"xp": 0.0, "rest": 0, "seated": false, "price": 0}
+		"specialty": "", "xp": 0.0, "perks": [], "rest": 0, "seated": false, "price": 0}
 
 
 ## Why `i` can't be hired right now, or "".
@@ -130,8 +130,8 @@ func _block(i: int) -> String:
 		return "HIRED"
 	if profile.roster_full():
 		return "ROSTER FULL"
-	if int(m.get("price", 0)) > profile.scrap:
-		return "NEED %d SCRAP" % int(m.price)
+	if profile.hire_price(m) > profile.scrap:
+		return "NEED %d SCRAP" % profile.hire_price(m)
 	return ""
 
 

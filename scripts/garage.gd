@@ -362,8 +362,9 @@ func _build_rig_area() -> void:
 	_crew_line.flat = true
 	_crew_line.focus_mode = Control.FOCUS_NONE
 	_crew_line.anchor_right = 1.0
-	_crew_line.offset_left = TAG_SIZE.x + 40.0
-	_crew_line.offset_right = -(TAG_SIZE.x + 40.0)
+	_crew_line.offset_left = 20.0     # below the slot tags: the full width fits a Bulwark's 4 riders
+	_crew_line.offset_right = -20.0
+	_crew_line.clip_text = true
 	_crew_line.offset_top = 524.0
 	_crew_line.offset_bottom = 556.0
 	_crew_line.add_theme_font_size_override("font_size", 18)
@@ -591,13 +592,23 @@ func _refresh() -> void:
 ## "CREW   DRIVER Mae Voss L2   GUNNER empty", red when DEPLOY is blocked.
 func _refresh_crew_line() -> void:
 	var bits: Array[String] = []
+	var riders := profile.seated_crew()
 	for seat: String in profile.seats():
-		if seat == "mechanic":
+		if seat == "open":
 			continue
 		var m := profile.seated_in(seat)
-		var who := "empty" if m.is_empty() else "%s  %s L%d" % [m.name, m.rarity, Crew.level(m)]
-		bits.append("%s  %s" % [str(Crew.ROLE_NAMES[seat]).to_upper(), who])
-	_crew_line.text = "CREW     " + "      ".join(bits) + "      >"
+		bits.append("%s %s" % [str(Crew.ROLE_NAMES[seat]).to_upper(), "empty" if m.is_empty() else "%s L%d" % [m.name, Crew.level(m)]])
+	var open := profile.seats().count("open")
+	var filled := 0
+	for m in riders:
+		if Crew.OPEN_CLASSES.has(str(m.role)):
+			bits.append("%s %s L%d" % [Crew.role_name(m).to_upper(), m.name, Crew.level(m)])
+			filled += 1
+	for i in open - filled:
+		bits.append("OPEN SEAT")
+	var waiting := profile.perks_waiting()
+	var tail := "    PERK READY  >" if waiting > 0 else "    >"
+	_crew_line.text = "CREW    " + "    ".join(bits) + tail
 	var blocked := profile.has_rig() and profile.deploy_block() != ""
 	var color := UI.BAD if blocked else T.COL_CYAN
 	for state: String in ["font_color", "font_hover_color", "font_pressed_color"]:

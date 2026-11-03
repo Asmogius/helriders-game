@@ -19,6 +19,7 @@ const ZombieDirector := preload("res://scripts/zombie_director.gd")
 const Vehicle := preload("res://scripts/vehicle.gd")
 const EnemyRig := preload("res://scripts/enemy_rig.gd")
 const BulwarkRig := preload("res://scripts/bulwark_rig.gd")
+const Crew := preload("res://scripts/crew.gd")
 const Hunter := preload("res://scripts/hunter.gd")
 const BulletPool := preload("res://scripts/bullet_pool.gd")
 const MinePool := preload("res://scripts/mine_pool.gd")
@@ -59,6 +60,7 @@ var outrider: EnemyRig           # the first Outrider (tests use it)
 var elite: EnemyRig              # the Hunt target, if any
 var bulwarks: Array[EnemyRig] = []    # heavy rammers, built up front like Outriders
 var bulwark: BulwarkRig          # the first Bulwark (tests use it)
+var marked: Node2D               # the last target a Spotter marked (tests)
 var bullets: BulletPool
 var mines: MinePool
 var fx: Fx
@@ -167,6 +169,8 @@ func _ready() -> void:
 	zombies.zombie_killed.connect(_on_zombie_killed)
 	vehicle.wrecked.connect(_on_wrecked)
 	vehicle.crew_injured.connect(_on_crew_injured)
+	vehicle.crew_healed.connect(_on_crew_healed)
+	vehicle.crew_ability_used.connect(_on_crew_ability)
 	vehicle.damaged.connect(_on_damaged)
 	for h in hunters:
 		h.died.connect(_on_hunter_died.bind(h))
@@ -180,7 +184,9 @@ func _ready() -> void:
 		elite.wrecked.connect(_on_elite_wrecked)
 	hud.restart_requested.connect(return_to_garage)
 	hud.lock_toggled.connect(func(on: bool) -> void: vehicle.lock_enabled = on)
-	hud.ability_pressed.connect(_on_ability_pressed)
+	hud.ability_pressed.connect(use_ability)
+	hud.crew_picked.connect(use_crew_ability)
+	hud.crew_wheel_toggled.connect(_on_crew_wheel)
 	_sync_hud_to_rig()
 	hud.banner("%s  -  %s" % [Missions.label(spec), str(spec.name).to_upper()], _type_color(), 3.0)
 	_refresh_hud()
@@ -275,6 +281,7 @@ func _physics_process(delta: float) -> void:
 
 func _process(_delta: float) -> void:
 	_refresh_hud()
+	bullets.big_game = float(vehicle.crew_mod("big_game"))
 
 
 ## Swap the player's rig to `stats` mid-mission (tests) and update the HUD.
@@ -283,25 +290,40 @@ func apply_rig(stats: Dictionary) -> void:
 	_sync_hud_to_rig()
 
 
-## LOCK, crew and utility buttons follow the rig's parts and crew. Crew
-## buttons come first (nearest LOCK), then utilities.
+## LOCK, the CREW wheel and utility buttons follow the rig's parts and crew.
 func _sync_hud_to_rig() -> void:
 	hud.set_lock_available(vehicle.can_lock())
 	var kinds: Array[String] = []
-	for c in vehicle.crew:
-		kinds.append(str(c.ability.kind))
 	for a in vehicle.abilities:
 		kinds.append(str(a.ability))
 	hud.set_abilities(kinds)
+	var entries: Array[Dictionary] = []
+	for c in vehicle.crew:
+		entries.append({"kind": str(c.ability.kind), "ability": str(c.ability.name), "name": str(c.name), "role": str(c.role)})
+	hud.set_crew_wheel(entries)
 	for i in vehicle.crew.size():
-		hud.set_ability_disabled(i, vehicle.is_crew_injured(i))
+		_crew_state(i)
 
 
-func _on_ability_pressed(index: int) -> void:
-	if index < vehicle.crew.size():
-		use_crew_ability(index)
-	else:
-		use_ability(index - vehicle.crew.size())
+func _crew_state(i: int) -> void:
+	var injured := vehicle.is_crew_injured(i)
+	var usable := _crew_usable(i)
+	hud.set_crew_state(i, vehicle.crew_charge(i), injured or not usable, "INJURED" if injured else ("NO ONE HURT" if not usable else ""))
+
+
+## Field Dressing only works with someone to treat.
+func _crew_usable(i: int) -> bool:
+	if str(vehicle.crew[i].ability.kind) != "field_dressing":
+		return true
+	for c in vehicle.crew:
+		if bool(c.injured):
+			return true
+	return false
+
+
+## The crew wheel slows the fight while it's open.
+func _on_crew_wheel(open: bool) -> void:
+	Engine.time_scale = T.CREW_WHEEL_SLOWMO if open and state == State.RUNNING else 1.0
 
 
 ## Fire the rig's utility `index`.
@@ -317,25 +339,69 @@ func use_crew_ability(index: int) -> bool:
 		return false
 	var ok := vehicle.use_crew_ability(index)
 	if ok:
+		for i in vehicle.crew.size():
+			_crew_state(i)
 		var c := vehicle.crew[index]
-		hud.banner(("HARD LINE" if str(c.ability.kind) == "hard_line" else "OVERCHARGE") + "  -  " + str(c.name).to_upper(),
-			T.COL_CYAN if str(c.role) == "driver" else Color(1.0, 0.92, 0.7), 1.2)
+		hud.banner("%s  -  %s" % [str(c.ability.name).to_upper(), str(c.name).to_upper()], Crew.ROLE_COLORS.get(str(c.role), T.COL_CYAN), 1.2)
 	return ok
+
+
+const INJURY_TEXT := {
+	"driver": "STEERING HALVED", "gunner": "TURRET AIM HALVED", "mechanic": "REPAIRS HALVED",
+	"spotter": "UTILITY COOLDOWNS UP", "engineer": "POWER DOWN", "medic": "CREW MORE AT RISK",
+	"scavenger": "KILL SCRAP HALVED", "bruiser": "RAMS HURT MORE",
+}
 
 
 func _on_crew_injured(index: int) -> void:
 	var c := vehicle.crew[index]
-	hud.set_ability_disabled(index, true)
-	var effect := "STEERING HALVED" if str(c.role) == "driver" else "TURRET AIM HALVED"
-	hud.banner("%s INJURED  -  %s" % [str(c.role).to_upper(), effect], T.COL_ENEMY, 2.5)
+	var role := str(c.role)
+	hud.banner("%s INJURED  -  %s" % [role.to_upper(), INJURY_TEXT.get(role, "")], T.COL_ENEMY, 2.5)
 	camera.shake(0.6)
 
 
+func _on_crew_healed(index: int) -> void:
+	hud.banner("%s PATCHED UP" % str(vehicle.crew[index].name).to_upper(), Color(0.45, 0.9, 0.5), 1.8)
+
+
+## Crew abilities that reach past the rig: Mark, Flare, Magnet.
+func _on_crew_ability(kind: String, a: Dictionary) -> void:
+	var weak := float(vehicle.crew_mod("weak_spot"))
+	match kind:
+		"mark":
+			var target: Node2D = vehicle.lock_target
+			if target == null:
+				var best := INF
+				for c: Node2D in lock_candidates():
+					if int(c.get("lock_priority")) < 2:
+						continue
+					var d := c.global_position.distance_to(vehicle.global_position)
+					if d < best:
+						best = d
+						target = c
+			if target != null:
+				target.call("apply_status", 1.0 + float(a.vuln) + weak, 1.0, float(a.time))
+				marked = target
+		"flare":
+			var r2 := float(a.radius) * float(a.radius)
+			for z in zombies.active_zombies():
+				if z.global_position.distance_squared_to(vehicle.global_position) <= r2:
+					z.apply_status(1.0 + float(a.vuln) + weak, 1.0 - minf(float(a.slow), 0.9), float(a.time))
+			fx.call("blast", vehicle.global_position, 60.0)
+		"magnet":
+			var r := float(a.radius)
+			for p in pickups.get_children():
+				if (p as Node2D).global_position.distance_to(vehicle.global_position) <= r:
+					_take_salvage(p as Pickup)
+
+
 func return_to_garage() -> void:
+	Engine.time_scale = 1.0
 	get_tree().change_scene_to_file(GARAGE_SCENE)
 
 
 func _exit_tree() -> void:
+	Engine.time_scale = 1.0
 	# Rigs are built up front; free any that never made it into the fight.
 	for rig in _all_enemy_rigs():
 		if not rig.is_inside_tree():
@@ -455,7 +521,7 @@ func _plan_route(count: int) -> void:
 		checkpoints.append(next)
 		length += _path_length(at, next)
 		at = next
-	var gold := length / T.COURIER_PAR_SPEED + T.COURIER_PAR_PER_CHECKPOINT * count
+	var gold := (length / T.COURIER_PAR_SPEED + T.COURIER_PAR_PER_CHECKPOINT * count) * float(vehicle.crew_mod("par"))
 	par = {"gold": gold, "silver": gold * T.COURIER_SILVER, "bronze": gold * T.COURIER_BRONZE}
 
 
@@ -490,12 +556,11 @@ func courier_tier() -> String:
 
 func _refresh_hud() -> void:
 	hud.set_armor(vehicle.armor / vehicle.armor_max)
-	hud.set_power(vehicle.power_load(), vehicle.power_output, vehicle.weight_load, vehicle.weight_capacity)
-	var crew_count := vehicle.crew.size()
-	for i in crew_count:
-		hud.set_ability_charge(i, vehicle.crew_charge(i))
+	hud.set_power(vehicle.power_load(), vehicle.power_capacity(), vehicle.weight_load, vehicle.weight_limit())
+	for i in vehicle.crew.size():
+		_crew_state(i)
 	for i in vehicle.abilities.size():
-		hud.set_ability_charge(crew_count + i, vehicle.ability_charge(i))
+		hud.set_ability_charge(i, vehicle.ability_charge(i))
 	hud.set_status_text(_status_line())
 	hud.set_lock_state(vehicle.lock_enabled, vehicle.lock_target != null)
 	# Edge arrows: specials always, the Courier's next stop, salvage, and the
@@ -560,9 +625,12 @@ func _type_color() -> Color:
 
 # --- Kills and drops -----------------------------------------------------------
 
-func _add_kill(points: int) -> void:
+func _add_kill(points: int, rig := false) -> void:
 	kills += 1
-	scrap += points * profile.salvage_mult()
+	var mult := profile.salvage_mult() * float(vehicle.crew_mod("scrap"))
+	if rig:
+		mult *= float(vehicle.crew_mod("rig_scrap"))
+	scrap += points * mult
 	if state == State.RUNNING and mission_type == "clear" and kills >= target_kills:
 		_succeed("BLOCK CLEARED", "", 1.0)
 
@@ -599,10 +667,11 @@ func _pending_ids() -> Array[String]:
 func _drop(at: Vector2, pool: String, guaranteed: bool, cache: int) -> void:
 	var pickup := Pickup.new()
 	var unknown := profile.unknown_schematics(Parts.DROP_POOLS[pool], _pending_ids())
-	if not unknown.is_empty() and (guaranteed or always_drop_schematic or randf() < profile.schematic_chance()):
+	var chance := minf(profile.schematic_chance() + float(vehicle.crew_mod("schematic")), 0.95)
+	if not unknown.is_empty() and (guaranteed or always_drop_schematic or randf() < chance):
 		pickup.part = Parts.get_part(unknown.pick_random())
 	else:
-		pickup.scrap_value = cache
+		pickup.scrap_value = roundi(cache * float(vehicle.crew_mod("cache")))
 	# Beside the burning wreck, toward the player.
 	pickup.position = at + (vehicle.global_position - at).normalized() * 70.0
 	pickups.add_child(pickup)
@@ -612,21 +681,30 @@ func _on_outrider_wrecked(rig: EnemyRig) -> void:
 	camera.shake(0.6)
 	_drop(rig.global_position, "outrider", false, T.SCRAP_CACHE)
 	hud.banner("RIG DOWN  -  GRAB THE SALVAGE", T.COL_CYAN)
-	_add_kill(T.OUTRIDER_SCRAP)
+	_add_kill(T.OUTRIDER_SCRAP, true)
+	_salvage_plating()
 
 
 func _on_bulwark_wrecked(rig: EnemyRig) -> void:
 	camera.shake(0.8)
 	_drop(rig.global_position, "bulwark", false, T.BULWARK_SCRAP_CACHE)
 	hud.banner("BULWARK DOWN  -  GRAB THE SALVAGE", T.COL_CYAN)
-	_add_kill(T.BULWARK_SCRAP)
+	_add_kill(T.BULWARK_SCRAP, true)
+	_salvage_plating()
 
 
 func _on_elite_wrecked() -> void:
 	camera.shake(0.9)
 	_drop(elite.global_position, "elite", true, T.ELITE_SCRAP_CACHE)
 	hud.banner("%s DOWN  -  GRAB THE SCHEMATIC" % elite.elite_name, T.COL_ELITE, 3.0)
-	_add_kill(T.ELITE_SCRAP)
+	_add_kill(T.ELITE_SCRAP, true)
+	_salvage_plating()
+
+
+## Mechanic perk: each enemy rig wreck restores some armor.
+func _salvage_plating() -> void:
+	if bool(vehicle.crew_mod("salvage_plating")) and not vehicle.is_wrecked:
+		vehicle.armor = minf(vehicle.armor + 15.0 * float(vehicle.crew_mod("repair")), vehicle.armor_max)
 
 
 func _collect_pickups() -> void:
@@ -661,6 +739,8 @@ func _on_damaged(amount: float) -> void:
 ## Success: bank the run's scrap plus the job's pay (x `pay_mult`) and any
 ## schematics, end the day, show the results card.
 func _succeed(title: String, detail: String, pay_mult: float) -> void:
+	hud.close_crew_wheel(false)
+	Engine.time_scale = 1.0
 	state = State.CLEARED
 	# The job's done: anything still on the ground gets hauled home.
 	for p in pickups.get_children():
@@ -673,7 +753,7 @@ func _succeed(title: String, detail: String, pay_mult: float) -> void:
 	bank_report = profile.bank_run(int(scrap) + pay, ids)
 	profile.finish_day()
 	# After the day ends, so tonight doesn't count toward anyone's rest.
-	var crew_lines := profile.bank_crew(skulls, injured_crew_ids())
+	var crew_lines := profile.bank_crew(skulls, injured_crew_ids(), bool(vehicle.crew_mod("triage")))
 	var lines := "Job pay +%d    Kill scrap +%d    Time %s" % [pay, int(scrap), _clock(elapsed)]
 	if detail != "":
 		lines = detail + "\n" + lines
@@ -681,6 +761,7 @@ func _succeed(title: String, detail: String, pay_mult: float) -> void:
 		lines += "\nNew schematic: " + Parts.describe(Parts.get_part(id))
 	if not crew_lines.is_empty():
 		lines += "\nCrew: " + ";  ".join(crew_lines)
+	Engine.time_scale = 1.0
 	hud.show_result(title, lines, "RETURN TO GARAGE", _type_color())
 
 
@@ -708,6 +789,8 @@ func _mission_reward_schematic(pay_mult: float) -> String:
 func _on_wrecked() -> void:
 	if state != State.RUNNING:
 		return
+	hud.close_crew_wheel(false)
+	Engine.time_scale = 1.0
 	state = State.WRECKED
 	camera.shake(1.0)
 	var lost: Array[String] = []
@@ -726,6 +809,7 @@ func _on_wrecked() -> void:
 		lines += "."
 	# Let the wreck burn for a beat before the results card.
 	await get_tree().create_timer(1.6).timeout
+	Engine.time_scale = 1.0
 	hud.show_result("WRECKED", lines, "BACK TO THE YARD", T.COL_ORANGE)
 
 

@@ -158,6 +158,8 @@ func _draw() -> void:
 	draw_rect(Rect2(-half_l + 4.0, -half_w + 3.0, body_len - 22.0, 2.0), T.COL_ENEMY)
 	draw_rect(Rect2(-half_l + 4.0, half_w - 5.0, body_len - 22.0, 2.0), T.COL_ENEMY)
 	draw_rect(Rect2(-half_l - 1.0, -4.0, 3.0, 8.0), T.COL_ENEMY)
+	if vuln_left > 0.0:
+		draw_arc(Vector2.ZERO, half_l + 8.0, 0.0, TAU, 28, Color(0.95, 0.3, 0.25, 0.85), 2.5)
 	# A Hunt target wears gold: a stripe down the spine and a nose chevron.
 	if is_elite():
 		draw_rect(Rect2(-half_l + 2.0, -2.0, body_len - 14.0, 4.0), T.COL_ELITE)
