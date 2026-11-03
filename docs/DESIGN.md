@@ -267,3 +267,21 @@ Agreed with the owner on 2026-11-03. **Do not implement until the numbers are dr
 - Lost crew return: after 3 days (Uncommon), +1 day per rarity step (Rare 4, Epic 5, Legendary 6, Mythic 7), they enter a rehire pool at level 1 with the same specialty and rarity (perks reset).
 - Saloon rehire section: one extra card a day, drawn at random from the rehire pool. A rehire can be dismissed permanently, which returns them to the general hire pool.
 - Rehire price: 20% below a normal hire of that rarity. Saloon upgrade Old Faces: 3 steps, each a further 10% off (max 50%).
+
+## Part Mods: First Draft (test-build parts)
+
+Spiked Ram Plate is renamed Zed Sled (code rename pending). Unlock levels: Minor 3, Major 7, Signature 11.
+
+| Part | Minor | Major | Signature |
+|---|---|---|---|
+| Zed Sled (Uncommon armor) | Cowcatcher: shamblers hit by a RAM are flung aside; half the speed loss per shambler | Breaker Bar: RAM on a rig adds heavy shock buildup; full speed nearly fills it | - |
+| Half-Track (Rare drive) | Grouser Plates: SLICK builds 50% slower | Dug In: when not DRIFTING, Tank and Bulwark shoves move you far less | Neutral Steer: turn on the spot at a standstill |
+| Diesel Block (Rare engine) | Low-End Torque: +20% acceleration below half speed | Load Bearer: armor parts weigh 15% less | Dead Weight: counts as 15% heavier in collision damage |
+| Scattergun Turret (Uncommon) | Point Blank: +20% damage within 150 px | Slug Round: vs STUNNED, fires one heavy slug | - |
+| Outrider Twin Guns (Uncommon) | Laser sight on the fixed guns | +15% fire rate | - |
+| Outrider Sport Wheels (Uncommon) | Quick Grip: regain grip 25% faster after a drift | 10% less incoming damage while DRIFTING | - |
+| Outrider Light Plating (Uncommon) | Low Profile: shield recharge delay 20% shorter | 10% of max armor added to max shield | - |
+| Turbo Four (Uncommon engine) | Spool-Up: +10% top speed after 2 s at full throttle | Blow-Off Valve: +25% speed for 2 s when the shield breaks | - |
+| Burst Turret (Uncommon) | Tight Grouping: 25% tighter spread per BURST | Live Tip: last round of each BURST deals shock | - |
+| Heavy MG Turret (Rare) | Spin-Up: fire rate climbs to +20% over 3 s | Suppression: rig under fire 2 s drives 20% slower, turret turns half as fast | Tracer Belt: every 5th round is incendiary |
+| Advanced Targeting Computer (Rare) | Fast Solve: LOCK range +10% | Priority Override: LOCK takes MARKED and STUNNED first | Weak Point Solver: locked turrets aim at exposed sides or rear, +20% damage |
