@@ -110,8 +110,9 @@ func _ready() -> void:
 	_build_overlay()
 
 
-## One round button per utility part, in a row left of LOCK. `kinds` are the
-## parts' ability names ("patch", "mines"). Built once at mission start.
+## One round button per crew member and utility part, in a row left of LOCK
+## (crew nearest). `kinds` are ability names: "hard_line", "overcharge",
+## "patch", "mines". Built at mission start.
 func set_abilities(kinds: Array[String]) -> void:
 	for b in _ability_buttons:
 		right_stick.blockers.erase(b)
@@ -124,7 +125,8 @@ func set_abilities(kinds: Array[String]) -> void:
 		b.anchor_right = 1.0
 		b.anchor_top = 1.0
 		b.anchor_bottom = 1.0
-		var right := -190.0 - i * 124.0
+		# Start where LOCK sits when the rig has no LOCK button.
+		var right := (-190.0 if _lock_button.visible else -60.0) - i * 124.0
 		b.offset_left = right - 104.0
 		b.offset_right = right
 		b.offset_top = -444.0
@@ -139,6 +141,16 @@ func set_abilities(kinds: Array[String]) -> void:
 func set_ability_charge(index: int, charge: float) -> void:
 	if index >= 0 and index < _ability_buttons.size():
 		_ability_buttons[index].set_charge(charge)
+
+
+## Greys a button out (an injured crew member's ability).
+func set_ability_disabled(index: int, off: bool) -> void:
+	if index >= 0 and index < _ability_buttons.size():
+		_ability_buttons[index].set_disabled(off)
+
+
+func is_ability_disabled(index: int) -> bool:
+	return index >= 0 and index < _ability_buttons.size() and _ability_buttons[index].disabled
 
 
 func ability_count() -> int:
@@ -164,6 +176,7 @@ func set_power(used: float, output: float, weight := 0.0, capacity := 0.0) -> vo
 ## Only rigs with a targeting system (and a lock-capable weapon) get the button.
 func set_lock_available(available: bool) -> void:
 	_lock_button.visible = available
+	_hint.text = "LEFT THUMB  DRIVE      RIGHT THUMB  AIM + FIRE" + ("      LOCK  AUTO-AIM" if available else "")
 
 
 func set_status(kills: int, target: int, scrap: int) -> void:
@@ -398,14 +411,22 @@ class AbilityButton extends Control:
 	## the right stick ignores this area.
 	signal pressed
 	const T := preload("res://scripts/tuning.gd")
-	var kind := ""      # "patch" or "mines"
+	const LABELS := {"patch": "PATCH", "mines": "MINES", "hard_line": "HARD LINE", "overcharge": "OVERCHARGE"}
+	var kind := ""      # "hard_line", "overcharge", "patch" or "mines"
 	var charge := 0.0   # 0 ready, 1 just used
+	var disabled := false
 
 	func _ready() -> void:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	func press() -> void:
-		pressed.emit()
+		if not disabled:
+			pressed.emit()
+
+	func set_disabled(off: bool) -> void:
+		if off != disabled:
+			disabled = off
+			queue_redraw()
 
 	func set_charge(value: float) -> void:
 		# Redraw in small steps, not every frame.
@@ -424,11 +445,13 @@ class AbilityButton extends Control:
 	func _draw() -> void:
 		var c := size * 0.5
 		var r := minf(size.x, size.y) * 0.5 - 4.0
-		var ready := charge <= 0.0
-		var accent := Color(0.45, 0.9, 0.5) if kind == "patch" else T.COL_ORANGE
+		var ready := charge <= 0.0 and not disabled
+		var accent: Color = {"patch": Color(0.45, 0.9, 0.5), "hard_line": T.COL_CYAN, "overcharge": Color(1.0, 0.92, 0.7)}.get(kind, T.COL_ORANGE)
 		var tint := accent if ready else Color(0.6, 0.58, 0.55)
+		if disabled:
+			tint = Color(0.42, 0.4, 0.38)
 		draw_circle(c, r, Color(0.0, 0.0, 0.0, 0.5))
-		if not ready:
+		if not ready and not disabled:
 			# Dark wedge for the time left, shrinking clockwise.
 			var shade := Color(0.0, 0.0, 0.0, 0.45)
 			if charge >= 0.97:
@@ -450,9 +473,22 @@ class AbilityButton extends Control:
 					var p := c + Vector2(-16.0 + k * 16.0, 0.0)
 					draw_circle(p, 6.0, tint)
 					draw_circle(p, 2.0, Color(0, 0, 0, 0.7))
+			"hard_line":
+				# Two chevrons: a sharp line through the turn.
+				for k in 2:
+					var x := c.x - 10.0 + k * 14.0
+					draw_polyline(PackedVector2Array([Vector2(x - 6.0, c.y - 14.0), Vector2(x + 6.0, c.y), Vector2(x - 6.0, c.y + 14.0)]), tint, 4.0)
+			"overcharge":
+				# A lightning bolt.
+				draw_colored_polygon(PackedVector2Array([c + Vector2(4, -20), c + Vector2(-10, 3), c + Vector2(-1, 3),
+					c + Vector2(-5, 20), c + Vector2(10, -4), c + Vector2(1, -4)]), tint)
+		if disabled:
+			draw_line(c + Vector2(-r * 0.6, -r * 0.6), c + Vector2(r * 0.6, r * 0.6), T.COL_ENEMY, 3.0)
 		var font := ThemeDB.fallback_font
-		var label := "PATCH" if kind == "patch" else ("MINES" if kind == "mines" else kind.to_upper())
-		draw_string(font, Vector2(0.0, size.y + 18.0), label, HORIZONTAL_ALIGNMENT_CENTER, size.x, 18, Color(tint, 0.9))
+		var label: String = LABELS.get(kind, kind.to_upper())
+		if disabled:
+			label = "INJURED"
+		draw_string(font, Vector2(-20.0, size.y + 18.0), label, HORIZONTAL_ALIGNMENT_CENTER, size.x + 40.0, 15, Color(tint, 0.9))
 
 
 class PowerBar extends Control:

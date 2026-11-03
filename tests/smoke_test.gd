@@ -3,7 +3,8 @@ extends SceneTree
 ## input, and checks each core mechanic in its own short scenario:
 ## driving, lock-on, the Hunter (latch, shoot off, crush), the Outrider
 ## (hunts and shoots you, drops salvage), power and weight overload, two
-## weapons with pellets, fixed guns, the utilities, and the wreck.
+## weapons with pellets, fixed guns, the utilities, crew (passives, Hard
+## Line, Overcharge, big-hit injuries, turret aim rule), and the wreck.
 ##
 ## Run:  godot --headless --fixed-fps 60 --path . -s res://tests/smoke_test.gd
 ## Exit code 0 = pass, 1 = fail. CI also fails on any "SCRIPT ERROR" output.
@@ -17,6 +18,12 @@ const Loadout := preload("res://scripts/loadout.gd")
 const OPEN_SPOT := Vector2(1600, 1200)     # clear ground around the start
 const ROAD_WEST := Vector2(400, 720)       # straight run west to the boundary wall
 const ROAD_EAST := Vector2(150, 720)       # long clear run east along the same road
+# The starter with LOCK: the Advanced Targeting Computer needs the Patched V8's
+# power (105 / 125).
+const LOCK_BUILD := {
+	"chassis": "scrap_frame", "engine": "patched_v8", "drive": "street_wheels", "armor": "scrap_plating",
+	"weapons": ["pintle_turret"], "utility": [], "internal": ["advanced_targeting"],
+}
 
 var main: Main
 var frame := 0
@@ -37,6 +44,9 @@ func _initialize() -> void:
 	var profile: Node = root.get_node("Profile")
 	profile.set("persist", false)
 	profile.call("new_game")
+	var known: Array[String] = profile.get("schematics")
+	known.append_array(["patched_v8", "advanced_targeting"])
+	profile.set("rig", LOCK_BUILD.duplicate(true))
 	var scene: PackedScene = load("res://scenes/mission.tscn")
 	main = scene.instantiate() as Main
 	main.auto_spawn_specials = false  # this test places the Hunter and Outrider
@@ -169,6 +179,7 @@ func _process(_delta: float) -> bool:
 	if frame == 2345:
 		var heavy := Parts.STARTER_LOADOUT.duplicate(true)
 		heavy.armor = "riot_plating"
+		heavy.internal = ["targeting_computer"]  # 105 / 100 weight, 100 / 100 power
 		main.apply_rig(Loadout.build(heavy))
 		_reset_rig(ROAD_EAST, 0.0)
 		mark = rig.global_position
@@ -223,15 +234,18 @@ func _process(_delta: float) -> bool:
 			"weapons": ["pintle_turret"], "utility": ["emergency_patch", "mine_dropper"], "internal": [],
 		}
 		main.apply_rig(Loadout.build(courier))
+		# The Courier seats only a Driver.
+		rig.set_crew(main.profile.seated_crew().filter(func(m: Dictionary) -> bool: return m.role == "driver"))
+		main.call("_sync_hud_to_rig")
 		_reset_rig(OPEN_SPOT, 0.0)
 		main.zombies.clear_all()
-		_check(main.hud.ability_count() == 2, "two utilities, two HUD buttons")
+		_check(main.hud.ability_count() == 3, "Driver + two utilities: three HUD buttons")
 		rig.armor = 20.0
-		main.hud.press_ability(0)
-		_check(is_equal_approx(rig.armor, 55.0), "Emergency Patch restores 35 armor")
-		main.hud.press_ability(0)
-		_check(is_equal_approx(rig.armor, 55.0) and rig.ability_charge(0) > 0.9, "the patch has to cool down before it works again")
 		main.hud.press_ability(1)
+		_check(is_equal_approx(rig.armor, 55.0), "Emergency Patch restores 35 armor")
+		main.hud.press_ability(1)
+		_check(is_equal_approx(rig.armor, 55.0) and rig.ability_charge(0) > 0.9, "the patch has to cool down before it works again")
+		main.hud.press_ability(2)
 		_check(main.mines.active_count() == 3, "Mine Dropper lays three mines")
 		mark = main.mines._pos[1]
 		_check(mark.x < rig.global_position.x, "mines go down behind the rig")
@@ -245,13 +259,57 @@ func _process(_delta: float) -> bool:
 		_check(main.mines.detonations >= 1 and main.kills > int(armor_mark), "a shambler on an armed mine sets it off and dies")
 		_check(rig.armor > 50.0, "your own mines don't hurt you")
 
-	# --- Wreck -------------------------------------------------------------------
+	# --- Crew: passives, Hard Line, Overcharge, aim rule, big-hit injuries -------
 	if frame == 2630:
-		rig.take_damage(99999.0)
+		main.apply_rig(Loadout.build(LOCK_BUILD))
+		rig.set_crew(main.profile.seated_crew())
+		main.call("_sync_hud_to_rig")
+		_reset_rig(OPEN_SPOT, 0.0)
+		print("  crew: turn x%.2f, grip +%.1f, turret aim x%.2f, spread x%.2f" % [rig.crew_turn, rig.crew_grip, rig.crew_aim, rig.crew_spread])
+		_check(rig.crew.size() == 2 and rig.crew_turn > 1.0 and rig.crew_grip > 0.0, "the seated Driver sharpens steering and grip")
+		_check(rig.crew_aim > 1.0 and rig.crew_spread < 1.0, "the seated Gunner speeds turret aim and tightens spread")
+		_check(main.hud.ability_count() == 2 and main.hud.is_lock_button_visible(), "crew buttons sit beside LOCK")
+		var turn_before := rig.crew_turn
+		main.hud.press_ability(0)
+		_check(rig.hard_line_active() and rig.crew_turn > turn_before and rig.crew_grip >= 3.0, "Hard Line boosts turn and grip")
+		main.hud.press_ability(1)
+		_check(rig.overcharge_active() and rig.crew_fire > 1.3 and rig.crew_damage > 1.1, "Overcharge boosts fire rate and damage")
+		_check(not rig.use_crew_ability(0), "Hard Line has a cooldown")
+		# Chip damage isn't a big hit; a burst over 15% of max armor is.
+		rig.take_damage(rig.armor_max * 0.05)
+		_check(rig.big_hits == 0, "chip damage never counts as a big hit")
+		rig.take_damage(rig.armor_max * 0.12)
+		_check(rig.big_hits == 1, "a burst over 15% of max armor in a second is a big hit")
+		rig.armor = rig.armor_max
 	if frame == 2640:
+		var aim_before := rig.crew_aim
+		rig.injure_crew(1)
+		print("  injured Gunner: turret aim x%.2f (was x%.2f)" % [rig.crew_aim, aim_before])
+		_check(is_equal_approx(rig.crew_aim, 0.5) and is_equal_approx(rig.crew_spread, 1.0), "an injured Gunner halves turret aim and loses their bonus")
+		_check(not rig.overcharge_active() and main.hud.is_ability_disabled(1) and not rig.use_crew_ability(1), "an injured Gunner's Overcharge stops and greys out")
+		rig.injure_crew(0)
+		_check(is_equal_approx(rig.crew_turn, 0.5) and is_equal_approx(rig.crew_grip, 0.0), "an injured Driver halves turn rate")
+		_check(main.injured_crew_ids().size() == 2, "the run remembers who was hurt")
+	if frame == 2645:
+		var bare := Parts.STARTER_LOADOUT.duplicate(true)
+		main.apply_rig(Loadout.build(bare))
+		rig.set_crew(main.profile.seated_crew().filter(func(m: Dictionary) -> bool: return m.role == "driver"))
+		_check(not rig.can_aim_turrets(), "no Gunner and no targeting computer: the turret can't aim")
+		bare.internal = ["targeting_computer"]
+		main.apply_rig(Loadout.build(bare))
+		_check(rig.can_aim_turrets() and not rig.can_lock(), "the Targeting Computer aims the turret without a Gunner, but gives no LOCK")
+		rig.set_crew(main.profile.seated_crew())
+		main.call("_sync_hud_to_rig")
+
+	# --- Wreck -------------------------------------------------------------------
+	if frame == 2650:
+		rig.take_damage(99999.0)
+	if frame == 2660:
 		_check(main.state == Main.State.WRECKED, "wreck ends the run")
-	if frame == 2770:
+	if frame == 2790:
 		_check(main.hud.is_result_visible(), "results card shown")
+		_check(main.hud.result_text().contains("Crew lost"), "results card names the crew lost")
+		_check((main.profile.crew as Array).is_empty(), "a wreck kills everyone seated")
 		_check(main.hud.result_text().contains("Salvage lost"), "results card reports lost salvage")
 		var profile: Node = root.get_node("Profile")
 		_check(not profile.call("has_rig"), "the wreck destroyed the rig")
@@ -265,27 +323,33 @@ func _process(_delta: float) -> bool:
 func _check_loadouts(rig: Vehicle) -> void:
 	var starter := Loadout.build(Parts.STARTER_LOADOUT)
 	_check(is_equal_approx(starter.max_speed, 560.0) and is_equal_approx(starter.armor, 150.0) and is_equal_approx(starter.acceleration, 640.0), "starter parts add up to the starter rig")
-	_check(rig.can_lock() and main.hud.is_lock_button_visible(), "targeting computer in a slot enables lock")
-	print("  starter power %.0f / %.0f" % [rig.power_draw, rig.power_output])
-	_check(rig.power_draw <= rig.power_output, "starter fits its power budget")
+	_check(float(starter.lock_range) == 0.0 and int(starter.power_draw) == 75, "the starter carries no targeting computer: 75 power, no LOCK")
+	_check(rig.can_lock() and main.hud.is_lock_button_visible(), "the Advanced Targeting Computer gives LOCK")
+	print("  lock build power %.0f / %.0f" % [rig.power_draw, rig.power_output])
+	_check(rig.power_draw <= rig.power_output, "the lock build fits its power budget")
 
-	var no_targeting := Parts.STARTER_LOADOUT.duplicate(true)
+	var basic := Parts.STARTER_LOADOUT.duplicate(true)
+	basic.internal = ["targeting_computer"]
+	var basic_stats := Loadout.build(basic)
+	_check(float(basic_stats.lock_range) == 0.0 and bool(basic_stats.manual_aim), "the basic Targeting Computer aims turrets but gives no LOCK")
+
+	var no_targeting := LOCK_BUILD.duplicate(true)
 	no_targeting.internal = []
 	var stats := Loadout.build(no_targeting)
 	var bare := Vehicle.new()
 	bare.apply_stats(stats)
 	bare.lock_enabled = true
-	_check(not bare.can_lock() and not bare.lock_enabled, "no targeting computer, no lock")
-	var computer: float = Parts.CATALOG.targeting_computer.power
-	_check(computer > 0.0 and is_equal_approx(bare.power_load(), rig.power_draw - computer), "pulling the targeting computer frees its power")
+	_check(not bare.can_lock() and not bare.lock_enabled, "no Advanced Targeting Computer, no lock")
+	var computer: float = Parts.CATALOG.advanced_targeting.power
+	_check(computer > 0.0 and is_equal_approx(bare.power_load(), rig.power_draw - computer), "pulling the computer frees its power")
 	bare.free()
 
-	var fixed_guns := Parts.STARTER_LOADOUT.duplicate(true)
+	var fixed_guns := LOCK_BUILD.duplicate(true)
 	fixed_guns.weapons = ["outrider_twin_guns"]
 	_check(float(Loadout.build(fixed_guns).lock_range) == 0.0, "fixed guns can't lock even with targeting")
 
 	print("  (one \"no slot\" warning below is expected)")
-	var crammed := Parts.STARTER_LOADOUT.duplicate(true)
+	var crammed := LOCK_BUILD.duplicate(true)
 	crammed.internal = ["targeting_computer", "targeting_computer", "targeting_computer"]
 	var crammed_stats := Loadout.build(crammed)
 	_check((crammed_stats.dropped as Array).size() == 1, "chassis slot limit is enforced")

@@ -14,6 +14,9 @@ const Vehicle := preload("res://scripts/vehicle.gd")
 const UI := preload("res://scripts/ui_theme.gd")
 const ProfileScript := preload("res://scripts/profile.gd")
 const Comms := preload("res://scripts/comms.gd")
+const Inn := preload("res://scripts/inn.gd")
+const Saloon := preload("res://scripts/saloon.gd")
+const Crew := preload("res://scripts/crew.gd")
 const Missions := preload("res://scripts/missions.gd")
 const MISSION_SCENE := "res://scenes/mission.tscn"
 
@@ -36,9 +39,6 @@ const REQUIRED := ["chassis", "engine", "drive"]
 const TABS := ["GARAGE", "RESEARCH", "SALOON", "INN", "COMMS"]
 const COMING_SOON := {
 	"RESEARCH": "Spend scrap to level up your schematics. Higher levels, better parts.",
-	"SALOON": "Hire crew and buy new schematics.",
-	"INN": "Rest injured crew and send your reserves out on expeditions.",
-	"COMMS": "Pick the day's mission from the board.",
 }
 
 const TAG_SIZE := Vector2(272, 70)
@@ -78,7 +78,10 @@ var _sheet_scroll: ScrollContainer
 var _overlay: Control
 var _tab_buttons: Array[Button] = []
 var _comms: Comms
+var _inn: Inn
+var _saloon: Saloon
 var _job: Label
+var _crew_line: Button
 
 
 func _ready() -> void:
@@ -106,6 +109,14 @@ func _ready() -> void:
 	_comms.visible = false
 	_comms.job_taken.connect(_on_job_taken)
 	add_child(_comms)
+	_inn = Inn.new()
+	_saloon = Saloon.new()
+	for panel: Control in [_inn, _saloon]:
+		panel.anchor_right = 1.0
+		panel.anchor_bottom = 1.0
+		panel.offset_bottom = -FOOTER_H
+		panel.visible = false
+		add_child(panel)
 
 	_toast = UI.label("", 22, T.COL_ORANGE)
 	_toast.anchor_right = 1.0
@@ -215,7 +226,8 @@ func rebuild() -> bool:
 	return true
 
 
-## Launch today's job. No job yet: off to Comms to pick one.
+## Launch today's job. No job yet: off to Comms to pick one. No Driver, or a
+## turret no one can aim: off to the Inn.
 func deploy() -> void:
 	if not profile.has_rig():
 		return
@@ -223,7 +235,17 @@ func deploy() -> void:
 		show_tab("COMMS")
 		toast("Take a job in Comms first")
 		return
+	var block := profile.deploy_block()
+	if block != "":
+		show_tab("INN")
+		toast(block, 3.5)
+		return
 	get_tree().change_scene_to_file(MISSION_SCENE)
+
+
+## Rig stats for `loadout` with the seated crew's passives folded in.
+func _built(loadout: Dictionary) -> Dictionary:
+	return Crew.apply_passives(Loadout.build(loadout), profile.seated_crew(loadout))
 
 
 ## Switch station: GARAGE, COMMS, or a placeholder for the others.
@@ -335,6 +357,18 @@ func _build_rig_area() -> void:
 	_stat_sheet.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_stat_sheet.visible = false
 	add_child(_stat_sheet)
+
+	_crew_line = Button.new()
+	_crew_line.flat = true
+	_crew_line.focus_mode = Control.FOCUS_NONE
+	_crew_line.anchor_right = 1.0
+	_crew_line.offset_left = TAG_SIZE.x + 40.0
+	_crew_line.offset_right = -(TAG_SIZE.x + 40.0)
+	_crew_line.offset_top = 524.0
+	_crew_line.offset_bottom = 556.0
+	_crew_line.add_theme_font_size_override("font_size", 18)
+	_crew_line.pressed.connect(func() -> void: show_tab("INN"))
+	add_child(_crew_line)
 
 	_job = UI.label("", 20, T.COL_ORANGE)
 	_job.anchor_right = 1.0
@@ -530,7 +564,8 @@ func _refresh() -> void:
 	var stats := Loadout.build(shown)
 	preview.apply_stats(stats)
 	preview.modulate.a = 1.0 if has_rig else 0.3
-	var built := Loadout.build(profile.rig)
+	var built := _built(profile.rig)
+	_refresh_crew_line()
 	_stats_label.text = _stats_line(built, has_rig)
 	_power_meter.set_values(float(built.power_draw), float(built.power_output), float(built.weight), float(built.weight_capacity))
 	_power_meter.visible = has_rig and selected < 0
@@ -545,11 +580,28 @@ func _refresh() -> void:
 		_rebuild.text = "STARTER RIG  FREE"
 	_rebuild.disabled = rebuild_cost > profile.scrap
 	_no_rig.visible = not has_rig and selected < 0
+	_crew_line.visible = has_rig and selected < 0
 	if not has_rig:
 		_no_rig.text = "NO RIG\nRebuild your last build, or fit parts slot by slot. Common parts are free."
 	_refresh_tags()
 	if selected >= 0:
 		_fill_sheet()
+
+
+## "CREW   DRIVER Mae Voss L2   GUNNER empty", red when DEPLOY is blocked.
+func _refresh_crew_line() -> void:
+	var bits: Array[String] = []
+	for seat: String in profile.seats():
+		if seat == "mechanic":
+			continue
+		var m := profile.seated_in(seat)
+		var who := "empty" if m.is_empty() else "%s  %s L%d" % [m.name, m.rarity, Crew.level(m)]
+		bits.append("%s  %s" % [str(Crew.ROLE_NAMES[seat]).to_upper(), who])
+	_crew_line.text = "CREW     " + "      ".join(bits) + "      >"
+	var blocked := profile.has_rig() and profile.deploy_block() != ""
+	var color := UI.BAD if blocked else T.COL_CYAN
+	for state: String in ["font_color", "font_hover_color", "font_pressed_color"]:
+		_crew_line.add_theme_color_override(state, color)
 
 
 func _stats_line(s: Dictionary, complete: bool) -> String:
@@ -630,7 +682,7 @@ func _fill_sheet() -> void:
 		_update_stat_sheet()
 		return
 
-	var now := Loadout.build(profile.rig)
+	var now := _built(profile.rig)
 	for id in ids:
 		_cards.add_child(_make_card(slot, id, current, now))
 	if current != "" and not REQUIRED.has(slot.key):
@@ -642,8 +694,8 @@ func _update_stat_sheet() -> void:
 	if selected < 0:
 		return
 	var slot: Dictionary = SLOTS[selected]
-	var now := Loadout.build(profile.rig)
-	var after := Loadout.build(profile.with_part(profile.rig, slot.key, slot.index, _preview))
+	var now := _built(profile.rig)
+	var after := _built(profile.with_part(profile.rig, slot.key, slot.index, _preview))
 	var name_now := _slot_part(slot)
 	var title := "%s:  %s" % [slot.label, Parts.get_part(name_now).name if name_now != "" else "Empty"]
 	if _preview != name_now:
@@ -655,7 +707,7 @@ func _make_card(slot: Dictionary, id: String, current: String, now: Dictionary) 
 	var card := PartCard.new()
 	card.part_id = id
 	var candidate := profile.with_part(profile.rig, slot.key, slot.index, id)
-	var after := Loadout.build(candidate)
+	var after := _built(candidate)
 	var cost := profile.build_cost(candidate)
 	card.cost = cost
 	card.selected = id == _preview
@@ -727,6 +779,10 @@ static func effect_text(part: Dictionary) -> String:
 	var bits: Array[String] = []
 	if part.get("enables_lock", false):
 		bits.append("LOCK")
+	elif part.get("manual_aim", false):
+		bits.append("AIMS TURRETS")
+	if part.has("injury_mult"):
+		bits.append("CREW INJURY -%d%%" % roundi((1.0 - float(part.injury_mult)) * 100.0))
 	var labels := {"fire_rate_mult": "FIRE", "damage_mult": "DMG", "lock_range_mult": "LOCK RNG", "turret_aim_mult": "AIM"}
 	for key: String in labels:
 		if part.has(key):
@@ -915,15 +971,24 @@ func _upgrade_effect(key: String) -> String:
 
 func _on_tab(tab_name: String) -> void:
 	_comms.visible = tab_name == "COMMS"
+	_inn.visible = tab_name == "INN"
+	_saloon.visible = tab_name == "SALOON"
 	if tab_name == "GARAGE":
 		_close_overlay()
 		return
-	if tab_name == "COMMS":
+	if tab_name in ["COMMS", "INN", "SALOON"]:
 		_close_overlay()
 		close_sheet()
-		_comms.selected = -1
-		_comms.refresh()
-		_highlight_tab("COMMS")
+		match tab_name:
+			"COMMS":
+				_comms.selected = -1
+				_comms.refresh()
+			"INN":
+				_inn.refresh()
+			"SALOON":
+				_saloon.selected = -1
+				_saloon.refresh()
+		_highlight_tab(tab_name)
 		return
 	var body := VBoxContainer.new()
 	body.add_child(UI.label(COMING_SOON[tab_name], 22, UI.TEXT))

@@ -2,7 +2,8 @@ extends SceneTree
 ## Headless Garage and economy test. Drives the Garage the way a player would
 ## (open a slot, tap a card) and checks scrap, storage, power, presets,
 ## upgrades, the wreck penalty and rebuild rules, banking a run, the save file,
-## and that DEPLOY launches the mission with the rig you built.
+## the crew (Inn, Saloon, seats, deploy rules, crew lost in a wreck), and that
+## DEPLOY launches the mission with the rig you built.
 ##
 ## Run:  godot --headless --fixed-fps 60 --path . -s res://tests/garage_test.gd
 
@@ -10,6 +11,8 @@ const Garage := preload("res://scripts/garage.gd")
 const ProfileScript := preload("res://scripts/profile.gd")
 const Parts := preload("res://scripts/parts.gd")
 const Loadout := preload("res://scripts/loadout.gd")
+const Crew := preload("res://scripts/crew.gd")
+const T := preload("res://scripts/tuning.gd")
 
 const CHASSIS := 0      # indexes into Garage.SLOTS
 const DRIVE := 2
@@ -64,6 +67,17 @@ func _run_checks() -> void:
 	_check(not garage._deploy.disabled, "DEPLOY is available with a complete rig")
 	var visible_tags := garage._tags.filter(func(t: Control) -> bool: return t.visible).size()
 	_check(visible_tags == 8, "Scrap Frame shows 8 slots (4 core, 1 weapon, 2 internal, 1 utility)")
+	var seated := profile.seated_crew()
+	_check(seated.size() == 2 and seated[0].role == "driver" and seated[1].role == "gunner" and seated[0].rarity == "Common", "new game: a free Common Driver and Gunner, seated")
+	_check(garage._crew_line.visible and garage._crew_line.text.contains("DRIVER") and garage._crew_line.text.contains(str(seated[1].name)), "the crew line under the rig names the seats")
+	_check(profile.deploy_block() == "", "Driver and Gunner seated: nothing blocks DEPLOY")
+	var with_crew := garage._built(profile.rig)
+	_check(float(with_crew.turn_rate) > float(Loadout.build(profile.rig).turn_rate), "the stat sheet includes the Driver's turn bonus")
+
+	# The starter has no targeting computer; fit the free one for the power checks.
+	garage.open_slot(INTERNAL_1)
+	_check(garage.choose("targeting_computer") and profile.scrap == 60, "the Targeting Computer is a free Common schematic")
+	garage.close_sheet()
 
 	# --- Building a new part costs scrap; the old one goes to storage ---------------
 	garage.open_slot(DRIVE)
@@ -119,6 +133,7 @@ func _run_checks() -> void:
 	_check(int(sheet.now.weight) == 80 and int(sheet.after.weight) == 100, "stat sheet shows weight load (Riot Plating: 80 > 100 of 100 without the computer)")
 	garage.close_sheet()
 	var heavy := profile.with_part(Parts.STARTER_LOADOUT, "armor", 0, "riot_plating")
+	heavy.internal = ["targeting_computer"]
 	var heavy_stats := Loadout.build(heavy)
 	_check(int(heavy_stats.weight) == 105 and Loadout.mobility(heavy_stats) < 1.0, "Riot Plating on the starter is 105 / 100 weight: overloaded")
 	_check(garage.StatSheet.overload_cause(heavy_stats).contains("WT 105/100"), "the overload names weight as the cause")
@@ -138,7 +153,46 @@ func _run_checks() -> void:
 	garage.close_sheet()
 	_check(not garage._tags[WEAPON_2].visible and garage._tags[UTILITY_2].visible, "Courier: one weapon, two utility slots")
 	_check((profile.rig.weapons as Array).size() == 1 and int(profile.storage.get("pintle_turret", 0)) == 1, "the extra gun goes to storage when the frame can't carry it")
+	_check(profile.seated_in("gunner").is_empty() and not profile.seated_in("driver").is_empty(), "the Courier seats only a Driver: the Gunner goes back to the Inn")
+	_check(profile.deploy_block().contains("turret"), "a turret with no Gunner and no computer blocks DEPLOY")
 	_check(profile.load_preset(0), "back to the saved preset")
+
+	# --- Crew: Inn and Saloon -------------------------------------------------------
+	garage.show_tab("INN")
+	var inn: Variant = garage._inn
+	var gunner_id := -1
+	for m: Dictionary in profile.crew:
+		if m.role == "gunner":
+			gunner_id = int(m.id)
+	inn.select(gunner_id)
+	_check(inn.visible and inn.seat_selected() and int(profile.seated_in("gunner").id) == gunner_id, "the Inn seats the Gunner again")
+	var driver_id := int(profile.seated_in("driver").id)
+	inn.select(driver_id)
+	inn.seat_selected()
+	_check(profile.seated_in("driver").is_empty() and profile.deploy_block().contains("Driver"), "no Driver seated blocks DEPLOY")
+	inn.seat_selected()
+	garage.show_tab("SALOON")
+	var saloon: Variant = garage._saloon
+	_check(saloon.visible and profile.saloon.size() == 3 and saloon.offer_count() == 5, "the Saloon shows 3 offers plus a free Driver and Gunner")
+	var odds_ok := true
+	for m: Dictionary in profile.saloon:
+		odds_ok = odds_ok and m.rarity != "Common" and int(m.price) == int(T.CREW_PRICES[m.rarity])
+	_check(odds_ok, "paid offers are Uncommon or better, priced by rarity")
+	profile.scrap = 2000
+	var price := int(profile.saloon[0].price)
+	saloon.select(0)
+	_check(saloon.hire_selected() and profile.scrap == 2000 - price and profile.crew.size() == 3, "hiring an offer costs its price and joins the roster")
+	_check(bool(profile.saloon[0].hired) and not saloon.hire_selected(), "an offer can only be hired once")
+	saloon.select(3)
+	while profile.crew.size() < T.ROSTER_SIZE:
+		saloon.hire_selected()
+	_check(profile.crew.size() == T.ROSTER_SIZE and not saloon.hire_selected(), "the roster holds 6; no hiring past that")
+	var spare: Dictionary = profile.crew[profile.crew.size() - 1]
+	garage.show_tab("INN")
+	inn.select(int(spare.id))
+	_check(not inn.dismiss_selected() and profile.crew.size() == T.ROSTER_SIZE, "DISMISS asks first")
+	_check(inn.dismiss_selected() and profile.crew.size() == T.ROSTER_SIZE - 1, "a second tap dismisses")
+	garage.show_tab("GARAGE")
 
 	# --- Upgrades -------------------------------------------------------------------
 	profile.scrap = 200
@@ -163,9 +217,12 @@ func _run_checks() -> void:
 	var plan: Dictionary = profile.rig.duplicate(true)
 	var value := profile.build_value(profile.rig)
 	var before := profile.scrap
+	var aboard := profile.seated_crew().size()
+	var roster := profile.crew.size()
 	var penalty := profile.record_wreck()
 	print("  lost build worth %d, wreck penalty %d" % [value, penalty])
 	_check(penalty == roundi(value * 0.25) and profile.scrap == before - penalty, "a wreck costs 25% of the lost build's value")
+	_check(aboard == 2 and profile.crew.size() == roster - 2 and profile.seated_crew().is_empty(), "a wreck kills the seated crew; the Inn's crew survive")
 	garage._refresh()
 	_check(not profile.has_rig() and garage._deploy.disabled, "a wreck leaves no rig; DEPLOY is off")
 	_check(garage._rebuild.visible and profile.plan == plan, "REBUILD offers your last build")
@@ -188,15 +245,25 @@ func _run_checks() -> void:
 	profile.save_game()
 	profile.scrap = 0
 	profile.schematics.clear()
+	var crew_before := str(profile.crew)
+	profile.crew.clear()
 	_check(profile.load_game() and profile.scrap == 1234 and profile.schematics.has("outrider_twin_guns"), "save file round-trips")
+	_check(str(profile.crew) == crew_before, "the crew round-trip through the save")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(profile.save_path))
 	profile.persist = false
 
-	# Leave a no-lock rig for the deploy check.
+	# Leave a no-lock rig for the deploy check, with a free Driver and Gunner
+	# from the Saloon (the wreck took the last pair).
 	var no_lock := Parts.STARTER_LOADOUT.duplicate(true)
 	no_lock.internal = []
 	profile.scrap = 500
 	profile.apply_loadout(no_lock)
+	for role: String in ["driver", "gunner"]:
+		if profile.seated_in(role).is_empty():
+			if profile.roster_full():
+				profile.dismiss(int(profile.crew[0].id))
+			profile.hire_basic(role)
+	_check(profile.deploy_block() == "", "free Saloon hires get a wrecked player back on the road")
 
 
 func _card_count() -> int:

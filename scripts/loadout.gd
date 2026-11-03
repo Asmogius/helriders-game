@@ -58,7 +58,9 @@ static func build(loadout: Dictionary) -> Dictionary:
 	var aim_mult := 1.0
 	var armor_bonus := 0.0
 	var ram_bonus := 0.0
+	var injury_mult := 1.0
 	var has_targeting := false
+	var manual_aim := false
 	for part: Dictionary in internal:
 		fire_mult *= float(part.get("fire_rate_mult", 1.0))
 		damage_mult *= float(part.get("damage_mult", 1.0))
@@ -66,7 +68,9 @@ static func build(loadout: Dictionary) -> Dictionary:
 		aim_mult *= float(part.get("turret_aim_mult", 1.0))
 		armor_bonus += float(part.get("armor_bonus", 0.0))
 		ram_bonus += float(part.get("ram_bonus", 0.0))
+		injury_mult *= float(part.get("injury_mult", 1.0))
 		has_targeting = has_targeting or bool(part.get("enables_lock", false))
+		manual_aim = manual_aim or bool(part.get("manual_aim", false))
 
 	# Every weapon, modifiers applied. Lock needs a targeting system AND a
 	# weapon that supports it; the longest lock range wins.
@@ -88,6 +92,9 @@ static func build(loadout: Dictionary) -> Dictionary:
 		if has_targeting:
 			lock_range = maxf(lock_range, float(w.lock_range))
 	var first: Dictionary = weapons[0] if not weapons.is_empty() else {}
+	var has_turret := false
+	for w in weapons:
+		has_turret = has_turret or int(w.mount) == 0
 
 	var abilities: Array[Dictionary] = []
 	for part: Dictionary in utility:
@@ -124,6 +131,9 @@ static func build(loadout: Dictionary) -> Dictionary:
 		"pellets": int(first.get("pellets", 1)),
 		"weapons": weapons,
 		"lock_range": lock_range,
+		"manual_aim": manual_aim,       # turrets can be aimed with no Gunner
+		"has_turret": has_turret,
+		"injury_mult": injury_mult,     # crew injury chance (Roll Cage)
 		"abilities": abilities,
 		"power_output": float(engine.get("power_output", 0.0)),
 		"power_draw": draw,

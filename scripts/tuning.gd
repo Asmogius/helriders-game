@@ -172,6 +172,19 @@ const UPGRADES := {
 	"quality": {"name": "Better Leads", "costs": [120, 300, 600], "per_level": 0.15},
 }
 
+# --- Crew (DESIGN §6; role tables live in crew.gd) ----------------------------
+const ROSTER_SIZE := 6                 # crew the Inn can hold
+const CREW_BIG_HIT := 0.15             # damage within 1 s, as a share of max armor
+const CREW_INJURY_CHANCE := 0.2        # per big hit (Roll Cage halves it)
+const CREW_INJURED_MULT := 0.5         # injured Driver: turn rate; injured Gunner: turret aim
+const CREW_REST_DAYS := 2              # days at the Inn after an injury...
+const CREW_REST_DAYS_HARD := 3         # ...after a 5- or 6-skull job
+const SALOON_OFFERS := 3               # paid hires on offer each day
+# Daily offer odds (percent) and prices by rarity. Common hires are always on
+# offer for free.
+const SALOON_ODDS := {"Uncommon": 60.0, "Rare": 28.0, "Epic": 9.0, "Legendary": 2.5, "Mythic": 0.5}
+const CREW_PRICES := {"Common": 0, "Uncommon": 80, "Rare": 200, "Epic": 450, "Legendary": 900, "Mythic": 1600}
+
 # --- Rigs ----------------------------------------------------------------------
 # The player's rig is built from parts: see parts.gd (schematics and the
 # starter loadout) and loadout.gd (how parts combine into these stats).

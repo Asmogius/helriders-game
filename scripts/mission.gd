@@ -39,6 +39,8 @@ var auto_spawn_specials := true
 var always_drop_schematic := false
 ## Tests: run this mission instead of the profile's.
 var mission_override := {}
+## Tests: ride with these crew (crew.gd dictionaries) instead of the seated ones.
+var crew_override: Array = []
 
 var spec := {}                   # the mission being run
 var mission_type := "clear"
@@ -117,6 +119,7 @@ func _ready() -> void:
 	# The rig from the garage. Tests (or a missing rig) fall back to the starter.
 	var loadout: Dictionary = profile.rig if profile.has_rig() else Parts.STARTER_LOADOUT
 	vehicle.apply_stats(Loadout.build(loadout))
+	vehicle.set_crew(crew_override if not crew_override.is_empty() else profile.seated_crew())
 	profile.start_run()
 
 	_configure_mission()
@@ -160,6 +163,7 @@ func _ready() -> void:
 
 	zombies.zombie_killed.connect(_on_zombie_killed)
 	vehicle.wrecked.connect(_on_wrecked)
+	vehicle.crew_injured.connect(_on_crew_injured)
 	vehicle.damaged.connect(_on_damaged)
 	for h in hunters:
 		h.died.connect(_on_hunter_died.bind(h))
@@ -171,7 +175,7 @@ func _ready() -> void:
 		elite.wrecked.connect(_on_elite_wrecked)
 	hud.restart_requested.connect(return_to_garage)
 	hud.lock_toggled.connect(func(on: bool) -> void: vehicle.lock_enabled = on)
-	hud.ability_pressed.connect(use_ability)
+	hud.ability_pressed.connect(_on_ability_pressed)
 	_sync_hud_to_rig()
 	hud.banner("%s  -  %s" % [Missions.label(spec), str(spec.name).to_upper()], _type_color(), 3.0)
 	_refresh_hud()
@@ -261,20 +265,52 @@ func apply_rig(stats: Dictionary) -> void:
 	_sync_hud_to_rig()
 
 
-## LOCK and utility buttons follow the rig's parts.
+## LOCK, crew and utility buttons follow the rig's parts and crew. Crew
+## buttons come first (nearest LOCK), then utilities.
 func _sync_hud_to_rig() -> void:
 	hud.set_lock_available(vehicle.can_lock())
 	var kinds: Array[String] = []
+	for c in vehicle.crew:
+		kinds.append(str(c.ability.kind))
 	for a in vehicle.abilities:
 		kinds.append(str(a.ability))
 	hud.set_abilities(kinds)
+	for i in vehicle.crew.size():
+		hud.set_ability_disabled(i, vehicle.is_crew_injured(i))
 
 
-## Fire the rig's utility `index` (its HUD button).
+func _on_ability_pressed(index: int) -> void:
+	if index < vehicle.crew.size():
+		use_crew_ability(index)
+	else:
+		use_ability(index - vehicle.crew.size())
+
+
+## Fire the rig's utility `index`.
 func use_ability(index: int) -> bool:
 	if state != State.RUNNING:
 		return false
 	return vehicle.use_ability(index)
+
+
+## Fire crew member `index`'s triggered ability.
+func use_crew_ability(index: int) -> bool:
+	if state != State.RUNNING:
+		return false
+	var ok := vehicle.use_crew_ability(index)
+	if ok:
+		var c := vehicle.crew[index]
+		hud.banner(("HARD LINE" if str(c.ability.kind) == "hard_line" else "OVERCHARGE") + "  -  " + str(c.name).to_upper(),
+			T.COL_CYAN if str(c.role) == "driver" else Color(1.0, 0.92, 0.7), 1.2)
+	return ok
+
+
+func _on_crew_injured(index: int) -> void:
+	var c := vehicle.crew[index]
+	hud.set_ability_disabled(index, true)
+	var effect := "STEERING HALVED" if str(c.role) == "driver" else "TURRET AIM HALVED"
+	hud.banner("%s INJURED  -  %s" % [str(c.role).to_upper(), effect], T.COL_ENEMY, 2.5)
+	camera.shake(0.6)
 
 
 func return_to_garage() -> void:
@@ -419,8 +455,11 @@ func courier_tier() -> String:
 func _refresh_hud() -> void:
 	hud.set_armor(vehicle.armor / vehicle.armor_max)
 	hud.set_power(vehicle.power_load(), vehicle.power_output, vehicle.weight_load, vehicle.weight_capacity)
+	var crew_count := vehicle.crew.size()
+	for i in crew_count:
+		hud.set_ability_charge(i, vehicle.crew_charge(i))
 	for i in vehicle.abilities.size():
-		hud.set_ability_charge(i, vehicle.ability_charge(i))
+		hud.set_ability_charge(crew_count + i, vehicle.ability_charge(i))
 	hud.set_status_text(_status_line())
 	hud.set_lock_state(vehicle.lock_enabled, vehicle.lock_target != null)
 	# Edge arrows: specials always, the Courier's next stop, salvage, and the
@@ -590,12 +629,25 @@ func _succeed(title: String, detail: String, pay_mult: float) -> void:
 		ids.append(reward_part)
 	bank_report = profile.bank_run(int(scrap) + pay, ids)
 	profile.finish_day()
+	# After the day ends, so tonight doesn't count toward anyone's rest.
+	var crew_lines := profile.bank_crew(skulls, injured_crew_ids())
 	var lines := "Job pay +%d    Kill scrap +%d    Time %s" % [pay, int(scrap), _clock(elapsed)]
 	if detail != "":
 		lines = detail + "\n" + lines
 	for id: String in bank_report.unlocked:
 		lines += "\nNew schematic: " + Parts.describe(Parts.get_part(id))
+	if not crew_lines.is_empty():
+		lines += "\nCrew: " + ";  ".join(crew_lines)
 	hud.show_result(title, lines, "RETURN TO GARAGE", _type_color())
+
+
+## Ids of crew hurt during this run.
+func injured_crew_ids() -> Array[int]:
+	var out: Array[int] = []
+	for c in vehicle.crew:
+		if bool(c.injured):
+			out.append(int(c.id))
+	return out
 
 
 ## A job may pay a schematic from its type's pool: odds by skulls, and a
@@ -615,9 +667,13 @@ func _on_wrecked() -> void:
 		return
 	state = State.WRECKED
 	camera.shake(1.0)
+	var lost: Array[String] = []
+	for m in profile.seated_crew():
+		lost.append(str(m.name))
 	var penalty := profile.record_wreck()
 	profile.finish_day()
-	var lines := "Rig destroyed with every part on it. Crew lost."
+	var lines := "Rig destroyed with every part on it."
+	lines += (" Crew lost: %s." % ", ".join(lost)) if not lost.is_empty() else " No crew aboard."
 	if penalty > 0:
 		lines += "\nWreck penalty: -%d scrap." % penalty
 	if scrap >= 1.0 or not salvage.is_empty():

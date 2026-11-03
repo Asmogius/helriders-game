@@ -13,6 +13,17 @@ extends Node
 ##   scaled to the lost build's value (DESIGN §4). Schematics and storage
 ##   survive. Scrap and schematics picked up during that run are lost.
 ## - You never get a schematic you already own: drops skip known ones.
+##
+## Crew rules (decided with the owner, "Helriders: Crew Draft" doc):
+## - Seats depend on the frame. A Driver is required to deploy; a turret needs
+##   a seated Gunner or a targeting computer to aim.
+## - A job's XP (its skulls) is split evenly among the crew on the rig.
+## - Big hits mid-fight can injure crew; injured crew rest at the Inn after
+##   the run and can't be seated until healed.
+## - A wreck kills everyone seated. Crew at the Inn are safe. Quitting
+##   mid-run costs only the day.
+## - The Saloon always has a free Common Driver and Gunner, so you can never
+##   get stuck; its daily paid offers roll rarity by T.SALOON_ODDS.
 
 signal changed
 
@@ -20,6 +31,7 @@ const T := preload("res://scripts/tuning.gd")
 const Parts := preload("res://scripts/parts.gd")
 const Loadout := preload("res://scripts/loadout.gd")
 const Missions := preload("res://scripts/missions.gd")
+const Crew := preload("res://scripts/crew.gd")
 
 const SAVE_VERSION := 1
 const SINGLE_SLOTS := ["chassis", "engine", "drive", "armor"]
@@ -41,6 +53,10 @@ var board: Array = []               # today's missions on the Comms board
 var active_mission := {}            # the one you took; DEPLOY runs it
 var run_active := false             # a mission is under way (saved, so a quit counts)
 var notice := ""                    # one-time message for the garage to show
+var crew: Array = []                # the roster (crew.gd dictionaries)
+var next_crew_id := 1
+var saloon: Array = []              # today's paid offers: crew dictionaries + "price", "hired"
+var saloon_day := 0
 var _ready_state := false           # set once a game is loaded or started
 
 
@@ -59,9 +75,8 @@ func new_game() -> void:
 	_ready_state = true
 	scrap = T.START_SCRAP
 	schematics.clear()
-	for id in parts_in(Parts.STARTER_LOADOUT):
-		if not schematics.has(id):
-			schematics.append(id)
+	for id: String in Parts.STARTER_SCHEMATICS:
+		schematics.append(id)
 	storage = {}
 	rig = Parts.STARTER_LOADOUT.duplicate(true)
 	plan = rig.duplicate(true)
@@ -74,7 +89,21 @@ func new_game() -> void:
 	active_mission = {}
 	run_active = false
 	board = Missions.make_board(day, board_size(), 0)
+	_starter_crew()
+	saloon_day = 0
+	ensure_saloon()
 	save_game()
+
+
+## DESIGN §11: a new game starts with a free Common Driver and Gunner, seated.
+func _starter_crew() -> void:
+	crew = []
+	next_crew_id = 1
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("helriders-starter-crew")
+	for role: String in ["driver", "gunner"]:
+		var m := _add_crew(Crew.make(role, "Common", rng))
+		m.seated = true
 
 
 # --- Loadouts -------------------------------------------------------------------
@@ -240,6 +269,7 @@ func apply_loadout(target: Dictionary) -> bool:
 	rig = target.duplicate(true)
 	if is_complete(rig):
 		plan = rig.duplicate(true)
+	_fit_seats()
 	save_game()
 	changed.emit()
 	return true
@@ -280,9 +310,12 @@ func has_mission() -> bool:
 ## A mission ended (cleared, wrecked or abandoned): one day per mission.
 func finish_day() -> void:
 	run_active = false
+	for m: Dictionary in crew:
+		m.rest = maxi(int(m.rest) - 1, 0)
 	day += 1
 	active_mission = {}
 	board = Missions.make_board(day, board_size(), int(upgrades.get("quality", 0)))
+	ensure_saloon()
 	save_game()
 	changed.emit()
 
@@ -290,7 +323,7 @@ func finish_day() -> void:
 ## DESIGN §7: extracted parts only (starter schematics don't count),
 ## rarity points x level. Every schematic is level 1 until Research.
 func district_score() -> int:
-	var starter := parts_in(Parts.STARTER_LOADOUT)
+	var starter: Array = Parts.STARTER_SCHEMATICS
 	var score := 0
 	for id in schematics:
 		if starter.has(id):
@@ -318,8 +351,9 @@ func bank_run(run_scrap: int, salvaged: Array[String]) -> Dictionary:
 	return {"scrap": run_scrap, "unlocked": unlocked}
 
 
-## Wrecked: the rig and every part on it are gone, and you pay a scrap
-## penalty scaled to what the build was worth. Returns the penalty paid.
+## Wrecked: the rig and every part on it are gone, everyone seated dies, and
+## you pay a scrap penalty scaled to what the build was worth. Returns the
+## penalty paid.
 func record_wreck() -> int:
 	record.wrecks = int(record.wrecks) + 1
 	var penalty := wreck_penalty(rig)
@@ -327,9 +361,210 @@ func record_wreck() -> int:
 	if is_complete(rig):
 		plan = rig.duplicate(true)
 	rig = empty_loadout()
+	crew = crew.filter(func(m: Dictionary) -> bool: return not bool(m.seated))
 	save_game()
 	changed.emit()
 	return penalty
+
+
+# --- Crew ---------------------------------------------------------------------------
+
+func _add_crew(member: Dictionary) -> Dictionary:
+	var m := member.duplicate(true)
+	m.erase("price")
+	m.erase("hired")
+	m.id = next_crew_id
+	next_crew_id += 1
+	m.seated = false
+	m.rest = 0
+	crew.append(m)
+	return m
+
+
+func member(id: int) -> Dictionary:
+	for m: Dictionary in crew:
+		if int(m.id) == id:
+			return m
+	return {}
+
+
+## Seats the rig's frame offers.
+func seats(loadout: Dictionary = {}) -> Array[String]:
+	return Crew.seats_for(rig if loadout.is_empty() else loadout)
+
+
+## Who rides in `role`'s seat, or {}.
+func seated_in(role: String) -> Dictionary:
+	for m: Dictionary in crew:
+		if bool(m.seated) and str(m.role) == role:
+			return m
+	return {}
+
+
+## Crew riding the rig, in seat order. With `loadout`, only those whose seat
+## that frame has (the Garage previews a frame swap with this).
+func seated_crew(loadout: Dictionary = {}) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var open := seats(loadout)
+	for role: String in Crew.SEAT_ORDER:
+		var m := seated_in(role)
+		if not m.is_empty() and open.has(role):
+			out.append(m)
+	return out
+
+
+func is_resting(m: Dictionary) -> bool:
+	return int(m.get("rest", 0)) > 0
+
+
+func roster_full() -> bool:
+	return crew.size() >= T.ROSTER_SIZE
+
+
+## Put crew member `id` in their role's seat (whoever sat there goes back to
+## the Inn). Fails if the frame has no such seat or they're resting.
+func seat_member(id: int) -> bool:
+	var m := member(id)
+	if m.is_empty() or is_resting(m) or not seats().has(str(m.role)):
+		return false
+	var current := seated_in(str(m.role))
+	if not current.is_empty():
+		current.seated = false
+	m.seated = true
+	save_game()
+	changed.emit()
+	return true
+
+
+func unseat_member(id: int) -> void:
+	var m := member(id)
+	if m.is_empty():
+		return
+	m.seated = false
+	save_game()
+	changed.emit()
+
+
+## Gone for good, no refund.
+func dismiss(id: int) -> bool:
+	var before := crew.size()
+	crew = crew.filter(func(m: Dictionary) -> bool: return int(m.id) != id)
+	if crew.size() == before:
+		return false
+	save_game()
+	changed.emit()
+	return true
+
+
+## Seats the new frame doesn't have send their crew back to the Inn.
+func _fit_seats() -> void:
+	var open := seats()
+	for m: Dictionary in crew:
+		if bool(m.seated) and not open.has(str(m.role)):
+			m.seated = false
+
+
+## A fresh hire takes an empty seat of their role, if the frame has one.
+func _auto_seat(m: Dictionary) -> void:
+	if seats().has(str(m.role)) and seated_in(str(m.role)).is_empty():
+		m.seated = true
+
+
+## Why the rig can't deploy with this crew, or "" if it can.
+func deploy_block() -> String:
+	if seated_in("driver").is_empty():
+		return "No Driver seated. Seat one at the Inn, or hire a free one at the Saloon."
+	var stats := Loadout.build(rig)
+	if bool(stats.has_turret) and not bool(stats.manual_aim) and seated_in("gunner").is_empty():
+		return "The turret has no one to aim it. Seat a Gunner, or fit a Targeting Computer."
+	return ""
+
+
+## Today's Saloon offers (seeded by the day, like the job board).
+func ensure_saloon() -> void:
+	if saloon_day == day and saloon.size() == T.SALOON_OFFERS:
+		return
+	saloon_day = day
+	saloon = []
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("helriders-saloon-%d" % day)
+	for i in T.SALOON_OFFERS:
+		var role: String = Crew.ROLES[rng.randi_range(0, Crew.ROLES.size() - 1)]
+		var rarity := _roll_rarity(rng)
+		var m := Crew.make(role, rarity, rng)
+		m["price"] = int(T.CREW_PRICES[rarity])
+		m["hired"] = false
+		saloon.append(m)
+
+
+static func _roll_rarity(rng: RandomNumberGenerator) -> String:
+	var total := 0.0
+	for r: String in T.SALOON_ODDS:
+		total += float(T.SALOON_ODDS[r])
+	var roll := rng.randf() * total
+	for r: String in T.SALOON_ODDS:
+		roll -= float(T.SALOON_ODDS[r])
+		if roll < 0.0:
+			return r
+	return "Uncommon"
+
+
+## Hire today's offer `index`. Needs the scrap and a free roster slot.
+func hire_offer(index: int) -> bool:
+	ensure_saloon()
+	if index < 0 or index >= saloon.size() or roster_full():
+		return false
+	var offer: Dictionary = saloon[index]
+	if bool(offer.hired) or int(offer.price) > scrap:
+		return false
+	scrap -= int(offer.price)
+	offer.hired = true
+	_auto_seat(_add_crew(offer))
+	save_game()
+	changed.emit()
+	return true
+
+
+## The free Common Driver or Gunner the Saloon always has.
+func hire_basic(role: String) -> bool:
+	if roster_full() or not Crew.ROLES.has(role):
+		return false
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("helriders-basic-%d-%d" % [day, next_crew_id])
+	_auto_seat(_add_crew(Crew.make(role, "Common", rng)))
+	save_game()
+	changed.emit()
+	return true
+
+
+## A job was finished: the crew on it split the skulls as XP, and anyone
+## injured goes to the Inn to rest. Call after finish_day(), so tonight's
+## rest doesn't count. Returns lines for the results card.
+func bank_crew(skulls: int, injured_ids: Array) -> Array[String]:
+	var lines: Array[String] = []
+	var riders := seated_crew()
+	if riders.is_empty():
+		return lines
+	var share := float(skulls) / riders.size()
+	for m in riders:
+		var before := Crew.level(m)
+		m.xp = float(m.xp) + share
+		var after := Crew.level(m)
+		var line := "%s +%s XP" % [m.name, _num(share)]
+		if after > before:
+			line += ", level %d" % after
+		if injured_ids.has(int(m.id)):
+			m.rest = T.CREW_REST_DAYS_HARD if skulls >= 5 else T.CREW_REST_DAYS
+			m.seated = false
+			line += ", injured: resting %d days" % int(m.rest)
+		lines.append(line)
+	save_game()
+	changed.emit()
+	return lines
+
+
+static func _num(v: float) -> String:
+	return str(int(v)) if is_equal_approx(v, roundf(v)) else "%.1f" % v
 
 
 # --- Upgrades ----------------------------------------------------------------------
@@ -399,6 +634,10 @@ func save_game() -> void:
 		"board": board,
 		"active_mission": active_mission,
 		"run_active": run_active,
+		"crew": crew,
+		"next_crew_id": next_crew_id,
+		"saloon": saloon,
+		"saloon_day": saloon_day,
 	}
 	var file := FileAccess.open(save_path, FileAccess.WRITE)
 	if file == null:
@@ -450,7 +689,49 @@ func load_game() -> bool:
 	active_mission = _clean_mission(data.get("active_mission", {}))
 	run_active = bool(data.get("run_active", false))
 	ensure_board()
+	if data.has("crew"):
+		crew = []
+		for raw: Variant in data.get("crew", []):
+			var m := _clean_member(raw)
+			if not m.is_empty():
+				crew.append(m)
+		next_crew_id = maxi(int(data.get("next_crew_id", 1)), 1)
+		for m: Dictionary in crew:
+			next_crew_id = maxi(next_crew_id, int(m.id) + 1)
+		saloon = []
+		for raw: Variant in data.get("saloon", []):
+			var offer := _clean_member(raw)
+			if not offer.is_empty() and raw is Dictionary:
+				offer["price"] = int((raw as Dictionary).get("price", T.CREW_PRICES[offer.rarity]))
+				offer["hired"] = bool((raw as Dictionary).get("hired", false))
+				saloon.append(offer)
+		saloon_day = int(data.get("saloon_day", 0))
+	else:
+		# A save from before crew: the starter pair joins, seated.
+		_starter_crew()
+		_fit_seats()
+	ensure_saloon()
 	return true
+
+
+## JSON gives back floats and loose types; rebuild a crew member, or {}.
+static func _clean_member(raw: Variant) -> Dictionary:
+	if not raw is Dictionary:
+		return {}
+	var d: Dictionary = raw
+	var role := str(d.get("role", ""))
+	var rarity := str(d.get("rarity", ""))
+	if not Crew.ROLES.has(role) or not Crew.RARITIES.has(rarity):
+		return {}
+	return {
+		"id": int(d.get("id", 0)),
+		"name": str(d.get("name", "Crew")),
+		"role": role,
+		"rarity": rarity,
+		"xp": maxf(float(d.get("xp", 0.0)), 0.0),
+		"rest": maxi(int(d.get("rest", 0)), 0),
+		"seated": bool(d.get("seated", false)),
+	}
 
 
 ## JSON turns ints into floats; put a mission back in shape, or {} if unusable.

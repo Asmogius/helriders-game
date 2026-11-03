@@ -5,15 +5,21 @@ extends CharacterBody2D
 ## Driving: point the left stick where you want to go; pull it behind you while
 ## slow to reverse. Turret rigs aim with the right stick (push past halfway to
 ## fire) or, with lock on, aim and fire at the locked target by themselves.
+##
+## Crew (player only, crew.gd): the seated Driver and Gunner add passives and
+## a triggered ability each, and a big hit can injure one mid-fight. A turret
+## turns only with a Gunner seated or a targeting computer fitted.
 
 signal wrecked
 signal damaged(amount: float)
+signal crew_injured(index: int)
 
 const T := preload("res://scripts/tuning.gd")
 const Hostile := preload("res://scripts/hostile.gd")
 const BulletPool := preload("res://scripts/bullet_pool.gd")
 const Parts := preload("res://scripts/parts.gd")
 const Loadout := preload("res://scripts/loadout.gd")
+const Crew := preload("res://scripts/crew.gd")
 
 enum Mount { TURRET, FIXED }
 
@@ -51,6 +57,21 @@ var weight_capacity := 0.0         # chassis limit (0 = no weight model, e.g. en
 var gun_stats: Array[Dictionary] = []   # every weapon (see loadout.gd)
 var abilities: Array[Dictionary] = []   # utility parts, each with "ready_in" seconds
 var look := {}                     # which parts are installed, for drawing
+var manual_aim := true             # a targeting computer can aim turrets (enemy rigs: always)
+var injury_mult := 1.0             # crew injury chance multiplier (Roll Cage)
+
+# Crew riding this rig: one entry per seated member, see set_crew().
+var crew: Array[Dictionary] = []
+var big_hits := 0                  # big hits taken (tests and stats)
+# Live crew modifiers, rebuilt by _refresh_crew_mods() when anything changes.
+var crew_turn := 1.0
+var crew_grip := 0.0
+var crew_speed := 1.0
+var crew_aim := 1.0
+var crew_spread := 1.0
+var crew_lock := 1.0
+var crew_fire := 1.0
+var crew_damage := 1.0
 
 var team := BulletPool.TEAM_PLAYER
 var armor := 0.0
@@ -94,6 +115,15 @@ var _barrel_side := 1.0
 var _lock_check := 0.0
 var _lock_blind := 0.0
 var _ray := PhysicsRayQueryParameters2D.new()
+var _hard_line_left := 0.0
+var _hard_line := {}
+var _overcharge_left := 0.0
+var _overcharge := {}
+var _streak_timer := 0.0
+# Damage taken per 0.1 s over the last second (big-hit check). No allocation.
+var _dmg_buckets := PackedFloat32Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+var _bucket_i := 0
+var _bucket_t := 0.0
 
 
 func _init() -> void:
@@ -121,6 +151,8 @@ func apply_stats(s: Dictionary) -> void:
 	power_draw = s.get("power_draw", 0.0)
 	weight_load = s.get("weight", 0.0)
 	weight_capacity = s.get("weight_capacity", 0.0)
+	manual_aim = bool(s.get("manual_aim", true))
+	injury_mult = float(s.get("injury_mult", 1.0))
 	look = s.get("look", {})
 	if s.has("body"):
 		body_len = float(s.body[0])
@@ -191,6 +223,179 @@ func can_lock() -> bool:
 	return lock_range > 0.0
 
 
+## Lock range with an Epic+ Gunner's bonus.
+func lock_reach() -> float:
+	return lock_range * crew_lock
+
+
+## Turrets turn only with a Gunner seated or a targeting computer fitted.
+func can_aim_turrets() -> bool:
+	if manual_aim:
+		return true
+	for c in crew:
+		if str(c.role) == "gunner":
+			return true
+	return false
+
+
+# --- Crew -----------------------------------------------------------------------
+
+## Seat `members` (crew.gd dictionaries) on this rig for the run.
+func set_crew(members: Array) -> void:
+	crew.clear()
+	for m: Dictionary in members:
+		crew.append({
+			"id": int(m.id), "name": str(m.name), "role": str(m.role),
+			"injured": false, "passive": Crew.passive(m), "ability": Crew.ability(m), "ready_in": 0.0,
+		})
+	_hard_line_left = 0.0
+	_overcharge_left = 0.0
+	_refresh_crew_mods()
+
+
+func _refresh_crew_mods() -> void:
+	crew_turn = 1.0
+	crew_grip = 0.0
+	crew_speed = 1.0
+	crew_aim = 1.0
+	crew_spread = 1.0
+	crew_lock = 1.0
+	crew_fire = 1.0
+	crew_damage = 1.0
+	for c in crew:
+		var p: Dictionary = c.passive
+		match str(c.role):
+			"driver":
+				if bool(c.injured):
+					crew_turn *= T.CREW_INJURED_MULT
+				else:
+					crew_turn *= 1.0 + float(p.turn)
+					crew_grip += float(p.grip)
+			"gunner":
+				if bool(c.injured):
+					crew_aim *= T.CREW_INJURED_MULT
+				else:
+					crew_spread *= 1.0 - float(p.spread)
+					crew_aim *= 1.0 + float(p.aim)
+					crew_lock *= 1.0 + float(p.lock)
+	if _hard_line_left > 0.0:
+		crew_turn *= 1.0 + float(_hard_line.turn)
+		crew_grip += float(_hard_line.grip)
+		crew_speed *= 1.0 + float(_hard_line.speed)
+	if _overcharge_left > 0.0:
+		crew_fire *= 1.0 + float(_overcharge.fire)
+		crew_damage *= 1.0 + float(_overcharge.damage)
+	for t in _turrets:
+		if t != null:
+			t.set("hot", _overcharge_left > 0.0)
+			t.queue_redraw()
+	queue_redraw()
+
+
+## Fire crew member `index`'s triggered ability (their HUD button).
+func use_crew_ability(index: int) -> bool:
+	if is_wrecked or index < 0 or index >= crew.size():
+		return false
+	var c := crew[index]
+	if bool(c.injured) or float(c.ready_in) > 0.0:
+		return false
+	var a: Dictionary = c.ability
+	c.ready_in = float(a.cooldown)
+	match str(a.kind):
+		"hard_line":
+			_hard_line = a
+			_hard_line_left = float(a.time)
+		"overcharge":
+			_overcharge = a
+			_overcharge_left = float(a.time)
+	_refresh_crew_mods()
+	return true
+
+
+## 0 when ready, up to 1 right after use.
+func crew_charge(index: int) -> float:
+	if index < 0 or index >= crew.size():
+		return 0.0
+	var c := crew[index]
+	return clampf(float(c.ready_in) / maxf(float(c.ability.cooldown), 0.01), 0.0, 1.0)
+
+
+func is_crew_injured(index: int) -> bool:
+	return index >= 0 and index < crew.size() and bool(crew[index].injured)
+
+
+func hard_line_active() -> bool:
+	return _hard_line_left > 0.0
+
+
+func overcharge_active() -> bool:
+	return _overcharge_left > 0.0
+
+
+## Injure crew member `index` now: their passive and button are gone for the
+## run, and the rig takes their role's debuff.
+func injure_crew(index: int) -> void:
+	if index < 0 or index >= crew.size() or bool(crew[index].injured):
+		return
+	var c := crew[index]
+	c.injured = true
+	match str(c.role):
+		"driver":
+			_hard_line_left = 0.0
+		"gunner":
+			_overcharge_left = 0.0
+	_refresh_crew_mods()
+	crew_injured.emit(index)
+
+
+## A big hit (over CREW_BIG_HIT of max armor inside a second) may injure a
+## random crew member who isn't hurt yet.
+func _check_big_hit() -> void:
+	var total := 0.0
+	for v in _dmg_buckets:
+		total += v
+	if total <= armor_max * T.CREW_BIG_HIT:
+		return
+	big_hits += 1
+	_dmg_buckets.fill(0.0)
+	if randf() >= T.CREW_INJURY_CHANCE * injury_mult:
+		return
+	var fit: Array[int] = []
+	for i in crew.size():
+		if not bool(crew[i].injured):
+			fit.append(i)
+	if not fit.is_empty():
+		injure_crew(fit[randi_range(0, fit.size() - 1)])
+
+
+func _tick_crew(delta: float) -> void:
+	# Roll the damage window forward in 0.1 s steps.
+	_bucket_t += delta
+	while _bucket_t >= 0.1:
+		_bucket_t -= 0.1
+		_bucket_i = (_bucket_i + 1) % _dmg_buckets.size()
+		_dmg_buckets[_bucket_i] = 0.0
+	for c in crew:
+		c.ready_in = maxf(float(c.ready_in) - delta, 0.0)
+	var ended := false
+	if _hard_line_left > 0.0:
+		_hard_line_left -= delta
+		ended = ended or _hard_line_left <= 0.0
+		# Cyan streaks off the rear tyres.
+		_streak_timer -= delta
+		if fx != null and _streak_timer <= 0.0 and velocity.length() > 120.0:
+			_streak_timer = 0.04
+			var back := -Vector2.RIGHT.rotated(rotation) * body_len * 0.4
+			var side := Vector2.RIGHT.rotated(rotation).orthogonal() * body_wid * 0.5
+			for s: float in [-1.0, 1.0]:
+				fx.call("emit", global_position + back + side * s, -velocity * 0.1, 0.35, 4.0, T.COL_CYAN, 4.0)
+	if _overcharge_left > 0.0:
+		_overcharge_left -= delta
+		ended = ended or _overcharge_left <= 0.0
+	if ended:
+		_refresh_crew_mods()
+
+
 ## Power drawn by the build. Fixed by what's installed, not by what's switched on.
 func power_load() -> float:
 	return power_draw
@@ -250,6 +455,8 @@ func _physics_process(delta: float) -> void:
 		wall_impact = 0.0
 		_burn(delta)
 		return
+	if not crew.is_empty():
+		_tick_crew(delta)
 	_drive(delta)
 	_update_lock(delta)
 	_weapons(delta)
@@ -281,7 +488,7 @@ func _drive(delta: float) -> void:
 			# Ease off the gas while turning hard; that's where drifts come from.
 			throttle = stick * clampf(0.35 + 0.65 * cos(diff), 0.15, 1.0)
 		var authority := clampf(absf(fwd_speed) / (max_speed * 0.3), 0.3, 1.0)
-		var max_turn := turn_rate * authority * delta
+		var max_turn := turn_rate * crew_turn * authority * delta
 		rotation += clampf(diff, -max_turn, max_turn)
 	else:
 		_reversing = false
@@ -296,7 +503,7 @@ func _drive(delta: float) -> void:
 	# An overloaded power plant can't deliver full speed or acceleration.
 	var power := mobility()
 	if throttle > 0.0:
-		var target := throttle * max_speed * power
+		var target := throttle * max_speed * power * crew_speed
 		var rate := acceleration * power if fwd_speed < target else coast
 		if fwd_speed < 0.0:
 			rate = brake
@@ -307,7 +514,7 @@ func _drive(delta: float) -> void:
 	else:
 		fwd_speed = move_toward(fwd_speed, 0.0, coast * delta)
 
-	side_speed *= exp(-grip * traction * delta)
+	side_speed *= exp(-(grip + crew_grip) * traction * delta)
 	velocity = forward * fwd_speed + side * side_speed
 
 	var pre_velocity := velocity
@@ -364,7 +571,7 @@ func _resolve_collisions(pre_velocity: Vector2) -> void:
 # --- Lock-on -------------------------------------------------------------------
 
 func _update_lock(delta: float) -> void:
-	if not lock_enabled or lock_range <= 0.0 or not lock_candidates.is_valid():
+	if not lock_enabled or lock_reach() <= 0.0 or not lock_candidates.is_valid():
 		lock_target = null
 		return
 	if lock_target != null and not _lock_still_valid(lock_target):
@@ -387,7 +594,7 @@ func _update_lock(delta: float) -> void:
 func _lock_still_valid(target: Node2D) -> bool:
 	if not is_instance_valid(target) or not target.call("is_targetable"):
 		return false
-	return global_position.distance_to(target.global_position) <= lock_range * 1.15
+	return global_position.distance_to(target.global_position) <= lock_reach() * 1.15
 
 
 func _priority_of(target: Node2D) -> int:
@@ -405,7 +612,7 @@ func _best_lock_target() -> Node2D:
 	candidates.sort_custom(func(a: Node2D, b: Node2D) -> bool:
 		return _score(a) > _score(b))
 	for c: Node2D in candidates:
-		if global_position.distance_to(c.global_position) > lock_range:
+		if global_position.distance_to(c.global_position) > lock_reach():
 			continue
 		if not c.call("is_targetable"):
 			continue
@@ -439,6 +646,7 @@ func _weapons(delta: float) -> void:
 	var trigger := aim_input.length() >= FIRE_THRESHOLD
 	var locked := lock_target != null
 	var forward := Vector2.RIGHT.rotated(rotation)
+	var can_aim := can_aim_turrets()
 	for i in gun_stats.size():
 		var w := gun_stats[i]
 		_cooldowns[i] = maxf(_cooldowns[i] - delta, 0.0)
@@ -446,14 +654,21 @@ func _weapons(delta: float) -> void:
 		var direction := forward
 		var muzzle := global_position + forward * (body_len * 0.25)
 		var turret := _turrets[i] if i < _turrets.size() else null
-		if turret != null:
+		if turret != null and not can_aim:
+			# No Gunner and no targeting computer: the turret stays facing
+			# forward and fires on the trigger like a fixed gun.
+			turret.rotation = lerp_angle(turret.rotation, 0.0, 1.0 - exp(-6.0 * delta))
+			direction = Vector2.RIGHT.rotated(turret.global_rotation)
+			muzzle = turret.global_position
+			wants_fire = trigger or fire_trigger
+		elif turret != null:
 			var want_angle := 0.0
 			if manual:
 				want_angle = aim_input.angle()
 			elif locked:
 				want_angle = (_lead_point(lock_target, float(w.bullet_speed)) - turret.global_position).angle()
 			if manual or locked:
-				turret.rotation = rotate_toward(turret.rotation, wrapf(want_angle - rotation, -PI, PI), float(w.turret_turn_rate) * delta)
+				turret.rotation = rotate_toward(turret.rotation, wrapf(want_angle - rotation, -PI, PI), float(w.turret_turn_rate) * crew_aim * delta)
 			else:
 				turret.rotation = lerp_angle(turret.rotation, 0.0, 1.0 - exp(-4.0 * delta))
 			direction = Vector2.RIGHT.rotated(turret.global_rotation)
@@ -473,7 +688,7 @@ func _weapons(delta: float) -> void:
 			# Twin fixed guns alternate barrels.
 			muzzle += forward.orthogonal() * 9.0 * _barrel_side
 		if wants_fire and _cooldowns[i] <= 0.0:
-			_cooldowns[i] = 1.0 / float(w.fire_rate)
+			_cooldowns[i] = 1.0 / (float(w.fire_rate) * crew_fire)
 			if turret == null:
 				_barrel_side = -_barrel_side
 			_shoot(w, muzzle, direction)
@@ -490,7 +705,7 @@ func _lead_point(target: Node2D, speed := 1500.0) -> Vector2:
 
 func _shoot(w: Dictionary, muzzle: Vector2, direction: Vector2) -> void:
 	var pellets := int(w.get("pellets", 1))
-	var damage := float(w.bullet_damage)
+	var damage := float(w.bullet_damage) * crew_damage
 	# A Hunter clinging to the hull is too close for a bullet to travel:
 	# if the gun is pointing at it, it's a point-blank hit (every pellet).
 	for h in latched:
@@ -501,7 +716,7 @@ func _shoot(w: Dictionary, muzzle: Vector2, direction: Vector2) -> void:
 				fx.sparks(h.global_position, -to_h.normalized())
 			bullets.record_direct_hit()
 			return
-	var cone := deg_to_rad(float(w.spread_deg))
+	var cone := deg_to_rad(float(w.spread_deg) * crew_spread)
 	for p in pellets:
 		var dir := direction.rotated(randf_range(-cone, cone))
 		bullets.fire(muzzle, dir * float(w.bullet_speed) * randf_range(0.95, 1.05) if pellets > 1 else dir * float(w.bullet_speed), damage, team)
@@ -561,6 +776,9 @@ func take_damage(amount: float) -> void:
 		_flash = 1.0
 		queue_redraw()
 	damaged.emit(amount)
+	if not crew.is_empty() and armor > 0.0:
+		_dmg_buckets[_bucket_i] += amount
+		_check_big_hit()
 	if armor <= 0.0:
 		armor = 0.0
 		_wreck()
@@ -662,6 +880,9 @@ func _draw() -> void:
 		if int(w.mount) == Mount.FIXED:
 			draw_rect(Rect2(half_l - 16.0, -12.0, 22.0, 4.0), Color(0.15, 0.15, 0.16))
 			draw_rect(Rect2(half_l - 16.0, 8.0, 22.0, 4.0), Color(0.15, 0.15, 0.16))
+			if _overcharge_left > 0.0:
+				draw_rect(Rect2(half_l + 2.0, -12.0, 4.0, 4.0), Color(1.0, 0.95, 0.8))
+				draw_rect(Rect2(half_l + 2.0, 8.0, 4.0, 4.0), Color(1.0, 0.95, 0.8))
 			break
 	# Utilities: a patch kit (green cross) or a mine rack at the tail.
 	var utils: Array = look.get("utility", [])
@@ -680,6 +901,11 @@ func _draw() -> void:
 	if internal.has("targeting_computer") or internal.has("advanced_targeting"):
 		draw_rect(Rect2(-half_l + 2.0, -5.0, 7.0, 10.0), Color(0.16, 0.17, 0.18))
 		draw_circle(Vector2(-half_l + 5.5, 0.0), 2.5, T.COL_CYAN)
+	if internal.has("roll_cage"):
+		# Bars over the cabin.
+		var cage := Rect2(-half_l * 0.35, -half_w + 6.0, half_l * 0.6, body_wid - 12.0)
+		draw_rect(cage, Color(0.12, 0.12, 0.13), false, 2.5)
+		draw_line(cage.position, cage.end, Color(0.12, 0.12, 0.13), 2.0)
 	# Practical lights: cyan edge strips, white headlights, orange tail lights.
 	draw_rect(Rect2(-half_l + 6.0, -half_w + 3.0, body_len - 20.0, 2.0), T.COL_CYAN)
 	draw_rect(Rect2(-half_l + 6.0, half_w - 5.0, body_len - 20.0, 2.0), T.COL_CYAN)
@@ -692,6 +918,7 @@ func _draw() -> void:
 class TurretSprite extends Node2D:
 	const T := preload("res://scripts/tuning.gd")
 	var kind := ""   # weapon part id: changes the barrel
+	var hot := false # Overcharge: white-hot muzzle
 
 	func _draw() -> void:
 		match kind:
@@ -708,6 +935,10 @@ class TurretSprite extends Node2D:
 			_:
 				draw_rect(Rect2(0.0, -3.0, 30.0, 6.0), Color(0.18, 0.18, 0.19))
 				draw_rect(Rect2(26.0, -3.0, 4.0, 6.0), T.COL_ORANGE)
+		if hot:
+			# Overcharge: the muzzle glows white-hot.
+			var tip := {"scattergun_turret": 25.0, "heavy_mg_turret": 38.0}.get(kind, 30.0) as float
+			draw_rect(Rect2(tip - 5.0, -4.0, 6.0, 8.0), Color(1.0, 0.95, 0.8))
 		draw_circle(Vector2.ZERO, 11.0, Color(0.22, 0.225, 0.235))
 		draw_arc(Vector2.ZERO, 11.0, 0.0, TAU, 20, T.COL_CYAN, 2.0)
 		draw_rect(Rect2(-4.0, -4.0, 8.0, 8.0), Color(0.14, 0.14, 0.15))

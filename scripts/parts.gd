@@ -16,7 +16,14 @@ extends RefCounted
 ## parts are.
 ##
 ## Internal modifiers (multiply or add to the build): fire_rate_mult,
-## damage_mult, armor_bonus, ram_bonus, lock_range_mult, turret_aim_mult.
+## damage_mult, armor_bonus, ram_bonus, lock_range_mult, turret_aim_mult,
+## injury_mult (crew injury chance).
+##
+## Aiming: a turret needs a seated Gunner or a part with `manual_aim` to turn
+## at all. LOCK (auto-aim) comes only from a part with `enables_lock` (the
+## Advanced Targeting Computer) and a weapon whose lock_range > 0.
+##
+## Chassis `seats` lists the crew seats the frame has (crew.gd).
 
 const RARITY_COLORS := {
 	"Common": Color(0.75, 0.75, 0.72),
@@ -32,19 +39,19 @@ const CATALOG := {
 		"name": "Scrap Frame", "category": "Chassis", "rarity": "Common", "cost": 50, "power": 15.0,
 		"hardpoints": 1, "utility_slots": 1, "internal_slots": 2, "weight_capacity": 100.0,
 		"armor": 60.0, "max_speed": 560.0, "reverse_speed": 230.0, "coast": 280.0, "turn_rate": 3.4,
-		"body": [64.0, 36.0],
+		"body": [64.0, 36.0], "seats": ["driver", "gunner"],
 	},
 	"courier_frame": {
 		"name": "Courier Frame", "category": "Chassis", "rarity": "Uncommon", "cost": 90, "power": 12.0,
 		"hardpoints": 1, "utility_slots": 2, "internal_slots": 1, "weight_capacity": 80.0,
 		"armor": 45.0, "max_speed": 610.0, "reverse_speed": 250.0, "coast": 260.0, "turn_rate": 3.8,
-		"body": [66.0, 32.0],
+		"body": [66.0, 32.0], "seats": ["driver"],
 	},
 	"bulwark_frame": {
 		"name": "Bulwark Frame", "category": "Chassis", "rarity": "Rare", "cost": 180, "power": 20.0,
 		"hardpoints": 2, "utility_slots": 1, "internal_slots": 2, "weight_capacity": 160.0,
 		"armor": 110.0, "max_speed": 500.0, "reverse_speed": 210.0, "coast": 300.0, "turn_rate": 3.0,
-		"body": [76.0, 42.0],
+		"body": [76.0, 42.0], "seats": ["driver", "gunner", "mechanic"],
 	},
 	# --- Engines: acceleration and the power budget -------------------------------
 	"junk_v6": {
@@ -125,7 +132,7 @@ const CATALOG := {
 	# --- Internal systems (passive, take internal capacity) -----------------------
 	"targeting_computer": {
 		"name": "Targeting Computer", "category": "Internal", "rarity": "Common", "cost": 30, "power": 25.0, "weight": 5.0,
-		"enables_lock": true,
+		"manual_aim": true,
 	},
 	"coolant_loop": {
 		"name": "Coolant Loop", "category": "Internal", "rarity": "Uncommon", "cost": 60, "power": 10.0, "weight": 5.0,
@@ -140,8 +147,12 @@ const CATALOG := {
 		"armor_bonus": 25.0, "ram_bonus": 15.0,
 	},
 	"advanced_targeting": {
-		"name": "Advanced Targeting", "category": "Internal", "rarity": "Rare", "cost": 140, "power": 30.0, "weight": 5.0,
-		"enables_lock": true, "lock_range_mult": 1.25, "turret_aim_mult": 1.2,
+		"name": "Advanced Targeting Computer", "category": "Internal", "rarity": "Rare", "cost": 140, "power": 30.0, "weight": 5.0,
+		"manual_aim": true, "enables_lock": true, "lock_range_mult": 1.25, "turret_aim_mult": 1.2,
+	},
+	"roll_cage": {
+		"name": "Roll Cage", "category": "Internal", "rarity": "Uncommon", "cost": 60, "power": 0.0, "weight": 15.0,
+		"injury_mult": 0.5,
 	},
 	# --- Utility (active: a HUD button each) --------------------------------------
 	"emergency_patch": {
@@ -155,9 +166,9 @@ const CATALOG := {
 	},
 }
 
-# What the player's rig rolls out with: 100 / 100 power, 85 / 100 weight.
-# Lock works because the Targeting Computer is in an internal slot; pull it
-# and the LOCK button goes away, but 25 power frees up for something else.
+# What the player's rig rolls out with: 75 / 100 power, 80 / 100 weight. The
+# Gunner seated on it aims the turret, so it carries no targeting computer and
+# has no LOCK until you find the Advanced Targeting Computer.
 const STARTER_LOADOUT := {
 	"chassis": "scrap_frame",
 	"engine": "junk_v6",
@@ -165,8 +176,12 @@ const STARTER_LOADOUT := {
 	"armor": "scrap_plating",
 	"weapons": ["pintle_turret"],
 	"utility": [],
-	"internal": ["targeting_computer"],
+	"internal": [],
 }
+
+# Schematics a new game starts with: the starter's parts plus the Targeting
+# Computer, for rigs that run a turret with no Gunner.
+const STARTER_SCHEMATICS := ["scrap_frame", "junk_v6", "street_wheels", "scrap_plating", "pintle_turret", "targeting_computer"]
 
 # What an Outrider can drop when you wreck it.
 const OUTRIDER_DROPS := ["outrider_twin_guns", "outrider_light_plating", "outrider_sport_wheels", "coolant_loop"]
@@ -175,7 +190,7 @@ const OUTRIDER_DROPS := ["outrider_twin_guns", "outrider_light_plating", "outrid
 const DROP_POOLS := {
 	"outrider": OUTRIDER_DROPS,
 	"elite": ["bulwark_frame", "diesel_block", "half_track", "composite_plating", "heavy_mg_turret", "advanced_targeting", "mine_dropper"],
-	"clear": ["riot_plating", "spiked_ram_plate", "scattergun_turret"],
+	"clear": ["riot_plating", "spiked_ram_plate", "scattergun_turret", "roll_cage"],
 	"survive": ["structural_bracing", "belt_feed", "patched_v8", "emergency_patch"],
 	"courier": ["courier_frame", "turbo_four", "off_road_tires"],
 }
