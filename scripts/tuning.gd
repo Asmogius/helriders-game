@@ -52,6 +52,7 @@ const MISSIONS := {
 		"hunters": [1, 1, 1, 1, 2, 2],
 		"outriders": [0, 0, 0, 1, 2, 2],
 		"bulwarks": [0, 0, 1, 1, 1, 1],
+		"gunners": [0, 0, 1, 1, 1, 1],
 		"cap": [24, 26, 27, 28, 28, 28],
 	},
 	"survive": {
@@ -65,9 +66,9 @@ const MISSIONS := {
 			[[60, "hunter"]],
 			[[55, "hunter"], [105, "hunter"]],
 			[[45, "hunter"], [90, "bulwark"]],
-			[[45, "hunter"], [90, "outrider"], [110, "hunter"], [130, "bulwark"]],
-			[[35, "hunter"], [70, "outrider"], [100, "hunter"], [120, "bulwark"], [140, "hunter"]],
-			[[30, "hunter"], [60, "outrider"], [95, "hunter"], [120, "outrider"], [150, "bulwark"]],
+			[[45, "hunter"], [90, "outrider"], [100, "gunner"], [110, "hunter"], [130, "bulwark"]],
+			[[35, "hunter"], [70, "outrider"], [85, "gunner"], [100, "hunter"], [120, "bulwark"], [140, "hunter"]],
+			[[30, "hunter"], [60, "outrider"], [80, "gunner"], [95, "hunter"], [120, "outrider"], [150, "bulwark"]],
 		],
 	},
 	"hunt": {
@@ -77,6 +78,7 @@ const MISSIONS := {
 		"elite_damage": [1.0, 1.1, 1.15, 1.25, 1.3, 1.4],
 		"escorts": [0, 0, 0, 0, 1, 1],
 		"bulwark_escorts": [0, 0, 1, 1, 1, 1],
+		"gunner_escorts": [0, 0, 0, 0, 1, 1],    # joins when there's room under the rig cap
 		"hunters": [0, 0, 1, 1, 1, 1],
 		"cap": [12, 14, 15, 17, 18, 20],
 	},
@@ -87,6 +89,7 @@ const MISSIONS := {
 		"cap": [8, 10, 11, 13, 14, 16],
 		"hunters": [0, 0, 1, 1, 1, 1],
 		"outriders": [0, 0, 0, 0, 1, 1],
+		"gunners": [0, 0, 0, 1, 1, 1],          # parks by a checkpoint and covers it
 	},
 }
 const MISSION_NAMES := {
@@ -114,7 +117,7 @@ const COURIER_TIER_PAY := {"gold": 1.0, "silver": 0.75, "bronze": 0.5, "late": 0
 const COURIER_RADIUS := 90.0
 
 # --- Districts (DESIGN §7) ----------------------------------------------------
-# Unlocked by parts score: extracted schematics, rarity points x level.
+# Unlocked by parts score: extracted schematics, rarity points x Research level.
 const RARITY_POINTS := {"Common": 1, "Uncommon": 2, "Rare": 4, "Epic": 7, "Legendary": 12}
 # Each district's board rolls jobs inside its skull band.
 const DISTRICTS := [
@@ -133,6 +136,57 @@ const SHAMBLER_SPEED := 85.0
 const SHAMBLER_RADIUS := 13.0
 const SHAMBLER_DPS := 3.0        # chip damage per zombie in contact
 const SHAMBLER_SEPARATION := 34.0
+
+# --- Zombie variants (DESIGN §8; agreed with the owner) ------------------------
+# All share the Shambler pool and steering loop (zombie_director.gd); a
+# zombie's `kind` picks its row here. "bullet" is the share of bullet damage
+# it takes (rams and mines always do full); "knock" scales how far hits push it.
+const ZOMBIE_KINDS := {
+	"shambler": {"hp": SHAMBLER_HP, "speed": SHAMBLER_SPEED, "radius": SHAMBLER_RADIUS, "dps": SHAMBLER_DPS, "bullet": 1.0, "knock": 1.0, "scrap": SCRAP_PER_KILL},
+	"brute": {"hp": 200.0, "speed": 70.0, "radius": 19.0, "dps": 8.0, "bullet": 0.5, "knock": 0.3, "scrap": 6},
+	"tank": {"hp": 450.0, "speed": 75.0, "radius": 25.0, "dps": 8.0, "bullet": 0.5, "knock": 0.1, "scrap": 15},
+	"boomer": {"hp": 60.0, "speed": 60.0, "radius": 16.0, "dps": 0.0, "bullet": 1.0, "knock": 0.8, "scrap": 3},
+	"slimer": {"hp": 70.0, "speed": 95.0, "radius": 14.0, "dps": 3.0, "bullet": 1.0, "knock": 1.0, "scrap": 3},
+}
+# Share of each horde by skulls 1-6 (the rest are Shamblers). Tanks are
+# capped per mission instead. Courier jobs only get Slimers and Boomers.
+const ZOMBIE_MIX := {
+	"slimer": [0.0, 0.06, 0.07, 0.08, 0.09, 0.10],
+	"brute": [0.0, 0.0, 0.05, 0.07, 0.09, 0.10],
+	"boomer": [0.0, 0.0, 0.04, 0.05, 0.07, 0.08],
+}
+const COURIER_KINDS := ["slimer", "boomer"]
+const TANKS_PER_MISSION := [0, 0, 0, 1, 1, 2]
+const TANK_PACK_CHANCE := 0.3          # each pack after TANK_EARLIEST may bring one
+const TANK_EARLIEST := 30.0            # seconds into the run
+const BRUTE_SHOVE := 140.0             # push on the rig per second of contact
+const TANK_CHARGE_RANGE := 350.0
+const TANK_CHARGE_COOLDOWN := 8.0
+const TANK_WINDUP := 0.8               # roar before the charge...
+const TANK_AIM_LOCK := 0.3             # ...it stops tracking for the last part of it
+const TANK_CHARGE_SPEED := 520.0
+const TANK_CHARGE_TIME := 0.9          # longest charge (~470 px)
+const TANK_CHARGE_DAMAGE := 25.0
+const TANK_SHOVE := 620.0              # velocity added to the rig it hits
+const TANK_STUMBLE := 1.5              # after a miss: stands still, open to rams
+const TANK_CACHE := 20                 # scrap crate a Tank drops
+const BOOMER_POOL_RADIUS := 70.0       # 140 wide
+const BOOMER_POOL_TIME := 8.0
+const BILE_MARK_TIME := 6.0            # a rig caught in the burst is marked this long...
+const BILE_MARK_RANGE := 500.0         # ...and zombies this close rush it...
+const BILE_FRENZY := 1.6               # ...at this speed (also inside a pool)
+const SLIME_DROP_EVERY := 0.3          # seconds between trail blobs
+const SLIME_RADIUS := 22.0
+const SLIME_TIME := 10.0
+const SLIME_PUDDLE_RADIUS := 60.0      # left where a Slimer dies
+const SLIME_GRIP := 0.35               # rig grip on slime...
+const SLIME_LINGER := 0.5              # ...and for this long after
+const COL_BRUTE := Color(0.42, 0.4, 0.36)
+const COL_TANK := Color(0.5, 0.33, 0.3)
+const COL_BOOMER := Color(0.66, 0.7, 0.3)
+const COL_SLIMER := Color(0.36, 0.62, 0.5)
+const COL_SLIME := Color(0.45, 0.85, 0.6, 0.35)
+const COL_BILE := Color(0.75, 0.8, 0.2, 0.28)
 
 # --- Hunter --------------------------------------------------------------------
 const HUNTER_HP := 60.0
@@ -166,6 +220,20 @@ const BULWARK_SCRAP_CACHE := 40     # dropped instead of a schematic
 const BULWARK_SPAWN_TIME := 60.0    # Clear: seconds in, or...
 const BULWARK_SPAWN_KILLS := 25     # ...after this many kills
 
+# --- Gunner Rig (enemy rig: standoff turret; agreed with the owner) -----------
+# Keeps its distance and works you over with a slow turret firing bursts. It
+# turns the turret on zombies that get close to it. Drops the Burst Turret.
+const GUNNER_RANGE_MIN := 350.0     # backs off if you get closer...
+const GUNNER_RANGE_MAX := 550.0     # ...closes in if you're further
+const GUNNER_GUARD_RADIUS := 300.0  # Courier: stays this close to its checkpoint
+const GUNNER_GUARD_LEASH := 700.0   # ...and only engages you this close to it
+const GUNNER_SELF_DEFENSE := 120.0  # zombies this close get the turret
+const GUNNER_FIRE_CONE := 0.12      # radians: turret this close to the target to fire
+const GUNNER_SCRAP := 30
+const GUNNER_SCRAP_CACHE := 30      # dropped instead of a schematic
+const GUNNER_SPAWN_TIME := 75.0     # Clear: seconds in, or...
+const GUNNER_SPAWN_KILLS := 30      # ...after this many kills
+
 # --- Economy (scrap is the only currency) --------------------------------------
 const START_SCRAP := 60
 const SCHEMATIC_DROP_CHANCE := 0.5     # a wrecked Outrider drops a schematic, else a scrap cache
@@ -182,6 +250,69 @@ const UPGRADES := {
 	# Comms station (DESIGN §5: more choices, better mission quality).
 	"choices": {"name": "Wider Net", "costs": [150, 400], "per_level": 1},
 	"quality": {"name": "Better Leads", "costs": [120, 300, 600], "per_level": 0.15},
+	# Research station (DESIGN §4: cost efficiency and levelling speed only).
+	"research_discount": {"name": "Bench Discount", "costs": [150, 350, 700], "per_level": 0.10},
+	"research_speed": {"name": "Second Shift", "costs": [200, 450], "per_level": 1},
+	# Inn (DESIGN §5; agreed with the owner).
+	"bunkhouse": {"name": "Bunkhouse", "costs": [150, 400], "per_level": 1},              # roster +1
+	"drill_yard": {"name": "Drill Yard", "costs": [120, 300], "per_level": 0.25},         # idle crew get this x mission XP
+	"infirmary": {"name": "Infirmary", "costs": [250], "per_level": 1},                   # rest days -1 (min 1)
+	"second_team": {"name": "Second Team", "costs": [200, 500], "per_level": 1},          # expeditions out at once +1
+	"scout_network": {"name": "Scout Network", "costs": [100, 250, 500], "per_level": 0.05},  # expedition odds +5%
+	"last_rites": {"name": "Last Rites", "costs": [600, 1200], "per_level": 0.10},       # wreck survival per crew member
+	# Saloon (DESIGN §5; agreed with the owner).
+	"back_room": {"name": "Back Room", "costs": [150, 400], "per_level": 1},              # offers per day +1
+	"word_around": {"name": "Word Gets Around", "costs": [200, 450, 900], "per_level": 1},  # odds shift (SALOON_ODDS_STEP)
+	"seasoned_hands": {"name": "Seasoned Hands", "costs": [250, 600], "per_level": 1},   # hires start a level higher
+	"house_credit": {"name": "House Credit", "costs": [120, 300, 600], "per_level": 0.10},  # hire prices -10%
+}
+const LAST_RITES_DISTRICT := 2         # Last Rites is for sale once Industrial Spine is open
+const LAST_RITES_REST := 3             # survivors rest this many days
+# Word Gets Around: each step moves these percentage points (from Uncommon).
+const SALOON_ODDS_STEP := {"Uncommon": -7.0, "Rare": 5.0, "Epic": 2.0}
+
+# --- Expeditions (DESIGN §5, §6; agreed with the owner) --------------------------
+# Benched crew go out for 1-3 days on a job from the Inn's daily board. Their
+# total level against the job's recommended level sets the odds; nobody is
+# ever lost.
+const EXPEDITION_UNLOCK_CLEARS := 3    # successful missions before the board opens
+const EXPEDITION_BOARD_SIZE := 3
+const EXPEDITION_MAX_TEAM := 6
+const EXPEDITION_AT_ONCE := 1          # Second Team adds one per step
+const EXPEDITION_TEAM_LEVEL := [3, 6, 10, 15, 21, 28]   # recommended team level, skulls 1-6
+const EXPEDITION_ODDS := 0.70          # at exactly the recommended level...
+const EXPEDITION_ODDS_OVER := 0.04     # ...plus this per level over...
+const EXPEDITION_ODDS_UNDER := 0.08    # ...minus this per level under
+const EXPEDITION_ODDS_MAX := 0.95
+const EXPEDITION_ODDS_MIN := 0.05
+const EXPEDITION_SCRAP := [20, 30, 42, 56, 72, 90]       # by skulls, for a 1-day trip
+const EXPEDITION_DAY_MULT := [1.0, 1.8, 2.5]             # 1, 2, 3 days
+# XP is skulls x days, split among the team.
+const EXPEDITION_BONUS_SHARE := 0.25   # share of board entries with a bonus find
+const EXPEDITION_BONUS_CHANCE := 0.03  # per skull per day
+const EXPEDITION_FAIL_SCRAP := 0.25    # a failed trip brings back this share of the scrap...
+const EXPEDITION_FAIL_XP := 0.5        # ...and of the XP, no bonus find...
+const EXPEDITION_FAIL_INJURY := 0.25   # ...and each member may come back injured
+const EXPEDITION_NAMES := ["Fuel Depot Sweep", "Overpass Salvage", "Rail Yard Run", "Mall Basement",
+	"Quarry Road", "Radio Tower", "Hospital Wing", "Drowned Metro", "Truck Stop", "Scrap Barge",
+	"Water Works", "Old Armory", "Cold Storage", "Bridge Toll", "Junk Canyon", "Signal Hill"]
+
+# --- Research (DESIGN §4; agreed with the owner) --------------------------------
+# Levels belong to the schematic: every copy you build has it, and a wreck
+# never takes it away. Build cost and the wreck penalty ignore levels.
+const RESEARCH_MAX_LEVEL := {"Common": 5, "Uncommon": 8, "Rare": 12, "Epic": 16, "Legendary": 20}
+const RESEARCH_GROWTH := 0.04          # each level past 1: +4% to the part's main stats
+# A level costs base x the level you're buying (Common L2 = 30, Rare L12 = 720).
+const RESEARCH_COST_BASE := {"Common": 15, "Uncommon": 30, "Rare": 60, "Epic": 110, "Legendary": 180}
+const RESEARCH_DAILY_CAP := 3          # levels you can buy per day (Second Shift adds 1 each)
+# Which stats grow, by category. Power draw and weight never change.
+# Internal parts grow their modifier instead (see Parts.at_level).
+const RESEARCH_STATS := {
+	"Chassis": ["armor", "weight_capacity"],
+	"Engine": ["power_output", "acceleration"],
+	"Drive": ["turn_mult", "grip"],
+	"Armor": ["armor"],
+	"Weapon": ["bullet_damage"],
 }
 
 # --- Crew (DESIGN §6; role tables live in crew.gd) ----------------------------
@@ -228,6 +359,29 @@ const OUTRIDER := {
 	"bullet_speed": 1200.0,
 	"spread_deg": 4.0,
 	"turret_turn_rate": 0.0,
+	"lock_range": 0.0,
+}
+
+const GUNNER := {
+	"name": "Gunner Rig",
+	"max_speed": 500.0,
+	"reverse_speed": 260.0,
+	"acceleration": 600.0,
+	"brake": 1500.0,
+	"coast": 280.0,
+	"turn_rate": 3.0,
+	"grip": 7.0,
+	"armor": 340.0,
+	"ram_damage": 40.0,
+	"mount": 0,                # turret on top
+	"gun_id": "gunner_rig",
+	"fire_rate": 1.0 / 1.4,    # a burst every 1.4 s...
+	"burst": 4,                # ...of 4 rounds...
+	"burst_rate": 10.0,
+	"bullet_damage": 7.0,      # ...of 7 damage: about 20 damage/s
+	"bullet_speed": 1600.0,    # reach ~610 px, past the edge of its standoff ring
+	"spread_deg": 3.0,
+	"turret_turn_rate": 2.5,   # fast sideways driving outruns its aim
 	"lock_range": 0.0,
 }
 

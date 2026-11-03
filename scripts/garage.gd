@@ -16,6 +16,7 @@ const ProfileScript := preload("res://scripts/profile.gd")
 const Comms := preload("res://scripts/comms.gd")
 const Inn := preload("res://scripts/inn.gd")
 const Saloon := preload("res://scripts/saloon.gd")
+const Research := preload("res://scripts/research.gd")
 const Crew := preload("res://scripts/crew.gd")
 const Missions := preload("res://scripts/missions.gd")
 const MISSION_SCENE := "res://scenes/mission.tscn"
@@ -37,9 +38,6 @@ const SLOTS := [
 ]
 const REQUIRED := ["chassis", "engine", "drive"]
 const TABS := ["GARAGE", "RESEARCH", "SALOON", "INN", "COMMS"]
-const COMING_SOON := {
-	"RESEARCH": "Spend scrap to level up your schematics. Higher levels, better parts.",
-}
 
 const TAG_SIZE := Vector2(272, 70)
 const TAG_TOP := 108.0
@@ -80,6 +78,7 @@ var _tab_buttons: Array[Button] = []
 var _comms: Comms
 var _inn: Inn
 var _saloon: Saloon
+var _research: Research
 var _job: Label
 var _crew_line: Button
 
@@ -111,7 +110,8 @@ func _ready() -> void:
 	add_child(_comms)
 	_inn = Inn.new()
 	_saloon = Saloon.new()
-	for panel: Control in [_inn, _saloon]:
+	_research = Research.new()
+	for panel: Control in [_inn, _saloon, _research]:
 		panel.anchor_right = 1.0
 		panel.anchor_bottom = 1.0
 		panel.offset_bottom = -FOOTER_H
@@ -245,10 +245,10 @@ func deploy() -> void:
 
 ## Rig stats for `loadout` with the seated crew's passives folded in.
 func _built(loadout: Dictionary) -> Dictionary:
-	return Crew.apply_passives(Loadout.build(loadout), profile.seated_crew(loadout))
+	return Crew.apply_passives(profile.build_stats(loadout), profile.seated_crew(loadout))
 
 
-## Switch station: GARAGE, COMMS, or a placeholder for the others.
+## Switch station: GARAGE, RESEARCH, SALOON, INN or COMMS.
 func show_tab(tab_name: String) -> void:
 	_on_tab(tab_name)
 
@@ -562,7 +562,7 @@ func _refresh() -> void:
 	var any_part := not profile.parts_in(profile.rig).is_empty()
 	if not any_part and profile.is_complete(profile.plan):
 		shown = profile.plan  # ghost of the rig you lost
-	var stats := Loadout.build(shown)
+	var stats := profile.build_stats(shown)
 	preview.apply_stats(stats)
 	preview.modulate.a = 1.0 if has_rig else 0.3
 	var built := _built(profile.rig)
@@ -646,8 +646,10 @@ func _refresh_tags() -> void:
 			tag.part_name = "Empty"
 			tag.detail = "REQUIRED" if tag.required else "Tap to fit a part"
 		else:
-			var part := Parts.get_part(id)
+			var part := profile.part(id)
 			tag.part_name = part.name
+			if int(part.level) > 1:
+				tag.part_name += "  LV %d" % int(part.level)
 			if part.has("power_output"):
 				tag.detail = "%s    OUTPUT %d    WT %d" % [part.rarity, int(part.power_output), int(part.weight)]
 			elif part.has("weight_capacity"):
@@ -727,7 +729,7 @@ func _make_card(slot: Dictionary, id: String, current: String, now: Dictionary) 
 		card.subtitle = "Back to storage"
 		card.rarity_color = UI.TEXT_DIM
 	else:
-		var part := Parts.get_part(id)
+		var part := profile.part(id)
 		card.title = part.name
 		var kind := str(part.category)
 		if kind == "Weapon":
@@ -735,6 +737,8 @@ func _make_card(slot: Dictionary, id: String, current: String, now: Dictionary) 
 			if int(part.get("pellets", 1)) > 1:
 				kind += ", %d pellets" % int(part.pellets)
 		card.subtitle = "%s %s" % [part.rarity, kind]
+		if int(part.level) > 1:
+			card.subtitle += "  LV %d" % int(part.level)
 		card.rarity_color = Parts.color_of(part)
 		card.headline = _headline(part)
 	if id == current:
@@ -776,8 +780,9 @@ func _headline(part: Dictionary) -> String:
 		"Armor":
 			return "ARMOR +%d  RAM %d  WT %d" % [int(part.armor), int(part.ram_damage), int(part.weight)]
 		"Weapon":
-			var dps := float(part.fire_rate) * float(part.bullet_damage) * int(part.get("pellets", 1))
-			return "DPS %d  PWR %d  WT %d%s" % [roundi(dps), int(part.power), int(part.weight), "  LOCK" if float(part.lock_range) > 0.0 else ""]
+			var dps := float(part.fire_rate) * float(part.bullet_damage) * int(part.get("pellets", 1)) * int(part.get("burst", 1))
+			var burst := "  x%d BURST" % int(part.burst) if int(part.get("burst", 1)) > 1 else ""
+			return "DPS %d  PWR %d  WT %d%s%s" % [roundi(dps), int(part.power), int(part.weight), burst, "  LOCK" if float(part.lock_range) > 0.0 else ""]
 		"Internal":
 			return "PWR %d  WT %d  %s" % [int(part.power), int(part.weight), effect_text(part)]
 		"Utility":
@@ -984,27 +989,24 @@ func _on_tab(tab_name: String) -> void:
 	_comms.visible = tab_name == "COMMS"
 	_inn.visible = tab_name == "INN"
 	_saloon.visible = tab_name == "SALOON"
+	_research.visible = tab_name == "RESEARCH"
 	if tab_name == "GARAGE":
 		_close_overlay()
 		return
-	if tab_name in ["COMMS", "INN", "SALOON"]:
-		_close_overlay()
-		close_sheet()
-		match tab_name:
-			"COMMS":
-				_comms.selected = -1
-				_comms.refresh()
-			"INN":
-				_inn.refresh()
-			"SALOON":
-				_saloon.selected = -1
-				_saloon.refresh()
-		_highlight_tab(tab_name)
-		return
-	var body := VBoxContainer.new()
-	body.add_child(UI.label(COMING_SOON[tab_name], 22, UI.TEXT))
-	body.add_child(UI.label("Coming soon.", 20, UI.TEXT_DIM))
-	_open_overlay(tab_name, body)
+	_close_overlay()
+	close_sheet()
+	match tab_name:
+		"COMMS":
+			_comms.selected = -1
+			_comms.refresh()
+		"INN":
+			_inn.refresh()
+		"SALOON":
+			_saloon.selected = -1
+			_saloon.refresh()
+		"RESEARCH":
+			_research.close_upgrades()
+			_research.refresh()
 	_highlight_tab(tab_name)
 
 
@@ -1204,7 +1206,7 @@ class StatSheet extends Control:
 			"dps": Loadout.total_dps(s),
 			"damage": float(w.get("bullet_damage", 0.0)) * pellets,
 			"pellets": float(pellets) if armed else 0.0,
-			"rate": float(w.get("fire_rate", 0.0)),
+			"rate": float(w.get("fire_rate", 0.0)) * int(w.get("burst", 1)),
 			"range": float(w.get("bullet_speed", 0.0)) * BulletPool.LIFETIME if armed else 0.0,
 			"spread": float(w.get("spread_deg", 0.0)) if armed else 0.0,
 			"aim": rad_to_deg(float(w.turret_turn_rate)) if armed and int(w.mount) == 0 else -1.0,

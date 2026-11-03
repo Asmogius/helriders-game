@@ -60,6 +60,8 @@ Research Station only levels parts the player already owns. Blueprints/new part 
 
 Max level by rarity: Common 5, Uncommon 8, Rare 12, Epic 16, Legendary 20. Unique Legendary bonus unlocks at high or max level. Station upgrades improve scrap cost efficiency and leveling speed only—they do not raise the cap.
 
+Agreed details: a level belongs to the schematic, so every copy you build has it and a wreck never removes it. Each level past 1 adds +4% to the part's main stats (internals grow their modifier, utilities cool down faster); power draw and weight never change. A level costs a rarity base (Common 15, Uncommon 30, Rare 60, Epic 110, Legendary 180) x the level being bought. Levelling is instant, capped at 3 levels per day. Station upgrades: Bench Discount (-10% per step, 3 steps) and Second Shift (+1 level per day, 2 steps). Levels don't change build cost or the wreck penalty.
+
 Vehicle loss applies a scrap penalty scaled to the cost of the lost build. Chassis/ability to reassemble remains. Parts on the destroyed vehicle are lost (or heavily reduced).
 
 # 5. Garage Systems and UI
@@ -75,6 +77,8 @@ Navigation: persistent footer tabs — Garage, Research, Saloon, Inn, Comms. Act
 - Saloon: Hire cards (free Common basics always present). Upgrades: more options, better rarity odds, higher starting level, lower cost.
 
 - Inn: Roster with assign/rest status. Expeditions for reserve crew (passive scrap + crew XP, failure = reduced/no reward, no crew loss). Upgrades: more slots, XP share, rest time reduction, late small cheat-death chance, expedition capacity/success. Unlocks early-midgame.
+
+  Agreed expedition details: the board opens after 3 successful missions and offers 3 named trips a day (one 1-2, one 3-4, one 5-6 skulls), each lasting 1-3 days. Send 1-6 benched crew; their total level against the trip's recommended level (3/6/10/15/21/28) sets the odds: 70% at the mark, +4% per level over (max 95%), -8% per level under (min 5%). Success pays scrap (20/30/42/56/72/90 by skulls, x1/x1.8/x2.5 for 1/2/3 days) and skulls x days XP split among the team; about 1 in 4 trips offers a schematic or recruit chance (3% per skull per day). Failure brings back 25% of the scrap and half the XP, and each member has a 25% injury chance. Nobody is lost. Inn upgrades: Bunkhouse (+1 roster), Drill Yard (idle crew get 25%/50% of mission XP), Infirmary (-1 rest day), Second Team (+1 expedition out at once), Scout Network (+5% odds), Last Rites (once Industrial Spine is open: 10%/20% per seated crew member to survive a wreck, injured for 3 days). Saloon upgrades: Back Room (+1 offer), Word Gets Around (+5% Rare, +2% Epic per step), Seasoned Hands (hires start at level 2/3), House Credit (-10% prices).
 
 - Comms: Daily mission board with clear labels and threat/reward. District progress bars. Upgrades: better mission quality, more choices.
 
@@ -148,9 +152,13 @@ Arcade top-down. Mobility is a felt stat (turn radius + drift). Builds express i
 
 - Hunter: Fast, latches for DoT. Remove by ramming obstacle, scraping, or shooting.
 
+Agreed details: Brute 200 HP, bullets do half (rams full), speed 70, 8 dmg/s, shoves the rig. Tank 450 HP, bullets half; within 350 it roars for 0.8 s (aim locks for the last 0.3 s), charges at 520 for up to 0.9 s; a hit deals 25 and shoves the rig hard, a miss leaves it stumbling 1.5 s; 8 s cooldown. Boomer 60 HP, speed 60; bursts on death or on reaching the rig into a 140-wide bile pool for 8 s; a rig caught in the burst is marked for 6 s and zombies within 500 rush it at +60% speed, as do zombies in a pool. Slimer 70 HP, speed 95; leaves a 10 s slime trail and a bigger puddle where it dies; rigs on slime keep 35% grip (for 0.5 s after). They mix into hordes by skulls (1: none; 2: Slimers; 3: + Brutes, Boomers; 4+: + Tanks; at 6 skulls about 10% Slimer, 10% Brute, 8% Boomer, up to 2 Tanks); Courier only gets Slimers and Boomers. Scrap: Slimer 3, Boomer 3, Brute 6, Tank 15 plus a 20-scrap crate.
+
 ## Enemy Vehicles
 
-Archetypes (refine later): Outrider (light flanker), Bulwark (heavy frontal), Gunner Rig (turret), Scrapper (utility), Convoy Lead (rarer mixed). Spawn with simple roles; react opportunistically (focus damaged targets, screen allies, deal with zombies). Max 3 active. Destroying them is primary source of better parts.
+Archetypes (refine later): Outrider (light flanker), Bulwark (heavy frontal), Gunner Rig (turret), Scrapper (utility), Convoy Lead (rarer mixed).
+
+Gunner Rig (agreed): a standoff turret rig. 340 armor, speed 500, ram 40. Keeps 350-550 px from the player, circling, backing off when closed on. A slow turret (2.5 rad/s) fires 4-round bursts of 7 every 1.4 s (~20 damage/s); it turns on zombies within 120 px of it first. Clear: 1 from 3 skulls; Survive: one joins the waves from 4 skulls; Hunt: escorts the Elite at 5-6 skulls (when there's room under the 3-rig cap); Courier: from 4 skulls it guards a checkpoint halfway along the route. Pays 30 scrap; drops the Burst Turret, Belt Feed or Coolant Loop, or a 30-scrap cache. Burst Turret (new Uncommon weapon): 4-round bursts of 14 every 0.9 s (~62 DPS), spread 1.5, bullet speed 1800, turret turn 8, lock 600, 40 power, 15 weight, 110 scrap. Spawn with simple roles; react opportunistically (focus damaged targets, screen allies, deal with zombies). Max 3 active. Destroying them is primary source of better parts.
 
 # 9. Controls, Camera, and HUD
 

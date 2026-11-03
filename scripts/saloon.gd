@@ -9,6 +9,9 @@ const UI := preload("res://scripts/ui_theme.gd")
 const Crew := preload("res://scripts/crew.gd")
 const CrewCard := preload("res://scripts/crew_card.gd")
 const ProfileScript := preload("res://scripts/profile.gd")
+const UpgradePanel := preload("res://scripts/upgrade_panel.gd")
+
+const SALOON_UPGRADES := ["back_room", "word_around", "seasoned_hands", "house_credit"]
 
 const FREE_ROLES := ["driver", "gunner"]
 
@@ -19,6 +22,8 @@ var _title: Label
 var _info: Label
 var _cards: HBoxContainer
 var _hire: Button
+var _note: Label
+var _upgrades: UpgradePanel
 
 
 func _ready() -> void:
@@ -38,12 +43,19 @@ func _ready() -> void:
 	var bar := HBoxContainer.new()
 	bar.anchor_left = 1.0
 	bar.anchor_right = 1.0
-	bar.offset_left = -400.0
+	bar.offset_left = -600.0
 	bar.offset_right = -20.0
 	bar.offset_top = 10.0
 	bar.offset_bottom = 60.0
 	bar.alignment = BoxContainer.ALIGNMENT_END
+	bar.add_theme_constant_override("separation", 10)
 	add_child(bar)
+	var up := Button.new()
+	up.text = "UPGRADES"
+	up.focus_mode = Control.FOCUS_NONE
+	up.custom_minimum_size = Vector2(170, 0)
+	up.pressed.connect(open_upgrades)
+	bar.add_child(up)
 	_hire = Button.new()
 	_hire.text = "HIRE"
 	_hire.focus_mode = Control.FOCUS_NONE
@@ -65,22 +77,26 @@ func _ready() -> void:
 	_cards.add_theme_constant_override("separation", 14)
 	scroll.add_child(_cards)
 
-	var note := UI.label("New hires start at level 1 with a random specialty. Offers can be any class and change when the day ends. Free Common Drivers and Gunners are always here, so you can never get stuck without a Driver.", 18, UI.TEXT_DIM)
-	note.anchor_right = 1.0
-	note.offset_left = 24.0
-	note.offset_right = -24.0
-	note.offset_top = 420.0
-	note.autowrap_mode = TextServer.AUTOWRAP_WORD
-	add_child(note)
+	_note = UI.label("", 18, UI.TEXT_DIM)
+	_note.anchor_right = 1.0
+	_note.offset_left = 24.0
+	_note.offset_right = -24.0
+	_note.offset_top = 420.0
+	_note.autowrap_mode = TextServer.AUTOWRAP_WORD
+	add_child(_note)
 
 	profile.changed.connect(refresh)
 	refresh()
 
 
 func refresh() -> void:
+	if not is_inside_tree():
+		return
 	profile.ensure_saloon()
 	_title.text = "SALOON   -   DAY %d" % profile.day
-	_info.text = "SCRAP  %d      ROSTER  %d / %d" % [profile.scrap, profile.crew.size(), T.ROSTER_SIZE]
+	_info.text = "SCRAP  %d      ROSTER  %d / %d" % [profile.scrap, profile.crew.size(), profile.roster_cap()]
+	var start := 1 + profile.upgrade_level("seasoned_hands")
+	_note.text = "New hires start at level %d (capped by rarity) with a random specialty. Offers can be any class and change when the day ends. Free Common Drivers and Gunners are always here, so you can never get stuck without a Driver.\nOdds today: %s" % [start, odds_text()]
 	for c in _cards.get_children():
 		_cards.remove_child(c)
 		c.queue_free()
@@ -117,8 +133,46 @@ func offer(i: int) -> Dictionary:
 	if i < profile.saloon.size():
 		return profile.saloon[i]
 	var role: String = FREE_ROLES[i - profile.saloon.size()]
-	return {"id": 0, "name": "Free %s" % Crew.ROLE_NAMES[role], "role": role, "rarity": "Common",
+	var m := {"id": 0, "name": "Free %s" % Crew.ROLE_NAMES[role], "role": role, "rarity": "Common",
 		"specialty": "", "xp": 0.0, "perks": [], "rest": 0, "seated": false, "price": 0}
+	m.xp = profile.hire_start_xp(m)
+	return m
+
+
+func odds_text() -> String:
+	var odds := ProfileScript.saloon_odds(profile.upgrade_level("word_around"))
+	var bits: Array[String] = []
+	for r: String in odds:
+		bits.append("%s %s%%" % [r, str(snappedf(float(odds[r]), 0.1)).trim_suffix(".0")])
+	return "   ".join(bits)
+
+
+func open_upgrades() -> UpgradePanel:
+	close_upgrades()
+	_upgrades = UpgradePanel.new()
+	_upgrades.setup(profile, "SALOON UPGRADES", SALOON_UPGRADES, _upgrade_effect)
+	_upgrades.closed.connect(func() -> void: _upgrades = null)
+	add_child(_upgrades)
+	return _upgrades
+
+
+func close_upgrades() -> void:
+	if _upgrades != null:
+		_upgrades.close()
+
+
+func _upgrade_effect(key: String) -> String:
+	var lv := profile.upgrade_level(key)
+	match key:
+		"back_room":
+			return "Paid offers per day: %d" % profile.saloon_offers()
+		"word_around":
+			return "Odds: " + odds_text()
+		"seasoned_hands":
+			return "Hires start at level %d" % (1 + lv)
+		"house_credit":
+			return "Hire prices %d%% lower" % roundi(float(T.UPGRADES.house_credit.per_level) * lv * 100.0)
+	return ""
 
 
 ## Why `i` can't be hired right now, or "".

@@ -115,12 +115,33 @@ static func threats_text(mission: Dictionary) -> String:
 	var hunters := _count(mission, "hunters")
 	var rigs := _count(mission, "outriders") + _count(mission, "escorts")
 	var heavies := _count(mission, "bulwarks") + _count(mission, "bulwark_escorts")
+	var gunners := _count(mission, "gunners") + _count(mission, "gunner_escorts")
 	if hunters > 0:
 		bits.append("%d Hunter%s" % [hunters, "" if hunters == 1 else "s"])
 	if rigs > 0:
 		bits.append("%d Outrider%s" % [rigs, "" if rigs == 1 else "s"])
 	if heavies > 0:
 		bits.append("%d Bulwark%s" % [heavies, "" if heavies == 1 else "s"])
+	if gunners > 0:
+		bits.append("%d Gunner Rig%s" % [gunners, "" if gunners == 1 else "s"])
+	var kinds := zombie_kinds_text(mission)
+	if kinds != "":
+		bits.append(kinds)
+	return ", ".join(bits)
+
+
+## The special zombies in this job's hordes, e.g. "Slimers, Brutes, 1 Tank".
+static func zombie_kinds_text(mission: Dictionary) -> String:
+	var i := skulls(mission) - 1
+	var courier := str(mission.type) == "courier"
+	var names := {"slimer": "Slimers", "brute": "Brutes", "boomer": "Boomers"}
+	var bits: Array[String] = []
+	for kind: String in names:
+		if float(T.ZOMBIE_MIX[kind][i]) > 0.0 and (not courier or T.COURIER_KINDS.has(kind)):
+			bits.append(str(names[kind]))
+	var tanks := 0 if courier else int(T.TANKS_PER_MISSION[i])
+	if tanks > 0:
+		bits.append("up to %d Tank%s" % [tanks, "" if tanks == 1 else "s"])
 	return ", ".join(bits)
 
 
@@ -128,7 +149,7 @@ static func _count(mission: Dictionary, key: String) -> int:
 	if str(mission.type) == "survive":
 		var n := 0
 		for e: Array in stat(mission, "events"):
-			if (key == "hunters" and e[1] == "hunter") or (key == "outriders" and e[1] == "outrider") or (key == "bulwarks" and e[1] == "bulwark"):
+			if (key == "hunters" and e[1] == "hunter") or (key == "outriders" and e[1] == "outrider") or (key == "bulwarks" and e[1] == "bulwark") or (key == "gunners" and e[1] == "gunner"):
 				n += 1
 		return n
 	return int(stat(mission, key)) if has_stat(mission, key) else 0

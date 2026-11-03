@@ -304,7 +304,7 @@ class DistrictBar extends Control:
 		if names.is_empty():
 			return
 		var font := get_theme_default_font()
-		draw_string(font, Vector2(0, 18), "DISTRICTS   -   parts score %d  (extracted schematics: Uncommon 2, Rare 4)" % score, HORIZONTAL_ALIGNMENT_LEFT, size.x, 16, UI.TEXT_DIM)
+		draw_string(font, Vector2(0, 18), "DISTRICTS   -   parts score %d  (extracted schematics: rarity points x Research level)" % score, HORIZONTAL_ALIGNMENT_LEFT, size.x, 16, UI.TEXT_DIM)
 		var gap := 12.0
 		var w := (size.x - gap * (names.size() - 1)) / names.size()
 		for i in names.size():

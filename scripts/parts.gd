@@ -25,6 +25,15 @@ extends RefCounted
 ##
 ## Chassis `seats` lists the crew seats the frame has (crew.gd): "driver",
 ## "gunner", and "open" seats any other class can take (one of each class).
+##
+## Research levels (DESIGN §4): `at_level` returns a part with its level's
+## numbers. Every level past 1 adds T.RESEARCH_GROWTH to the category's main
+## stats (T.RESEARCH_STATS); internals grow their modifier, utilities cool
+## down faster. Power and weight never change. A Legendary part may carry
+##   "legendary_bonus": {"at": level, "add": {stat: amount}, "text": "..."}
+## and gets `add` on top once it reaches level `at`.
+
+const T := preload("res://scripts/tuning.gd")
 
 const RARITY_COLORS := {
 	"Common": Color(0.75, 0.75, 0.72),
@@ -130,6 +139,14 @@ const CATALOG := {
 		"mount": 0, "fire_rate": 9.0, "bullet_damage": 11.0, "bullet_speed": 1700.0,
 		"spread_deg": 2.5, "turret_turn_rate": 6.5, "lock_range": 600.0, "pellets": 1,
 	},
+	# Burst weapons: `fire_rate` is bursts per second; each burst is `burst`
+	# rounds, `burst_rate` rounds per second. Approved with the Gunner Rig.
+	"burst_turret": {
+		"name": "Burst Turret", "category": "Weapon", "rarity": "Uncommon", "cost": 110, "power": 40.0, "weight": 15.0,
+		"mount": 0, "fire_rate": 1.0 / 0.9, "bullet_damage": 14.0, "bullet_speed": 1800.0,
+		"spread_deg": 1.5, "turret_turn_rate": 8.0, "lock_range": 600.0, "pellets": 1,
+		"burst": 4, "burst_rate": 12.0,
+	},
 	# --- Internal systems (passive, take internal capacity) -----------------------
 	"targeting_computer": {
 		"name": "Targeting Computer", "category": "Internal", "rarity": "Common", "cost": 30, "power": 25.0, "weight": 5.0,
@@ -195,6 +212,7 @@ const DROP_POOLS := {
 	"survive": ["structural_bracing", "belt_feed", "patched_v8", "emergency_patch"],
 	"courier": ["courier_frame", "turbo_four", "off_road_tires"],
 	"bulwark": ["riot_plating", "spiked_ram_plate", "structural_bracing", "roll_cage"],
+	"gunner": ["burst_turret", "belt_feed", "coolant_loop"],
 }
 
 
@@ -205,6 +223,55 @@ static func get_part(id: String) -> Dictionary:
 	var part: Dictionary = CATALOG[id].duplicate()
 	part["id"] = id
 	return part
+
+
+## Highest Research level for a part's rarity.
+static func max_level(part: Dictionary) -> int:
+	return int(T.RESEARCH_MAX_LEVEL.get(str(part.get("rarity", "")), 1))
+
+
+## `part` (from get_part) with its stats at Research `level`. Level 1 (or
+## below) returns it unchanged.
+static func at_level(part: Dictionary, level: int) -> Dictionary:
+	if part.is_empty():
+		return part
+	level = clampi(level, 1, max_level(part))
+	var out := part.duplicate()
+	out["level"] = level
+	var scale := 1.0 + T.RESEARCH_GROWTH * (level - 1)
+	var category := str(part.get("category", ""))
+	for key: String in T.RESEARCH_STATS.get(category, []):
+		if out.has(key):
+			out[key] = float(out[key]) * scale
+	if category == "Internal":
+		for key: String in ["fire_rate_mult", "damage_mult", "lock_range_mult", "turret_aim_mult"]:
+			if out.has(key):
+				out[key] = 1.0 + (float(out[key]) - 1.0) * scale
+		for key: String in ["armor_bonus", "ram_bonus"]:
+			if out.has(key):
+				out[key] = float(out[key]) * scale
+		if out.has("injury_mult"):
+			out["injury_mult"] = maxf(1.0 - (1.0 - float(out.injury_mult)) * scale, 0.0)
+	if category == "Utility" and out.has("cooldown"):
+		out["cooldown"] = float(out.cooldown) / scale
+	var bonus: Dictionary = part.get("legendary_bonus", {})
+	if not bonus.is_empty() and level >= int(bonus.get("at", 999)):
+		var add: Dictionary = bonus.get("add", {})
+		for key: String in add:
+			out[key] = float(out.get(key, 0.0)) + float(add[key])
+	return out
+
+
+## Whether Research changes anything on this part. (The plain Targeting
+## Computer only lets turrets aim; there's no number to grow.)
+static func can_level(part: Dictionary) -> bool:
+	if part.is_empty() or max_level(part) <= 1:
+		return false
+	var top := at_level(part, max_level(part))
+	for key: String in part:
+		if key != "level" and part[key] is float and not is_equal_approx(float(part[key]), float(top[key])):
+			return true
+	return part.has("legendary_bonus")
 
 
 static func describe(part: Dictionary) -> String:
