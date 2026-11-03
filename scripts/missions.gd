@@ -12,7 +12,7 @@ extends RefCounted
 
 const T := preload("res://scripts/tuning.gd")
 
-const TYPES := ["clear", "survive", "hunt", "courier"]
+const TYPES := ["clear", "survive", "hunt", "courier", "retrieve", "escort"]
 
 
 ## Today's board: `count` missions, covering as many types as fit, skulls
@@ -126,6 +126,13 @@ static func threats_text(mission: Dictionary) -> String:
 			bits.append("Elite rig, armor x%.1f" % float(stat(mission, "elite_armor")))
 		"courier":
 			bits.append("%d checkpoints" % int(stat(mission, "checkpoints")))
+		"retrieve":
+			bits.append("%d caches (1 deep, guarded by a Gunner Rig)" % int(stat(mission, "caches")))
+			var calls := int(stat(mission, "rig_calls"))
+			if calls > 0:
+				bits.append("up to %d rig%s called in as it heats up" % [calls, "" if calls == 1 else "s"])
+		"escort":
+			bits.append("%d salvage sites, maybe a risky extra" % int(stat(mission, "sites")))
 	var hunters := _count(mission, "hunters")
 	var rigs := _count(mission, "outriders") + _count(mission, "escorts")
 	var convoy := has_convoy(mission)
@@ -168,7 +175,7 @@ static func zombie_kinds_text(mission: Dictionary) -> String:
 
 
 static func _count(mission: Dictionary, key: String) -> int:
-	if str(mission.type) == "survive":
+	if has_stat(mission, "events"):
 		var n := 0
 		for e: Array in stat(mission, "events"):
 			if (key == "hunters" and e[1] == "hunter") or (key == "outriders" and e[1] == "outrider") or (key == "bulwarks" and e[1] == "bulwark") or (key == "gunners" and e[1] == "gunner") or (key == "scrappers" and e[1] == "scrapper"):

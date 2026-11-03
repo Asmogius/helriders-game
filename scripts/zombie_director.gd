@@ -18,10 +18,13 @@ var nav: NavGrid
 var hazards: GroundHazards
 var mix := {}                            # kind -> share of each pack (set_mix)
 var tanks_left := 0                      # Tanks still to come this job
+var alt_target: Node2D                   # Escort: the truck; each zombie goes for the nearer one
+var speed_bonus := 1.0                   # Retrieve: the horde speeds up as the danger climbs
 var spawn_points: Array[Vector2] = []
 var spawn_budget := T.CLEAR_SHAMBLERS   # shamblers left to spawn this mission
 # Crowd shape; the mission sets these before the director enters the tree.
-var cap := T.ZOMBIE_CAP                  # most alive at once (pool size)
+var cap := T.ZOMBIE_CAP                  # most alive at once (can rise mid-job up to pool_size)
+var pool_size := 0                       # zombies built up front; 0 = cap
 var start_count := T.ZOMBIE_START        # alive at the start
 var ramp_seconds := T.ZOMBIE_RAMP_SECONDS  # +1 allowed alive every N seconds
 
@@ -32,7 +35,7 @@ var _spawn_timer := 0.0
 
 
 func _ready() -> void:
-	for i in cap:
+	for i in maxi(pool_size, cap):
 		var zombie := Zombie.new()
 		add_child(zombie)
 		zombie.died.connect(_on_zombie_died.bind(zombie))
@@ -114,7 +117,8 @@ func _physics_process(delta: float) -> void:
 func _steer(delta: float) -> void:
 	if target == null:
 		return
-	var goal := target.position
+	var player_goal := target.position
+	var alt := alt_target != null and alt_target.is_inside_tree() and not bool(alt_target.get("is_wrecked"))
 	var space := get_world_2d().direct_space_state
 	var sep_dist := T.SHAMBLER_SEPARATION
 	var sep_dist2 := sep_dist * sep_dist
@@ -123,6 +127,10 @@ func _steer(delta: float) -> void:
 	var count := _active.size()
 	for a in count:
 		var zombie := _active[a]
+		var chase: Node2D = target
+		if alt and zombie.position.distance_squared_to(alt_target.position) < zombie.position.distance_squared_to(player_goal):
+			chase = alt_target
+		var goal := chase.position
 		# Re-plan a few times a second (staggered): straight at the target when
 		# it's in sight, otherwise along the nav grid around buildings.
 		zombie.nav_timer -= delta
@@ -148,14 +156,14 @@ func _steer(delta: float) -> void:
 				push += away * ((sep_dist2 - d2) / sep_dist2) / sqrt(d2)
 		desired += push * zombie.speed * 0.9
 		if hazards != null:
-			zombie.frenzy = (marked and zombie.position.distance_squared_to(goal) < mark_range2) or hazards.bile_at(zombie.position)
+			zombie.frenzy = (marked and zombie.position.distance_squared_to(player_goal) < mark_range2) or hazards.bile_at(zombie.position)
 			zombie.oiled = hazards.oil_at(zombie.position)
 			if zombie.kind == "slimer":
 				zombie.slime_timer -= delta
 				if zombie.slime_timer <= 0.0:
 					zombie.slime_timer = T.SLIME_DROP_EVERY
 					hazards.add_slime(zombie.position, T.SLIME_RADIUS)
-		zombie.step(delta, desired, target)
+		zombie.step(delta, desired * speed_bonus, chase)
 	# Boomers that reached the rig pop now, outside the loop over _active.
 	for i in range(_active.size() - 1, -1, -1):
 		var zombie := _active[i]

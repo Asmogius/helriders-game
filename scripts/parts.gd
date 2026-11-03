@@ -227,6 +227,8 @@ const DROP_POOLS := {
 	"bulwark": ["riot_plating", "spiked_ram_plate", "structural_bracing", "roll_cage"],
 	"gunner": ["burst_turret", "belt_feed", "coolant_loop"],
 	"scrapper": ["oil_slick", "mine_dropper", "off_road_tires"],
+	"retrieve": ["turbo_four", "off_road_tires", "oil_slick", "mine_dropper"],
+	"escort": ["structural_bracing", "riot_plating", "emergency_patch", "burst_turret"],
 	"convoy": ["heavy_mg_turret", "composite_plating", "diesel_block", "half_track", "cowcatcher_ram", "hood_guns"],
 }
 

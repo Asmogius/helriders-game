@@ -43,7 +43,7 @@ The owner works from a phone and has no computer, so nobody opens the Godot edit
 - Zombie variants (Shambler, Brute, Tank, Boomer, Slimer) are one pooled `zombie.gd` with a `kind`; stats in `T.ZOMBIE_KINDS`, the horde mix by skulls in `T.ZOMBIE_MIX`. `zombie_director.gd` picks kinds per pack (`set_mix`), lays Slimer trails, pops Boomers and frenzies zombies. Slime and bile live in one pooled drawer, `ground_hazards.gd`; rigs on slime lose grip through `vehicle.set_on_slime()`. Agreed numbers; don't change them without asking.
 - Bullets carry a team (`bullet_pool.gd`). Each team's ray mask decides what it can hit, so nobody shoots their own side.
 - New mission-level enemies get a `spawn_*` function in `mission.gd` that tests can call directly (`auto_spawn_specials = false`).
-- Mission types and their tables live in `tuning.gd` (`MISSIONS`, six entries per stat, one per skull 1-6); `missions.gd` builds the daily board inside the district's skull band; `mission.gd` runs any type. Tests set `mission_override` to run a specific mission and `apply_rig()` to swap the player's build mid-run.
+- Mission types and their tables live in `tuning.gd` (`MISSIONS`, six entries per stat, one per skull 1-6): Clear, Survive, Hunt, Courier, Retrieve and Escort. `missions.gd` builds the daily board inside the district's skull band; `mission.gd` runs any type. Escort's truck is `friendly_truck.gd` (player team: your bullets pass it, enemy bullets and zombies don't; `zombies.alt_target`). A job can fail without a wreck (`_fail`). The driver's radio call pauses the tree; `hud.show_choice` runs while paused. Tests set `mission_override` to run a specific mission and `apply_rig()` to swap the player's build mid-run.
 - Schematic drop pools by source are `Parts.DROP_POOLS`. Drops never repeat a schematic the player owns.
 
 ## Verify before pushing
@@ -60,6 +60,7 @@ godot --headless --fixed-fps 60 --path . -s res://tests/zombie_test.gd     # mus
 godot --headless --fixed-fps 60 --path . -s res://tests/gunner_test.gd     # must end "GUNNER TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/scrapper_test.gd   # must end "SCRAPPER TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/convoy_test.gd     # must end "CONVOY TEST PASSED"
+godot --headless --fixed-fps 60 --path . -s res://tests/jobs_test.gd       # must end "JOBS TEST PASSED"
 ```
 
 - Tests must call `Profile.new_game()` with `persist = false` first, so they never touch a real save.

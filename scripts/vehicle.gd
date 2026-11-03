@@ -644,7 +644,10 @@ func _resolve_collisions(pre_velocity: Vector2) -> void:
 				plowed_through = true
 		elif other != null and other.has_method("receive_ram"):
 			# Another rig. Hit it hard enough and it hurts; it'll hit back from its side.
+			# Friendly rigs (your rig and an Escort's truck) only bump.
 			if already_hit.has(other) or impact < RAM_MIN_SPEED:
+				continue
+			if team == BulletPool.TEAM_PLAYER and int(other.get("team")) == BulletPool.TEAM_PLAYER:
 				continue
 			already_hit.append(other)
 			other.call("receive_ram", ram_damage * float(crew_mods.ram) * clampf(impact / max_speed, 0.0, 1.2))

@@ -8,6 +8,7 @@ signal lock_toggled(on: bool)
 signal ability_pressed(index: int)
 signal crew_picked(index: int)
 signal crew_wheel_toggled(open: bool)
+signal choice_made(yes: bool)
 
 const T := preload("res://scripts/tuning.gd")
 const ThumbStick := preload("res://scripts/thumb_stick.gd")
@@ -31,6 +32,7 @@ var _banner: Label
 var _banner_tween: Tween
 var _alert: Label
 var _overlay: Control
+var _choice: Control             # the Escort driver's radio call
 var _title: Label
 var _subtitle: Label
 var _button: Button
@@ -376,6 +378,79 @@ func show_result(title: String, subtitle: String, button_text: String, accent: C
 	_overlay.visible = true
 	_overlay.modulate.a = 0.0
 	create_tween().tween_property(_overlay, "modulate:a", 1.0, 0.35)
+
+
+## A paused, two-way choice (the Escort driver's radio call). The mission
+## pauses the game while it's open; this panel keeps running.
+func show_choice(speaker: String, text: String, yes_text: String, no_text: String) -> void:
+	close_choice()
+	_choice = Control.new()
+	_choice.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_choice.process_mode = Node.PROCESS_MODE_ALWAYS
+	_root.add_child(_choice)
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.55)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_choice.add_child(dim)
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_choice.add_child(center)
+	var panel := PanelContainer.new()
+	var box := StyleBoxFlat.new()
+	box.bg_color = Color(0.08, 0.085, 0.09, 0.97)
+	box.border_color = T.COL_TRUCK
+	box.set_border_width_all(3)
+	box.content_margin_left = 24
+	box.content_margin_right = 24
+	box.content_margin_top = 18
+	box.content_margin_bottom = 18
+	panel.add_theme_stylebox_override("panel", box)
+	panel.custom_minimum_size = Vector2(720, 0)
+	center.add_child(panel)
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 14)
+	panel.add_child(column)
+	var who := Label.new()
+	who.text = speaker
+	who.add_theme_font_size_override("font_size", 22)
+	who.add_theme_color_override("font_color", T.COL_TRUCK)
+	column.add_child(who)
+	var said := Label.new()
+	said.text = text
+	said.autowrap_mode = TextServer.AUTOWRAP_WORD
+	said.custom_minimum_size = Vector2(670, 0)
+	said.add_theme_font_size_override("font_size", 24)
+	column.add_child(said)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 16)
+	column.add_child(row)
+	for pick: Array in [[yes_text, true, T.COL_ORANGE], [no_text, false, Color(0.75, 0.75, 0.72)]]:
+		var b := Button.new()
+		b.text = str(pick[0])
+		b.focus_mode = Control.FOCUS_NONE
+		b.custom_minimum_size = Vector2(320, 64)
+		b.add_theme_font_size_override("font_size", 22)
+		b.add_theme_color_override("font_color", pick[2])
+		b.pressed.connect(pick_choice.bind(bool(pick[1])))
+		row.add_child(b)
+
+
+func is_choice_open() -> bool:
+	return _choice != null
+
+
+## Answer the open choice (its buttons call this; tests can too).
+func pick_choice(yes: bool) -> void:
+	if _choice == null:
+		return
+	close_choice()
+	choice_made.emit(yes)
+
+
+func close_choice() -> void:
+	if _choice != null:
+		_choice.queue_free()
+		_choice = null
 
 
 func is_result_visible() -> bool:

@@ -144,6 +144,10 @@ func _schematic_odds(m: Dictionary) -> String:
 		return ""
 	if m.type == "hunt":
 		return "Elite drops a schematic"
+	if m.type == "retrieve":
+		return "Deep cache holds a schematic"
+	if m.type == "escort":
+		return "%d%% schematic, sure with the extra site" % roundi(Missions.schematic_chance(m) * 100.0)
 	var odds := roundi(Missions.schematic_chance(m) * 100.0)
 	if odds <= 0:
 		return ""

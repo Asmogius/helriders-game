@@ -93,12 +93,47 @@ const MISSIONS := {
 		"gunners": [0, 0, 0, 1, 1, 1],          # parks by a checkpoint and covers it
 		"scrappers": [0, 1, 1, 1, 1, 1],        # lays traps along your route
 	},
+	# Retrieve-and-extract (agreed with the owner): grab caches around the
+	# block, leave through the extraction point whenever you like. Every cache
+	# grabbed and every RETRIEVE_STEP_SECONDS raise the danger a step. One
+	# "deep" cache sits far out under a Gunner Rig's guard: worth double, and a
+	# sure schematic. Pay = reward x (30% + 70% x the cache share brought out).
+	"retrieve": {
+		"label": "RETRIEVE", "brief": "Grab the caches, then get out. Every cache stirs the block up.",
+		"reward": [78, 94, 109, 127, 148, 169],   # ~1.3x a Clear with every cache
+		"caches": [3, 3, 4, 4, 5, 5],              # including the deep cache
+		"cap": [14, 16, 18, 20, 22, 24],           # crowd at step 0; +RETRIEVE_CAP_STEP a step
+		"hunters": [0, 1, 1, 1, 2, 2],
+		"rig_calls": [0, 1, 1, 2, 2, 3],           # rigs called in as the danger climbs
+	},
+	# Escort (agreed with the owner): a friendly salvage truck drives to sites
+	# and works each one while you keep zombies and rigs off it. After the
+	# first site the driver radios about an optional, nastier site.
+	"escort": {
+		"label": "ESCORT", "brief": "Keep the salvage truck alive while it works each site.",
+		"reward": [70, 82, 94, 108, 124, 140],
+		"sites": [2, 2, 3, 3, 3, 3],
+		"cap": [16, 18, 20, 22, 24, 26],
+		"ramp": [3.0, 2.8, 2.6, 2.4, 2.2, 2.0],
+		"hunters": [0, 1, 1, 1, 2, 2],
+		# [seconds into the run, what arrives]
+		"events": [
+			[],
+			[[70, "scrapper"]],
+			[[60, "scrapper"], [110, "outrider"]],
+			[[50, "outrider"], [90, "scrapper"], [130, "bulwark"]],
+			[[45, "outrider"], [80, "scrapper"], [115, "gunner"], [150, "bulwark"]],
+			[[40, "outrider"], [70, "scrapper"], [100, "gunner"], [130, "outrider"], [160, "bulwark"]],
+		],
+	},
 }
 const MISSION_NAMES := {
 	"clear": ["Laundromat Row", "Bus Depot", "Parking Structure", "Pawn Alley", "Cinema Lot"],
 	"survive": ["Hold the Overpass", "Pharmacy Siege", "Gas Station Stand", "Rooftop Relay", "Tow Yard"],
 	"hunt": ["Rustjaw", "Widowmaker", "Gutter King", "Red Mare", "Sawtooth"],
 	"courier": ["Medicine Run", "Battery Drop", "Signal Parts", "Ammo Relay", "Water Filters"],
+	"retrieve": ["Dead Drop", "Lost Shipment", "Abandoned Depot", "Scattered Cargo", "Black Boxes"],
+	"escort": ["Salvage Crew", "Wrecker Run", "Scrap Haul", "Parts Pull", "Copper Strip"],
 }
 # Chance a job pays a schematic from its type's pool, by skulls 1-6. Courier
 # only pays one on a gold time; a Hunt Elite always drops one.
@@ -273,6 +308,42 @@ const CONVOY_UNHITCHED_TURN := 1.15   # ...and a little nimbler
 const CONVOY_SCRAP := 60
 const CONVOY_SCRAP_CACHE := 60
 const CONVOY_TRAILER_CRATE := 30      # dropped when the trailer is shot off
+
+# --- Retrieve and Escort jobs ---------------------------------------------------
+const RETRIEVE_STEP_SECONDS := 40.0   # the danger also climbs a step every this long
+const RETRIEVE_CAP_STEP := 2          # +zombies allowed alive per step (up to ZOMBIE_CAP)
+const RETRIEVE_SPEED_STEP := 0.05     # +zombie speed per step
+const RETRIEVE_RIG_STEPS := [2, 4, 6] # steps that call in a rig (up to the job's rig_calls)
+const RETRIEVE_DEEP_MULT := 2.0       # the deep cache counts double toward pay
+const RETRIEVE_BASE_SHARE := 0.3      # paid for getting out at all (with at least one cache)
+const CACHE_RADIUS := 60.0            # drive this close to grab a cache
+const EXTRACT_RADIUS := 110.0
+const EXTRACT_ARM_DISTANCE := 300.0   # leave the zone once before it counts
+const ESCORT_SALVAGE_TIME := 20.0
+const ESCORT_OPTIONAL_TIME := 30.0
+const ESCORT_OPTIONAL_PAY := 1.6      # with the optional site
+const ESCORT_OPTIONAL_WAVE := 10      # extra zombies the optional site wakes
+const ESCORT_SITE_RADIUS := 90.0
+const TRUCK := {
+	"name": "Salvage Truck",
+	"max_speed": 260.0,
+	"reverse_speed": 150.0,
+	"acceleration": 300.0,
+	"brake": 1300.0,
+	"coast": 300.0,
+	"turn_rate": 2.0,
+	"grip": 8.0,
+	"armor": 400.0,
+	"ram_damage": 40.0,
+	"mount": 1,
+	"fire_rate": 0.0,          # no guns: that's your job
+	"bullet_damage": 0.0,
+	"bullet_speed": 1000.0,
+	"spread_deg": 0.0,
+	"turret_turn_rate": 0.0,
+	"lock_range": 0.0,
+}
+const COL_TRUCK := Color(0.45, 0.85, 0.5)
 
 # Oil (the Scrapper's slicks and your Oil Slick utility): rigs on it keep
 # SLIME_GRIP, zombies in it move at OIL_ZOMBIE_SPEED.
