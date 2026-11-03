@@ -311,3 +311,30 @@ Replaces the single armor pool (§4 Armor Sections, §8 Bulwark front rule).
 | Speedster (Floor It) | Deep Tank: +20% duration | Quick Fuse: -15% cooldown | Battering Speed: RAMs +30% during it | Open Road: above 80% top speed, restore 1% max armor/s | Afterburn: burning trail (fire, BURNING, ignites oil) | Clean Run: no damage taken -> half cooldown refunded |
 | Bootlegger (Bootleg Turn) | Tight Swing: -15% cooldown | Shake Off: throws off a latched Hunter | Tail Swipe: rear counts as a RAM while swinging | About Face: fixed guns +25% for 2 s after | Double Back: 2 charges | Oil Spin: enemy-only oil ring |
 | Gunslinger (Overcharge) | Hot Barrels: +1 s | Quick Draw: -15% cooldown | Bottomless: no ammo use or heat during it | Red Hot: shots also deal fire, build BURNING | Siphon: 10% of damage refills shield | Full Auto: turrets turn 2x fast, no spread |
+| Marksman (Deadeye) | Steady Aim: +1 s | Deep Breath: -15% cooldown | Plate Splitter: +30% damage to armor during it | Called Shot: +50% vs MARKED | Opening Shot: first shot triple damage | Executioner: wrecks rigs below 10% HP |
+| Breacher (Piercing Rounds) | Long Burn: +1 s | Deeper Cuts: pierce 4 | Overpenetration: +10% per target passed | Bleed-Through: 20% of armor hits go to HP | Rail Line: pierces rigs too | Acid Core: pierced targets take acid, build CORRODED |
+| Fixer (Field Repair) | Spare Parts: +20% repair | Quick Wrench: -15% cooldown | Kickstart: skips shield recharge delay | Fresh Weld: repaired facing -20% damage for 4 s | Full Rebuild: once per mission, fully restores a stripped facing | Hull Patch: also restores 5% max HP |
+| Gearhead (Tune-Up) | Fine Tuning: +1 s | Spare Time: -15% cooldown | Tight Servos: turrets +25% turn, LOCK +10% | Clean Lines: status buildup drains 2x | Crew Tune: halves other crew cooldowns | Afterglow: boosts fade over 4 s |
+| Conduit (Power Divert) | Clean Routing: +1 s | Capacitor: -15% cooldown | Insulated Feed: shield status bonus doubled | Spillover: half leftover bonus shield -> armor (capped) | Arc Feedback: shield hits shock the shooter | Grid Priority: utility cooldowns 2x during it |
+| Tinkerer (Scrap Drones) | Longer Leash: +2 s | Spare Rotors: -15% cooldown | Third Wheel: 3 drones | Bait Drones: zombies prefer drones | Kamikaze: expiring drones dive and explode | Copycat: drones use your weapon's damage type and keywords |
+| Marker (Mark) | Lingering Mark: +2 s | Quick Spot: -15% cooldown | Exposed: MARKED shields stop recharging | Pass It On: Mark jumps on kill | Weak Point: +50% to HP on a MARKED rig's stripped facing | Shutdown: MARKED rigs can't use abilities |
+| Scout (Flare) | Bright Flare: +100 px | Slow Fade: +2 s | Pinned: Hunters inside can't pounce | Magnesium: Flare burns (BURNING) | Signal Flare: rigs inside become MARKED | Flashbang: ignition stuns zombies inside |
+| Field Medic (Field Dressing) | Clean Bandage: half rest days | Quick Kit: -15% cooldown | Back in It: treated crew's ability ready | Second Kit: 2 charges | Full Recovery: no rest days | Last Breath: once per mission, a lethal hit leaves 1 HP |
+| Poisoner (Miasma) | Thick Fumes: +2 s | Quick Vent: -15% cooldown | Lingering Cloud: cloud stays 4 s | Caustic Gas: also builds CORRODED | Contagion: TOXIC zombies burst and spread it | Neurotoxin: TOXIC rigs -25% speed, half turret turn |
+| Magpie (Magnet) | Wide Pull: +200 px | Sticky Fingers: -15% cooldown | Scrap Plating: 2 armor per salvage pulled | Snatch: steals a wreck's crate before a revive | Shrapnel Storm: pulled salvage damages enemies | Second Look: pulled rig crate rolls twice |
+| Salvager (Gold Rush) | Long Haul: +2 s | Quick Count: -15% cooldown | Bounty: rig wrecks drop bonus scrap | Strip Mine: armor damage knocks loose scrap | Jackpot: rig wrecks always drop a schematic | Safe Deposit: Gold Rush scrap survives a wreck |
+| Bracer (Brace) | Firm Stance: +1 s | Quick Set: -15% cooldown | Shell: no splash spill during it | Counterweight: 25% heavier in collisions | Juggernaut: RAMs don't slow you, rigs go flying | Absorb: blocked damage released as a shock wave |
+| Breaker (Shockwave) | Wider Blast: +50 px | Quick Reset: -15% cooldown | Live Wire: deals shock | Clear Out: hurls zombies, throws off Hunter | Aftershock: second half-strength wave after 1 s | Payback: +50% of damage taken in the last 3 s |
+
+## Specialty Changes and New Status
+
+- Welder -> Gearhead (Mechanic). Ability Tune-Up: 6 s of +15% speed, +15% fire rate, shield recharges with no delay.
+- Overclocker -> Conduit (Engineer). Ability Power Divert: for 6 s, unused power budget becomes extra shield, which keeps recharging under fire.
+- Tinkerer (Engineer): ability changes from Reroute to Scrap Drones: 2 orbiting drones for 10 s that shoot nearby enemies and draw some zombie attention.
+- Combat Medic -> Poisoner (Medic). Ability Miasma: 6 s toxic cloud, 250 px around the rig; own rig immune.
+- TOXIC (new status, 11th keyword): buildup like the others; damage over time that bypasses armor to HP, blocked by a raised shield, never takes a rig below 10% max HP.
+- Armor never exceeds a facing's max; repair past the cap is lost.
+
+## Ammo Assignment (first pass, case by case)
+
+Pintle Turret: magazine. Outrider Twin Guns: heat. Scattergun Turret: magazine. Heavy MG Turret: heat. Burst Turret: magazine. Harpoon: magazine (1). Mortar: small magazine.
