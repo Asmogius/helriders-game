@@ -9,9 +9,13 @@ extends SceneTree
 
 const Main := preload("res://scripts/main.gd")
 const Hunter := preload("res://scripts/hunter.gd")
+const Vehicle := preload("res://scripts/vehicle.gd")
+const Parts := preload("res://scripts/parts.gd")
+const Loadout := preload("res://scripts/loadout.gd")
 
 const OPEN_SPOT := Vector2(1600, 1200)     # clear ground around the start
 const ROAD_WEST := Vector2(400, 720)       # straight run west to the boundary wall
+const ROAD_EAST := Vector2(150, 720)       # long clear run east along the same road
 
 var main: Main
 var frame := 0
@@ -22,6 +26,7 @@ var armor_mark := 0.0
 var shots_mark := 0
 var lock_frames := 0
 var enemy_damage := 0.0
+var free_run := 0.0
 
 
 func _initialize() -> void:
@@ -37,6 +42,10 @@ func _process(_delta: float) -> bool:
 		started_usec = Time.get_ticks_usec()
 	var rig := main.vehicle
 
+	# --- Parts, slots and power ---------------------------------------------------
+	if frame == 5:
+		_check_loadouts(rig)
+
 	# --- Driving ----------------------------------------------------------------
 	if frame == 10:
 		_check(main.zombies.active_count() > 0, "zombies spawned at start")
@@ -45,6 +54,7 @@ func _process(_delta: float) -> bool:
 		main.hud.left_stick.output = Vector2.DOWN
 	if frame == 130:
 		var moved := rig.global_position.distance_to(mark)
+		free_run = moved
 		print("  drove %.0f px, speed %.0f" % [moved, rig.velocity.length()])
 		_check(moved > 300.0, "rig drives forward")
 		main.hud.left_stick.output = Vector2.RIGHT
@@ -56,6 +66,9 @@ func _process(_delta: float) -> bool:
 	if frame == 200:
 		main.hud.press_lock()
 		_check(rig.lock_enabled, "lock button turns lock on")
+		print("  power with lock on %.0f / %.0f, mobility %.2f" % [rig.power_load(), rig.power_output, rig.mobility()])
+		_check(is_equal_approx(rig.power_load(), rig.power_draw + rig.lock_power), "lock draws the targeting computer's power")
+		_check(rig.is_overloaded() and rig.mobility() < 1.0, "starter rig overloads with lock on")
 		shots_mark = main.bullets.shots_fired
 	if frame > 200 and frame < 1200:
 		main.hud.left_stick.output = Vector2.RIGHT.rotated(frame * 0.01) * 0.6
@@ -129,18 +142,58 @@ func _process(_delta: float) -> bool:
 	if frame == 2215:
 		_check(main.salvage.size() == 1, "driving over salvage collects it")
 
-	# --- Wreck -------------------------------------------------------------------
+	# --- Overload is felt: same straight run as the start, lock on -------------------
 	if frame == 2220:
+		_reset_rig(ROAD_EAST, 0.0)
+		main.hud.press_lock()
+		mark = rig.global_position
+		main.hud.left_stick.output = Vector2.RIGHT
+	if frame == 2340:
+		var moved := rig.global_position.distance_to(mark)
+		print("  overloaded run %.0f px vs %.0f px with lock off" % [moved, free_run])
+		_check(rig.lock_enabled and moved < free_run * 0.95, "overload costs speed")
+		main.hud.left_stick.output = Vector2.ZERO
+
+	# --- Wreck -------------------------------------------------------------------
+	if frame == 2350:
 		rig.take_damage(99999.0)
-	if frame == 2230:
-		_check(main.state == Main.State.WRECKED, "wreck ends the run")
 	if frame == 2360:
+		_check(main.state == Main.State.WRECKED, "wreck ends the run")
+	if frame == 2490:
 		_check(main.hud.is_result_visible(), "results card shown")
 		_check(main.hud.result_text().contains("Salvage lost"), "results card reports lost salvage")
 		var cost_ms := (Time.get_ticks_usec() - started_usec) / 1000.0 / (frame - 30)
 		print("  avg CPU cost %.2f ms/frame (headless, no rendering, this machine)" % cost_ms)
 		_finish()
 	return false
+
+
+func _check_loadouts(rig: Vehicle) -> void:
+	var starter := Loadout.build(Parts.STARTER_LOADOUT)
+	_check(is_equal_approx(starter.max_speed, 560.0) and is_equal_approx(starter.armor, 150.0) and is_equal_approx(starter.acceleration, 640.0), "starter parts add up to the starter rig")
+	_check(rig.can_lock() and main.hud.is_lock_button_visible(), "targeting computer in a slot enables lock")
+	print("  starter power %.0f / %.0f, lock costs %.0f" % [rig.power_draw, rig.power_output, rig.lock_power])
+	_check(rig.power_draw <= rig.power_output and rig.lock_power > 0.0, "starter fits its power budget; lock has a cost")
+
+	var no_targeting := Parts.STARTER_LOADOUT.duplicate(true)
+	no_targeting.internal = []
+	var stats := Loadout.build(no_targeting)
+	var bare := Vehicle.new()
+	bare.apply_stats(stats)
+	bare.lock_enabled = true
+	_check(not bare.can_lock() and not bare.lock_enabled, "no targeting computer, no lock")
+	_check(is_equal_approx(bare.power_load(), rig.power_draw), "empty slot frees its power")
+	bare.free()
+
+	var fixed_guns := Parts.STARTER_LOADOUT.duplicate(true)
+	fixed_guns.weapons = ["outrider_twin_guns"]
+	_check(float(Loadout.build(fixed_guns).lock_range) == 0.0, "fixed guns can't lock even with targeting")
+
+	print("  (one \"no slot\" warning below is expected)")
+	var crammed := Parts.STARTER_LOADOUT.duplicate(true)
+	crammed.internal = ["targeting_computer", "targeting_computer", "targeting_computer"]
+	var crammed_stats := Loadout.build(crammed)
+	_check((crammed_stats.dropped as Array).size() == 1, "chassis slot limit is enforced")
 
 
 func _reset_rig(at: Vector2, facing: float) -> void:

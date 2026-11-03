@@ -1,6 +1,11 @@
 extends RefCounted
-## Part definitions. Placeholder until the Garage lands: parts can drop and be
-## extracted, but nothing equips them yet. Rarity names match DESIGN §4.
+## Part schematics: every part the player can own, by category (DESIGN §4).
+## loadout.gd turns a set of these into a rig's final stats.
+##
+## Power: the engine's `power_output` is the budget. Every part's `power` is a
+## constant draw while equipped. A part's `power_active` is drawn only while
+## its system is switched on (the Targeting Computer, while lock is on).
+## Going over budget is an overload: the rig loses mobility (tuning.gd).
 
 const RARITY_COLORS := {
 	"Common": Color(0.75, 0.75, 0.72),
@@ -10,12 +15,77 @@ const RARITY_COLORS := {
 	"Legendary": Color(1.0, 0.72, 0.25),
 }
 
+const CATALOG := {
+	# --- Chassis: slots and base handling --------------------------------------
+	"scrap_frame": {
+		"name": "Scrap Frame", "category": "Chassis", "rarity": "Common", "power": 20.0,
+		"hardpoints": 1, "utility_slots": 1, "internal_slots": 2,
+		"armor": 60.0, "max_speed": 560.0, "reverse_speed": 230.0, "coast": 280.0, "turn_rate": 3.4,
+	},
+	# --- Engine: acceleration and the power budget --------------------------------
+	"junk_v6": {
+		"name": "Junk V6", "category": "Engine", "rarity": "Common", "power": 0.0,
+		"power_output": 100.0, "acceleration": 640.0,
+	},
+	# --- Drive: grip, braking, handling ----------------------------------------
+	"street_wheels": {
+		"name": "Street Wheels", "category": "Drive", "rarity": "Common", "power": 15.0,
+		"grip": 5.5, "brake": 1500.0, "speed_mult": 1.0, "turn_mult": 1.0,
+	},
+	"outrider_sport_wheels": {
+		"name": "Outrider Sport Wheels", "category": "Drive", "rarity": "Uncommon", "power": 20.0,
+		"grip": 6.5, "brake": 1500.0, "speed_mult": 1.07, "turn_mult": 1.06,
+	},
+	# --- Armor ---------------------------------------------------------------------
+	"scrap_plating": {
+		"name": "Scrap Plating", "category": "Armor", "rarity": "Common", "power": 0.0,
+		"armor": 90.0, "ram_damage": 70.0,
+	},
+	"outrider_light_plating": {
+		"name": "Outrider Light Plating", "category": "Armor", "rarity": "Uncommon", "power": 0.0,
+		"armor": 70.0, "ram_damage": 45.0,
+	},
+	# --- Weapons (hardpoints). lock_range 0 = this weapon can't be locked ---------
+	"pintle_turret": {
+		"name": "Pintle Turret", "category": "Weapon", "rarity": "Common", "power": 50.0,
+		"mount": 0, "fire_rate": 7.0, "bullet_damage": 9.0, "bullet_speed": 1500.0,
+		"spread_deg": 3.0, "turret_turn_rate": 9.0, "lock_range": 520.0,
+	},
+	"outrider_twin_guns": {
+		"name": "Outrider Twin Guns", "category": "Weapon", "rarity": "Uncommon", "power": 35.0,
+		"mount": 1, "fire_rate": 8.0, "bullet_damage": 6.0, "bullet_speed": 1200.0,
+		"spread_deg": 4.0, "turret_turn_rate": 0.0, "lock_range": 0.0,
+	},
+	# --- Internal systems (passive, take internal capacity) -----------------------
+	"targeting_computer": {
+		"name": "Targeting Computer", "category": "Internal", "rarity": "Common", "power": 0.0,
+		"power_active": 25.0, "enables_lock": true,
+	},
+}
+
+# What the player's rig rolls out with. Lock works because the Targeting
+# Computer is in an internal slot; take it out and the LOCK button goes away.
+const STARTER_LOADOUT := {
+	"chassis": "scrap_frame",
+	"engine": "junk_v6",
+	"drive": "street_wheels",
+	"armor": "scrap_plating",
+	"weapons": ["pintle_turret"],
+	"utility": [],
+	"internal": ["targeting_computer"],
+}
+
 # What an Outrider can drop when you wreck it.
-const OUTRIDER_DROPS := [
-	{"name": "Outrider Twin Guns", "category": "Weapon", "rarity": "Uncommon"},
-	{"name": "Outrider Light Plating", "category": "Armor", "rarity": "Uncommon"},
-	{"name": "Outrider Sport Wheels", "category": "Drive", "rarity": "Uncommon"},
-]
+const OUTRIDER_DROPS := ["outrider_twin_guns", "outrider_light_plating", "outrider_sport_wheels"]
+
+
+## A copy of a part's schematic with its id attached, or {} if unknown.
+static func get_part(id: String) -> Dictionary:
+	if not CATALOG.has(id):
+		return {}
+	var part: Dictionary = CATALOG[id].duplicate()
+	part["id"] = id
+	return part
 
 
 static func describe(part: Dictionary) -> String:
@@ -23,4 +93,4 @@ static func describe(part: Dictionary) -> String:
 
 
 static func color_of(part: Dictionary) -> Color:
-	return RARITY_COLORS.get(part.rarity, Color.WHITE)
+	return RARITY_COLORS.get(part.get("rarity", ""), Color.WHITE)

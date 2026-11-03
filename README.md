@@ -21,6 +21,8 @@ One "Clear" mission in an Outer Blocks city block: 40 shamblers, one Hunter, and
 - **Left thumb:** drive. Point where you want to go. Pull behind you while slow to reverse. Hard turns at speed drift.
 - **Right thumb:** aim the turret. Push past halfway to fire. Manual aim always overrides lock.
 - **LOCK button** (above the right stick): toggles target lock. While on, the turret picks the most dangerous target in range, leads it, and fires by itself. Priority: a Hunter on your hull, then enemy rigs, then Hunters, then the nearest shambler.
+- **Lock comes from a part.** The Targeting Computer schematic sits in one of the chassis's internal slots, and the weapon has to support lock (the turret does, fixed guns don't). Without both, there's no LOCK button.
+- **Power.** The thin bar under armor is power in use against the engine's output. The starter rig draws 85 of 100. Switching lock on draws another 25, which overloads the engine (110/100). Overload cuts acceleration and top speed (about 13% here) until you switch lock off.
 - **Ramming:** fast hits kill shamblers and Hunters. Slow pushes get you clogged in the crowd.
 - **Hunter:** shows up 25 seconds in (or after 10 kills). It pulses red before it leaps. If it latches on, it chews armor until you crush it into a wall, scrape it along one, or shoot it.
 - **Outrider:** a fast enemy rig with forward guns. It arrives 45 seconds in (or after 20 kills) and makes strafing passes. Wreck it and it drops a salvage part; drive over the crate to grab it.
@@ -64,7 +66,9 @@ scripts/
   nav_grid.gd           A* grid for pathing around buildings
   bullet_pool.gd        every bullet, both teams, in one node
   fx.gd / splats.gd     particles and ground stains
-  pickup.gd / parts.gd  salvage crates and part definitions
+  parts.gd              part schematics, power costs, starter loadout
+  loadout.gd            turns a loadout (parts in slots) into rig stats
+  pickup.gd             salvage crates
   lock_reticle.gd       brackets on the locked target
   arena.gd              the city block and its collision
   chase_camera.gd       follow camera
@@ -98,6 +102,7 @@ From DESIGN §13:
 - [x] Target lock button (per-weapon lock range)
 - [x] Hunter zombie (fast, latches for damage over time)
 - [x] One enemy vehicle (Outrider) that drops a part
+- [x] Parts, slots and power budget (lock needs the Targeting Computer)
 - [ ] Garage screen: swap a part between runs
 - [ ] Comms screen: pick the mission
 - [ ] Driver + Gunner crew with passive and triggered abilities

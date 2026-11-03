@@ -12,6 +12,8 @@ signal damaged(amount: float)
 const T := preload("res://scripts/tuning.gd")
 const Hostile := preload("res://scripts/hostile.gd")
 const BulletPool := preload("res://scripts/bullet_pool.gd")
+const Parts := preload("res://scripts/parts.gd")
+const Loadout := preload("res://scripts/loadout.gd")
 
 enum Mount { TURRET, FIXED }
 
@@ -41,7 +43,10 @@ var bullet_damage := 0.0
 var bullet_speed := 0.0
 var spread := 0.0
 var turret_turn_rate := 0.0
-var lock_range := 0.0
+var lock_range := 0.0             # 0 = no lock (weapon can't, or no targeting system)
+var power_output := 0.0            # engine budget (0 = no power model, e.g. enemy rigs)
+var power_draw := 0.0              # constant draw of everything equipped
+var lock_power := 0.0              # extra draw while lock is switched on
 
 var team := BulletPool.TEAM_PLAYER
 var armor := 0.0
@@ -56,8 +61,9 @@ var aim_input := Vector2.ZERO
 var fire_trigger := false          # fixed-mount weapons
 var lock_enabled := false:
 	set(value):
-		lock_enabled = value
-		if not value:
+		# No targeting system (or a weapon that can't lock): lock stays off.
+		lock_enabled = value and can_lock()
+		if not lock_enabled:
 			lock_target = null
 var lock_target: Node2D = null
 var lock_candidates := Callable()  # returns Array[Node2D] of things to lock onto
@@ -84,7 +90,7 @@ var _ray := PhysicsRayQueryParameters2D.new()
 
 
 func _init() -> void:
-	apply_stats(T.STARTER_RIG)
+	apply_stats(Loadout.build(Parts.STARTER_LOADOUT))
 
 
 func apply_stats(s: Dictionary) -> void:
@@ -104,7 +110,32 @@ func apply_stats(s: Dictionary) -> void:
 	spread = deg_to_rad(s.spread_deg)
 	turret_turn_rate = s.turret_turn_rate
 	lock_range = s.lock_range
+	power_output = s.get("power_output", 0.0)
+	power_draw = s.get("power_draw", 0.0)
+	lock_power = s.get("lock_power", 0.0)
 	armor = armor_max
+	if not can_lock():
+		lock_enabled = false
+
+
+func can_lock() -> bool:
+	return lock_range > 0.0
+
+
+## Power in use right now: everything equipped, plus lock if it's switched on.
+func power_load() -> float:
+	return power_draw + (lock_power if lock_enabled else 0.0)
+
+
+func is_overloaded() -> bool:
+	return power_output > 0.0 and power_load() > power_output
+
+
+## 1.0 within budget; less when overloaded (scales top speed and acceleration).
+func mobility() -> float:
+	if not is_overloaded():
+		return 1.0
+	return clampf(pow(power_output / power_load(), T.OVERLOAD_EXPONENT), T.OVERLOAD_MIN_MOBILITY, 1.0)
 
 
 func _ready() -> void:
@@ -186,15 +217,17 @@ func _drive(delta: float) -> void:
 	fwd_speed = velocity.dot(forward)
 	var side_speed := velocity.dot(side)
 
+	# An overloaded power plant can't deliver full speed or acceleration.
+	var power := mobility()
 	if throttle > 0.0:
-		var target := throttle * max_speed
-		var rate := acceleration if fwd_speed < target else coast
+		var target := throttle * max_speed * power
+		var rate := acceleration * power if fwd_speed < target else coast
 		if fwd_speed < 0.0:
 			rate = brake
 		fwd_speed = move_toward(fwd_speed, target, rate * delta)
 	elif throttle < 0.0:
-		var rate := brake if fwd_speed > 0.0 else acceleration
-		fwd_speed = move_toward(fwd_speed, throttle * reverse_speed, rate * delta)
+		var rate := brake if fwd_speed > 0.0 else acceleration * power
+		fwd_speed = move_toward(fwd_speed, throttle * reverse_speed * power, rate * delta)
 	else:
 		fwd_speed = move_toward(fwd_speed, 0.0, coast * delta)
 

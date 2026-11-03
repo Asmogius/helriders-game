@@ -105,6 +105,7 @@ func _ready() -> void:
 	outrider.wrecked.connect(_on_outrider_wrecked)
 	hud.restart_requested.connect(restart)
 	hud.lock_toggled.connect(func(on: bool) -> void: vehicle.lock_enabled = on)
+	hud.set_lock_available(vehicle.can_lock(), vehicle.lock_power)
 	_refresh_hud()
 
 
@@ -167,6 +168,7 @@ func lock_candidates() -> Array[Node2D]:
 
 func _refresh_hud() -> void:
 	hud.set_armor(vehicle.armor / vehicle.armor_max)
+	hud.set_power(vehicle.power_load(), vehicle.power_output)
 	hud.set_status(kills, T.CLEAR_TARGET, scrap)
 	hud.set_lock_state(vehicle.lock_enabled, vehicle.lock_target != null)
 	# Edge arrows: the Hunter and enemy rigs always, the last few shamblers too.
@@ -216,7 +218,7 @@ func _on_hunter_died(at: Vector2) -> void:
 func _on_outrider_wrecked() -> void:
 	camera.shake(0.6)
 	var pickup := Pickup.new()
-	pickup.part = Parts.OUTRIDER_DROPS.pick_random()
+	pickup.part = Parts.get_part(Parts.OUTRIDER_DROPS.pick_random())
 	# Drop it beside the burning wreck, toward the player.
 	var away := (vehicle.global_position - outrider.global_position).normalized()
 	pickup.position = outrider.global_position + away * 70.0

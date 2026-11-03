@@ -14,6 +14,7 @@ var right_stick: ThumbStick
 
 var _root: Control
 var _armor_bar: ArmorBar
+var _power_bar: PowerBar
 var _arrows: ThreatArrows
 var _lock_button: LockButton
 var _status: Label
@@ -42,8 +43,13 @@ func _ready() -> void:
 	_armor_bar.size = Vector2(300, 16)
 	_root.add_child(_armor_bar)
 
+	_power_bar = PowerBar.new()
+	_power_bar.position = Vector2(24, 38)
+	_power_bar.size = Vector2(300, 8)
+	_root.add_child(_power_bar)
+
 	_status = _label(24, Color(0.85, 0.83, 0.78))
-	_status.position = Vector2(24, 40)
+	_status.position = Vector2(24, 52)
 	_root.add_child(_status)
 
 	_fps = _label(20, Color(0.6, 0.6, 0.58))
@@ -106,6 +112,19 @@ func set_armor(ratio: float) -> void:
 	_armor_bar.set_ratio(ratio)
 
 
+## Power in use vs the engine's budget. Over budget shows as an overload.
+func set_power(used: float, output: float) -> void:
+	_power_bar.set_values(used, output)
+
+
+## Only rigs with a targeting system (and a lock-capable weapon) get the button.
+## `cost` is the power it draws while on, shown under the button.
+func set_lock_available(available: bool, cost: float) -> void:
+	_lock_button.visible = available
+	_lock_button.cost = cost
+	_lock_button.queue_redraw()
+
+
 func set_status(kills: int, target: int, scrap: int) -> void:
 	_status.text = "CLEAR  %d / %d      SCRAP  %d" % [kills, target, scrap]
 
@@ -122,7 +141,12 @@ func set_lock_state(on: bool, has_target: bool) -> void:
 
 ## Test/keyboard hook: same as tapping the lock button.
 func press_lock() -> void:
-	_lock_button.press()
+	if _lock_button.visible:
+		_lock_button.press()
+
+
+func is_lock_button_visible() -> bool:
+	return _lock_button.visible
 
 
 ## A short message that fades out (enemy inbound, salvage picked up...).
@@ -250,6 +274,7 @@ class LockButton extends Control:
 	const T := preload("res://scripts/tuning.gd")
 	var on := false
 	var has_target := false
+	var cost := 0.0
 
 	func _ready() -> void:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -289,6 +314,8 @@ class LockButton extends Control:
 			draw_circle(c, 5.0, accent)
 		var font := ThemeDB.fallback_font
 		draw_string(font, Vector2(0.0, size.y + 18.0), "LOCK", HORIZONTAL_ALIGNMENT_CENTER, size.x, 18, Color(accent, 0.9))
+		if cost > 0.0:
+			draw_string(font, Vector2(0.0, size.y + 36.0), "%d PWR" % roundi(cost), HORIZONTAL_ALIGNMENT_CENTER, size.x, 14, Color(accent, 0.7))
 
 
 class ThreatArrows extends Control:
@@ -319,6 +346,35 @@ class ThreatArrows extends Control:
 			var side := dir.orthogonal() * 12.0
 			var color := colors[i] if i < colors.size() else Color(1, 0.5, 0.2)
 			draw_colored_polygon(PackedVector2Array([tip + dir * 14.0, tip - dir * 8.0 + side, tip - dir * 8.0 - side]), Color(color, 0.85))
+
+
+class PowerBar extends Control:
+	## Thin bar under armor: power in use / engine output. Overload spills
+	## past the end in orange with a label.
+	const T := preload("res://scripts/tuning.gd")
+	var used := 0.0
+	var output := 0.0
+
+	func set_values(new_used: float, new_output: float) -> void:
+		if not is_equal_approx(new_used, used) or not is_equal_approx(new_output, output):
+			used = new_used
+			output = new_output
+			queue_redraw()
+
+	func _draw() -> void:
+		if output <= 0.0:
+			return
+		var over := used > output
+		draw_rect(Rect2(Vector2.ZERO, size), Color(0, 0, 0, 0.55))
+		var inner := size.x - 4.0
+		var fill := minf(used / output, 1.0) * inner
+		var color := T.COL_ORANGE if over else Color(0.95, 0.85, 0.4)
+		draw_rect(Rect2(Vector2(2, 2), Vector2(fill, size.y - 4.0)), color)
+		var font := ThemeDB.fallback_font
+		var text := "PWR %d/%d" % [roundi(used), roundi(output)]
+		if over:
+			text += "  OVERLOAD"
+		draw_string(font, Vector2(size.x + 10.0, size.y + 1.0), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, color)
 
 
 class ArmorBar extends Control:

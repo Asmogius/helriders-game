@@ -68,29 +68,16 @@ const OUTRIDER_SPAWN_KILLS := 20
 const OUTRIDER_SCRAP := 25
 
 # --- Rigs ----------------------------------------------------------------------
-# One flat dictionary of final stats per rig. The parts system will build these
-# from chassis + engine + drive + armor + weapons; for now they're hand-tuned.
-# mount: 0 = turret (aims independently), 1 = fixed (aims with the vehicle).
-const STARTER_RIG := {
-	"name": "Starter Rig",
-	"max_speed": 560.0,        # px/s
-	"reverse_speed": 230.0,
-	"acceleration": 640.0,
-	"brake": 1500.0,
-	"coast": 280.0,
-	"turn_rate": 3.4,          # rad/s at full steering authority
-	"grip": 5.5,               # how fast sideways slide dies (lower = more drift)
-	"armor": 150.0,
-	"ram_damage": 70.0,        # at full speed
-	"mount": 0,
-	"fire_rate": 7.0,          # shots/s
-	"bullet_damage": 9.0,
-	"bullet_speed": 1500.0,
-	"spread_deg": 3.0,
-	"turret_turn_rate": 9.0,
-	"lock_range": 520.0,       # 0 = this weapon can't lock
-}
+# The player's rig is built from parts: see parts.gd (schematics and the
+# starter loadout) and loadout.gd (how parts combine into these stats).
 
+# Power overload (DESIGN §4: overload reduces mobility). Load over the engine's
+# output scales acceleration and top speed by (output / load) ^ exponent.
+const OVERLOAD_EXPONENT := 1.5
+const OVERLOAD_MIN_MOBILITY := 0.5   # never worse than this
+
+# Enemy rigs still use one flat stat dictionary each.
+# mount: 0 = turret (aims independently), 1 = fixed (aims with the vehicle).
 const OUTRIDER := {
 	"name": "Outrider",
 	"max_speed": 600.0,        # faster than the starter rig: it flanks you
