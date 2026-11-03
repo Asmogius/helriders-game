@@ -390,3 +390,39 @@ Approved one by one through Pintle Turret; Targeting Computer onward were finish
 | Roll Cage (Uncommon) | Padding: injured crew rest 1 day less | Safety Cell: splash damage can't injure crew | - |
 | Emergency Patch (Rare) | Bigger Patch: +20% armor restored | Quick Fit: -20% cooldown | Full Spread: also restores half the amount to every other facing |
 | Mine Dropper (Rare) | Wide Blast: +20% blast radius | Extra Mine: drops 4 mines | Seeker Mines: armed mines creep toward the nearest enemy rig |
+
+## Numbers: First Pass
+
+Finding: today's starter dies in ~5 s standing still at 1 skull (~32 DPS from 8 shamblers + a latched Hunter vs 150 armor). These values hit the 15 s target; enemy damage unchanged.
+
+| Frame | HP |
+|---|---|
+| Courier Frame | 105 |
+| Scrap Frame | 150 |
+| Bulwark Frame | 270 |
+
+| Armor part | Armor per facing | Front/Rear slot weight | Sides slot weight |
+|---|---|---|---|
+| Outrider Light Plating | 62 | 7 | 12 |
+| Zed Sled (front only) | 71 | 15 | - |
+| Scrap Plating | 80 | 12 | 21 |
+| Riot Plating | 115 | 18 | 33 |
+| Composite Plating | 142 | 17 (+4 power) | 30 (+7 power) |
+
+| Shield | Max | Delay | Full refill |
+|---|---|---|---|
+| Junk Emitter | 30 | 3 s | ~5 s |
+| Flux Coil | 45 | 2.5 s | ~1 s |
+| Reflex Emitter | 45 | 1 s | ~3 s |
+| Capacitor Bank | 75 | 4 s | ~6 s |
+
+Status bars: always 100 points. Resistance 0-100; buildup taken = hit buildup x (100 - resistance) / 50 (0 = x2, 50 = x1, 100 = immune). Profiles: Low 45, Medium 60, High 75. Active shield +15 (cap 100). Drain 15/s after 1.5 s without buildup; after a trigger, buildup 50% slower for 3 s.
+
+| Status | Lasts | On rigs | On zombies |
+|---|---|---|---|
+| STUNNED | 1.2 s | Can't drive, fire or turn turrets | 2 s frozen |
+| BURNING | 5 s | 6/s across facings (splash rule) | 15/s, spreads on touch |
+| CORRODED | 6 s | +25% damage taken | Same |
+| TOXIC | 8 s | 4/s to HP, floor 10%, shield blocks | 4/s |
+| SLICK | 3 s | Grip 35% | Slowed |
+| GOOPED | 6 s | Zombies within 500 px rush at +60% | Frenzied |
