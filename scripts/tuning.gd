@@ -251,6 +251,29 @@ const SCRAPPER_SCRAP := 25
 const SCRAPPER_SCRAP_CACHE := 25
 const SCRAPPER_SPAWN_TIME := 60.0   # Clear: seconds in, or...
 const SCRAPPER_SPAWN_KILLS := 20    # ...after this many kills
+# --- Convoy Lead (elite enemy rig; agreed with the owner) ---------------------
+# An armored semi with a ram, towing a short trailer with a heavy turret on a
+# hitch. It hunts and rams like a slow Bulwark (the ram takes half damage);
+# two small fixed guns on the nose cover the front, because the trailer turret
+# can't fire forward through the cab. The trailer has its own armor: shoot it
+# off and the cab drives on lighter, or wreck the cab to finish both.
+# Chance a job brings one (seeded per job, shown on Comms), by skulls 1-6. It
+# takes an Outrider's place.
+const CONVOY_CHANCE := {
+	"clear": [0.0, 0.0, 0.0, 0.35, 0.35, 0.5],
+	"survive": [0.0, 0.0, 0.0, 0.35, 0.35, 0.5],
+	"hunt": [0.0, 0.0, 0.0, 0.0, 0.35, 0.5],
+}
+const CONVOY_TURRET_BLOCK := 0.785  # trailer turret can't fire within 45 deg of the cab
+const CONVOY_HITCH_GAP := 8.0
+const CONVOY_MAX_JACKKNIFE := 1.4   # radians (80 deg): the hitch won't fold further
+const CONVOY_UNHITCHED_SPEED := 1.15  # the cab without its trailer: faster...
+const CONVOY_UNHITCHED_ACCEL := 1.2   # ...quicker off the line...
+const CONVOY_UNHITCHED_TURN := 1.15   # ...and a little nimbler
+const CONVOY_SCRAP := 60
+const CONVOY_SCRAP_CACHE := 60
+const CONVOY_TRAILER_CRATE := 30      # dropped when the trailer is shot off
+
 # Oil (the Scrapper's slicks and your Oil Slick utility): rigs on it keep
 # SLIME_GRIP, zombies in it move at OIL_ZOMBIE_SPEED.
 const OIL_RADIUS := 70.0            # 140 wide
@@ -427,6 +450,48 @@ const SCRAPPER := {
 	"bullet_speed": 1400.0,    # reach ~530 px
 	"spread_deg": 4.0,
 	"turret_turn_rate": 3.0,
+	"lock_range": 0.0,
+}
+
+const CONVOY := {
+	"name": "Convoy Lead",
+	"max_speed": 420.0,
+	"reverse_speed": 180.0,
+	"acceleration": 380.0,
+	"brake": 1300.0,
+	"coast": 300.0,
+	"turn_rate": 1.5,          # a wide circle: get beside or behind it
+	"grip": 8.0,
+	"armor": 650.0,            # the front ram takes half (BULWARK_FRONT_MULT)
+	"ram_damage": 120.0,
+	"mount": 1,                # two small guns fixed on the nose, alternating
+	"gun_id": "convoy_nose",
+	"fire_rate": 8.0,          # 4 a second each...
+	"bullet_damage": 4.0,      # ...of 4: ~32 damage/s, straight ahead only
+	"bullet_speed": 1300.0,
+	"spread_deg": 4.0,
+	"turret_turn_rate": 0.0,
+	"lock_range": 0.0,
+}
+
+const CONVOY_TRAILER := {
+	"name": "Convoy Trailer",
+	"max_speed": 420.0,
+	"reverse_speed": 180.0,
+	"acceleration": 380.0,
+	"brake": 1300.0,
+	"coast": 300.0,
+	"turn_rate": 1.5,
+	"grip": 8.0,
+	"armor": 300.0,
+	"ram_damage": 60.0,
+	"mount": 0,                # the heavy turret
+	"gun_id": "convoy_turret",
+	"fire_rate": 5.0,
+	"bullet_damage": 6.0,      # ~30 damage/s
+	"bullet_speed": 1500.0,
+	"spread_deg": 3.0,
+	"turret_turn_rate": 2.0,
 	"lock_range": 0.0,
 }
 

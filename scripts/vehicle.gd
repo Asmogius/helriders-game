@@ -1072,6 +1072,11 @@ class TurretSprite extends Node2D:
 				draw_rect(Rect2(0.0, -5.0, 32.0, 3.0), Color(0.17, 0.17, 0.18))
 				draw_rect(Rect2(0.0, 2.0, 32.0, 3.0), Color(0.17, 0.17, 0.18))
 				draw_rect(Rect2(30.0, -6.0, 4.0, 12.0), T.COL_ENEMY if enemy else T.COL_ORANGE)
+			"convoy_turret":
+				# Heavy: a thick barrel on a wide armored mount.
+				draw_rect(Rect2(-2.0, -9.0, 14.0, 18.0), Color(0.2, 0.2, 0.21))
+				draw_rect(Rect2(0.0, -5.0, 40.0, 10.0), Color(0.15, 0.15, 0.16))
+				draw_rect(Rect2(36.0, -6.0, 5.0, 12.0), T.COL_ENEMY)
 			"heavy_mg_turret":
 				# Long and thick, with a cooling jacket.
 				draw_rect(Rect2(0.0, -4.0, 38.0, 8.0), Color(0.16, 0.16, 0.17))

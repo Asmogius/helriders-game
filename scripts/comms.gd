@@ -259,15 +259,16 @@ class MissionCard extends Button:
 		for i in T.MAX_SKULLS:
 			UI.draw_skull(self, Vector2(26 + i * 26, 100), 10.0, UI.skull_color(level), i < level)
 		_wrapped(font, Missions.brief(mission), Vector2(16, 136), w, 16, UI.TEXT_DIM)
-		_wrapped(font, Missions.threats_text(mission), Vector2(16, 196), w, 16, UI.TEXT)
+		# Up to five tighter lines: a 6-skull job lists a lot of trouble.
+		_wrapped(font, Missions.threats_text(mission), Vector2(16, 184), w, 14, UI.TEXT, 5, 4.0)
 		draw_string(font, Vector2(16, size.y - 52), "PAYS %d SCRAP" % int(mission.reward), HORIZONTAL_ALIGNMENT_LEFT, w, 20, T.COL_ORANGE)
 		if schematic_odds != "":
 			draw_string(font, Vector2(16, size.y - 28), "+ " + schematic_odds, HORIZONTAL_ALIGNMENT_LEFT, w, 15, UI.GOOD)
 		if taken:
 			draw_string(font, Vector2(16, size.y - 8), "TAKEN", HORIZONTAL_ALIGNMENT_RIGHT, w, 15, T.COL_CYAN)
 
-	## Simple word wrap for card text (up to three lines).
-	func _wrapped(font: Font, text: String, at: Vector2, width: float, font_size: int, tint: Color) -> void:
+	## Simple word wrap for card text (up to `max_lines` lines).
+	func _wrapped(font: Font, text: String, at: Vector2, width: float, font_size: int, tint: Color, max_lines := 3, gap := 6.0) -> void:
 		var line := ""
 		var y := at.y
 		var lines := 0
@@ -275,10 +276,10 @@ class MissionCard extends Button:
 			var trial := word if line == "" else line + " " + word
 			if font.get_string_size(trial, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x > width and line != "":
 				draw_string(font, Vector2(at.x, y), line, HORIZONTAL_ALIGNMENT_LEFT, width, font_size, tint)
-				y += font_size + 6.0
+				y += font_size + gap
 				lines += 1
 				line = word
-				if lines >= 3:
+				if lines >= max_lines:
 					return
 			else:
 				line = trial

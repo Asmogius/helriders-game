@@ -114,6 +114,10 @@ const CATALOG := {
 		"name": "Spiked Ram Plate", "category": "Armor", "rarity": "Uncommon", "cost": 70, "power": 0.0, "weight": 45.0,
 		"armor": 80.0, "ram_damage": 130.0,
 	},
+	"cowcatcher_ram": {
+		"name": "Cowcatcher Ram", "category": "Armor", "rarity": "Rare", "cost": 180, "power": 0.0, "weight": 65.0,
+		"armor": 140.0, "ram_damage": 170.0,
+	},
 	"composite_plating": {
 		"name": "Composite Plating", "category": "Armor", "rarity": "Rare", "cost": 170, "power": 10.0, "weight": 50.0,
 		"armor": 160.0, "ram_damage": 75.0,
@@ -138,6 +142,11 @@ const CATALOG := {
 		"name": "Heavy MG Turret", "category": "Weapon", "rarity": "Rare", "cost": 190, "power": 65.0, "weight": 30.0,
 		"mount": 0, "fire_rate": 9.0, "bullet_damage": 11.0, "bullet_speed": 1700.0,
 		"spread_deg": 2.5, "turret_turn_rate": 6.5, "lock_range": 600.0, "pellets": 1,
+	},
+	"hood_guns": {
+		"name": "Hood Guns", "category": "Weapon", "rarity": "Rare", "cost": 170, "power": 40.0, "weight": 20.0,
+		"mount": 1, "fire_rate": 8.0, "bullet_damage": 7.0, "bullet_speed": 1300.0,
+		"spread_deg": 3.0, "turret_turn_rate": 0.0, "lock_range": 0.0, "pellets": 1,
 	},
 	# Burst weapons: `fire_rate` is bursts per second; each burst is `burst`
 	# rounds, `burst_rate` rounds per second. Approved with the Gunner Rig.
@@ -218,6 +227,7 @@ const DROP_POOLS := {
 	"bulwark": ["riot_plating", "spiked_ram_plate", "structural_bracing", "roll_cage"],
 	"gunner": ["burst_turret", "belt_feed", "coolant_loop"],
 	"scrapper": ["oil_slick", "mine_dropper", "off_road_tires"],
+	"convoy": ["heavy_mg_turret", "composite_plating", "diesel_block", "half_track", "cowcatcher_ram", "hood_guns"],
 }
 
 

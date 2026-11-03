@@ -22,6 +22,7 @@ const EnemyRig := preload("res://scripts/enemy_rig.gd")
 const BulwarkRig := preload("res://scripts/bulwark_rig.gd")
 const GunnerRig := preload("res://scripts/gunner_rig.gd")
 const ScrapperRig := preload("res://scripts/scrapper_rig.gd")
+const ConvoyRig := preload("res://scripts/convoy_rig.gd")
 const Crew := preload("res://scripts/crew.gd")
 const Hunter := preload("res://scripts/hunter.gd")
 const BulletPool := preload("res://scripts/bullet_pool.gd")
@@ -68,6 +69,8 @@ var gunners: Array[EnemyRig] = []     # standoff turret rigs, built up front too
 var gunner: GunnerRig            # the first Gunner Rig (tests use it)
 var scrappers: Array[EnemyRig] = []   # trap layers, built up front too
 var scrapper: ScrapperRig        # the first Scrapper (tests use it)
+var convoys: Array[EnemyRig] = []     # elite semis with trailers, built up front too
+var convoy: ConvoyRig            # the first Convoy Lead (tests use it)
 var enemy_mines: MinePool        # the Scrappers' mines (hurt you and zombies)
 var marked: Node2D               # the last target a Spotter marked (tests)
 var bullets: BulletPool
@@ -199,6 +202,9 @@ func _ready() -> void:
 		rig.wrecked.connect(_on_gunner_wrecked.bind(rig))
 	for rig in scrappers:
 		rig.wrecked.connect(_on_scrapper_wrecked.bind(rig))
+	for rig in convoys:
+		rig.wrecked.connect(_on_convoy_wrecked.bind(rig))
+		(rig as ConvoyRig).trailer.wrecked.connect(_on_trailer_lost.bind(rig))
 	if elite != null:
 		elite.wrecked.connect(_on_elite_wrecked)
 	hud.restart_requested.connect(return_to_garage)
@@ -220,6 +226,7 @@ func _configure_mission() -> void:
 	var bulwark_count := 0
 	var gunner_count := 0
 	var scrapper_count := 0
+	var convoy_count := 0
 	match mission_type:
 		"clear":
 			var shamblers: int = Missions.stat(spec, "shamblers")
@@ -228,9 +235,13 @@ func _configure_mission() -> void:
 			bulwark_count = Missions.stat(spec, "bulwarks")
 			gunner_count = Missions.stat(spec, "gunners")
 			scrapper_count = Missions.stat(spec, "scrappers")
+			if Missions.has_convoy(spec):
+				convoy_count = 1
+				outrider_count = maxi(outrider_count - 1, 0)
+				_events.append([T.OUTRIDER_SPAWN_TIME, "convoy", T.OUTRIDER_SPAWN_KILLS, false])
 			zombies.spawn_budget = shamblers
 			zombies.start_count = mini(T.ZOMBIE_START, cap)
-			target_kills = shamblers + hunter_count + outrider_count + bulwark_count + gunner_count + scrapper_count
+			target_kills = shamblers + hunter_count + outrider_count + bulwark_count + gunner_count + scrapper_count + convoy_count
 			for i in scrapper_count:
 				_events.append([T.SCRAPPER_SPAWN_TIME + 40.0 * i, "scrapper", T.SCRAPPER_SPAWN_KILLS if i == 0 else -1, false])
 			for i in gunner_count:
@@ -245,9 +256,15 @@ func _configure_mission() -> void:
 			zombies.spawn_budget = 1000000
 			zombies.start_count = 10
 			zombies.ramp_seconds = Missions.stat(spec, "ramp")
+			var swap := Missions.has_convoy(spec)
 			for e: Array in Missions.stat(spec, "events"):
-				_events.append([float(e[0]), str(e[1]), -1, false])
-				if e[1] == "outrider":
+				var kind := str(e[1])
+				if swap and kind == "outrider":
+					kind = "convoy"   # the Convoy Lead takes the first Outrider's slot
+					swap = false
+					convoy_count += 1
+				_events.append([float(e[0]), kind, -1, false])
+				if kind == "outrider":
 					outrider_count += 1
 				elif e[1] == "bulwark":
 					bulwark_count += 1
@@ -262,6 +279,10 @@ func _configure_mission() -> void:
 			elite.make_elite(str(spec.name).to_upper(), Missions.stat(spec, "elite_armor"), Missions.stat(spec, "elite_damage"))
 			_events.append([3.0, "elite", -1, false])
 			outrider_count = Missions.stat(spec, "escorts")
+			if Missions.has_convoy(spec):
+				convoy_count = 1
+				outrider_count = maxi(outrider_count - 1, 0)
+				_events.append([3.0, "convoy_escort", -1, false])
 			for i in outrider_count:
 				_events.append([3.0, "escort", -1, false])
 			bulwark_count = Missions.stat(spec, "bulwark_escorts")
@@ -305,6 +326,9 @@ func _configure_mission() -> void:
 	for i in maxi(scrapper_count, 1):
 		scrappers.append(ScrapperRig.new())
 	scrapper = scrappers[0] as ScrapperRig
+	for i in maxi(convoy_count, 1):
+		convoys.append(ConvoyRig.new())
+	convoy = convoys[0] as ConvoyRig
 
 
 func _physics_process(delta: float) -> void:
@@ -462,6 +486,7 @@ func _all_enemy_rigs() -> Array[EnemyRig]:
 	all.append_array(bulwarks)
 	all.append_array(gunners)
 	all.append_array(scrappers)
+	all.append_array(convoys)
 	if elite != null:
 		all.append(elite)
 	return all
@@ -496,6 +521,11 @@ func _run_events() -> void:
 				e[3] = spawn_gunner(zombies.pick_spawn_point()) != null
 			"scrapper":
 				e[3] = spawn_scrapper(zombies.pick_spawn_point()) != null
+			"convoy":
+				e[3] = spawn_convoy(zombies.pick_spawn_point()) != null
+			"convoy_escort":
+				var near: Vector2 = elite.global_position + Vector2(randf_range(-180, 180), randf_range(-180, 180)) if elite.is_inside_tree() else zombies.pick_spawn_point()
+				e[3] = spawn_convoy(near) != null
 			"gunner_escort":
 				var near: Vector2 = elite.global_position + Vector2(randf_range(-160, 160), randf_range(-160, 160)) if elite.is_inside_tree() else zombies.pick_spawn_point()
 				e[3] = spawn_gunner(near) != null
@@ -575,6 +605,20 @@ func spawn_scrapper(at: Vector2) -> EnemyRig:
 	return null
 
 
+## Sends in the next Convoy Lead (cab and trailer, one rig toward the cap).
+func spawn_convoy(at: Vector2) -> EnemyRig:
+	if active_rig_count() >= T.MAX_ENEMY_RIGS:
+		return null
+	for rig in convoys:
+		if not rig.is_inside_tree():
+			rig.position = at
+			rig.rotation = (vehicle.global_position - at).angle()
+			rigs.add_child(rig)
+			hud.banner("CONVOY LEAD INBOUND  -  GET BESIDE IT", T.COL_ENEMY)
+			return rig
+	return null
+
+
 ## Enemy rigs in the fight right now (wrecks don't count).
 func active_rig_count() -> int:
 	var n := 0
@@ -604,6 +648,9 @@ func lock_candidates() -> Array[Node2D]:
 	for rig in rigs.get_children():
 		if not rig.get("is_wrecked"):
 			out.append(rig as Node2D)
+		var trailer: Variant = rig.get("trailer")
+		if trailer is Node2D and not (trailer as Node2D).get("is_wrecked"):
+			out.append(trailer as Node2D)
 	return out
 
 
@@ -838,6 +885,24 @@ func _on_scrapper_wrecked(rig: EnemyRig) -> void:
 	hud.banner("SCRAPPER DOWN  -  GRAB THE SALVAGE", T.COL_CYAN)
 	_add_kill(T.SCRAPPER_SCRAP, true)
 	_salvage_plating()
+
+
+func _on_convoy_wrecked(rig: EnemyRig) -> void:
+	camera.shake(1.0)
+	_drop(rig.global_position, "convoy", false, T.CONVOY_SCRAP_CACHE)
+	hud.banner("CONVOY LEAD DOWN  -  GRAB THE SALVAGE", T.COL_CYAN)
+	_add_kill(T.CONVOY_SCRAP, true)
+	_salvage_plating()
+
+
+## The trailer shot off a running Convoy Lead: a scrap crate where it fell.
+func _on_trailer_lost(rig: EnemyRig) -> void:
+	if rig.is_wrecked:
+		return   # wrecking the cab took it; that payout covers both
+	var trailer := (rig as ConvoyRig).trailer
+	camera.shake(0.5)
+	drop_cache(trailer.global_position, T.CONVOY_TRAILER_CRATE)
+	hud.banner("TRAILER DOWN  -  THE CAB'S STILL COMING", T.COL_CYAN)
 
 
 func _on_elite_wrecked() -> void:

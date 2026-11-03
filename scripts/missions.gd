@@ -67,6 +67,20 @@ static func make(type: String, level: int, mission_seed: int, quality := 0, day 
 	}
 
 
+## Does this job bring a Convoy Lead? Rolled from the job's seed, so the
+## Comms card and the mission agree. It takes an Outrider's place.
+static func has_convoy(mission: Dictionary) -> bool:
+	var chances: Array = T.CONVOY_CHANCE.get(str(mission.get("type", "")), [])
+	if chances.is_empty():
+		return false
+	var chance := float(chances[skulls(mission) - 1])
+	if chance <= 0.0:
+		return false
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("helriders-convoy-%d" % int(mission.get("seed", 0)))
+	return rng.randf() < chance
+
+
 ## The mission tests and a fresh mission scene fall back to.
 static func default_mission() -> Dictionary:
 	return make("clear", 3, 1)
@@ -114,6 +128,9 @@ static func threats_text(mission: Dictionary) -> String:
 			bits.append("%d checkpoints" % int(stat(mission, "checkpoints")))
 	var hunters := _count(mission, "hunters")
 	var rigs := _count(mission, "outriders") + _count(mission, "escorts")
+	var convoy := has_convoy(mission)
+	if convoy:
+		rigs = maxi(rigs - 1, 0)   # the Convoy Lead takes an Outrider's place
 	var heavies := _count(mission, "bulwarks") + _count(mission, "bulwark_escorts")
 	var gunners := _count(mission, "gunners") + _count(mission, "gunner_escorts")
 	var scrappers := _count(mission, "scrappers")
@@ -123,6 +140,8 @@ static func threats_text(mission: Dictionary) -> String:
 		bits.append("%d Outrider%s" % [rigs, "" if rigs == 1 else "s"])
 	if heavies > 0:
 		bits.append("%d Bulwark%s" % [heavies, "" if heavies == 1 else "s"])
+	if convoy:
+		bits.append("1 Convoy Lead")
 	if gunners > 0:
 		bits.append("%d Gunner Rig%s" % [gunners, "" if gunners == 1 else "s"])
 	if scrappers > 0:

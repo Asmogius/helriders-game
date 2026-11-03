@@ -3,7 +3,7 @@ extends SceneTree
 ## input, and checks each core mechanic in its own short scenario:
 ## driving, lock-on, the Hunter (latch, shoot off, crush), the Outrider
 ## (hunts and shoots you, drops salvage), the Bulwark (charges, rams, armored
-## front, drops salvage), a Brute's armor, the Gunner Rig and Scrapper, power and weight overload, two
+## front, drops salvage), a Brute's armor, the Gunner Rig, Scrapper and Convoy Lead, power and weight overload, two
 ## weapons with pellets, fixed guns, the utilities, crew (passives, the crew
 ## wheel, Hard Line, Overcharge, big-hit injuries, turret aim rule), and the
 ## wreck.
@@ -372,6 +372,11 @@ func _process(_delta: float) -> bool:
 		_check(scr != null and scr.call("drop_trap") == "mine" and main.enemy_mines.active_count() >= 1, "a Scrapper lays mines")
 		scr.take_damage(100000.0)
 		_check(scr.is_wrecked and main.kills == kills_before + 3, "a wrecked Scrapper counts as a kill")
+		var semi := main.spawn_convoy(rig.global_position + Vector2(-900, 0))
+		var trailer: Node = semi.get("trailer") if semi != null else null
+		_check(trailer != null and main.lock_candidates().has(trailer as Node2D), "a Convoy Lead rolls in towing a lockable trailer")
+		semi.take_damage(100000.0)
+		_check(semi.is_wrecked and bool(trailer.get("is_wrecked")) and main.kills == kills_before + 4, "wrecking the Convoy Lead's cab takes the trailer too")
 
 	# --- Wreck -------------------------------------------------------------------
 	if frame == 2790:
