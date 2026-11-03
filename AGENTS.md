@@ -12,6 +12,8 @@ The owner works from a phone and has no computer, so nobody opens the Godot edit
 
 - Research: a level belongs to the schematic (`Profile.levels`). `Parts.at_level()` is the only per-level math; `Loadout.build(loadout, levels)` applies it, so game code builds the player's rig with `profile.build_stats()` and shows parts with `profile.part(id)`. Numbers (growth, max levels, costs, daily cap, the two Research upgrades) live in `tuning.gd` and were agreed with the owner; don't change them without asking. `scripts/research.gd` is the station screen.
 
+- Expeditions and the Inn and Saloon upgrade tracks: rules in `profile.gd` (Expeditions section; `_advance_expeditions()` runs from `finish_day()`), numbers in `tuning.gd` (agreed with the owner; don't change them without asking), screens in `inn.gd` and `saloon.gd`. Station upgrade panels for the Inn and Saloon use `upgrade_panel.gd`. Tests force rolls with `Profile.roll_override`.
+
 - `scripts/profile.gd` (autoload `Profile`) is the save game: scrap, schematics, storage, the rig, presets, upgrades. Every change saves to `user://`. Economy rules agreed with the owner are listed at the top of that file; don't change them without asking.
 
 ## Engine rules
@@ -52,6 +54,7 @@ godot --headless --fixed-fps 60 --path . -s res://tests/garage_test.gd  # must e
 godot --headless --fixed-fps 60 --path . -s res://tests/missions_test.gd # must end "MISSIONS TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/crew_test.gd     # must end "CREW TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/research_test.gd # must end "RESEARCH TEST PASSED"
+godot --headless --fixed-fps 60 --path . -s res://tests/expedition_test.gd # must end "EXPEDITION TEST PASSED"
 ```
 
 - Tests must call `Profile.new_game()` with `persist = false` first, so they never touch a real save.

@@ -793,13 +793,20 @@ func _on_wrecked() -> void:
 	Engine.time_scale = 1.0
 	state = State.WRECKED
 	camera.shake(1.0)
-	var lost: Array[String] = []
+	var aboard: Array[String] = []
 	for m in profile.seated_crew():
-		lost.append(str(m.name))
+		aboard.append(str(m.name))
 	var penalty := profile.record_wreck()
+	var saved := profile.last_wreck_survivors.duplicate()
+	var lost := aboard.filter(func(n: String) -> bool: return not saved.has(n))
 	profile.finish_day()
 	var lines := "Rig destroyed with every part on it."
-	lines += (" Crew lost: %s." % ", ".join(lost)) if not lost.is_empty() else " No crew aboard."
+	if aboard.is_empty():
+		lines += " No crew aboard."
+	elif not lost.is_empty():
+		lines += " Crew lost: %s." % ", ".join(lost)
+	if not saved.is_empty():
+		lines += "\nLast Rites: %s pulled through, resting %d days." % [", ".join(saved), T.LAST_RITES_REST]
 	if penalty > 0:
 		lines += "\nWreck penalty: -%d scrap." % penalty
 	if scrap >= 1.0 or not salvage.is_empty():

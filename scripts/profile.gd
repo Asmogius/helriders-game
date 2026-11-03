@@ -35,6 +35,20 @@ extends Node
 ##   mid-run costs only the day.
 ## - The Saloon always has a free Common Driver and Gunner, so you can never
 ##   get stuck; its daily paid offers roll rarity by T.SALOON_ODDS.
+##
+## Expedition rules (decided with the owner):
+## - The Inn's expedition board opens after T.EXPEDITION_UNLOCK_CLEARS
+##   successful missions. It shows T.EXPEDITION_BOARD_SIZE named trips a day,
+##   each with skulls (1-6), a length (1-3 days) and maybe a bonus find.
+## - Send 1 to T.EXPEDITION_MAX_TEAM benched crew (not seated, not resting).
+##   Their total level against the trip's recommended level sets the odds,
+##   which you see before sending. Away crew can't be seated, dismissed or
+##   recalled; they don't get Drill Yard XP.
+## - Success pays scrap and XP (skulls x days, split) and rolls the bonus
+##   find (a new schematic or a recruit). Failure brings back part of it, and
+##   each member may come home injured. Nobody is ever lost.
+## - Last Rites (Inn upgrade, once Industrial Spine is open): on a wreck each
+##   seated crew member may survive, injured.
 
 signal changed
 
@@ -70,6 +84,13 @@ var crew: Array = []                # the roster (crew.gd dictionaries)
 var next_crew_id := 1
 var saloon: Array = []              # today's paid offers: crew dictionaries + "price", "hired"
 var saloon_day := 0
+var exp_board: Array = []           # today's expedition offers
+var exp_board_day := 0
+var expeditions: Array = []         # trips under way: offer + "team" ids + "days_left" + "odds"
+var expedition_reports: Array = []  # lines about the trips that came back last
+var last_wreck_survivors: Array[String] = []  # names Last Rites saved on the last wreck
+var roll_override := -1.0           # tests: 0..1 replaces every expedition/Last Rites roll
+var luck := RandomNumberGenerator.new()  # expedition and Last Rites rolls
 var _ready_state := false           # set once a game is loaded or started
 
 
@@ -107,6 +128,11 @@ func new_game() -> void:
 	_starter_crew()
 	saloon_day = 0
 	ensure_saloon()
+	exp_board = []
+	exp_board_day = 0
+	expeditions = []
+	expedition_reports = []
+	last_wreck_survivors = []
 	save_game()
 
 
@@ -339,6 +365,7 @@ func finish_day() -> void:
 	active_mission = {}
 	board = Missions.make_board(day, board_size(), int(upgrades.get("quality", 0)))
 	ensure_saloon()
+	_advance_expeditions()
 	save_game()
 	changed.emit()
 
@@ -448,6 +475,13 @@ func record_wreck() -> int:
 	if is_complete(rig):
 		plan = rig.duplicate(true)
 	rig = empty_loadout()
+	last_wreck_survivors = []
+	var chance := float(T.UPGRADES.last_rites.per_level) * upgrade_level("last_rites")
+	for m: Dictionary in crew:
+		if bool(m.seated) and chance > 0.0 and _roll() < chance:
+			m.seated = false
+			m.rest = T.LAST_RITES_REST
+			last_wreck_survivors.append(str(m.name))
 	crew = crew.filter(func(m: Dictionary) -> bool: return not bool(m.seated))
 	save_game()
 	changed.emit()
@@ -520,12 +554,18 @@ func is_resting(m: Dictionary) -> bool:
 	return int(m.get("rest", 0)) > 0
 
 
+func roster_cap() -> int:
+	return T.ROSTER_SIZE + int(T.UPGRADES.bunkhouse.per_level) * upgrade_level("bunkhouse")
+
+
 func roster_full() -> bool:
-	return crew.size() >= T.ROSTER_SIZE
+	return crew.size() >= roster_cap()
 
 
 ## Why crew member `m` can't be seated on this frame, or "".
 func seat_block(m: Dictionary) -> String:
+	if is_away(m):
+		return "ON EXPEDITION"
 	if is_resting(m):
 		return "RESTING"
 	var role := str(m.role)
@@ -567,6 +607,8 @@ func unseat_member(id: int) -> void:
 
 ## Gone for good, no refund.
 func dismiss(id: int) -> bool:
+	if is_away(member(id)):
+		return false
 	var before := crew.size()
 	crew = crew.filter(func(m: Dictionary) -> bool: return int(m.id) != id)
 	if crew.size() == before:
@@ -644,42 +686,71 @@ func perks_waiting() -> int:
 
 
 ## Today's Saloon offers (seeded by the day, like the job board).
+## Today's Saloon offers (seeded by the day, like the job board). Back Room
+## bought mid-day adds offers without changing the ones already there.
 func ensure_saloon() -> void:
-	if saloon_day == day and saloon.size() == T.SALOON_OFFERS:
+	var count := saloon_offers()
+	if saloon_day == day and saloon.size() == count:
 		return
-	saloon_day = day
-	saloon = []
-	var rng := RandomNumberGenerator.new()
-	rng.seed = hash("helriders-saloon-%d" % day)
-	for i in T.SALOON_OFFERS:
-		var role: String = Crew.CLASSES[rng.randi_range(0, Crew.CLASSES.size() - 1)]
-		var rarity := _roll_rarity(rng)
-		var m := Crew.make(role, rarity, rng)
+	var keep := saloon_day == day and saloon.size() < count
+	var dice := RandomNumberGenerator.new()
+	dice.seed = hash("helriders-saloon-%d" % day)
+	var fresh: Array = []
+	for i in count:
+		var role: String = Crew.CLASSES[dice.randi_range(0, Crew.CLASSES.size() - 1)]
+		var rarity := _roll_rarity(dice, upgrade_level("word_around"))
+		var m := Crew.make(role, rarity, dice)
 		m["price"] = int(T.CREW_PRICES[rarity])
 		m["hired"] = false
-		saloon.append(m)
+		m.xp = hire_start_xp(m)
+		fresh.append(m)
+	if keep:
+		for i in range(saloon.size(), count):
+			saloon.append(fresh[i])
+	else:
+		saloon = fresh
+	saloon_day = day
 
 
-static func _roll_rarity(rng: RandomNumberGenerator) -> String:
+func saloon_offers() -> int:
+	return T.SALOON_OFFERS + int(T.UPGRADES.back_room.per_level) * upgrade_level("back_room")
+
+
+## The Saloon's offer odds (percent by rarity) with Word Gets Around applied.
+static func saloon_odds(step: int) -> Dictionary:
+	var odds: Dictionary = T.SALOON_ODDS.duplicate()
+	for r: String in T.SALOON_ODDS_STEP:
+		odds[r] = maxf(float(odds[r]) + float(T.SALOON_ODDS_STEP[r]) * step, 0.0)
+	return odds
+
+
+static func _roll_rarity(dice: RandomNumberGenerator, step := 0) -> String:
+	var odds := saloon_odds(step)
 	var total := 0.0
-	for r: String in T.SALOON_ODDS:
-		total += float(T.SALOON_ODDS[r])
-	var roll := rng.randf() * total
-	for r: String in T.SALOON_ODDS:
-		roll -= float(T.SALOON_ODDS[r])
+	for r: String in odds:
+		total += float(odds[r])
+	var roll := dice.randf() * total
+	for r: String in odds:
+		roll -= float(odds[r])
 		if roll < 0.0:
 			return r
 	return "Uncommon"
 
 
+## XP a new hire starts with: Seasoned Hands sets the level (capped by rarity).
+func hire_start_xp(m: Dictionary) -> float:
+	var lv := mini(1 + upgrade_level("seasoned_hands"), Crew.max_level(m))
+	return float(Crew.xp_for_level(lv))
+
+
 ## What hiring `offer` costs: its price, less 10% while a Scavenger with
 ## Haggler is on the roster.
 func hire_price(offer: Dictionary) -> int:
-	var price := int(offer.get("price", 0))
+	var price := float(offer.get("price", 0)) * (1.0 - float(T.UPGRADES.house_credit.per_level) * upgrade_level("house_credit"))
 	for m: Dictionary in crew:
 		if str(m.role) == "scavenger" and Crew.has_perk(m, "haggler"):
 			return roundi(price * 0.9)
-	return price
+	return roundi(price)
 
 
 ## Hire today's offer `index`. Needs the scrap and a free roster slot.
@@ -693,7 +764,9 @@ func hire_offer(index: int) -> bool:
 		return false
 	scrap -= price
 	offer.hired = true
-	_auto_seat(_add_crew(offer))
+	var m := _add_crew(offer)
+	m.xp = maxf(float(m.xp), hire_start_xp(m))
+	_auto_seat(m)
 	save_game()
 	changed.emit()
 	return true
@@ -705,7 +778,9 @@ func hire_basic(role: String) -> bool:
 		return false
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash("helriders-basic-%d-%d" % [day, next_crew_id])
-	_auto_seat(_add_crew(Crew.make(role, "Common", rng)))
+	var m := _add_crew(Crew.make(role, "Common", rng))
+	m.xp = hire_start_xp(m)
+	_auto_seat(m)
 	save_game()
 	changed.emit()
 	return true
@@ -736,17 +811,231 @@ func bank_crew(skulls: int, injured_ids: Array, triage := false) -> Array[String
 				days -= 1
 			if triage:
 				days -= 1
-			m.rest = maxi(days, 1)
+			m.rest = rest_days(days)
 			m.seated = false
 			line += ", injured: resting %d day%s" % [int(m.rest), "" if int(m.rest) == 1 else "s"]
 		lines.append(line)
+	# Drill Yard: crew idle at the Inn learn a share of the job's XP.
+	var drill := float(T.UPGRADES.drill_yard.per_level) * upgrade_level("drill_yard") * skulls
+	if drill > 0.0:
+		var names: Array[String] = []
+		for m: Dictionary in crew:
+			if bool(m.seated) or is_away(m):
+				continue
+			m.xp = float(m.xp) + drill
+			names.append(str(m.name))
+		if not names.is_empty():
+			lines.append("Drill Yard: %s +%s XP" % [", ".join(names), _num(drill)])
 	save_game()
 	changed.emit()
 	return lines
 
 
+## Rest days after an injury, less the Infirmary, never under 1.
+func rest_days(days: int) -> int:
+	return maxi(days - int(T.UPGRADES.infirmary.per_level) * upgrade_level("infirmary"), 1)
+
+
 static func _num(v: float) -> String:
 	return str(int(v)) if is_equal_approx(v, roundf(v)) else "%.1f" % v
+
+
+# --- Expeditions -------------------------------------------------------------------
+
+func _roll() -> float:
+	return roll_override if roll_override >= 0.0 else luck.randf()
+
+
+func expeditions_open() -> bool:
+	return int(record.clears) >= T.EXPEDITION_UNLOCK_CLEARS
+
+
+func expeditions_at_once() -> int:
+	return T.EXPEDITION_AT_ONCE + int(T.UPGRADES.second_team.per_level) * upgrade_level("second_team")
+
+
+func is_away(m: Dictionary) -> bool:
+	if m.is_empty():
+		return false
+	for e: Dictionary in expeditions:
+		if (e.team as Array).has(int(m.id)):
+			return true
+	return false
+
+
+## Benched crew who could go: not seated, not resting, not already away.
+func can_send(m: Dictionary) -> bool:
+	return not m.is_empty() and not bool(m.seated) and not is_resting(m) and not is_away(m)
+
+
+## Today's expedition board (seeded by the day). One easy, one middling and
+## one hard trip, so there's always something for a small team.
+func ensure_exp_board() -> void:
+	if exp_board_day == day and exp_board.size() == T.EXPEDITION_BOARD_SIZE:
+		return
+	exp_board_day = day
+	exp_board = []
+	var dice := RandomNumberGenerator.new()
+	dice.seed = hash("helriders-expeditions-%d" % day)
+	var names: Array = T.EXPEDITION_NAMES.duplicate()
+	for i in T.EXPEDITION_BOARD_SIZE:
+		var band := i % 3
+		var skulls := dice.randi_range(band * 2 + 1, band * 2 + 2)
+		var trip_name: String = names.pop_at(dice.randi_range(0, names.size() - 1))
+		var bonus := ""
+		if dice.randf() < T.EXPEDITION_BONUS_SHARE:
+			bonus = "schematic" if dice.randf() < 0.5 else "recruit"
+		exp_board.append({"name": trip_name, "skulls": skulls, "days": dice.randi_range(1, 3), "bonus": bonus, "taken": false})
+
+
+static func recommended_level(e: Dictionary) -> int:
+	return int(T.EXPEDITION_TEAM_LEVEL[clampi(int(e.skulls), 1, T.MAX_SKULLS) - 1])
+
+
+func team_level(ids: Array) -> int:
+	var total := 0
+	for id: Variant in ids:
+		var m := member(int(id))
+		if not m.is_empty():
+			total += Crew.level(m)
+	return total
+
+
+## Success chance for `ids` on trip `e`, Scout Network included.
+func expedition_odds(e: Dictionary, ids: Array) -> float:
+	if ids.is_empty():
+		return 0.0
+	var diff := team_level(ids) - recommended_level(e)
+	var odds := T.EXPEDITION_ODDS
+	odds += diff * (T.EXPEDITION_ODDS_OVER if diff > 0 else T.EXPEDITION_ODDS_UNDER)
+	odds += float(T.UPGRADES.scout_network.per_level) * upgrade_level("scout_network")
+	return clampf(odds, T.EXPEDITION_ODDS_MIN, T.EXPEDITION_ODDS_MAX)
+
+
+static func expedition_scrap(e: Dictionary) -> int:
+	var base := float(T.EXPEDITION_SCRAP[int(e.skulls) - 1])
+	return roundi(base * float(T.EXPEDITION_DAY_MULT[int(e.days) - 1]))
+
+
+static func expedition_xp(e: Dictionary) -> int:
+	return int(e.skulls) * int(e.days)
+
+
+static func bonus_chance(e: Dictionary) -> float:
+	if str(e.get("bonus", "")) == "":
+		return 0.0
+	return minf(T.EXPEDITION_BONUS_CHANCE * int(e.skulls) * int(e.days), 1.0)
+
+
+## Why board trip `index` can't go with team `ids`, or "".
+func send_block(index: int, ids: Array) -> String:
+	if not expeditions_open():
+		return "LOCKED"
+	ensure_exp_board()
+	if index < 0 or index >= exp_board.size():
+		return "PICK A TRIP"
+	if bool((exp_board[index] as Dictionary).get("taken", false)):
+		return "ALREADY SENT"
+	if expeditions.size() >= expeditions_at_once():
+		return "TEAM ALREADY OUT"
+	if ids.is_empty():
+		return "PICK A TEAM"
+	if ids.size() > T.EXPEDITION_MAX_TEAM:
+		return "TEAM TOO BIG"
+	for id: Variant in ids:
+		if not can_send(member(int(id))):
+			return "CREW NOT FREE"
+	return ""
+
+
+func send_expedition(index: int, ids: Array) -> bool:
+	if send_block(index, ids) != "":
+		return false
+	var offer: Dictionary = exp_board[index]
+	var team: Array = []
+	for id: Variant in ids:
+		team.append(int(id))
+	var e := {"name": offer.name, "skulls": offer.skulls, "days": offer.days, "bonus": offer.bonus,
+		"team": team, "days_left": int(offer.days), "odds": expedition_odds(offer, ids)}
+	offer.taken = true
+	expeditions.append(e)
+	save_game()
+	changed.emit()
+	return true
+
+
+## A day passed: count trips down and bring home the ones that are done.
+func _advance_expeditions() -> void:
+	var still: Array = []
+	var lines: Array[String] = []
+	for e: Dictionary in expeditions:
+		e.days_left = int(e.days_left) - 1
+		if int(e.days_left) > 0:
+			still.append(e)
+		else:
+			lines.append_array(_resolve_expedition(e))
+	expeditions = still
+	if not lines.is_empty():
+		expedition_reports = lines
+		notice = (notice + "\n" if notice != "" else "") + lines[0] + " Details at the Inn."
+
+
+## Bring trip `e` home. Returns lines for the Inn's report.
+func _resolve_expedition(e: Dictionary) -> Array[String]:
+	var team: Array[Dictionary] = []
+	for id: Variant in e.team:
+		var m := member(int(id))
+		if not m.is_empty():
+			team.append(m)
+	var lines: Array[String] = []
+	if team.is_empty():
+		return lines
+	var success := _roll() < float(e.odds)
+	var scrap_won := expedition_scrap(e)
+	var xp := float(expedition_xp(e))
+	if not success:
+		scrap_won = roundi(scrap_won * T.EXPEDITION_FAIL_SCRAP)
+		xp *= T.EXPEDITION_FAIL_XP
+	scrap += scrap_won
+	lines.append("%s: %s, +%d scrap." % [str(e.name), "the team came back with the goods" if success else "it went wrong", scrap_won])
+	var share := xp / team.size()
+	for m in team:
+		var before := Crew.level(m)
+		m.xp = float(m.xp) + share
+		var line := "%s +%s XP" % [m.name, _num(share)]
+		if Crew.level(m) > before:
+			line += ", level %d" % Crew.level(m)
+			if Crew.perks_due(m) > 0:
+				line += ", PERK READY"
+		if not success and _roll() < T.EXPEDITION_FAIL_INJURY:
+			m.rest = rest_days(T.CREW_REST_DAYS)
+			line += ", injured: resting %d day%s" % [int(m.rest), "" if int(m.rest) == 1 else "s"]
+		lines.append(line)
+	if success and _roll() < bonus_chance(e):
+		lines.append(_bonus_find(str(e.bonus)))
+	return lines
+
+
+func _bonus_find(kind: String) -> String:
+	if kind == "schematic":
+		var pool: Array = []
+		for source: String in Parts.DROP_POOLS:
+			if source == "elite":
+				continue
+			for id: String in Parts.DROP_POOLS[source]:
+				if not pool.has(id):
+					pool.append(id)
+		var unknown := unknown_schematics(pool)
+		if unknown.is_empty():
+			return "They found a schematic you already had."
+		var id: String = unknown[luck.randi_range(0, unknown.size() - 1)]
+		schematics.append(id)
+		return "New schematic: " + Parts.describe(Parts.get_part(id))
+	if roster_full():
+		return "A drifter wanted to join, but the Inn has no free bunk."
+	var role: String = Crew.CLASSES[luck.randi_range(0, Crew.CLASSES.size() - 1)]
+	var m := _add_crew(Crew.make(role, _roll_rarity(luck, upgrade_level("word_around")), luck))
+	return "New recruit: %s, %s %s, waiting at the Inn." % [m.name, m.rarity, Crew.role_name(m)]
 
 
 # --- Upgrades ----------------------------------------------------------------------
@@ -762,15 +1051,28 @@ func upgrade_cost(key: String) -> int:
 	return int(costs[level]) if level < costs.size() else -1
 
 
+## Why `key` can't be bought yet (beyond scrap), or "".
+func upgrade_block(key: String) -> String:
+	if key == "last_rites" and not is_district_open(T.LAST_RITES_DISTRICT):
+		return "OPENS WITH %s" % str(T.DISTRICTS[T.LAST_RITES_DISTRICT].name).to_upper()
+	return ""
+
+
 func buy_upgrade(key: String) -> bool:
 	var cost := upgrade_cost(key)
-	if cost < 0 or cost > scrap:
+	if cost < 0 or cost > scrap or upgrade_block(key) != "":
 		return false
 	scrap -= cost
 	upgrades[key] = upgrade_level(key) + 1
 	if key == "choices" or key == "quality":
 		# Same seed, so today's missions stay; more of them, or better paid.
 		board = Missions.make_board(day, board_size(), int(upgrades.quality))
+	if key == "back_room":
+		ensure_saloon()
+	if key == "seasoned_hands":
+		for offer: Dictionary in saloon:
+			if not bool(offer.hired):
+				offer.xp = maxf(float(offer.xp), hire_start_xp(offer))
 	save_game()
 	changed.emit()
 	return true
@@ -822,6 +1124,10 @@ func save_game() -> void:
 		"next_crew_id": next_crew_id,
 		"saloon": saloon,
 		"saloon_day": saloon_day,
+		"exp_board": exp_board,
+		"exp_board_day": exp_board_day,
+		"expeditions": expeditions,
+		"expedition_reports": expedition_reports,
 	}
 	var file := FileAccess.open(save_path, FileAccess.WRITE)
 	if file == null:
@@ -898,6 +1204,7 @@ func load_game() -> bool:
 			if not offer.is_empty() and raw is Dictionary:
 				offer["price"] = int((raw as Dictionary).get("price", T.CREW_PRICES[offer.rarity]))
 				offer["hired"] = bool((raw as Dictionary).get("hired", false))
+				offer.xp = float((raw as Dictionary).get("xp", 0.0))
 				saloon.append(offer)
 		saloon_day = int(data.get("saloon_day", 0))
 	else:
@@ -905,7 +1212,49 @@ func load_game() -> bool:
 		_starter_crew()
 		_fit_seats()
 	ensure_saloon()
+	# Expeditions (saves from before them have none).
+	exp_board_day = int(data.get("exp_board_day", 0))
+	exp_board = []
+	for raw: Variant in data.get("exp_board", []):
+		var e := _clean_expedition(raw)
+		if not e.is_empty():
+			e["taken"] = bool((raw as Dictionary).get("taken", false))
+			exp_board.append(e)
+	expeditions = []
+	for raw: Variant in data.get("expeditions", []):
+		var e := _clean_expedition(raw)
+		if e.is_empty():
+			continue
+		var d: Dictionary = raw
+		var team: Array = []
+		for id: Variant in d.get("team", []):
+			if not member(int(id)).is_empty():
+				team.append(int(id))
+		if team.is_empty():
+			continue
+		e["team"] = team
+		e["days_left"] = clampi(int(d.get("days_left", 1)), 1, 3)
+		e["odds"] = clampf(float(d.get("odds", T.EXPEDITION_ODDS)), 0.0, 1.0)
+		expeditions.append(e)
+	expedition_reports = []
+	for line: Variant in data.get("expedition_reports", []):
+		expedition_reports.append(str(line))
 	return true
+
+
+static func _clean_expedition(raw: Variant) -> Dictionary:
+	if not raw is Dictionary:
+		return {}
+	var d: Dictionary = raw
+	var bonus := str(d.get("bonus", ""))
+	if not bonus in ["", "schematic", "recruit"]:
+		bonus = ""
+	return {
+		"name": str(d.get("name", "Expedition")),
+		"skulls": clampi(int(d.get("skulls", 1)), 1, T.MAX_SKULLS),
+		"days": clampi(int(d.get("days", 1)), 1, 3),
+		"bonus": bonus,
+	}
 
 
 ## JSON gives back floats and loose types; rebuild a crew member, or {}.

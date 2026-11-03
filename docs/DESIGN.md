@@ -78,6 +78,8 @@ Navigation: persistent footer tabs — Garage, Research, Saloon, Inn, Comms. Act
 
 - Inn: Roster with assign/rest status. Expeditions for reserve crew (passive scrap + crew XP, failure = reduced/no reward, no crew loss). Upgrades: more slots, XP share, rest time reduction, late small cheat-death chance, expedition capacity/success. Unlocks early-midgame.
 
+  Agreed expedition details: the board opens after 3 successful missions and offers 3 named trips a day (one 1-2, one 3-4, one 5-6 skulls), each lasting 1-3 days. Send 1-6 benched crew; their total level against the trip's recommended level (3/6/10/15/21/28) sets the odds: 70% at the mark, +4% per level over (max 95%), -8% per level under (min 5%). Success pays scrap (20/30/42/56/72/90 by skulls, x1/x1.8/x2.5 for 1/2/3 days) and skulls x days XP split among the team; about 1 in 4 trips offers a schematic or recruit chance (3% per skull per day). Failure brings back 25% of the scrap and half the XP, and each member has a 25% injury chance. Nobody is lost. Inn upgrades: Bunkhouse (+1 roster), Drill Yard (idle crew get 25%/50% of mission XP), Infirmary (-1 rest day), Second Team (+1 expedition out at once), Scout Network (+5% odds), Last Rites (once Industrial Spine is open: 10%/20% per seated crew member to survive a wreck, injured for 3 days). Saloon upgrades: Back Room (+1 offer), Word Gets Around (+5% Rare, +2% Epic per step), Seasoned Hands (hires start at level 2/3), House Credit (-10% prices).
+
 - Comms: Daily mission board with clear labels and threat/reward. District progress bars. Upgrades: better mission quality, more choices.
 
 All stations use short upgrade tracks and the single scrap currency. No secondary resources.

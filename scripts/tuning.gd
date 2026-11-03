@@ -185,7 +185,49 @@ const UPGRADES := {
 	# Research station (DESIGN §4: cost efficiency and levelling speed only).
 	"research_discount": {"name": "Bench Discount", "costs": [150, 350, 700], "per_level": 0.10},
 	"research_speed": {"name": "Second Shift", "costs": [200, 450], "per_level": 1},
+	# Inn (DESIGN §5; agreed with the owner).
+	"bunkhouse": {"name": "Bunkhouse", "costs": [150, 400], "per_level": 1},              # roster +1
+	"drill_yard": {"name": "Drill Yard", "costs": [120, 300], "per_level": 0.25},         # idle crew get this x mission XP
+	"infirmary": {"name": "Infirmary", "costs": [250], "per_level": 1},                   # rest days -1 (min 1)
+	"second_team": {"name": "Second Team", "costs": [200, 500], "per_level": 1},          # expeditions out at once +1
+	"scout_network": {"name": "Scout Network", "costs": [100, 250, 500], "per_level": 0.05},  # expedition odds +5%
+	"last_rites": {"name": "Last Rites", "costs": [600, 1200], "per_level": 0.10},       # wreck survival per crew member
+	# Saloon (DESIGN §5; agreed with the owner).
+	"back_room": {"name": "Back Room", "costs": [150, 400], "per_level": 1},              # offers per day +1
+	"word_around": {"name": "Word Gets Around", "costs": [200, 450, 900], "per_level": 1},  # odds shift (SALOON_ODDS_STEP)
+	"seasoned_hands": {"name": "Seasoned Hands", "costs": [250, 600], "per_level": 1},   # hires start a level higher
+	"house_credit": {"name": "House Credit", "costs": [120, 300, 600], "per_level": 0.10},  # hire prices -10%
 }
+const LAST_RITES_DISTRICT := 2         # Last Rites is for sale once Industrial Spine is open
+const LAST_RITES_REST := 3             # survivors rest this many days
+# Word Gets Around: each step moves these percentage points (from Uncommon).
+const SALOON_ODDS_STEP := {"Uncommon": -7.0, "Rare": 5.0, "Epic": 2.0}
+
+# --- Expeditions (DESIGN §5, §6; agreed with the owner) --------------------------
+# Benched crew go out for 1-3 days on a job from the Inn's daily board. Their
+# total level against the job's recommended level sets the odds; nobody is
+# ever lost.
+const EXPEDITION_UNLOCK_CLEARS := 3    # successful missions before the board opens
+const EXPEDITION_BOARD_SIZE := 3
+const EXPEDITION_MAX_TEAM := 6
+const EXPEDITION_AT_ONCE := 1          # Second Team adds one per step
+const EXPEDITION_TEAM_LEVEL := [3, 6, 10, 15, 21, 28]   # recommended team level, skulls 1-6
+const EXPEDITION_ODDS := 0.70          # at exactly the recommended level...
+const EXPEDITION_ODDS_OVER := 0.04     # ...plus this per level over...
+const EXPEDITION_ODDS_UNDER := 0.08    # ...minus this per level under
+const EXPEDITION_ODDS_MAX := 0.95
+const EXPEDITION_ODDS_MIN := 0.05
+const EXPEDITION_SCRAP := [20, 30, 42, 56, 72, 90]       # by skulls, for a 1-day trip
+const EXPEDITION_DAY_MULT := [1.0, 1.8, 2.5]             # 1, 2, 3 days
+# XP is skulls x days, split among the team.
+const EXPEDITION_BONUS_SHARE := 0.25   # share of board entries with a bonus find
+const EXPEDITION_BONUS_CHANCE := 0.03  # per skull per day
+const EXPEDITION_FAIL_SCRAP := 0.25    # a failed trip brings back this share of the scrap...
+const EXPEDITION_FAIL_XP := 0.5        # ...and of the XP, no bonus find...
+const EXPEDITION_FAIL_INJURY := 0.25   # ...and each member may come back injured
+const EXPEDITION_NAMES := ["Fuel Depot Sweep", "Overpass Salvage", "Rail Yard Run", "Mall Basement",
+	"Quarry Road", "Radio Tower", "Hospital Wing", "Drowned Metro", "Truck Stop", "Scrap Barge",
+	"Water Works", "Old Armory", "Cold Storage", "Bridge Toll", "Junk Canyon", "Signal Hill"]
 
 # --- Research (DESIGN §4; agreed with the owner) --------------------------------
 # Levels belong to the schematic: every copy you build has it, and a wreck
