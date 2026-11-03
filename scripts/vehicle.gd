@@ -82,7 +82,8 @@ var crew_damage := 1.0
 
 var team := BulletPool.TEAM_PLAYER
 var armor := 0.0
-var traction := 1.0                # Slimer trails will lower this later
+var traction := 1.0                # grip multiplier: slime lowers it (set_on_slime)
+var slime_left := 0.0               # seconds of slick tyres left after leaving slime
 var is_wrecked := false
 var lock_priority := 3             # when someone else locks onto this rig
 var lock_radius := 40.0
@@ -852,6 +853,12 @@ func ability_charge(index: int) -> float:
 
 
 # --- Damage ----------------------------------------------------------------------
+
+## Slimer trails: on slime (and for a moment after) the tyres lose grip.
+func set_on_slime(on: bool, delta: float) -> void:
+	slime_left = T.SLIME_LINGER if on else maxf(slime_left - delta, 0.0)
+	traction = T.SLIME_GRIP if slime_left > 0.0 else 1.0
+
 
 func take_hit(damage: float, impulse: Vector2, _cause := "shot") -> void:
 	if not is_wrecked:

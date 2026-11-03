@@ -152,6 +152,8 @@ Arcade top-down. Mobility is a felt stat (turn radius + drift). Builds express i
 
 - Hunter: Fast, latches for DoT. Remove by ramming obstacle, scraping, or shooting.
 
+Agreed details: Brute 200 HP, bullets do half (rams full), speed 70, 8 dmg/s, shoves the rig. Tank 450 HP, bullets half; within 350 it roars for 0.8 s (aim locks for the last 0.3 s), charges at 520 for up to 0.9 s; a hit deals 25 and shoves the rig hard, a miss leaves it stumbling 1.5 s; 8 s cooldown. Boomer 60 HP, speed 60; bursts on death or on reaching the rig into a 140-wide bile pool for 8 s; a rig caught in the burst is marked for 6 s and zombies within 500 rush it at +60% speed, as do zombies in a pool. Slimer 70 HP, speed 95; leaves a 10 s slime trail and a bigger puddle where it dies; rigs on slime keep 35% grip (for 0.5 s after). They mix into hordes by skulls (1: none; 2: Slimers; 3: + Brutes, Boomers; 4+: + Tanks; at 6 skulls about 10% Slimer, 10% Brute, 8% Boomer, up to 2 Tanks); Courier only gets Slimers and Boomers. Scrap: Slimer 3, Boomer 3, Brute 6, Tank 15 plus a 20-scrap crate.
+
 ## Enemy Vehicles
 
 Archetypes (refine later): Outrider (light flanker), Bulwark (heavy frontal), Gunner Rig (turret), Scrapper (utility), Convoy Lead (rarer mixed). Spawn with simple roles; react opportunistically (focus damaged targets, screen allies, deal with zombies). Max 3 active. Destroying them is primary source of better parts.

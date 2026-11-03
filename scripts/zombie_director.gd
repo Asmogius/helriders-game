@@ -1,15 +1,23 @@
 extends Node2D
 ## Owns every zombie: a fixed pool (no runtime allocation), spawning off-screen,
 ## and one central steering loop so each zombie doesn't run its own script.
+## Packs mix in Brutes, Boomers and Slimers by the job's skulls (set_mix), and
+## a few Tanks per job. The director also lays Slimer trails, pops Boomers into
+## bile pools (marking the rig if it's caught in the burst) and frenzies
+## zombies in bile or near a marked rig.
 
-signal zombie_killed(at: Vector2)
+signal zombie_killed(at: Vector2, kind: String)
 
 const T := preload("res://scripts/tuning.gd")
 const Zombie := preload("res://scripts/zombie.gd")
 const NavGrid := preload("res://scripts/nav_grid.gd")
+const GroundHazards := preload("res://scripts/ground_hazards.gd")
 
 var target: Node2D
 var nav: NavGrid
+var hazards: GroundHazards
+var mix := {}                            # kind -> share of each pack (set_mix)
+var tanks_left := 0                      # Tanks still to come this job
 var spawn_points: Array[Vector2] = []
 var spawn_budget := T.CLEAR_SHAMBLERS   # shamblers left to spawn this mission
 # Crowd shape; the mission sets these before the director enters the tree.
@@ -32,6 +40,38 @@ func _ready() -> void:
 	var opening := mini(start_count, cap)
 	while _active.size() < opening and spawn_budget > 0:
 		_spawn_pack(opening)
+
+
+## The pack mix for a job of `skulls` (T.ZOMBIE_MIX, T.TANKS_PER_MISSION).
+## Courier jobs only get the kinds in T.COURIER_KINDS and no Tanks.
+func set_mix(skulls: int, courier := false) -> void:
+	var i := clampi(skulls, 1, T.MAX_SKULLS) - 1
+	mix = {}
+	for kind: String in T.ZOMBIE_MIX:
+		if courier and not T.COURIER_KINDS.has(kind):
+			continue
+		var share := float(T.ZOMBIE_MIX[kind][i])
+		if share > 0.0:
+			mix[kind] = share
+	tanks_left = 0 if courier else int(T.TANKS_PER_MISSION[i])
+
+
+## Kind for the next zombie in a pack.
+func roll_kind() -> String:
+	var roll := randf()
+	for kind: String in mix:
+		roll -= float(mix[kind])
+		if roll < 0.0:
+			return kind
+	return "shambler"
+
+
+func count_kind(kind: String) -> int:
+	var n := 0
+	for zombie in _active:
+		if zombie.kind == kind:
+			n += 1
+	return n
 
 
 func active_count() -> int:
@@ -78,6 +118,8 @@ func _steer(delta: float) -> void:
 	var space := get_world_2d().direct_space_state
 	var sep_dist := T.SHAMBLER_SEPARATION
 	var sep_dist2 := sep_dist * sep_dist
+	var marked := hazards != null and hazards.is_marked(target)
+	var mark_range2 := T.BILE_MARK_RANGE * T.BILE_MARK_RANGE
 	var count := _active.size()
 	for a in count:
 		var zombie := _active[a]
@@ -105,7 +147,19 @@ func _steer(delta: float) -> void:
 			if d2 < sep_dist2 and d2 > 0.01:
 				push += away * ((sep_dist2 - d2) / sep_dist2) / sqrt(d2)
 		desired += push * zombie.speed * 0.9
+		if hazards != null:
+			zombie.frenzy = (marked and zombie.position.distance_squared_to(goal) < mark_range2) or hazards.bile_at(zombie.position)
+			if zombie.kind == "slimer":
+				zombie.slime_timer -= delta
+				if zombie.slime_timer <= 0.0:
+					zombie.slime_timer = T.SLIME_DROP_EVERY
+					hazards.add_slime(zombie.position, T.SLIME_RADIUS)
 		zombie.step(delta, desired, target)
+	# Boomers that reached the rig pop now, outside the loop over _active.
+	for i in range(_active.size() - 1, -1, -1):
+		var zombie := _active[i]
+		if zombie.burst:
+			zombie.take_hit(zombie.hp + 1.0, Vector2.ZERO, "burst")
 
 
 ## Spawns a pack at one off-screen point so they arrive as a mob, without
@@ -115,6 +169,7 @@ func _spawn_pack(limit: int) -> void:
 		return
 	var at := pick_spawn_point()
 	var size := randi_range(T.HORDE_SIZE.x, T.HORDE_SIZE.y)
+	var tank := tanks_left > 0 and _elapsed >= T.TANK_EARLIEST and randf() < T.TANK_PACK_CHANCE
 	for i in size:
 		if spawn_budget <= 0 or _active.size() >= limit:
 			return
@@ -125,16 +180,20 @@ func _spawn_pack(limit: int) -> void:
 				break
 		if zombie == null:
 			return
-		zombie.activate(at + Vector2(randf_range(-6.0, 6.0), randf_range(-6.0, 6.0)))
+		var kind := roll_kind()
+		if tank and i == 0:
+			kind = "tank"
+			tanks_left -= 1
+		zombie.activate(at + Vector2(randf_range(-6.0, 6.0), randf_range(-6.0, 6.0)), kind)
 		_active.append(zombie)
 		spawn_budget -= 1
 
 
-## Wake one pooled shambler at `at`, outside the spawn budget (tests).
-func spawn_at(at: Vector2) -> Zombie:
+## Wake one pooled zombie of `kind` at `at`, outside the spawn budget (tests).
+func spawn_at(at: Vector2, kind := "shambler") -> Zombie:
 	for candidate in _pool:
 		if not candidate.active:
-			candidate.activate(at)
+			candidate.activate(at, kind)
 			_active.append(candidate)
 			return candidate
 	return null
@@ -154,4 +213,12 @@ func pick_spawn_point() -> Vector2:
 
 func _on_zombie_died(at: Vector2, zombie: Zombie) -> void:
 	_active.erase(zombie)
-	zombie_killed.emit(at)
+	if hazards != null:
+		match zombie.kind:
+			"boomer":
+				hazards.add_bile(at)
+				if target != null and target.global_position.distance_to(at) < T.BOOMER_POOL_RADIUS + 32.0:
+					hazards.mark(target)
+			"slimer":
+				hazards.add_slime(at, T.SLIME_PUDDLE_RADIUS)
+	zombie_killed.emit(at, zombie.kind)

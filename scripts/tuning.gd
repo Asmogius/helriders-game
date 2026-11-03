@@ -134,6 +134,57 @@ const SHAMBLER_RADIUS := 13.0
 const SHAMBLER_DPS := 3.0        # chip damage per zombie in contact
 const SHAMBLER_SEPARATION := 34.0
 
+# --- Zombie variants (DESIGN §8; agreed with the owner) ------------------------
+# All share the Shambler pool and steering loop (zombie_director.gd); a
+# zombie's `kind` picks its row here. "bullet" is the share of bullet damage
+# it takes (rams and mines always do full); "knock" scales how far hits push it.
+const ZOMBIE_KINDS := {
+	"shambler": {"hp": SHAMBLER_HP, "speed": SHAMBLER_SPEED, "radius": SHAMBLER_RADIUS, "dps": SHAMBLER_DPS, "bullet": 1.0, "knock": 1.0, "scrap": SCRAP_PER_KILL},
+	"brute": {"hp": 200.0, "speed": 70.0, "radius": 19.0, "dps": 8.0, "bullet": 0.5, "knock": 0.3, "scrap": 6},
+	"tank": {"hp": 450.0, "speed": 75.0, "radius": 25.0, "dps": 8.0, "bullet": 0.5, "knock": 0.1, "scrap": 15},
+	"boomer": {"hp": 60.0, "speed": 60.0, "radius": 16.0, "dps": 0.0, "bullet": 1.0, "knock": 0.8, "scrap": 3},
+	"slimer": {"hp": 70.0, "speed": 95.0, "radius": 14.0, "dps": 3.0, "bullet": 1.0, "knock": 1.0, "scrap": 3},
+}
+# Share of each horde by skulls 1-6 (the rest are Shamblers). Tanks are
+# capped per mission instead. Courier jobs only get Slimers and Boomers.
+const ZOMBIE_MIX := {
+	"slimer": [0.0, 0.06, 0.07, 0.08, 0.09, 0.10],
+	"brute": [0.0, 0.0, 0.05, 0.07, 0.09, 0.10],
+	"boomer": [0.0, 0.0, 0.04, 0.05, 0.07, 0.08],
+}
+const COURIER_KINDS := ["slimer", "boomer"]
+const TANKS_PER_MISSION := [0, 0, 0, 1, 1, 2]
+const TANK_PACK_CHANCE := 0.3          # each pack after TANK_EARLIEST may bring one
+const TANK_EARLIEST := 30.0            # seconds into the run
+const BRUTE_SHOVE := 140.0             # push on the rig per second of contact
+const TANK_CHARGE_RANGE := 350.0
+const TANK_CHARGE_COOLDOWN := 8.0
+const TANK_WINDUP := 0.8               # roar before the charge...
+const TANK_AIM_LOCK := 0.3             # ...it stops tracking for the last part of it
+const TANK_CHARGE_SPEED := 520.0
+const TANK_CHARGE_TIME := 0.9          # longest charge (~470 px)
+const TANK_CHARGE_DAMAGE := 25.0
+const TANK_SHOVE := 620.0              # velocity added to the rig it hits
+const TANK_STUMBLE := 1.5              # after a miss: stands still, open to rams
+const TANK_CACHE := 20                 # scrap crate a Tank drops
+const BOOMER_POOL_RADIUS := 70.0       # 140 wide
+const BOOMER_POOL_TIME := 8.0
+const BILE_MARK_TIME := 6.0            # a rig caught in the burst is marked this long...
+const BILE_MARK_RANGE := 500.0         # ...and zombies this close rush it...
+const BILE_FRENZY := 1.6               # ...at this speed (also inside a pool)
+const SLIME_DROP_EVERY := 0.3          # seconds between trail blobs
+const SLIME_RADIUS := 22.0
+const SLIME_TIME := 10.0
+const SLIME_PUDDLE_RADIUS := 60.0      # left where a Slimer dies
+const SLIME_GRIP := 0.35               # rig grip on slime...
+const SLIME_LINGER := 0.5              # ...and for this long after
+const COL_BRUTE := Color(0.42, 0.4, 0.36)
+const COL_TANK := Color(0.5, 0.33, 0.3)
+const COL_BOOMER := Color(0.66, 0.7, 0.3)
+const COL_SLIMER := Color(0.36, 0.62, 0.5)
+const COL_SLIME := Color(0.45, 0.85, 0.6, 0.35)
+const COL_BILE := Color(0.75, 0.8, 0.2, 0.28)
+
 # --- Hunter --------------------------------------------------------------------
 const HUNTER_HP := 60.0
 const HUNTER_SPEED := 250.0          # outrun it at full throttle (rig does 560)

@@ -1,18 +1,43 @@
 extends "res://scripts/hostile.gd"
-## Shambler. Pooled: the ZombieDirector activates, steers, and recycles these.
+## A pooled zombie: Shambler, Brute, Tank, Boomer or Slimer (`kind`, stats in
+## T.ZOMBIE_KINDS). The ZombieDirector activates, steers and recycles them in
+## one loop; this script only moves itself along the steering it's given and
+## does its kind's trick:
+##   Brute   armored (bullets do half, grey sparks), heavy, shoves the rig
+##   Tank    a heavier Brute that roars, then charges in a straight line; a hit
+##           shoves the rig hard, a miss leaves it stumbling
+##   Boomer  bursts into a bile pool when it dies or reaches the rig (the
+##           director handles the pool and marking the rig)
+##   Slimer  drops a slime trail as it walks (the director lays it down)
 ## Zombies don't collide with each other (the director keeps them apart with a
 ## cheap separation pass), but they do block the rig, which is what clogs
 ## movement in a crowd.
 
 const CONTACT_DISTANCE := 40.0
+const KINDS := ["shambler", "brute", "tank", "boomer", "slimer"]
+enum Charge { WALK, WINDUP, CHARGE, STUMBLE }
 
+var kind := "shambler"
 var speed := T.SHAMBLER_SPEED
+var radius := T.SHAMBLER_RADIUS
+var frenzy := false          # set by the director: bile pool or a marked rig nearby
+var slime_timer := 0.0       # Slimer: seconds to the next trail blob (director)
+var burst := false           # Boomer reached the rig: the director pops it after the loop
 
 # Path following, driven by the director.
 var nav_timer := 0.0
 var nav_point := Vector2.ZERO
 var nav_direct := true
 
+# Tank charge.
+var charge := Charge.WALK
+var charge_time := 0.0
+var charge_cooldown := 0.0
+var charge_dir := Vector2.ZERO
+var charge_hits := 0         # tests and feedback
+
+var _stats: Dictionary = T.ZOMBIE_KINDS.shambler
+var _circle: CircleShape2D
 var _shape: CollisionShape2D
 var _knock := Vector2.ZERO
 var _flash := 0.0
@@ -24,19 +49,25 @@ var _detour_sign := 1.0  # each zombie always circles buildings the same way
 
 func _ready() -> void:
 	motion_mode = CharacterBody2D.MOTION_MODE_FLOATING
-	var circle := CircleShape2D.new()
-	circle.radius = T.SHAMBLER_RADIUS
+	_circle = CircleShape2D.new()
+	_circle.radius = T.SHAMBLER_RADIUS
 	_shape = CollisionShape2D.new()
-	_shape.shape = circle
+	_shape.shape = _circle
 	add_child(_shape)
 	deactivate()
 
 
-func activate(at: Vector2) -> void:
+func activate(at: Vector2, as_kind := "shambler") -> void:
+	kind = as_kind if T.ZOMBIE_KINDS.has(as_kind) else "shambler"
+	_stats = T.ZOMBIE_KINDS[kind]
 	position = at
 	rotation = randf() * TAU
-	hp = T.SHAMBLER_HP
-	speed = T.SHAMBLER_SPEED * randf_range(0.8, 1.2)
+	hp = float(_stats.hp)
+	radius = float(_stats.radius)
+	_circle.radius = radius
+	speed = float(_stats.speed) * randf_range(0.8, 1.2)
+	lock_priority = 2 if kind == "tank" else 1
+	lock_radius = radius + 5.0
 	velocity = Vector2.ZERO
 	_knock = Vector2.ZERO
 	_flash = 0.0
@@ -44,6 +75,13 @@ func activate(at: Vector2) -> void:
 	_detour_time = 0.0
 	nav_timer = 0.0
 	nav_direct = true
+	frenzy = false
+	burst = false
+	slime_timer = randf() * T.SLIME_DROP_EVERY
+	charge = Charge.WALK
+	charge_time = 0.0
+	charge_cooldown = 3.0
+	charge_hits = 0
 	_detour_sign = 1.0 if randf() < 0.5 else -1.0
 	clear_status()
 	active = true
@@ -63,20 +101,43 @@ func deactivate() -> void:
 	position = Vector2(-10000.0, -10000.0)
 
 
+func is_armored() -> bool:
+	return float(_stats.bullet) < 1.0
+
+
+## Bullets do the kind's share; rams, mines and bursts do full damage.
+func take_hit(damage: float, impulse: Vector2, cause := "shot") -> void:
+	if cause == "shot":
+		damage *= float(_stats.bullet)
+	super.take_hit(damage, impulse, cause)
+
+
+## Armored kinds throw grey sparks at bullets (bullet_pool.gd).
+func deflects(_at: Vector2) -> bool:
+	return is_armored()
+
+
 ## Called by the director once per physics tick with the steering it wants.
-## `target` is the player rig (duck-typed: needs take_damage(amount)).
+## `target` is the player rig (duck-typed: take_damage(amount), velocity).
 func step(delta: float, desired: Vector2, target: Node2D) -> void:
 	_knock = _knock.move_toward(Vector2.ZERO, 900.0 * delta)
-	tick_status(delta)
+	if tick_status(delta):
+		queue_redraw()
 	desired *= speed_mult()
+	if frenzy:
+		desired *= T.BILE_FRENZY
 	# Walking around a building: hold a wall-following direction for a while.
 	if _detour_time > 0.0:
 		_detour_time -= delta
 		desired = _detour * speed
+	if kind == "tank":
+		desired = _tank(delta, desired, target)
 	velocity = desired + _knock
 	if desired.length_squared() > 1.0:
 		rotation = lerp_angle(rotation, desired.angle(), 1.0 - exp(-6.0 * delta))
 	move_and_slide()
+	if not active:
+		return
 
 	var touching := false
 	var wall_normal := Vector2.ZERO
@@ -87,9 +148,11 @@ func step(delta: float, desired: Vector2, target: Node2D) -> void:
 		else:
 			wall_normal = collision.get_normal()
 
-	# Pressed flat against a wall with the target behind it: pick a side and
-	# follow the wall. Cheap stand-in for pathfinding in an open city block.
-	if wall_normal != Vector2.ZERO and get_real_velocity().length() < speed * 0.35:
+	if kind == "tank" and charge == Charge.CHARGE:
+		_charge_contact(target, touching, wall_normal)
+	elif wall_normal != Vector2.ZERO and get_real_velocity().length() < speed * 0.35:
+		# Pressed flat against a wall with the target behind it: pick a side and
+		# follow the wall. Cheap stand-in for pathfinding in an open city block.
 		_stuck_time += delta
 		if _stuck_time > 0.4 and _detour_time <= 0.0:
 			_detour = wall_normal.orthogonal() * _detour_sign
@@ -99,26 +162,123 @@ func step(delta: float, desired: Vector2, target: Node2D) -> void:
 		_stuck_time = 0.0
 
 	if target != null:
-		if touching or position.distance_to(target.position) < CONTACT_DISTANCE:
-			target.call("take_damage", T.SHAMBLER_DPS * delta)
+		var reach := CONTACT_DISTANCE + (radius - T.SHAMBLER_RADIUS)
+		if touching or position.distance_to(target.position) < reach:
+			if kind == "boomer":
+				burst = true
+				return
+			target.call("take_damage", float(_stats.dps) * delta)
+			if kind == "brute" or kind == "tank":
+				var push := (target.position - position).normalized() * T.BRUTE_SHOVE * delta
+				target.set("velocity", (target.get("velocity") as Vector2) + push)
 
 	if _flash > 0.0:
 		_flash = maxf(_flash - delta * 6.0, 0.0)
 		queue_redraw()
 
 
+## Tank: walk, roar, charge, stumble. Returns the velocity it wants.
+func _tank(delta: float, desired: Vector2, target: Node2D) -> Vector2:
+	charge_cooldown -= delta
+	match charge:
+		Charge.WALK:
+			if target != null and charge_cooldown <= 0.0 and position.distance_to(target.position) < T.TANK_CHARGE_RANGE:
+				charge = Charge.WINDUP
+				charge_time = T.TANK_WINDUP
+				queue_redraw()
+			return desired
+		Charge.WINDUP:
+			charge_time -= delta
+			if target != null and charge_time > T.TANK_AIM_LOCK:
+				charge_dir = (target.position - position).normalized()
+				rotation = charge_dir.angle()
+			if charge_time <= 0.0:
+				charge = Charge.CHARGE
+				charge_time = T.TANK_CHARGE_TIME
+			queue_redraw()
+			return Vector2.ZERO
+		Charge.CHARGE:
+			charge_time -= delta
+			if charge_time <= 0.0:
+				_stumble()
+			return charge_dir * T.TANK_CHARGE_SPEED
+		Charge.STUMBLE:
+			charge_time -= delta
+			if charge_time <= 0.0:
+				charge = Charge.WALK
+				queue_redraw()
+			return Vector2.ZERO
+	return desired
+
+
+func _charge_contact(target: Node2D, touching: bool, wall_normal: Vector2) -> void:
+	var hit := target != null and (touching or position.distance_to(target.position) < radius + 40.0)
+	if hit:
+		charge_hits += 1
+		target.call("take_damage", T.TANK_CHARGE_DAMAGE)
+		target.set("velocity", (target.get("velocity") as Vector2) + charge_dir * T.TANK_SHOVE)
+		target.rotation += randf_range(0.2, 0.4) * (1.0 if randf() < 0.5 else -1.0)
+		charge = Charge.WALK
+		charge_cooldown = T.TANK_CHARGE_COOLDOWN
+		queue_redraw()
+	elif wall_normal != Vector2.ZERO:
+		_stumble()
+
+
+func _stumble() -> void:
+	charge = Charge.STUMBLE
+	charge_time = T.TANK_STUMBLE
+	charge_cooldown = T.TANK_CHARGE_COOLDOWN
+	queue_redraw()
+
+
+func is_charging() -> bool:
+	return kind == "tank" and (charge == Charge.WINDUP or charge == Charge.CHARGE)
+
+
+func is_stumbling() -> bool:
+	return kind == "tank" and charge == Charge.STUMBLE
+
+
 func _on_hit(_damage: float, impulse: Vector2) -> void:
-	_knock += impulse
+	_knock += impulse * float(_stats.knock)
 	_flash = 1.0
 	queue_redraw()
 
 
 func _draw() -> void:
-	var skin := T.COL_ZOMBIE.lerp(Color(1.0, 0.95, 0.9), _flash * 0.7)
-	draw_rect(Rect2(-9.0, -11.0, 14.0, 22.0), T.COL_ZOMBIE_DARK)  # shoulders
-	draw_rect(Rect2(3.0, -11.0, 12.0, 5.0), skin)                 # arms reaching
-	draw_rect(Rect2(3.0, 6.0, 12.0, 5.0), skin)
-	draw_rect(Rect2(-3.0, -6.0, 11.0, 12.0), skin)                # head
-	draw_rect(Rect2(4.0, -3.0, 3.0, 2.0), Color(0.12, 0.08, 0.06))
-	draw_rect(Rect2(4.0, 1.0, 3.0, 2.0), Color(0.12, 0.08, 0.06))
-	draw_status(17.0)
+	match kind:
+		"brute":
+			_draw_body(1.45, T.COL_BRUTE, T.COL_ZOMBIE_DARK.darkened(0.2))
+			draw_rect(Rect2(-12.0, -15.0, 6.0, 30.0), T.COL_STEEL)     # scrap plates on the back
+		"tank":
+			_draw_body(1.9, T.COL_TANK, T.COL_TANK.darkened(0.45))
+			draw_rect(Rect2(-17.0, -20.0, 8.0, 40.0), T.COL_STEEL)
+			if charge == Charge.WINDUP:
+				var t := 1.0 - charge_time / T.TANK_WINDUP
+				draw_arc(Vector2.ZERO, radius + 6.0 + 14.0 * t, -0.6, 0.6, 12, Color(0.95, 0.3, 0.2, 0.9), 4.0)
+			elif charge == Charge.STUMBLE:
+				draw_arc(Vector2(-4.0, 0.0), 10.0, 0.0, TAU, 10, Color(1.0, 0.9, 0.4, 0.8), 2.0)
+		"boomer":
+			var skin := T.COL_BOOMER.lerp(Color(1.0, 0.95, 0.9), _flash * 0.7)
+			draw_circle(Vector2.ZERO, radius, T.COL_BOOMER.darkened(0.35))
+			draw_circle(Vector2(-2.0, 0.0), radius - 3.0, skin)
+			draw_rect(Rect2(6.0, -5.0, 8.0, 10.0), skin)
+			draw_circle(Vector2(-3.0, -5.0), 3.0, T.COL_BILE.lightened(0.3))
+			draw_circle(Vector2(-6.0, 5.0), 2.5, T.COL_BILE.lightened(0.3))
+		"slimer":
+			_draw_body(1.05, T.COL_SLIMER, T.COL_SLIMER.darkened(0.4))
+			draw_circle(Vector2(-10.0, 0.0), 5.0, T.COL_SLIME.lightened(0.2))
+		_:
+			_draw_body(1.0, T.COL_ZOMBIE, T.COL_ZOMBIE_DARK)
+	draw_status(radius + 4.0)
+
+
+func _draw_body(s: float, color: Color, dark: Color) -> void:
+	var skin := color.lerp(Color(1.0, 0.95, 0.9), _flash * 0.7)
+	draw_rect(Rect2(Vector2(-9.0, -11.0) * s, Vector2(14.0, 22.0) * s), dark)   # shoulders
+	draw_rect(Rect2(Vector2(3.0, -11.0) * s, Vector2(12.0, 5.0) * s), skin)     # arms reaching
+	draw_rect(Rect2(Vector2(3.0, 6.0) * s, Vector2(12.0, 5.0) * s), skin)
+	draw_rect(Rect2(Vector2(-3.0, -6.0) * s, Vector2(11.0, 12.0) * s), skin)    # head
+	draw_rect(Rect2(Vector2(4.0, -3.0) * s, Vector2(3.0, 2.0) * s), Color(0.12, 0.08, 0.06))
+	draw_rect(Rect2(Vector2(4.0, 1.0) * s, Vector2(3.0, 2.0) * s), Color(0.12, 0.08, 0.06))

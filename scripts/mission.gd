@@ -15,6 +15,7 @@ const Loadout := preload("res://scripts/loadout.gd")
 const Missions := preload("res://scripts/missions.gd")
 const Arena := preload("res://scripts/arena.gd")
 const Splats := preload("res://scripts/splats.gd")
+const GroundHazards := preload("res://scripts/ground_hazards.gd")
 const ZombieDirector := preload("res://scripts/zombie_director.gd")
 const Vehicle := preload("res://scripts/vehicle.gd")
 const EnemyRig := preload("res://scripts/enemy_rig.gd")
@@ -50,6 +51,7 @@ var skulls := 3                  # difficulty, 1 to 6
 
 var arena: Arena
 var splats: Splats
+var hazards: GroundHazards
 var zombies: ZombieDirector
 var vehicle: Vehicle
 var rigs: Node2D                 # enemy rigs live here
@@ -101,6 +103,7 @@ func _ready() -> void:
 
 	arena = Arena.new()
 	splats = Splats.new()
+	hazards = GroundHazards.new()
 	splats.z_index = -5
 	zombies = ZombieDirector.new()
 	vehicle = Vehicle.new()
@@ -144,6 +147,7 @@ func _ready() -> void:
 		h.target = vehicle
 		h.nav = nav
 	zombies.nav = nav
+	zombies.hazards = hazards
 	bullets.fx = fx
 	mines.fx = fx
 	zombies.target = vehicle
@@ -155,7 +159,7 @@ func _ready() -> void:
 	# Tree order is also physics order:
 	# inputs (here) -> zombies -> player rig -> enemy rigs -> hunters -> bullets.
 	# Hunters run after the rig so they see this tick's wall contact.
-	for node: Node in [arena, splats, markers, mines, pickups, zombies, vehicle, rigs]:
+	for node: Node in [arena, splats, hazards, markers, mines, pickups, zombies, vehicle, rigs]:
 		add_child(node)
 	for h in hunters:
 		add_child(h)
@@ -196,6 +200,7 @@ func _ready() -> void:
 func _configure_mission() -> void:
 	var cap: int = Missions.stat(spec, "cap")
 	zombies.cap = cap
+	zombies.set_mix(skulls, mission_type == "courier")
 	var outrider_count := 0
 	var bulwark_count := 0
 	match mission_type:
@@ -270,6 +275,7 @@ func _physics_process(delta: float) -> void:
 	if auto_spawn_specials:
 		_run_events()
 	_collect_pickups()
+	_apply_slime(delta)
 	match mission_type:
 		"survive":
 			if elapsed >= float(Missions.stat(spec, "seconds")):
@@ -635,10 +641,34 @@ func _add_kill(points: int, rig := false) -> void:
 		_succeed("BLOCK CLEARED", "", 1.0)
 
 
-func _on_zombie_killed(at: Vector2) -> void:
+func _on_zombie_killed(at: Vector2, kind: String) -> void:
 	splats.add(at)
 	fx.gore(at, (at - vehicle.global_position).normalized())
-	_add_kill(T.SCRAP_PER_KILL)
+	_add_kill(int(T.ZOMBIE_KINDS[kind].scrap))
+	match kind:
+		"tank":
+			hud.banner("TANK DOWN", T.COL_ORANGE, 1.8)
+			drop_cache(at, T.TANK_CACHE)
+		"boomer":
+			fx.call("blast", at, T.BOOMER_POOL_RADIUS)
+			if hazards.is_marked(vehicle) and hazards.marked_left > T.BILE_MARK_TIME - 0.05:
+				hud.banner("BILE!  THE HORDE IS COMING", T.COL_BOOMER, 2.0)
+
+
+## Every rig on slime loses grip (the player's and the enemy rigs alike).
+func _apply_slime(delta: float) -> void:
+	vehicle.set_on_slime(hazards.slime_at(vehicle.global_position), delta)
+	for rig in rigs.get_children():
+		if rig.has_method("set_on_slime"):
+			rig.call("set_on_slime", hazards.slime_at((rig as Node2D).global_position), delta)
+
+
+## A scrap crate at `at` (a Tank's), scaled like other caches.
+func drop_cache(at: Vector2, value: int) -> void:
+	var pickup := Pickup.new()
+	pickup.scrap_value = roundi(value * float(vehicle.crew_mod("cache")))
+	pickup.position = at
+	pickups.add_child(pickup)
 
 
 func _on_hunter_died(at: Vector2, h: Hunter) -> void:

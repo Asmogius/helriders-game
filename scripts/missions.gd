@@ -121,6 +121,24 @@ static func threats_text(mission: Dictionary) -> String:
 		bits.append("%d Outrider%s" % [rigs, "" if rigs == 1 else "s"])
 	if heavies > 0:
 		bits.append("%d Bulwark%s" % [heavies, "" if heavies == 1 else "s"])
+	var kinds := zombie_kinds_text(mission)
+	if kinds != "":
+		bits.append(kinds)
+	return ", ".join(bits)
+
+
+## The special zombies in this job's hordes, e.g. "Slimers, Brutes, 1 Tank".
+static func zombie_kinds_text(mission: Dictionary) -> String:
+	var i := skulls(mission) - 1
+	var courier := str(mission.type) == "courier"
+	var names := {"slimer": "Slimers", "brute": "Brutes", "boomer": "Boomers"}
+	var bits: Array[String] = []
+	for kind: String in names:
+		if float(T.ZOMBIE_MIX[kind][i]) > 0.0 and (not courier or T.COURIER_KINDS.has(kind)):
+			bits.append(str(names[kind]))
+	var tanks := 0 if courier else int(T.TANKS_PER_MISSION[i])
+	if tanks > 0:
+		bits.append("up to %d Tank%s" % [tanks, "" if tanks == 1 else "s"])
 	return ", ".join(bits)
 
 
