@@ -444,3 +444,14 @@ Scrapper: speed 580; one hazard every 3 s, alternating oil and spikes; max 6 act
 Ammo: Pintle Turret 28 rounds, 2 s reload. Scattergun 6 shells, 2.5 s. Burst Turret 6 bursts, 2.2 s. Outrider Twin Guns overheat after 6 s nonstop, 3 s lockout, cool 25%/s idle. Heavy MG overheats after 8 s, 4 s lockout, cools 20%/s idle. Harpoon 1 shot, 2.5 s. Mortar 3 shells, 4 s.
 
 Barrels: 20 HP; any ram sets them off; blasts chain. Explosive: 140 px, 60 damage, strong shove. Fire: 140 px, 25 damage, ground burns 6 s (heavy BURNING buildup, ignites oil). Acid: 140 px, 20 damage + 80 acid buildup. Slime: 160 px pool, 10 s. Boomer: 160 px, fills the GOOPED bar instantly.
+
+Buildup per hit: a typed hit adds 2x its damage as buildup, before resistance (~50 damage triggers at neutral). Fixed amounts: Shock Pulse 90; Zed Sled Breaker Bar full-speed ram 80; Acid barrel 80; Miasma, fire ground and slime pools 25/s inside.
+
+New crew abilities (Common baseline; rarity +10% effect and duration, -1 s cooldown per step):
+
+| Ability | Effect | Duration | Cooldown |
+|---|---|---|---|
+| Tune-Up (Gearhead) | +15% speed, +15% fire rate, no shield recharge delay | 6 s | 22 s |
+| Power Divert (Conduit) | +1 shield per unused power point (cap 80), recharges under fire | 6 s | 24 s |
+| Scrap Drones (Tinkerer) | 2 drones, 20 HP each, 4-damage shots 3x/s | 10 s | 26 s |
+| Miasma (Poisoner) | 250 px cloud, 25 TOXIC buildup/s | 6 s | 22 s |
