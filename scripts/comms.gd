@@ -16,6 +16,8 @@ const TYPE_COLORS := {
 	"survive": Color(0.93, 0.48, 0.17),
 	"hunt": Color(1.0, 0.78, 0.25),
 	"courier": Color(0.45, 0.85, 0.5),
+	"retrieve": Color(0.95, 0.8, 0.3),
+	"escort": Color(0.4, 0.8, 0.75),
 }
 
 var profile: ProfileScript
@@ -147,7 +149,7 @@ func _schematic_odds(m: Dictionary) -> String:
 	if m.type == "retrieve":
 		return "Deep cache holds a schematic"
 	if m.type == "escort":
-		return "%d%% schematic, sure with the extra site" % roundi(Missions.schematic_chance(m) * 100.0)
+		return "%d%% schematic, 100%% if you risk it" % roundi(Missions.schematic_chance(m) * 100.0)
 	var odds := roundi(Missions.schematic_chance(m) * 100.0)
 	if odds <= 0:
 		return ""
