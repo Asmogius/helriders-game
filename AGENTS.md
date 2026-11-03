@@ -6,7 +6,8 @@ The owner works from a phone and has no computer, so nobody opens the Godot edit
 
 - `docs/DESIGN.md` is the design. Systems marked "locked" are locked. Enemy vehicle archetypes are the main open area.
 - `scripts/tuning.gd` holds every balance number, color and collision layer. Tune there, not inside gameplay scripts.
-- `scripts/parts.gd` holds part schematics (stats, slots, power costs) and the starter loadout. `scripts/loadout.gd` is the only place that combines parts into rig stats. Player capabilities come from parts: for example, lock exists only with a Targeting Computer in an internal slot and a weapon whose `lock_range` > 0.
+- `scripts/parts.gd` holds part schematics (stats, slots, power, weight), the drop pools and the starter loadout. Part numbers were approved by the owner in the "Helriders: New Parts Draft" doc; don't change them without asking. `scripts/loadout.gd` is the only place that combines parts into rig stats (weapons list, internal modifiers, abilities, power and weight budgets). Player capabilities come from parts: for example, lock exists only with a Targeting Computer (or Advanced Targeting) in an internal slot and a weapon whose `lock_range` > 0.
+- Utility parts are abilities: `vehicle.gd` `use_ability(i)` runs them, `hud.gd` shows a button each. A new utility needs a case there and, if it spawns things, a pooled single-node drawer like `mine_pool.gd`.
 
 - `scripts/profile.gd` (autoload `Profile`) is the save game: scrap, schematics, storage, the rig, presets, upgrades. Every change saves to `user://`. Economy rules agreed with the owner are listed at the top of that file; don't change them without asking.
 
@@ -36,7 +37,7 @@ The owner works from a phone and has no computer, so nobody opens the Godot edit
 - Enemy rigs extend `vehicle.gd` and only decide stick inputs (`drive_input`, `fire_trigger`), the way `enemy_rig.gd` does. They share the player's driving model, so builds feel the same on both sides.
 - Bullets carry a team (`bullet_pool.gd`). Each team's ray mask decides what it can hit, so nobody shoots their own side.
 - New mission-level enemies get a `spawn_*` function in `mission.gd` that tests can call directly (`auto_spawn_specials = false`).
-- Mission types and their threat tables live in `tuning.gd` (`MISSIONS`); `missions.gd` builds the daily board; `mission.gd` runs any type. Tests set `mission_override` to run a specific mission.
+- Mission types and their tables live in `tuning.gd` (`MISSIONS`, six entries per stat, one per skull 1-6); `missions.gd` builds the daily board inside the district's skull band; `mission.gd` runs any type. Tests set `mission_override` to run a specific mission and `apply_rig()` to swap the player's build mid-run.
 - Schematic drop pools by source are `Parts.DROP_POOLS`. Drops never repeat a schematic the player owns.
 
 ## Verify before pushing

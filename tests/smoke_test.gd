@@ -2,7 +2,8 @@ extends SceneTree
 ## Headless smoke test. Boots the main scene, fakes thumb-stick and button
 ## input, and checks each core mechanic in its own short scenario:
 ## driving, lock-on, the Hunter (latch, shoot off, crush), the Outrider
-## (hunts and shoots you, drops salvage), and the wreck.
+## (hunts and shoots you, drops salvage), power and weight overload, two
+## weapons with pellets, fixed guns, the utilities, and the wreck.
 ##
 ## Run:  godot --headless --fixed-fps 60 --path . -s res://tests/smoke_test.gd
 ## Exit code 0 = pass, 1 = fail. CI also fails on any "SCRIPT ERROR" output.
@@ -30,6 +31,8 @@ var free_run := 0.0
 
 
 func _initialize() -> void:
+	# Same spawns every run, so CI doesn't depend on where the packs land.
+	seed(20261102)
 	# Fresh in-memory profile: never touch a real save file.
 	var profile: Node = root.get_node("Profile")
 	profile.set("persist", false)
@@ -162,12 +165,92 @@ func _process(_delta: float) -> bool:
 		_check(rig.is_overloaded() and moved < free_run * 0.95, "an over-budget build costs speed")
 		main.hud.left_stick.output = Vector2.ZERO
 
+	# --- Weight overload: same run with Riot Plating (105 / 100 weight) ----------
+	if frame == 2345:
+		var heavy := Parts.STARTER_LOADOUT.duplicate(true)
+		heavy.armor = "riot_plating"
+		main.apply_rig(Loadout.build(heavy))
+		_reset_rig(ROAD_EAST, 0.0)
+		mark = rig.global_position
+		main.hud.left_stick.output = Vector2.RIGHT
+	if frame == 2465:
+		var moved := rig.global_position.distance_to(mark)
+		print("  overweight build (%.0f / %.0f) ran %.0f px vs %.0f px in budget" % [rig.weight_load, rig.weight_capacity, moved, free_run])
+		_check(rig.is_weight_overloaded() and not rig.is_power_overloaded() and moved < free_run * 0.97, "an overweight build costs speed")
+		main.hud.left_stick.output = Vector2.ZERO
+
+	# --- Bulwark: two turrets fire together, the Scattergun throws pellets --------
+	if frame == 2470:
+		var bulwark := {
+			"chassis": "bulwark_frame", "engine": "diesel_block", "drive": "half_track", "armor": "scrap_plating",
+			"weapons": ["pintle_turret", "scattergun_turret"], "utility": [], "internal": ["targeting_computer"],
+		}
+		main.apply_rig(Loadout.build(bulwark))
+		_reset_rig(OPEN_SPOT, 0.0)
+		main.zombies.clear_all()
+		_check(rig.gun_stats.size() == 2 and rig._turrets.size() == 2 and rig._turrets[0] != null and rig._turrets[1] != null, "Bulwark mounts two turrets")
+		_check(rig._turrets[0].position.x > rig._turrets[1].position.x, "one turret forward, one aft")
+		shots_mark = main.bullets.shots_fired
+		main.hud.right_stick.output = Vector2.UP
+	if frame == 2530:
+		var shots := main.bullets.shots_fired - shots_mark
+		print("  two turrets fired %d bullets in 1 s (Pintle 7/s + Scattergun 2.5/s x 6 pellets)" % shots)
+		_check(shots >= 20, "both weapons fire together, the Scattergun in pellets")
+		var aim_ok := true
+		for t: Node2D in rig._turrets:
+			aim_ok = aim_ok and absf(angle_difference(t.global_rotation, -PI / 2.0)) < 0.15
+		_check(aim_ok, "both turrets follow the aim stick")
+		main.hud.right_stick.output = Vector2.ZERO
+
+	# --- Fixed guns fire for the player too ------------------------------------------
+	if frame == 2535:
+		var twin := Parts.STARTER_LOADOUT.duplicate(true)
+		twin.weapons = ["outrider_twin_guns"]
+		main.apply_rig(Loadout.build(twin))
+		_reset_rig(OPEN_SPOT, 0.0)
+		shots_mark = main.bullets.shots_fired
+		main.hud.right_stick.output = Vector2.UP  # any push fires; the guns point ahead
+	if frame == 2565:
+		var shots := main.bullets.shots_fired - shots_mark
+		print("  fixed twin guns fired %d shots in 0.5 s" % shots)
+		_check(shots >= 3 and not main.hud.is_lock_button_visible(), "player fires fixed guns with the right stick (no lock on fixed guns)")
+		main.hud.right_stick.output = Vector2.ZERO
+
+	# --- Utilities: Emergency Patch and Mine Dropper ----------------------------------
+	if frame == 2570:
+		var courier := {
+			"chassis": "courier_frame", "engine": "junk_v6", "drive": "street_wheels", "armor": "outrider_light_plating",
+			"weapons": ["pintle_turret"], "utility": ["emergency_patch", "mine_dropper"], "internal": [],
+		}
+		main.apply_rig(Loadout.build(courier))
+		_reset_rig(OPEN_SPOT, 0.0)
+		main.zombies.clear_all()
+		_check(main.hud.ability_count() == 2, "two utilities, two HUD buttons")
+		rig.armor = 20.0
+		main.hud.press_ability(0)
+		_check(is_equal_approx(rig.armor, 55.0), "Emergency Patch restores 35 armor")
+		main.hud.press_ability(0)
+		_check(is_equal_approx(rig.armor, 55.0) and rig.ability_charge(0) > 0.9, "the patch has to cool down before it works again")
+		main.hud.press_ability(1)
+		_check(main.mines.active_count() == 3, "Mine Dropper lays three mines")
+		mark = main.mines._pos[1]
+		_check(mark.x < rig.global_position.x, "mines go down behind the rig")
+	if frame == 2610:
+		# Armed after 0.5 s: walk a shambler onto the middle mine.
+		var z := main.zombies.spawn_at(mark)
+		_check(z != null, "test shambler placed on a mine")
+		armor_mark = float(main.kills)
+	if frame == 2625:
+		print("  mines left %d, detonations %d, kills %d" % [main.mines.active_count(), main.mines.detonations, main.kills])
+		_check(main.mines.detonations >= 1 and main.kills > int(armor_mark), "a shambler on an armed mine sets it off and dies")
+		_check(rig.armor > 50.0, "your own mines don't hurt you")
+
 	# --- Wreck -------------------------------------------------------------------
-	if frame == 2350:
+	if frame == 2630:
 		rig.take_damage(99999.0)
-	if frame == 2360:
+	if frame == 2640:
 		_check(main.state == Main.State.WRECKED, "wreck ends the run")
-	if frame == 2490:
+	if frame == 2770:
 		_check(main.hud.is_result_visible(), "results card shown")
 		_check(main.hud.result_text().contains("Salvage lost"), "results card reports lost salvage")
 		var profile: Node = root.get_node("Profile")

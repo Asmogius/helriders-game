@@ -20,6 +20,7 @@ const Vehicle := preload("res://scripts/vehicle.gd")
 const EnemyRig := preload("res://scripts/enemy_rig.gd")
 const Hunter := preload("res://scripts/hunter.gd")
 const BulletPool := preload("res://scripts/bullet_pool.gd")
+const MinePool := preload("res://scripts/mine_pool.gd")
 const Fx := preload("res://scripts/fx.gd")
 const Pickup := preload("res://scripts/pickup.gd")
 const LockReticle := preload("res://scripts/lock_reticle.gd")
@@ -41,7 +42,7 @@ var mission_override := {}
 
 var spec := {}                   # the mission being run
 var mission_type := "clear"
-var threat := 2
+var skulls := 3                  # difficulty, 1 to 6
 
 var arena: Arena
 var splats: Splats
@@ -54,6 +55,7 @@ var outriders: Array[EnemyRig] = []   # built up front, added when they spawn
 var outrider: EnemyRig           # the first Outrider (tests use it)
 var elite: EnemyRig              # the Hunt target, if any
 var bullets: BulletPool
+var mines: MinePool
 var fx: Fx
 var pickups: Node2D
 var reticle: LockReticle
@@ -88,7 +90,7 @@ func _ready() -> void:
 	else:
 		spec = Missions.default_mission()
 	mission_type = str(spec.type)
-	threat = clampi(int(spec.threat), 1, 3)
+	skulls = Missions.skulls(spec)
 
 	arena = Arena.new()
 	splats = Splats.new()
@@ -101,6 +103,7 @@ func _ready() -> void:
 	hunter = hunters[0]
 	bullets = BulletPool.new()
 	bullets.z_index = 4
+	mines = MinePool.new()
 	fx = Fx.new()
 	fx.z_index = 5
 	pickups = Node2D.new()
@@ -122,6 +125,7 @@ func _ready() -> void:
 	vehicle.position = Arena.PLAYER_START
 	vehicle.rotation = -PI / 2.0
 	vehicle.bullets = bullets
+	vehicle.mines = mines
 	vehicle.fx = fx
 	vehicle.lock_candidates = lock_candidates
 	for rig: EnemyRig in _all_enemy_rigs():
@@ -133,6 +137,7 @@ func _ready() -> void:
 		h.nav = nav
 	zombies.nav = nav
 	bullets.fx = fx
+	mines.fx = fx
 	zombies.target = vehicle
 	zombies.spawn_points = arena.spawn_points
 	camera.target = vehicle
@@ -142,7 +147,7 @@ func _ready() -> void:
 	# Tree order is also physics order:
 	# inputs (here) -> zombies -> player rig -> enemy rigs -> hunters -> bullets.
 	# Hunters run after the rig so they see this tick's wall contact.
-	for node: Node in [arena, splats, markers, pickups, zombies, vehicle, rigs]:
+	for node: Node in [arena, splats, markers, mines, pickups, zombies, vehicle, rigs]:
 		add_child(node)
 	for h in hunters:
 		add_child(h)
@@ -166,12 +171,13 @@ func _ready() -> void:
 		elite.wrecked.connect(_on_elite_wrecked)
 	hud.restart_requested.connect(return_to_garage)
 	hud.lock_toggled.connect(func(on: bool) -> void: vehicle.lock_enabled = on)
-	hud.set_lock_available(vehicle.can_lock())
+	hud.ability_pressed.connect(use_ability)
+	_sync_hud_to_rig()
 	hud.banner("%s  -  %s" % [Missions.label(spec), str(spec.name).to_upper()], _type_color(), 3.0)
 	_refresh_hud()
 
 
-## Crowd size, specials and objective for this mission's type and threat.
+## Crowd size, specials and objective for this mission's type and skulls.
 func _configure_mission() -> void:
 	var cap: int = Missions.stat(spec, "cap")
 	zombies.cap = cap
@@ -247,6 +253,28 @@ func _physics_process(delta: float) -> void:
 
 func _process(_delta: float) -> void:
 	_refresh_hud()
+
+
+## Swap the player's rig to `stats` mid-mission (tests) and update the HUD.
+func apply_rig(stats: Dictionary) -> void:
+	vehicle.apply_stats(stats)
+	_sync_hud_to_rig()
+
+
+## LOCK and utility buttons follow the rig's parts.
+func _sync_hud_to_rig() -> void:
+	hud.set_lock_available(vehicle.can_lock())
+	var kinds: Array[String] = []
+	for a in vehicle.abilities:
+		kinds.append(str(a.ability))
+	hud.set_abilities(kinds)
+
+
+## Fire the rig's utility `index` (its HUD button).
+func use_ability(index: int) -> bool:
+	if state != State.RUNNING:
+		return false
+	return vehicle.use_ability(index)
 
 
 func return_to_garage() -> void:
@@ -390,7 +418,9 @@ func courier_tier() -> String:
 
 func _refresh_hud() -> void:
 	hud.set_armor(vehicle.armor / vehicle.armor_max)
-	hud.set_power(vehicle.power_load(), vehicle.power_output)
+	hud.set_power(vehicle.power_load(), vehicle.power_output, vehicle.weight_load, vehicle.weight_capacity)
+	for i in vehicle.abilities.size():
+		hud.set_ability_charge(i, vehicle.ability_charge(i))
 	hud.set_status_text(_status_line())
 	hud.set_lock_state(vehicle.lock_enabled, vehicle.lock_target != null)
 	# Edge arrows: specials always, the Courier's next stop, salvage, and the
@@ -472,7 +502,7 @@ func _on_hunter_died(at: Vector2, h: Hunter) -> void:
 	splats.add(at)
 	fx.gore(at, Vector2.ZERO)
 	_on_hunter_let_go()
-	var how := {"crushed": "HUNTER CRUSHED", "scraped": "HUNTER SCRAPED OFF", "rammed": "HUNTER RUN DOWN"}
+	var how := {"crushed": "HUNTER CRUSHED", "scraped": "HUNTER SCRAPED OFF", "rammed": "HUNTER RUN DOWN", "mine": "HUNTER BLOWN UP"}
 	hud.banner(how.get(h.last_hit_cause, "HUNTER DOWN"), T.COL_HUNTER, 1.8)
 	_add_kill(T.HUNTER_SCRAP)
 
@@ -568,14 +598,14 @@ func _succeed(title: String, detail: String, pay_mult: float) -> void:
 	hud.show_result(title, lines, "RETURN TO GARAGE", _type_color())
 
 
-## A job may pay a schematic from its type's pool: odds by threat, and a
+## A job may pay a schematic from its type's pool: odds by skulls, and a
 ## Courier only pays one for a gold time.
 func _mission_reward_schematic(pay_mult: float) -> String:
 	if mission_type == "courier" and pay_mult < 1.0:
 		return ""
 	var pool: Array = Parts.DROP_POOLS.get(mission_type, [])
 	var unknown := profile.unknown_schematics(pool, _pending_ids())
-	if unknown.is_empty() or randf() >= float(T.MISSION_SCHEMATIC_CHANCE[threat - 1]):
+	if unknown.is_empty() or randf() >= Missions.schematic_chance(spec):
 		return ""
 	return unknown.pick_random()
 

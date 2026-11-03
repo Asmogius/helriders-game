@@ -1,10 +1,11 @@
 extends CanvasLayer
 ## Minimal combat HUD: armor bar, objective, FPS readout, twin sticks, lock
-## button, event banners, threat arrows, and the results card. The vehicle
-## stays the visual focus.
+## button, utility buttons, event banners, threat arrows, and the results
+## card. The vehicle stays the visual focus.
 
 signal restart_requested
 signal lock_toggled(on: bool)
+signal ability_pressed(index: int)
 
 const T := preload("res://scripts/tuning.gd")
 const ThumbStick := preload("res://scripts/thumb_stick.gd")
@@ -17,6 +18,7 @@ var _armor_bar: ArmorBar
 var _power_bar: PowerBar
 var _arrows: ThreatArrows
 var _lock_button: LockButton
+var _ability_buttons: Array[AbilityButton] = []
 var _status: Label
 var _fps: Label
 var _hint: Label
@@ -108,13 +110,55 @@ func _ready() -> void:
 	_build_overlay()
 
 
+## One round button per utility part, in a row left of LOCK. `kinds` are the
+## parts' ability names ("patch", "mines"). Built once at mission start.
+func set_abilities(kinds: Array[String]) -> void:
+	for b in _ability_buttons:
+		right_stick.blockers.erase(b)
+		b.queue_free()
+	_ability_buttons.clear()
+	for i in kinds.size():
+		var b := AbilityButton.new()
+		b.kind = kinds[i]
+		b.anchor_left = 1.0
+		b.anchor_right = 1.0
+		b.anchor_top = 1.0
+		b.anchor_bottom = 1.0
+		var right := -190.0 - i * 124.0
+		b.offset_left = right - 104.0
+		b.offset_right = right
+		b.offset_top = -444.0
+		b.offset_bottom = -340.0
+		b.pressed.connect(func() -> void: ability_pressed.emit(i))
+		_root.add_child(b)
+		_ability_buttons.append(b)
+		right_stick.blockers.append(b)
+
+
+## 0 = ready, 1 = just used.
+func set_ability_charge(index: int, charge: float) -> void:
+	if index >= 0 and index < _ability_buttons.size():
+		_ability_buttons[index].set_charge(charge)
+
+
+func ability_count() -> int:
+	return _ability_buttons.size()
+
+
+## Test hook: same as tapping utility button `index`.
+func press_ability(index: int) -> void:
+	if index >= 0 and index < _ability_buttons.size():
+		_ability_buttons[index].press()
+
+
 func set_armor(ratio: float) -> void:
 	_armor_bar.set_ratio(ratio)
 
 
-## Power in use vs the engine's budget. Over budget shows as an overload.
-func set_power(used: float, output: float) -> void:
-	_power_bar.set_values(used, output)
+## Power in use vs the engine's budget, and weight vs the chassis's capacity.
+## Over either budget shows as an overload.
+func set_power(used: float, output: float, weight := 0.0, capacity := 0.0) -> void:
+	_power_bar.set_values(used, output, weight, capacity)
 
 
 ## Only rigs with a targeting system (and a lock-capable weapon) get the button.
@@ -184,6 +228,8 @@ func show_result(title: String, subtitle: String, button_text: String, accent: C
 	left_stick.enabled = false
 	right_stick.enabled = false
 	_lock_button.visible = false
+	for b in _ability_buttons:
+		b.visible = false
 	set_alert("")
 	_title.text = title
 	_title.add_theme_color_override("font_color", accent)
@@ -347,31 +393,101 @@ class ThreatArrows extends Control:
 			draw_colored_polygon(PackedVector2Array([tip + dir * 14.0, tip - dir * 8.0 + side, tip - dir * 8.0 - side]), Color(color, 0.85))
 
 
+class AbilityButton extends Control:
+	## Round utility button with a cooldown sweep. Handles its own touches;
+	## the right stick ignores this area.
+	signal pressed
+	const T := preload("res://scripts/tuning.gd")
+	var kind := ""      # "patch" or "mines"
+	var charge := 0.0   # 0 ready, 1 just used
+
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func press() -> void:
+		pressed.emit()
+
+	func set_charge(value: float) -> void:
+		# Redraw in small steps, not every frame.
+		if absf(value - charge) >= 0.01 or (value == 0.0 and charge != 0.0):
+			charge = value
+			queue_redraw()
+
+	func _input(event: InputEvent) -> void:
+		if not visible or not event is InputEventScreenTouch:
+			return
+		var touch := event as InputEventScreenTouch
+		if touch.pressed and get_global_rect().has_point(touch.position):
+			press()
+			get_viewport().set_input_as_handled()
+
+	func _draw() -> void:
+		var c := size * 0.5
+		var r := minf(size.x, size.y) * 0.5 - 4.0
+		var ready := charge <= 0.0
+		var accent := Color(0.45, 0.9, 0.5) if kind == "patch" else T.COL_ORANGE
+		var tint := accent if ready else Color(0.6, 0.58, 0.55)
+		draw_circle(c, r, Color(0.0, 0.0, 0.0, 0.5))
+		if not ready:
+			# Dark wedge for the time left, shrinking clockwise.
+			var shade := Color(0.0, 0.0, 0.0, 0.45)
+			if charge >= 0.97:
+				draw_circle(c, r, shade)
+			elif charge > 0.02:
+				var points := PackedVector2Array([c])
+				var steps := maxi(2, ceili(32.0 * charge))
+				for k in steps + 1:
+					var ang := -PI / 2.0 + TAU * charge * float(k) / steps
+					points.append(c + Vector2.RIGHT.rotated(ang) * r)
+				draw_colored_polygon(points, shade)
+		draw_arc(c, r, 0.0, TAU, 40, Color(tint, 0.9 if ready else 0.5), 4.0 if ready else 2.5)
+		match kind:
+			"patch":
+				draw_rect(Rect2(c - Vector2(5, 16), Vector2(10, 32)), tint)
+				draw_rect(Rect2(c - Vector2(16, 5), Vector2(32, 10)), tint)
+			"mines":
+				for k in 3:
+					var p := c + Vector2(-16.0 + k * 16.0, 0.0)
+					draw_circle(p, 6.0, tint)
+					draw_circle(p, 2.0, Color(0, 0, 0, 0.7))
+		var font := ThemeDB.fallback_font
+		var label := "PATCH" if kind == "patch" else ("MINES" if kind == "mines" else kind.to_upper())
+		draw_string(font, Vector2(0.0, size.y + 18.0), label, HORIZONTAL_ALIGNMENT_CENTER, size.x, 18, Color(tint, 0.9))
+
+
 class PowerBar extends Control:
-	## Thin bar under armor: power in use / engine output. Overload spills
-	## past the end in orange with a label.
+	## Thin bar under armor: power in use / engine output. Overload (power or
+	## weight) spills past the end in orange with a label.
 	const T := preload("res://scripts/tuning.gd")
 	var used := 0.0
 	var output := 0.0
+	var weight := 0.0
+	var capacity := 0.0
 
-	func set_values(new_used: float, new_output: float) -> void:
-		if not is_equal_approx(new_used, used) or not is_equal_approx(new_output, output):
+	func set_values(new_used: float, new_output: float, new_weight := 0.0, new_capacity := 0.0) -> void:
+		if not is_equal_approx(new_used, used) or not is_equal_approx(new_output, output) \
+				or not is_equal_approx(new_weight, weight) or not is_equal_approx(new_capacity, capacity):
 			used = new_used
 			output = new_output
+			weight = new_weight
+			capacity = new_capacity
 			queue_redraw()
 
 	func _draw() -> void:
 		if output <= 0.0:
 			return
 		var over := used > output
+		var heavy := capacity > 0.0 and weight > capacity
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0, 0, 0, 0.55))
 		var inner := size.x - 4.0
 		var fill := minf(used / output, 1.0) * inner
-		var color := T.COL_ORANGE if over else Color(0.95, 0.85, 0.4)
+		var color := T.COL_ORANGE if over or heavy else Color(0.95, 0.85, 0.4)
 		draw_rect(Rect2(Vector2(2, 2), Vector2(fill, size.y - 4.0)), color)
 		var font := ThemeDB.fallback_font
 		var text := "PWR %d/%d" % [roundi(used), roundi(output)]
-		if over:
+		if heavy:
+			text += "  WT %d/%d" % [roundi(weight), roundi(capacity)]
+		if over or heavy:
 			text += "  OVERLOAD"
 		draw_string(font, Vector2(size.x + 10.0, size.y + 1.0), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, color)
 

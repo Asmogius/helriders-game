@@ -461,10 +461,15 @@ static func _clean_mission(raw: Variant) -> Dictionary:
 	var type := str(d.get("type", ""))
 	if not T.MISSIONS.has(type):
 		return {}
+	# Saves from before skulls rated jobs threat 1-3 (1 skull = threat 1,
+	# 6 skulls = threat 3).
+	var skulls := int(d.get("skulls", 0))
+	if skulls <= 0:
+		skulls = [1, 3, 6][clampi(int(d.get("threat", 1)), 1, 3) - 1]
 	return {
 		"id": str(d.get("id", "")),
 		"type": type,
-		"threat": clampi(int(d.get("threat", 1)), 1, 3),
+		"skulls": clampi(skulls, 1, T.MAX_SKULLS),
 		"name": str(d.get("name", "")),
 		"seed": int(d.get("seed", 1)),
 		"reward": int(d.get("reward", 0)),

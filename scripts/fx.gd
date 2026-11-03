@@ -75,6 +75,24 @@ func explosion(at: Vector2, carry: Vector2) -> void:
 		emit(at, dir * randf_range(30.0, 160.0), randf_range(1.0, 2.0), randf_range(14.0, 24.0), Color(0.35, 0.33, 0.3, 0.5), 1.2)
 
 
+## Green motes when the Emergency Patch fires.
+func repair(at: Vector2) -> void:
+	for i in 16:
+		var dir := Vector2.RIGHT.rotated(randf() * TAU)
+		emit(at + dir * randf_range(8.0, 30.0), dir * randf_range(30.0, 110.0), randf_range(0.4, 0.8), randf_range(3.0, 6.0), Color(0.45, 0.9, 0.5), 2.0)
+
+
+## A mine going off: a ring of fire sized to the blast radius, plus dust.
+func blast(at: Vector2, radius: float) -> void:
+	for i in 22:
+		var dir := Vector2.RIGHT.rotated(randf() * TAU)
+		var color := T.COL_ORANGE if i % 2 == 0 else Color(1.0, 0.85, 0.4)
+		emit(at, dir * randf_range(radius * 1.2, radius * 3.0), randf_range(0.25, 0.5), randf_range(7.0, 13.0), color, 4.0)
+	for i in 10:
+		var dir := Vector2.RIGHT.rotated(randf() * TAU)
+		emit(at, dir * randf_range(20.0, radius), randf_range(0.8, 1.4), randf_range(12.0, 20.0), Color(0.35, 0.33, 0.3, 0.5), 1.5)
+
+
 func _process(delta: float) -> void:
 	if _count == 0:
 		return

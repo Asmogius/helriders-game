@@ -46,6 +46,10 @@ var turret_turn_rate := 0.0
 var lock_range := 0.0             # 0 = no lock (weapon can't, or no targeting system)
 var power_output := 0.0            # engine budget (0 = no power model, e.g. enemy rigs)
 var power_draw := 0.0              # constant draw of everything installed
+var weight_load := 0.0             # weight of everything installed
+var weight_capacity := 0.0         # chassis limit (0 = no weight model, e.g. enemy rigs)
+var gun_stats: Array[Dictionary] = []   # every weapon (see loadout.gd)
+var abilities: Array[Dictionary] = []   # utility parts, each with "ready_in" seconds
 var look := {}                     # which parts are installed, for drawing
 
 var team := BulletPool.TEAM_PLAYER
@@ -76,8 +80,11 @@ var latched: Array[Node2D] = []    # Hunters on the hull
 
 var bullets: Node2D                # BulletPool
 var fx: Node2D                     # Fx
+var mines: Node2D                  # MinePool, for the Mine Dropper
 
-var _turret: Node2D
+var _turret: Node2D                # the first turret, if any
+var _turrets: Array[Node2D] = []   # one per weapon; null for fixed guns
+var _cooldowns: Array[float] = []
 var _fire_cooldown := 0.0
 var _flash := 0.0
 var _reversing := false
@@ -112,7 +119,32 @@ func apply_stats(s: Dictionary) -> void:
 	lock_range = s.lock_range
 	power_output = s.get("power_output", 0.0)
 	power_draw = s.get("power_draw", 0.0)
+	weight_load = s.get("weight", 0.0)
+	weight_capacity = s.get("weight_capacity", 0.0)
 	look = s.get("look", {})
+	if s.has("body"):
+		body_len = float(s.body[0])
+		body_wid = float(s.body[1])
+	# Weapons: a list from loadout.gd, or one gun from a flat enemy stat sheet.
+	gun_stats.clear()
+	if s.has("weapons"):
+		for w: Dictionary in s.weapons:
+			gun_stats.append(w)
+	elif float(s.fire_rate) > 0.0:
+		gun_stats.append({
+			"id": "", "mount": int(s.mount), "fire_rate": float(s.fire_rate),
+			"bullet_damage": float(s.bullet_damage), "bullet_speed": float(s.bullet_speed),
+			"spread_deg": float(s.spread_deg), "turret_turn_rate": float(s.turret_turn_rate),
+			"lock_range": float(s.lock_range), "pellets": int(s.get("pellets", 1)),
+		})
+	_cooldowns.clear()
+	for w in gun_stats:
+		_cooldowns.append(0.0)
+	abilities.clear()
+	for a: Dictionary in s.get("abilities", []):
+		var copy := a.duplicate()
+		copy["ready_in"] = 0.0
+		abilities.append(copy)
 	armor = armor_max
 	if not can_lock():
 		lock_enabled = false
@@ -120,20 +152,38 @@ func apply_stats(s: Dictionary) -> void:
 		_sync_parts()
 
 
+## Where turret `index` of `count` sits on the hull: one gun mid-hull, two
+## front and back.
+func turret_position(index: int, count: int) -> Vector2:
+	if count <= 1:
+		return Vector2(-4.0, 0.0)
+	return Vector2(body_len * (0.2 if index == 0 else -0.3), 0.0)
+
+
 func has_weapon() -> bool:
-	return fire_rate > 0.0
+	return not gun_stats.is_empty()
 
 
-## Add or remove the turret to match the weapon, and redraw the parts.
+## Turret sprites to match the weapons (fixed guns are drawn on the nose).
 func _sync_parts() -> void:
-	var wants_turret := mount == Mount.TURRET and has_weapon()
-	if wants_turret and _turret == null:
-		_turret = TurretSprite.new()
-		_turret.position = Vector2(-4.0, 0.0)
-		add_child(_turret)
-	elif not wants_turret and _turret != null:
-		_turret.queue_free()
-		_turret = null
+	for t in _turrets:
+		if t != null:
+			t.queue_free()
+	_turrets.clear()
+	_turret = null
+	var count := gun_stats.size()
+	for i in count:
+		var w := gun_stats[i]
+		if int(w.mount) != Mount.TURRET:
+			_turrets.append(null)
+			continue
+		var sprite := TurretSprite.new()
+		sprite.kind = str(w.get("id", ""))
+		sprite.position = turret_position(i, count)
+		add_child(sprite)
+		_turrets.append(sprite)
+		if _turret == null:
+			_turret = sprite
 	queue_redraw()
 
 
@@ -147,12 +197,22 @@ func power_load() -> float:
 
 
 func is_overloaded() -> bool:
+	return is_power_overloaded() or is_weight_overloaded()
+
+
+func is_power_overloaded() -> bool:
 	return power_output > 0.0 and power_load() > power_output
 
 
-## 1.0 within budget; less when overloaded (scales top speed and acceleration).
+func is_weight_overloaded() -> bool:
+	return weight_capacity > 0.0 and weight_load > weight_capacity
+
+
+## 1.0 within budget; less when overloaded on power or weight (scales top
+## speed and acceleration).
 func mobility() -> float:
-	return Loadout.mobility_factor(power_load(), power_output)
+	return Loadout.mobility({"power_draw": power_load(), "power_output": power_output,
+		"weight": weight_load, "weight_capacity": weight_capacity})
 
 
 func _ready() -> void:
@@ -193,6 +253,8 @@ func _physics_process(delta: float) -> void:
 	_drive(delta)
 	_update_lock(delta)
 	_weapons(delta)
+	for a in abilities:
+		a.ready_in = maxf(float(a.ready_in) - delta, 0.0)
 	if _flash > 0.0:
 		_flash = maxf(_flash - delta * 5.0, 0.0)
 		queue_redraw()
@@ -371,66 +433,112 @@ func _has_los(to: Vector2) -> bool:
 # --- Weapons -------------------------------------------------------------------
 
 func _weapons(delta: float) -> void:
-	_fire_cooldown = maxf(_fire_cooldown - delta, 0.0)
 	if bullets == null or not has_weapon():
 		return
-	var wants_fire := false
-	var direction := Vector2.RIGHT.rotated(rotation)
-	var muzzle := global_position + direction * (body_len * 0.25)
-
-	if mount == Mount.TURRET:
-		var manual := aim_input.length() >= AIM_DEADZONE
-		var locked := lock_target != null
-		var want_angle := 0.0
-		if manual:
-			want_angle = aim_input.angle()
-		elif locked:
-			want_angle = (_lead_point(lock_target) - _turret.global_position).angle()
-		if manual or locked:
-			_turret.rotation = rotate_toward(_turret.rotation, wrapf(want_angle - rotation, -PI, PI), turret_turn_rate * delta)
+	var manual := aim_input.length() >= AIM_DEADZONE
+	var trigger := aim_input.length() >= FIRE_THRESHOLD
+	var locked := lock_target != null
+	var forward := Vector2.RIGHT.rotated(rotation)
+	for i in gun_stats.size():
+		var w := gun_stats[i]
+		_cooldowns[i] = maxf(_cooldowns[i] - delta, 0.0)
+		var wants_fire := false
+		var direction := forward
+		var muzzle := global_position + forward * (body_len * 0.25)
+		var turret := _turrets[i] if i < _turrets.size() else null
+		if turret != null:
+			var want_angle := 0.0
+			if manual:
+				want_angle = aim_input.angle()
+			elif locked:
+				want_angle = (_lead_point(lock_target, float(w.bullet_speed)) - turret.global_position).angle()
+			if manual or locked:
+				turret.rotation = rotate_toward(turret.rotation, wrapf(want_angle - rotation, -PI, PI), float(w.turret_turn_rate) * delta)
+			else:
+				turret.rotation = lerp_angle(turret.rotation, 0.0, 1.0 - exp(-4.0 * delta))
+			direction = Vector2.RIGHT.rotated(turret.global_rotation)
+			# Rays start at the turret pivot, not the muzzle tip, so a zombie
+			# pressed against the hull is still in the line of fire.
+			muzzle = turret.global_position
+			if manual:
+				wants_fire = trigger
+			elif locked:
+				wants_fire = absf(angle_difference(turret.global_rotation, want_angle)) < LOCK_FIRE_CONE
 		else:
-			_turret.rotation = lerp_angle(_turret.rotation, 0.0, 1.0 - exp(-4.0 * delta))
-		direction = Vector2.RIGHT.rotated(_turret.global_rotation)
-		# Rays start at the turret pivot, not the muzzle tip, so a zombie
-		# pressed against the hull is still in the line of fire.
-		muzzle = _turret.global_position
-		if manual:
-			wants_fire = aim_input.length() >= FIRE_THRESHOLD
-		elif locked:
-			wants_fire = absf(angle_difference(_turret.global_rotation, want_angle)) < LOCK_FIRE_CONE
-	else:
-		wants_fire = fire_trigger
-		# Twin fixed guns alternate barrels.
-		muzzle += direction.orthogonal() * 9.0 * _barrel_side
-
-	if wants_fire and _fire_cooldown <= 0.0:
-		_fire_cooldown = 1.0 / fire_rate
-		_barrel_side = -_barrel_side
-		_shoot(muzzle, direction)
+			# Fixed guns fire straight ahead: on the AI's trigger, when the player
+			# pushes the right stick, or when a locked target is in front.
+			wants_fire = fire_trigger or trigger
+			if locked and not wants_fire:
+				wants_fire = absf(forward.angle_to(lock_target.global_position - global_position)) < 0.2
+			# Twin fixed guns alternate barrels.
+			muzzle += forward.orthogonal() * 9.0 * _barrel_side
+		if wants_fire and _cooldowns[i] <= 0.0:
+			_cooldowns[i] = 1.0 / float(w.fire_rate)
+			if turret == null:
+				_barrel_side = -_barrel_side
+			_shoot(w, muzzle, direction)
 
 
-func _lead_point(target: Node2D) -> Vector2:
+func _lead_point(target: Node2D, speed := 1500.0) -> Vector2:
 	var at := target.global_position
 	if latched.has(target):
 		return at
 	var vel: Vector2 = target.get("velocity")
-	var t := clampf(global_position.distance_to(at) / bullet_speed, 0.0, 0.5)
+	var t := clampf(global_position.distance_to(at) / maxf(speed, 1.0), 0.0, 0.5)
 	return at + vel * t
 
 
-func _shoot(muzzle: Vector2, direction: Vector2) -> void:
+func _shoot(w: Dictionary, muzzle: Vector2, direction: Vector2) -> void:
+	var pellets := int(w.get("pellets", 1))
+	var damage := float(w.bullet_damage)
 	# A Hunter clinging to the hull is too close for a bullet to travel:
-	# if the gun is pointing at it, it's a point-blank hit.
+	# if the gun is pointing at it, it's a point-blank hit (every pellet).
 	for h in latched:
 		var to_h := h.global_position - global_position
 		if absf(direction.angle_to(to_h)) < 0.6:
-			h.call("take_hit", bullet_damage, Vector2.ZERO, "shot")
+			h.call("take_hit", damage * pellets, Vector2.ZERO, "shot")
 			if fx != null:
 				fx.sparks(h.global_position, -to_h.normalized())
 			bullets.record_direct_hit()
 			return
-	var dir := direction.rotated(randf_range(-spread, spread))
-	bullets.fire(muzzle, dir * bullet_speed, bullet_damage, team)
+	var cone := deg_to_rad(float(w.spread_deg))
+	for p in pellets:
+		var dir := direction.rotated(randf_range(-cone, cone))
+		bullets.fire(muzzle, dir * float(w.bullet_speed) * randf_range(0.95, 1.05) if pellets > 1 else dir * float(w.bullet_speed), damage, team)
+
+
+# --- Utilities ---------------------------------------------------------------------
+
+## Fire utility `index` (its HUD button). Returns false if it's still cooling down.
+func use_ability(index: int) -> bool:
+	if is_wrecked or index < 0 or index >= abilities.size():
+		return false
+	var a := abilities[index]
+	if float(a.ready_in) > 0.0:
+		return false
+	a.ready_in = float(a.cooldown)
+	match str(a.ability):
+		"patch":
+			armor = minf(armor + float(a.heal), armor_max)
+			if fx != null:
+				fx.call("repair", global_position)
+		"mines":
+			if mines != null:
+				var back := -Vector2.RIGHT.rotated(rotation)
+				var count := int(a.mines)
+				for m in count:
+					var side := (float(m) - (count - 1) * 0.5) * 34.0
+					var at := global_position + back * (body_len * 0.5 + 18.0) + back.orthogonal() * side
+					mines.call("drop", at, float(a.mine_damage), float(a.mine_radius), float(a.mine_arm), float(a.mine_life))
+	return true
+
+
+## 0 when ready, up to 1 right after use.
+func ability_charge(index: int) -> float:
+	if index < 0 or index >= abilities.size():
+		return 0.0
+	var a := abilities[index]
+	return clampf(float(a.ready_in) / maxf(float(a.cooldown), 0.01), 0.0, 1.0)
 
 
 # --- Damage ----------------------------------------------------------------------
@@ -462,8 +570,9 @@ func _wreck() -> void:
 	is_wrecked = true
 	lock_target = null
 	_burn_left = 6.0
-	if _turret != null:
-		_turret.visible = false
+	for t in _turrets:
+		if t != null:
+			t.visible = false
 	queue_redraw()
 	if fx != null:
 		fx.explosion(global_position, velocity)
@@ -492,15 +601,28 @@ func _draw() -> void:
 	elif _flash > 0.0:
 		hull = hull.lerp(Color(1.0, 0.85, 0.7), _flash * 0.6)
 
-	# Wheels first so the hull overlaps them. Sport wheels get orange rims.
+	# Wheels first so the hull overlaps them. Each drive reads differently.
 	var tyre := Color(0.07, 0.07, 0.075)
-	var sport: bool = look.get("drive", "") == "outrider_sport_wheels"
-	for sx: float in [-1.0, 1.0]:
+	var drive := str(look.get("drive", ""))
+	if drive == "half_track":
+		# Tracks at the back, small wheels up front.
 		for sy: float in [-1.0, 1.0]:
-			var wheel := Rect2(Vector2(sx * half_l * 0.55 - 8.0, sy * half_w - 5.0), Vector2(16.0, 10.0))
-			draw_rect(wheel, tyre)
-			if sport:
-				draw_rect(wheel.grow(-3.0), T.COL_ORANGE.darkened(0.2))
+			draw_rect(Rect2(Vector2(-half_l + 2.0, sy * half_w - 6.0), Vector2(body_len * 0.55, 12.0)), tyre)
+			for k in 5:
+				draw_rect(Rect2(Vector2(-half_l + 4.0 + k * body_len * 0.1, sy * half_w - 5.0), Vector2(3.0, 10.0)), Color(0.18, 0.18, 0.19))
+			draw_rect(Rect2(Vector2(half_l * 0.55 - 7.0, sy * half_w - 4.0), Vector2(14.0, 8.0)), tyre)
+	else:
+		var big := drive == "off_road_tires"
+		var size := Vector2(19.0, 13.0) if big else Vector2(16.0, 10.0)
+		for sx: float in [-1.0, 1.0]:
+			for sy: float in [-1.0, 1.0]:
+				var wheel := Rect2(Vector2(sx * half_l * 0.55, sy * half_w) - size * 0.5, size)
+				draw_rect(wheel, tyre)
+				if drive == "outrider_sport_wheels":
+					draw_rect(wheel.grow(-3.0), T.COL_ORANGE.darkened(0.2))
+				elif big:
+					for k in 3:
+						draw_rect(Rect2(wheel.position + Vector2(3.0 + k * 5.0, 1.0), Vector2(2.0, size.y - 2.0)), Color(0.16, 0.16, 0.17))
 
 	draw_rect(Rect2(-half_l, -half_w + 3.0, body_len, body_wid - 6.0), hull)
 	if is_wrecked:
@@ -508,7 +630,14 @@ func _draw() -> void:
 		return
 	# Cab.
 	draw_rect(Rect2(-half_l + 8.0, -half_w + 7.0, 26.0, body_wid - 14.0), hull.darkened(0.25))
-	# Front armor: heavy rust plate, a thin light plate, or bare.
+	# Frame details: Bulwark gets side skirts, Courier a racing stripe.
+	match str(look.get("chassis", "")):
+		"bulwark_frame":
+			draw_rect(Rect2(-half_l + 10.0, -half_w + 1.0, body_len - 24.0, 4.0), hull.darkened(0.4))
+			draw_rect(Rect2(-half_l + 10.0, half_w - 5.0, body_len - 24.0, 4.0), hull.darkened(0.4))
+		"courier_frame":
+			draw_rect(Rect2(-half_l + 4.0, -3.0, body_len - 16.0, 6.0), T.COL_CYAN.darkened(0.35))
+	# Front armor: each plate has its own nose.
 	match str(look.get("armor", "scrap_plating")):
 		"scrap_plating":
 			draw_rect(Rect2(half_l - 11.0, -half_w + 2.0, 11.0, body_wid - 4.0), T.COL_RUST)
@@ -516,13 +645,39 @@ func _draw() -> void:
 		"outrider_light_plating":
 			draw_rect(Rect2(half_l - 7.0, -half_w + 3.0, 7.0, body_wid - 6.0), Color(0.3, 0.2, 0.16))
 			draw_rect(Rect2(half_l - 7.0, -1.0, 7.0, 2.0), T.COL_ENEMY)
+		"riot_plating":
+			draw_rect(Rect2(half_l - 14.0, -half_w, 14.0, body_wid), Color(0.36, 0.37, 0.38))
+			for k in 3:
+				draw_rect(Rect2(half_l - 12.0, -half_w + 4.0 + k * (body_wid - 8.0) / 3.0, 10.0, 2.0), Color(0.22, 0.22, 0.23))
+		"spiked_ram_plate":
+			draw_rect(Rect2(half_l - 10.0, -half_w + 2.0, 10.0, body_wid - 4.0), T.COL_RUST.darkened(0.2))
+			for k in 4:
+				var y := -half_w + 4.0 + k * (body_wid - 8.0) / 3.0
+				draw_colored_polygon(PackedVector2Array([Vector2(half_l, y - 3.0), Vector2(half_l + 9.0, y), Vector2(half_l, y + 3.0)]), Color(0.75, 0.72, 0.66))
+		"composite_plating":
+			draw_rect(Rect2(half_l - 13.0, -half_w + 1.0, 13.0, body_wid - 2.0), Color(0.24, 0.27, 0.3))
+			draw_rect(Rect2(half_l - 13.0, -half_w + 1.0, 13.0, body_wid - 2.0), T.COL_CYAN.darkened(0.4), false, 1.5)
 	# Fixed guns on the nose instead of a turret.
-	if mount == Mount.FIXED and has_weapon():
-		draw_rect(Rect2(half_l - 16.0, -12.0, 22.0, 4.0), Color(0.15, 0.15, 0.16))
-		draw_rect(Rect2(half_l - 16.0, 8.0, 22.0, 4.0), Color(0.15, 0.15, 0.16))
+	for w in gun_stats:
+		if int(w.mount) == Mount.FIXED:
+			draw_rect(Rect2(half_l - 16.0, -12.0, 22.0, 4.0), Color(0.15, 0.15, 0.16))
+			draw_rect(Rect2(half_l - 16.0, 8.0, 22.0, 4.0), Color(0.15, 0.15, 0.16))
+			break
+	# Utilities: a patch kit (green cross) or a mine rack at the tail.
+	var utils: Array = look.get("utility", [])
+	if utils.has("emergency_patch"):
+		draw_rect(Rect2(-half_l + 12.0, half_w - 13.0, 8.0, 8.0), Color(0.2, 0.2, 0.21))
+		draw_rect(Rect2(-half_l + 15.0, half_w - 12.0, 2.0, 6.0), Color(0.45, 0.85, 0.5))
+		draw_rect(Rect2(-half_l + 13.0, half_w - 10.0, 6.0, 2.0), Color(0.45, 0.85, 0.5))
+	if utils.has("mine_dropper"):
+		draw_rect(Rect2(-half_l - 3.0, -12.0, 7.0, 24.0), Color(0.12, 0.12, 0.13))
+		for k in 3:
+			var p := Vector2(-half_l + 0.5, -8.0 + k * 8.0)
+			draw_circle(p, 3.0, Color(0.3, 0.29, 0.25))
+			draw_circle(p, 1.2, T.COL_ENEMY)
 	# Targeting computer: a sensor dish behind the cab.
 	var internal: Array = look.get("internal", [])
-	if internal.has("targeting_computer"):
+	if internal.has("targeting_computer") or internal.has("advanced_targeting"):
 		draw_rect(Rect2(-half_l + 2.0, -5.0, 7.0, 10.0), Color(0.16, 0.17, 0.18))
 		draw_circle(Vector2(-half_l + 5.5, 0.0), 2.5, T.COL_CYAN)
 	# Practical lights: cyan edge strips, white headlights, orange tail lights.
@@ -536,10 +691,23 @@ func _draw() -> void:
 
 class TurretSprite extends Node2D:
 	const T := preload("res://scripts/tuning.gd")
+	var kind := ""   # weapon part id: changes the barrel
 
 	func _draw() -> void:
-		draw_rect(Rect2(0.0, -3.0, 30.0, 6.0), Color(0.18, 0.18, 0.19))
-		draw_rect(Rect2(26.0, -3.0, 4.0, 6.0), T.COL_ORANGE)
+		match kind:
+			"scattergun_turret":
+				# Short, wide, flared.
+				draw_rect(Rect2(0.0, -5.0, 20.0, 10.0), Color(0.18, 0.18, 0.19))
+				draw_colored_polygon(PackedVector2Array([Vector2(18, -5), Vector2(25, -8), Vector2(25, 8), Vector2(18, 5)]), T.COL_ORANGE.darkened(0.2))
+			"heavy_mg_turret":
+				# Long and thick, with a cooling jacket.
+				draw_rect(Rect2(0.0, -4.0, 38.0, 8.0), Color(0.16, 0.16, 0.17))
+				for k in 4:
+					draw_rect(Rect2(10.0 + k * 6.0, -5.0, 2.0, 10.0), Color(0.26, 0.26, 0.27))
+				draw_rect(Rect2(34.0, -4.0, 4.0, 8.0), T.COL_ORANGE)
+			_:
+				draw_rect(Rect2(0.0, -3.0, 30.0, 6.0), Color(0.18, 0.18, 0.19))
+				draw_rect(Rect2(26.0, -3.0, 4.0, 6.0), T.COL_ORANGE)
 		draw_circle(Vector2.ZERO, 11.0, Color(0.22, 0.225, 0.235))
 		draw_arc(Vector2.ZERO, 11.0, 0.0, TAU, 20, T.COL_CYAN, 2.0)
 		draw_rect(Rect2(-4.0, -4.0, 8.0, 8.0), Color(0.14, 0.14, 0.15))

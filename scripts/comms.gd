@@ -144,7 +144,9 @@ func _schematic_odds(m: Dictionary) -> String:
 		return ""
 	if m.type == "hunt":
 		return "Elite drops a schematic"
-	var odds := roundi(float(T.MISSION_SCHEMATIC_CHANCE[int(m.threat) - 1]) * 100.0)
+	var odds := roundi(Missions.schematic_chance(m) * 100.0)
+	if odds <= 0:
+		return ""
 	return "%d%% schematic%s" % [odds, " (gold time)" if m.type == "courier" else ""]
 
 
@@ -219,7 +221,7 @@ func _close_upgrades() -> void:
 
 
 class MissionCard extends Button:
-	## One job on the board: type, name, threat, what's in the block, pay.
+	## One job on the board: type, name, skulls, what's in the block, pay.
 	const T := preload("res://scripts/tuning.gd")
 	const UI := preload("res://scripts/ui_theme.gd")
 	const Missions := preload("res://scripts/missions.gd")
@@ -252,14 +254,10 @@ class MissionCard extends Button:
 		var w := size.x - 32.0
 		draw_string(font, Vector2(16, 40), Missions.label(mission), HORIZONTAL_ALIGNMENT_LEFT, w, 26, color)
 		draw_string(font, Vector2(16, 72), str(mission.name), HORIZONTAL_ALIGNMENT_LEFT, w, 21, UI.TEXT)
-		# Threat pips.
-		draw_string(font, Vector2(16, 104), "THREAT", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, UI.TEXT_DIM)
-		for i in 3:
-			var r := Rect2(Vector2(86 + i * 22, 91), Vector2(16, 16))
-			if i < int(mission.threat):
-				draw_rect(r, UI.BAD if int(mission.threat) == 3 else T.COL_ORANGE)
-			else:
-				draw_rect(r, UI.PANEL_EDGE, false, 2.0)
+		# Difficulty: lit skulls out of six.
+		var level := Missions.skulls(mission)
+		for i in T.MAX_SKULLS:
+			UI.draw_skull(self, Vector2(26 + i * 26, 100), 10.0, UI.skull_color(level), i < level)
 		_wrapped(font, Missions.brief(mission), Vector2(16, 136), w, 16, UI.TEXT_DIM)
 		_wrapped(font, Missions.threats_text(mission), Vector2(16, 196), w, 16, UI.TEXT)
 		draw_string(font, Vector2(16, size.y - 52), "PAYS %d SCRAP" % int(mission.reward), HORIZONTAL_ALIGNMENT_LEFT, w, 20, T.COL_ORANGE)
@@ -322,7 +320,10 @@ class DistrictBar extends Control:
 			draw_rect(bar, Color(0, 0, 0, 0.5))
 			var fill := 1.0 if needs[i] == 0 else clampf(float(score) / needs[i], 0.0, 1.0)
 			draw_rect(Rect2(bar.position, Vector2(bar.size.x * fill, bar.size.y)), T.COL_CYAN if open else T.COL_ORANGE)
+			var band: Array = T.DISTRICTS[i].skulls
+			var skull_text := "%d-%d skulls" % [int(band[0]), int(band[1])]
 			if i == 0:
 				draw_string(font, Vector2(x + 12, size.y - 8), "Jobs today are here", HORIZONTAL_ALIGNMENT_LEFT, w - 24, 14, UI.TEXT_DIM)
 			elif not open:
 				draw_string(font, Vector2(x + 12, size.y - 8), "Locked", HORIZONTAL_ALIGNMENT_LEFT, w - 24, 14, UI.TEXT_DIM)
+			draw_string(font, Vector2(x + 12, size.y - 8), skull_text, HORIZONTAL_ALIGNMENT_RIGHT, w - 24, 14, UI.TEXT_DIM)

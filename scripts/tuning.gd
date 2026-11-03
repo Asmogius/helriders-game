@@ -30,46 +30,61 @@ const WORLD_SIZE := Vector2(3200, 2400)
 const SPAWN_MIN_DISTANCE := 850.0  # keep spawns off-screen
 
 # --- Missions -------------------------------------------------------------------
-# Defaults (a Clear at threat 2); missions.gd scales these per type and threat.
-const CLEAR_SHAMBLERS := 40    # shamblers in the block
+# Defaults (a 3-skull Clear); missions.gd scales these per type and skulls.
+const CLEAR_SHAMBLERS := 38    # shamblers in the block
 const CLEAR_TARGET := CLEAR_SHAMBLERS + 2  # + one Hunter + one Outrider
 const ZOMBIE_START := 12       # alive at the start
 const ZOMBIE_CAP := 28         # design cap is 25-30 alive at once
 const ZOMBIE_RAMP_SECONDS := 4.0  # +1 allowed alive every N seconds
 const MAX_ENEMY_RIGS := 3      # DESIGN §8
 
-# Per mission type: label, one-line brief, scrap reward on success by threat 1/2/3,
-# and what each threat level puts in the block. Lists are indexed by threat - 1.
+# Difficulty is 1 to 6 skulls (1 easiest). The range is the old threat 1-3 in
+# finer steps: 1 skull = old threat 1, 6 skulls = old threat 3.
+const MAX_SKULLS := 6
+
+# Per mission type: label, one-line brief, scrap reward on success, and what
+# each skull level puts in the block. Lists are indexed by skulls - 1.
 const MISSIONS := {
 	"clear": {
 		"label": "CLEAR", "brief": "Kill everything in the block.",
-		"reward": [60, 90, 130],
-		"shamblers": [30, 40, 50], "hunters": [1, 1, 2], "outriders": [0, 1, 2],
-		"cap": [24, 28, 28],
+		"reward": [60, 72, 84, 98, 114, 130],
+		"shamblers": [30, 34, 38, 42, 46, 50],
+		"hunters": [1, 1, 1, 1, 2, 2],
+		"outriders": [0, 0, 1, 1, 2, 2],
+		"cap": [24, 26, 27, 28, 28, 28],
 	},
 	"survive": {
 		"label": "SURVIVE", "brief": "Hold out until the timer runs down.",
-		"reward": [70, 100, 140],
-		"seconds": [120, 150, 180],
-		"cap": [20, 26, 28], "ramp": [3.0, 2.5, 2.0],
+		"reward": [70, 82, 94, 108, 124, 140],
+		"seconds": [120, 130, 145, 155, 170, 180],
+		"cap": [20, 22, 25, 26, 27, 28],
+		"ramp": [3.0, 2.8, 2.6, 2.4, 2.2, 2.0],
 		# [seconds into the run, what arrives]
 		"events": [
 			[[60, "hunter"]],
+			[[55, "hunter"], [105, "hunter"]],
+			[[45, "hunter"], [90, "outrider"]],
 			[[45, "hunter"], [90, "outrider"], [110, "hunter"]],
+			[[35, "hunter"], [70, "outrider"], [100, "hunter"], [140, "hunter"]],
 			[[30, "hunter"], [60, "outrider"], [95, "hunter"], [120, "outrider"]],
 		],
 	},
 	"hunt": {
 		"label": "HUNT", "brief": "Wreck the marked rig and grab its schematic.",
-		"reward": [80, 120, 170],
-		"elite_armor": [1.6, 2.0, 2.5], "elite_damage": [1.0, 1.2, 1.4],
-		"escorts": [0, 0, 1], "hunters": [0, 1, 1], "cap": [12, 16, 20],
+		"reward": [80, 96, 112, 130, 150, 170],
+		"elite_armor": [1.6, 1.75, 1.9, 2.1, 2.3, 2.5],
+		"elite_damage": [1.0, 1.1, 1.15, 1.25, 1.3, 1.4],
+		"escorts": [0, 0, 0, 0, 1, 1],
+		"hunters": [0, 0, 1, 1, 1, 1],
+		"cap": [12, 14, 15, 17, 18, 20],
 	},
 	"courier": {
 		"label": "COURIER", "brief": "Hit every checkpoint in order. Faster pays more.",
-		"reward": [50, 80, 110],
-		"checkpoints": [5, 6, 7], "cap": [8, 12, 16],
-		"hunters": [0, 1, 1], "outriders": [0, 0, 1],
+		"reward": [50, 62, 74, 86, 98, 110],
+		"checkpoints": [5, 5, 6, 6, 7, 7],
+		"cap": [8, 10, 11, 13, 14, 16],
+		"hunters": [0, 0, 1, 1, 1, 1],
+		"outriders": [0, 0, 0, 0, 1, 1],
 	},
 }
 const MISSION_NAMES := {
@@ -78,7 +93,12 @@ const MISSION_NAMES := {
 	"hunt": ["Rustjaw", "Widowmaker", "Gutter King", "Red Mare", "Sawtooth"],
 	"courier": ["Medicine Run", "Battery Drop", "Signal Parts", "Ammo Relay", "Water Filters"],
 }
-const MISSION_SCHEMATIC_CHANCE := [0.25, 0.5, 1.0]   # mission reward schematic, by threat
+# Chance a job pays a schematic from its type's pool, by skulls 1-6. Courier
+# only pays one on a gold time; a Hunt Elite always drops one.
+const MISSION_SCHEMATIC_CHANCE := [0.0, 0.15, 0.30, 0.50, 0.75, 1.0]
+# How often the board rolls each skull level inside a district's band
+# (lowest first), weighted toward the easier middle like the old threat roll.
+const SKULL_WEIGHTS := [3, 4, 3, 2]
 const ELITE_SCRAP_CACHE := 60      # an Elite drops this if you own its whole pool
 const ELITE_SCRAP := 40            # kill scrap for the Elite itself
 
@@ -94,11 +114,12 @@ const COURIER_RADIUS := 90.0
 # --- Districts (DESIGN §7) ----------------------------------------------------
 # Unlocked by parts score: extracted schematics, rarity points x level.
 const RARITY_POINTS := {"Common": 1, "Uncommon": 2, "Rare": 4, "Epic": 7, "Legendary": 12}
+# Each district's board rolls jobs inside its skull band.
 const DISTRICTS := [
-	{"id": "outer_blocks", "name": "Outer Blocks", "need": 0},
-	{"id": "midtown", "name": "Midtown Ruins", "need": 40},
-	{"id": "industrial", "name": "Industrial Spine", "need": 120},
-	{"id": "core", "name": "Core Collapse", "need": 300},
+	{"id": "outer_blocks", "name": "Outer Blocks", "need": 0, "skulls": [1, 4]},
+	{"id": "midtown", "name": "Midtown Ruins", "need": 40, "skulls": [2, 5]},
+	{"id": "industrial", "name": "Industrial Spine", "need": 120, "skulls": [3, 6]},
+	{"id": "core", "name": "Core Collapse", "need": 300, "skulls": [4, 6]},
 ]
 const SCRAP_PER_KILL := 2
 const HORDE_SIZE := Vector2i(3, 6)  # zombies spawn in packs of this many
@@ -155,8 +176,9 @@ const UPGRADES := {
 # The player's rig is built from parts: see parts.gd (schematics and the
 # starter loadout) and loadout.gd (how parts combine into these stats).
 
-# Power overload (DESIGN §4: overload reduces mobility). Load over the engine's
-# output scales acceleration and top speed by (output / load) ^ exponent.
+# Overload (DESIGN §4: overload reduces mobility). Power drawn over the
+# engine's output, or weight over the chassis's capacity, scales acceleration
+# and top speed by (limit / load) ^ exponent. Both together multiply.
 const OVERLOAD_EXPONENT := 1.5
 const OVERLOAD_MIN_MOBILITY := 0.5   # never worse than this
 

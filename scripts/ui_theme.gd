@@ -61,3 +61,25 @@ static func label(text: String, size := 22, color := TEXT) -> Label:
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", color)
 	return l
+
+
+## Color of a lit skull: orange for most jobs, red for the top two levels.
+static func skull_color(skulls: int) -> Color:
+	return BAD if skulls >= 5 else T.COL_ORANGE
+
+
+## A small skull icon (job difficulty). `lit` false draws an empty outline.
+static func draw_skull(canvas: CanvasItem, center: Vector2, r: float, color: Color, lit: bool) -> void:
+	var cranium := center + Vector2(0.0, -r * 0.15)
+	var jaw := Rect2(center + Vector2(-r * 0.5, r * 0.35), Vector2(r, r * 0.55))
+	if lit:
+		canvas.draw_circle(cranium, r * 0.8, color)
+		canvas.draw_rect(jaw, color)
+		var hole := Color(0.08, 0.08, 0.09)
+		canvas.draw_circle(cranium + Vector2(-r * 0.33, r * 0.05), r * 0.22, hole)
+		canvas.draw_circle(cranium + Vector2(r * 0.33, r * 0.05), r * 0.22, hole)
+		canvas.draw_rect(Rect2(jaw.position + Vector2(r * 0.3, r * 0.25), Vector2(r * 0.12, r * 0.3)), hole)
+		canvas.draw_rect(Rect2(jaw.position + Vector2(r * 0.58, r * 0.25), Vector2(r * 0.12, r * 0.3)), hole)
+	else:
+		canvas.draw_arc(cranium, r * 0.8, 0.0, TAU, 20, PANEL_EDGE, 2.0)
+		canvas.draw_rect(jaw, PANEL_EDGE, false, 2.0)

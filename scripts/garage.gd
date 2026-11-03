@@ -18,16 +18,19 @@ const Missions := preload("res://scripts/missions.gd")
 const MISSION_SCENE := "res://scenes/mission.tscn"
 
 # Slot tags: the loadout slot, where its line points on the rig (rig-local
-# pixels), and which screen side the tag sits on (0 left, 1 right).
+# pixels), and which screen side the tag sits on (0 left, 1 right). Second
+# weapon and utility tags only show on a chassis with the slot.
 const SLOTS := [
 	{"key": "chassis", "index": 0, "label": "CHASSIS", "category": "Chassis", "anchor": Vector2(-6, 15), "side": 0},
 	{"key": "engine", "index": 0, "label": "ENGINE", "category": "Engine", "anchor": Vector2(-25, 0), "side": 0},
 	{"key": "drive", "index": 0, "label": "DRIVE", "category": "Drive", "anchor": Vector2(-17, 18), "side": 0},
 	{"key": "armor", "index": 0, "label": "ARMOR", "category": "Armor", "anchor": Vector2(28, 0), "side": 0},
-	{"key": "weapons", "index": 0, "label": "WEAPON", "category": "Weapon", "anchor": Vector2(-4, 0), "side": 1},
-	{"key": "internal", "index": 0, "label": "INTERNAL 1", "category": "Internal", "anchor": Vector2(-27, 0), "side": 1},
+	{"key": "weapons", "index": 0, "label": "WEAPON 1", "category": "Weapon", "anchor": Vector2(-4, 0), "side": 1},
+	{"key": "weapons", "index": 1, "label": "WEAPON 2", "category": "Weapon", "anchor": Vector2(-20, 0), "side": 1},
+	{"key": "internal", "index": 0, "label": "INTERNAL 1", "category": "Internal", "anchor": Vector2(-27, -6), "side": 1},
 	{"key": "internal", "index": 1, "label": "INTERNAL 2", "category": "Internal", "anchor": Vector2(-12, -7), "side": 1},
-	{"key": "utility", "index": 0, "label": "UTILITY", "category": "Utility", "anchor": Vector2(14, -12), "side": 1},
+	{"key": "utility", "index": 0, "label": "UTILITY 1", "category": "Utility", "anchor": Vector2(14, -12), "side": 1},
+	{"key": "utility", "index": 1, "label": "UTILITY 2", "category": "Utility", "anchor": Vector2(14, 12), "side": 1},
 ]
 const REQUIRED := ["chassis", "engine", "drive"]
 const TABS := ["GARAGE", "RESEARCH", "SALOON", "INN", "COMMS"]
@@ -41,6 +44,9 @@ const COMING_SOON := {
 const TAG_SIZE := Vector2(272, 70)
 const TAG_TOP := 108.0
 const TAG_GAP := 8.0
+const TAG_COMPACT_H := 56.0        # five tags on one side: shorter, so the sheet doesn't cover one
+const TAG_COMPACT_TOP := 100.0
+const TAG_COMPACT_GAP := 5.0
 const RIG_SCALE := 3.4
 const FOOTER_H := 72.0
 const SHEET_H := 236.0
@@ -242,12 +248,22 @@ func tap_rig(at: Vector2) -> void:
 	for i in SLOTS.size():
 		if not _slot_exists(SLOTS[i]):
 			continue
-		var d := at.distance_to(preview.to_global(SLOTS[i].anchor))
+		var d := at.distance_to(preview.to_global(slot_anchor(i)))
 		if d < best_d:
 			best_d = d
 			best = i
 	if best >= 0:
 		open_slot(best)
+
+
+## Where slot `i`'s callout points on the rig. With two weapons the first
+## turret moves forward (vehicle.gd), so its line follows.
+func slot_anchor(i: int) -> Vector2:
+	var slot: Dictionary = SLOTS[i]
+	var guns := profile.slot_count(profile.rig, "weapons")
+	if slot.key == "weapons" and guns >= 2:
+		return preview.turret_position(int(slot.index), guns)
+	return slot.anchor
 
 
 func toast(text: String, seconds := 2.2) -> void:
@@ -386,14 +402,11 @@ func _build_top_bar() -> void:
 
 
 func _build_tags() -> void:
-	var row := [0, 0]
 	for i in SLOTS.size():
 		var slot: Dictionary = SLOTS[i]
 		var tag := SlotTag.new()
 		tag.side = slot.side
 		tag.slot_label = slot.label
-		var y: float = TAG_TOP + int(row[slot.side]) * (TAG_SIZE.y + TAG_GAP)
-		row[slot.side] += 1
 		if slot.side == 0:
 			tag.offset_left = 20.0
 			tag.offset_right = 20.0 + TAG_SIZE.x
@@ -402,11 +415,29 @@ func _build_tags() -> void:
 			tag.anchor_right = 1.0
 			tag.offset_left = -20.0 - TAG_SIZE.x
 			tag.offset_right = -20.0
-		tag.offset_top = y
-		tag.offset_bottom = y + TAG_SIZE.y
 		tag.pressed.connect(open_slot.bind(i))
 		add_child(tag)
 		_tags.append(tag)
+	_layout_tags()
+
+
+## Stack the visible tags on each side top-down. A side with five tags goes
+## compact so the bottom one stays clear of the part sheet.
+func _layout_tags() -> void:
+	for side in 2:
+		var visible_tags: Array[SlotTag] = []
+		for i in SLOTS.size():
+			if int(SLOTS[i].side) == side and _slot_exists(SLOTS[i]):
+				visible_tags.append(_tags[i])
+		var compact := visible_tags.size() > 4
+		var h := TAG_COMPACT_H if compact else TAG_SIZE.y
+		var gap := TAG_COMPACT_GAP if compact else TAG_GAP
+		var y := TAG_COMPACT_TOP if compact else TAG_TOP
+		for tag in visible_tags:
+			tag.compact = compact
+			tag.offset_top = y
+			tag.offset_bottom = y + h
+			y += h + gap
 
 
 func _build_sheet() -> void:
@@ -486,7 +517,8 @@ func _refresh() -> void:
 	_scrap_label.text = "SCRAP  %d     DAY %d" % [profile.scrap, profile.day]
 	if profile.has_mission():
 		var m := profile.active_mission
-		_job.text = "JOB:  %s  -  %s     THREAT %d     PAYS %d" % [Missions.label(m), str(m.name), int(m.threat), int(m.reward)]
+		var level := Missions.skulls(m)
+		_job.text = "JOB:  %s  -  %s     %d SKULL%s     PAYS %d" % [Missions.label(m), str(m.name), level, "" if level == 1 else "S", int(m.reward)]
 	else:
 		_job.text = "No job taken. Open COMMS to pick today's job."
 	_job.visible = selected < 0
@@ -500,7 +532,7 @@ func _refresh() -> void:
 	preview.modulate.a = 1.0 if has_rig else 0.3
 	var built := Loadout.build(profile.rig)
 	_stats_label.text = _stats_line(built, has_rig)
-	_power_meter.set_values(float(built.power_draw), float(built.power_output))
+	_power_meter.set_values(float(built.power_draw), float(built.power_output), float(built.weight), float(built.weight_capacity))
 	_power_meter.visible = has_rig and selected < 0
 
 	_deploy.disabled = not has_rig
@@ -527,16 +559,18 @@ func _stats_line(s: Dictionary, complete: bool) -> String:
 			if str(profile.rig.get(key, "")) == "":
 				missing.append(key.to_upper())
 		return "Needs " + ", ".join(missing) + " to deploy"
-	var dps := float(s.fire_rate) * float(s.bullet_damage)
+	var m := Loadout.mobility(s)
 	var lock := "LOCK %d" % int(s.lock_range) if float(s.lock_range) > 0.0 else "NO LOCK"
-	var power := "POWER %d/%d" % [int(s.power_draw), int(s.power_output)]
-	if float(s.power_draw) > float(s.power_output):
-		power += "  OVERLOAD"
-	return "ARMOR %d    SPEED %d    ACCEL %d    GRIP %.1f    DPS %d    %s    %s" % [
-		int(s.armor), int(s.max_speed), int(s.acceleration), float(s.grip), roundi(dps), lock, power]
+	var line := "ARMOR %d    SPEED %d    ACCEL %d    GRIP %.1f    DPS %d    %s" % [
+		int(s.armor), roundi(float(s.max_speed) * m), roundi(float(s.acceleration) * m), float(s.grip), roundi(Loadout.total_dps(s)), lock]
+	var over := StatSheet.overload_cause(s)
+	if over != "":
+		line += "    " + over
+	return line
 
 
 func _refresh_tags() -> void:
+	_layout_tags()
 	for i in SLOTS.size():
 		var slot: Dictionary = SLOTS[i]
 		var tag := _tags[i]
@@ -551,8 +585,12 @@ func _refresh_tags() -> void:
 		else:
 			var part := Parts.get_part(id)
 			tag.part_name = part.name
-			tag.detail = "%s    PWR %d" % [part.rarity, int(part.power)] if not part.has("power_output") \
-				else "%s    OUTPUT %d" % [part.rarity, int(part.power_output)]
+			if part.has("power_output"):
+				tag.detail = "%s    OUTPUT %d    WT %d" % [part.rarity, int(part.power_output), int(part.weight)]
+			elif part.has("weight_capacity"):
+				tag.detail = "%s    PWR %d    CAP %d" % [part.rarity, int(part.power), int(part.weight_capacity)]
+			else:
+				tag.detail = "%s    PWR %d    WT %d" % [part.rarity, int(part.power), int(part.get("weight", 0))]
 		tag.queue_redraw()
 
 
@@ -610,7 +648,8 @@ func _update_stat_sheet() -> void:
 	var title := "%s:  %s" % [slot.label, Parts.get_part(name_now).name if name_now != "" else "Empty"]
 	if _preview != name_now:
 		title += "   >   " + (str(Parts.get_part(_preview).name) if _preview != "" else "Empty")
-	_stat_sheet.set_data(title, now, after)
+	var weapon := int(slot.index) if slot.key == "weapons" else 0
+	_stat_sheet.set_data(title, now, after, weapon)
 
 func _make_card(slot: Dictionary, id: String, current: String, now: Dictionary) -> PartCard:
 	var card := PartCard.new()
@@ -627,15 +666,19 @@ func _make_card(slot: Dictionary, id: String, current: String, now: Dictionary) 
 	else:
 		var part := Parts.get_part(id)
 		card.title = part.name
-		card.subtitle = "%s %s" % [part.rarity, part.category]
+		var kind := str(part.category)
+		if kind == "Weapon":
+			kind = "Turret" if int(part.mount) == 0 else "Fixed guns"
+			if int(part.get("pellets", 1)) > 1:
+				kind += ", %d pellets" % int(part.pellets)
+		card.subtitle = "%s %s" % [part.rarity, kind]
 		card.rarity_color = Parts.color_of(part)
 		card.headline = _headline(part)
 	if id == current:
 		card.installed = true
 	else:
 		card.deltas = _deltas(now, after)
-		if float(after.power_draw) > float(after.power_output) and float(after.power_output) > 0.0:
-			card.warning = "OVERLOAD  %d / %d" % [int(after.power_draw), int(after.power_output)]
+		card.warning = StatSheet.overload_cause(after)
 	_style_card(card)
 	card.pressed.connect(press_card.bind(id))
 	return card
@@ -662,20 +705,42 @@ func _style_card(card: PartCard) -> void:
 func _headline(part: Dictionary) -> String:
 	match str(part.category):
 		"Chassis":
-			return "ARMOR %d  SPD %d  SLOTS %d/%d/%d" % [int(part.armor), int(part.max_speed), int(part.hardpoints), int(part.internal_slots), int(part.utility_slots)]
+			return "W/I/U %d/%d/%d  CAP %d  ARMOR %d" % [int(part.hardpoints), int(part.internal_slots), int(part.utility_slots), int(part.weight_capacity), int(part.armor)]
 		"Engine":
-			return "OUTPUT %d  ACCEL %d" % [int(part.power_output), int(part.acceleration)]
+			return "OUTPUT %d  ACCEL %d  WT %d" % [int(part.power_output), int(part.acceleration), int(part.weight)]
 		"Drive":
-			return "PWR %d  GRIP %.1f  SPD x%.2f" % [int(part.power), float(part.grip), float(part.speed_mult)]
+			return "PWR %d  WT %d  GRIP %.1f  SPD x%.2f" % [int(part.power), int(part.weight), float(part.grip), float(part.speed_mult)]
 		"Armor":
-			return "ARMOR +%d  RAM %d" % [int(part.armor), int(part.ram_damage)]
+			return "ARMOR +%d  RAM %d  WT %d" % [int(part.armor), int(part.ram_damage), int(part.weight)]
 		"Weapon":
-			var dps := float(part.fire_rate) * float(part.bullet_damage)
-			var aim := "TURRET" if int(part.mount) == 0 else "FIXED"
-			return "PWR %d  DPS %d  %s%s" % [int(part.power), roundi(dps), aim, "  LOCK" if float(part.lock_range) > 0.0 else ""]
+			var dps := float(part.fire_rate) * float(part.bullet_damage) * int(part.get("pellets", 1))
+			return "DPS %d  PWR %d  WT %d%s" % [roundi(dps), int(part.power), int(part.weight), "  LOCK" if float(part.lock_range) > 0.0 else ""]
 		"Internal":
-			return "PWR %d%s" % [int(part.power), "  ENABLES LOCK" if part.get("enables_lock", false) else ""]
+			return "PWR %d  WT %d  %s" % [int(part.power), int(part.weight), effect_text(part)]
+		"Utility":
+			return "PWR %d  WT %d  EVERY %dS" % [int(part.power), int(part.weight), int(part.cooldown)]
 	return "PWR %d" % int(part.get("power", 0))
+
+
+## What an internal or utility part does, in a few words.
+static func effect_text(part: Dictionary) -> String:
+	var bits: Array[String] = []
+	if part.get("enables_lock", false):
+		bits.append("LOCK")
+	var labels := {"fire_rate_mult": "FIRE", "damage_mult": "DMG", "lock_range_mult": "LOCK RNG", "turret_aim_mult": "AIM"}
+	for key: String in labels:
+		if part.has(key):
+			bits.append("%s +%d%%" % [str(labels[key]), roundi((float(part[key]) - 1.0) * 100.0)])
+	if part.has("armor_bonus"):
+		bits.append("ARMOR +%d" % int(part.armor_bonus))
+	if part.has("ram_bonus"):
+		bits.append("RAM +%d" % int(part.ram_bonus))
+	match str(part.get("ability", "")):
+		"patch":
+			bits.append("REPAIR %d" % int(part.heal))
+		"mines":
+			bits.append("%d MINES x%d" % [int(part.mines), int(part.mine_damage)])
+	return "  ".join(bits)
 
 
 ## Up to four "+/-" changes this swap would make, worst first so costs show.
@@ -686,6 +751,7 @@ func _deltas(now_stats: Dictionary, after_stats: Dictionary) -> Array:
 	var out: Array = []
 	var rows := [
 		["PWR", "load", false, 0],
+		["WT", "weight", false, 0],
 		["ARMOR", "armor", true, 0],
 		["SPD", "speed", true, 0],
 		["ACCEL", "accel", true, 0],
@@ -889,6 +955,7 @@ class SlotTag extends Button:
 	var empty := false
 	var required := false
 	var active := false
+	var compact := false   # shorter tag when five share a side
 
 	func _ready() -> void:
 		flat = true
@@ -910,9 +977,10 @@ class SlotTag extends Button:
 		draw_rect(Rect2(Vector2.ZERO, size), fill)
 		draw_rect(Rect2(Vector2.ZERO, size), Color(a, 0.85 if active else 0.4), false, 2.0)
 		draw_rect(Rect2(size.x - 4.0 if side == 0 else 0.0, 0.0, 4.0, size.y), a)
-		draw_string(font, Vector2(14, 20), slot_label, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, UI.TEXT_DIM)
-		draw_string(font, Vector2(14, 45), part_name, HORIZONTAL_ALIGNMENT_LEFT, size.x - 26.0, 21, UI.TEXT_DIM if empty else UI.TEXT)
-		draw_string(font, Vector2(14, 63), detail, HORIZONTAL_ALIGNMENT_LEFT, size.x - 26.0, 14, Color(a, 0.9))
+		var ys := PackedFloat32Array([17.0, 36.0, 51.0]) if compact else PackedFloat32Array([20.0, 45.0, 63.0])
+		draw_string(font, Vector2(14, ys[0]), slot_label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13 if compact else 14, UI.TEXT_DIM)
+		draw_string(font, Vector2(14, ys[1]), part_name, HORIZONTAL_ALIGNMENT_LEFT, size.x - 26.0, 18 if compact else 21, UI.TEXT_DIM if empty else UI.TEXT)
+		draw_string(font, Vector2(14, ys[2]), detail, HORIZONTAL_ALIGNMENT_LEFT, size.x - 26.0, 13 if compact else 14, Color(a, 0.9))
 
 
 class PartCard extends Button:
@@ -988,7 +1056,7 @@ class Callouts extends Control:
 				continue
 			var r := tag.get_global_rect()
 			var from := Vector2(r.end.x, r.get_center().y) if int(slots[i].side) == 0 else Vector2(r.position.x, r.get_center().y)
-			var to := rig.to_global(slots[i].anchor)
+			var to: Vector2 = rig.to_global(g.call("slot_anchor", i))
 			var on := i == selected
 			var c := T.COL_ORANGE if on else Color(T.COL_CYAN, 0.35)
 			if rings_only:
@@ -1002,7 +1070,8 @@ class Callouts extends Control:
 class StatSheet extends Control:
 	## Armored Core-style readout: every number for the rig as it stands, and
 	## what the previewed part would make it (green better, red worse). Speed
-	## and acceleration already include any overload penalty.
+	## and acceleration already include any overload penalty. Weapon rows show
+	## one weapon (the slot being changed, else the first); DPS adds up all.
 	const T := preload("res://scripts/tuning.gd")
 	const UI := preload("res://scripts/ui_theme.gd")
 	const Loadout := preload("res://scripts/loadout.gd")
@@ -1017,31 +1086,36 @@ class StatSheet extends Control:
 		["BRAKING", "brake", true, 0, ""],
 		["ARMOR", "armor", true, 0, ""],
 		["RAM DAMAGE", "ram", true, 0, ""],
-		["POWER OUTPUT", "output", true, 0, ""],
+		["POWER LOAD", "load", false, 0, ""],
 	]
 	const RIGHT := [
-		["DPS", "dps", true, 0, ""],
+		["DPS (ALL GUNS)", "dps", true, 0, ""],
 		["DAMAGE / SHOT", "damage", true, 0, ""],
 		["FIRE RATE", "rate", true, 1, " /S"],
 		["RANGE", "range", true, 0, ""],
 		["SPREAD", "spread", false, 1, " DEG"],
 		["TURRET AIM", "aim", true, 0, " DEG/S"],
 		["LOCK RANGE", "lock", true, 0, ""],
-		["POWER LOAD", "load", false, 0, ""],
+		["WEIGHT LOAD", "weight", false, 0, ""],
 	]
+	# Rows shown as "used / limit": compared by headroom, not the raw load.
+	const LIMITS := {"load": "output", "weight": "capacity"}
 	var title := ""
 	var now := {}
 	var after := {}
 
-	func set_data(new_title: String, now_stats: Dictionary, after_stats: Dictionary) -> void:
+	func set_data(new_title: String, now_stats: Dictionary, after_stats: Dictionary, weapon := 0) -> void:
 		title = new_title
-		now = values(now_stats)
-		after = values(after_stats)
+		now = values(now_stats, weapon)
+		after = values(after_stats, weapon)
 		queue_redraw()
 
-	static func values(s: Dictionary) -> Dictionary:
-		var m := Loadout.mobility_factor(float(s.power_draw), float(s.power_output))
-		var armed := float(s.fire_rate) > 0.0
+	static func values(s: Dictionary, weapon := 0) -> Dictionary:
+		var m := Loadout.mobility(s)
+		var weapons: Array = s.get("weapons", [])
+		var w: Dictionary = weapons[weapon] if weapon < weapons.size() else {}
+		var armed := not w.is_empty()
+		var pellets := int(w.get("pellets", 1))
 		return {
 			"speed": float(s.max_speed) * m,
 			"accel": float(s.acceleration) * m,
@@ -1051,16 +1125,33 @@ class StatSheet extends Control:
 			"armor": float(s.armor),
 			"ram": float(s.ram_damage),
 			"output": float(s.power_output),
-			"dps": float(s.fire_rate) * float(s.bullet_damage),
-			"damage": float(s.bullet_damage),
-			"rate": float(s.fire_rate),
-			"range": float(s.bullet_speed) * BulletPool.LIFETIME if armed else 0.0,
-			"spread": float(s.spread_deg) if armed else 0.0,
-			"aim": rad_to_deg(float(s.turret_turn_rate)) if int(s.mount) == 0 and armed else -1.0,
+			"dps": Loadout.total_dps(s),
+			"damage": float(w.get("bullet_damage", 0.0)) * pellets,
+			"pellets": float(pellets) if armed else 0.0,
+			"rate": float(w.get("fire_rate", 0.0)),
+			"range": float(w.get("bullet_speed", 0.0)) * BulletPool.LIFETIME if armed else 0.0,
+			"spread": float(w.get("spread_deg", 0.0)) if armed else 0.0,
+			"aim": rad_to_deg(float(w.turret_turn_rate)) if armed and int(w.mount) == 0 else -1.0,
 			"lock": float(s.lock_range),
 			"load": float(s.power_draw),
+			"weight": float(s.get("weight", 0.0)),
+			"capacity": float(s.get("weight_capacity", 0.0)),
 			"mobility": m,
+			"weapon": weapon,
+			"weapon_count": weapons.size(),
 		}
+
+	## "OVER  PWR 110/100  WT 105/100" (whichever apply), or "" within budget.
+	static func overload_cause(s: Dictionary) -> String:
+		var causes: Array[String] = []
+		if float(s.power_output) > 0.0 and float(s.power_draw) > float(s.power_output):
+			causes.append("PWR %d/%d" % [roundi(float(s.power_draw)), roundi(float(s.power_output))])
+		var cap := float(s.get("weight_capacity", 0.0))
+		if cap > 0.0 and float(s.get("weight", 0.0)) > cap:
+			causes.append("WT %d/%d" % [roundi(float(s.weight)), roundi(cap)])
+		if causes.is_empty():
+			return ""
+		return "OVER  " + "  ".join(causes)
 
 	func _draw() -> void:
 		if now.is_empty():
@@ -1072,11 +1163,19 @@ class StatSheet extends Control:
 		var col_w := (size.x - 56.0) / 2.0
 		_column(font, LEFT, Vector2(16, 42), col_w)
 		_column(font, RIGHT, Vector2(40 + col_w, 42), col_w)
+		var count := maxi(int(now.weapon_count), int(after.weapon_count))
+		if count > 1:
+			draw_string(font, Vector2(40 + col_w, 47), "gun rows show WEAPON %d" % (int(now.weapon) + 1), HORIZONTAL_ALIGNMENT_RIGHT, col_w, 12, UI.TEXT_DIM)
 		var m_now: float = now.mobility
 		var m_after: float = after.mobility
 		var foot := Vector2(16, size.y - 12.0)
 		if m_after < 1.0:
-			draw_string(font, foot, "OVERLOAD: speed and acceleration -%d%%" % roundi((1.0 - m_after) * 100.0), HORIZONTAL_ALIGNMENT_LEFT, size.x - 32.0, 15, UI.BAD)
+			var why: Array[String] = []
+			if float(after.output) > 0.0 and float(after.load) > float(after.output):
+				why.append("power")
+			if float(after.capacity) > 0.0 and float(after.weight) > float(after.capacity):
+				why.append("weight")
+			draw_string(font, foot, "OVERLOAD (%s): speed and acceleration -%d%%" % [" + ".join(why), roundi((1.0 - m_after) * 100.0)], HORIZONTAL_ALIGNMENT_LEFT, size.x - 32.0, 15, UI.BAD)
 		elif m_now < 1.0:
 			draw_string(font, foot, "Overload cleared", HORIZONTAL_ALIGNMENT_LEFT, size.x - 32.0, 15, UI.GOOD)
 
@@ -1087,15 +1186,25 @@ class StatSheet extends Control:
 			var key: String = r[1]
 			var a: float = now[key]
 			var b: float = after[key]
+			var text_now := _fmt(r, a)
+			var text_after := _fmt(r, b)
+			var better := (b > a) == bool(r[2])
+			if LIMITS.has(key):
+				# "used / limit": better means more headroom.
+				var limit: String = LIMITS[key]
+				text_now = "%d / %d" % [roundi(a), roundi(float(now[limit]))]
+				text_after = "%d / %d" % [roundi(b), roundi(float(after[limit]))]
+				a = float(now[limit]) - a
+				b = float(after[limit]) - b
+				better = b > a
 			draw_string(font, Vector2(origin.x, y), r[0], HORIZONTAL_ALIGNMENT_LEFT, -1, 14, UI.TEXT_DIM)
 			if absf(b - a) < 0.05:
-				draw_string(font, Vector2(origin.x, y), _fmt(r, a), HORIZONTAL_ALIGNMENT_RIGHT, width, 17, UI.TEXT)
+				var over := LIMITS.has(key) and a < 0.0
+				draw_string(font, Vector2(origin.x, y), text_now, HORIZONTAL_ALIGNMENT_RIGHT, width, 17, UI.BAD if over else UI.TEXT)
 			else:
-				var better := (b > a) == bool(r[2])
-				var text_after := _fmt(r, b)
 				var after_w := font.get_string_size(text_after, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x
 				draw_string(font, Vector2(origin.x, y), text_after, HORIZONTAL_ALIGNMENT_RIGHT, width, 17, UI.GOOD if better else UI.BAD)
-				draw_string(font, Vector2(origin.x, y), _fmt(r, a) + "  >", HORIZONTAL_ALIGNMENT_RIGHT, width - after_w - 10.0, 14, UI.TEXT_DIM)
+				draw_string(font, Vector2(origin.x, y), text_now + "  >", HORIZONTAL_ALIGNMENT_RIGHT, width - after_w - 10.0, 14, UI.TEXT_DIM)
 			draw_line(Vector2(origin.x, y + 9.0), Vector2(origin.x + width, y + 9.0), Color(1, 1, 1, 0.06), 1.0)
 
 	static func _fmt(r: Array, v: float) -> String:
@@ -1109,29 +1218,40 @@ class StatSheet extends Control:
 
 
 class PowerMeter extends Control:
-	## Big Armored Core-style energy load bar under the rig.
+	## Armored Core-style budget bars under the rig: power load against the
+	## engine's output, weight against the chassis's capacity.
 	const T := preload("res://scripts/tuning.gd")
 	const UI := preload("res://scripts/ui_theme.gd")
 	var used := 0.0
 	var output := 0.0
+	var weight := 0.0
+	var capacity := 0.0
 
-	func set_values(new_used: float, new_output: float) -> void:
+	func set_values(new_used: float, new_output: float, new_weight := 0.0, new_capacity := 0.0) -> void:
 		used = new_used
 		output = new_output
+		weight = new_weight
+		capacity = new_capacity
 		queue_redraw()
 
 	func _draw() -> void:
-		if output <= 0.0:
+		var gap := 24.0
+		var w := (size.x - gap) * 0.5
+		_bar(Rect2(0, 0, w, size.y), "POWER LOAD", used, output, Color(0.95, 0.85, 0.4))
+		_bar(Rect2(w + gap, 0, w, size.y), "WEIGHT LOAD", weight, capacity, Color(0.7, 0.78, 0.85))
+
+	func _bar(area: Rect2, label: String, value: float, limit: float, tint: Color) -> void:
+		if limit <= 0.0:
 			return
 		var font := get_theme_default_font()
-		var over := used > output
-		var color := UI.BAD if over else Color(0.95, 0.85, 0.4)
-		draw_string(font, Vector2(0, 16), "POWER LOAD", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, UI.TEXT_DIM)
-		var right := "%d / %d%s" % [roundi(used), roundi(output), "   OVERLOAD" if over else ""]
-		draw_string(font, Vector2(0, 16), right, HORIZONTAL_ALIGNMENT_RIGHT, size.x, 16, color)
-		var bar := Rect2(0, 24, size.x, 16)
+		var over := value > limit
+		var color := UI.BAD if over else tint
+		draw_string(font, area.position + Vector2(0, 16), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, UI.TEXT_DIM)
+		var right := "%d / %d%s" % [roundi(value), roundi(limit), "  OVER" if over else ""]
+		draw_string(font, area.position + Vector2(0, 16), right, HORIZONTAL_ALIGNMENT_RIGHT, area.size.x, 15, color)
+		var bar := Rect2(area.position + Vector2(0, 24), Vector2(area.size.x, 16))
 		draw_rect(bar, Color(0, 0, 0, 0.5))
-		var fill := minf(used / output, 1.0) * (bar.size.x - 4.0)
+		var fill := minf(value / limit, 1.0) * (bar.size.x - 4.0)
 		draw_rect(Rect2(bar.position + Vector2(2, 2), Vector2(fill, bar.size.y - 4.0)), color)
 		draw_rect(bar, Color(UI.PANEL_EDGE, 1.0), false, 1.0)
 

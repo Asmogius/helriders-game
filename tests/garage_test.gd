@@ -11,8 +11,12 @@ const ProfileScript := preload("res://scripts/profile.gd")
 const Parts := preload("res://scripts/parts.gd")
 const Loadout := preload("res://scripts/loadout.gd")
 
-const DRIVE := 2        # indexes into Garage.SLOTS
-const INTERNAL_1 := 5
+const CHASSIS := 0      # indexes into Garage.SLOTS
+const DRIVE := 2
+const ARMOR := 3
+const WEAPON_2 := 5
+const INTERNAL_1 := 6
+const UTILITY_2 := 9
 
 var profile: ProfileScript
 var garage: Garage
@@ -105,6 +109,37 @@ func _run_checks() -> void:
 	_check(profile.load_preset(0) and (profile.rig.internal as Array).is_empty(), "loading a preset swaps the rig")
 	garage.close_sheet()
 
+	# --- Weight, frames with more slots, two weapons --------------------------------
+	profile.scrap = 1000
+	profile.bank_run(0, ["riot_plating", "bulwark_frame", "courier_frame"] as Array[String])
+	profile.scrap = 1000
+	garage.open_slot(ARMOR)
+	garage.preview_part("riot_plating")
+	print("  Riot Plating weight %d / %d, mobility %.2f" % [int(sheet.after.weight), int(sheet.after.capacity), float(sheet.after.mobility)])
+	_check(int(sheet.now.weight) == 80 and int(sheet.after.weight) == 100, "stat sheet shows weight load (Riot Plating: 80 > 100 of 100 without the computer)")
+	garage.close_sheet()
+	var heavy := profile.with_part(Parts.STARTER_LOADOUT, "armor", 0, "riot_plating")
+	var heavy_stats := Loadout.build(heavy)
+	_check(int(heavy_stats.weight) == 105 and Loadout.mobility(heavy_stats) < 1.0, "Riot Plating on the starter is 105 / 100 weight: overloaded")
+	_check(garage.StatSheet.overload_cause(heavy_stats).contains("WT 105/100"), "the overload names weight as the cause")
+	garage.open_slot(CHASSIS)
+	_check(garage.choose("bulwark_frame") and profile.rig.chassis == "bulwark_frame", "Bulwark Frame fitted")
+	garage.close_sheet()
+	_check(garage._tags[WEAPON_2].visible and not garage._tags[UTILITY_2].visible, "Bulwark shows a WEAPON 2 slot and one utility")
+	_check(garage._tags[WEAPON_2].compact, "five tags on the right go compact")
+	garage.open_slot(WEAPON_2)
+	_check(garage.choose("pintle_turret") and (profile.rig.weapons as Array).size() == 2, "a second Pintle goes on the second hardpoint")
+	var twin := Loadout.build(profile.rig)
+	_check((twin.weapons as Array).size() == 2 and roundi(Loadout.total_dps(twin)) == 126, "both weapons count: DPS 63 + 63")
+	_check(int(sheet.now.weapon) == 1 and roundi(float(sheet.now.dps)) == 126, "the WEAPON 2 sheet shows that gun and the total DPS")
+	garage.close_sheet()
+	garage.open_slot(CHASSIS)
+	garage.choose("courier_frame")
+	garage.close_sheet()
+	_check(not garage._tags[WEAPON_2].visible and garage._tags[UTILITY_2].visible, "Courier: one weapon, two utility slots")
+	_check((profile.rig.weapons as Array).size() == 1 and int(profile.storage.get("pintle_turret", 0)) == 1, "the extra gun goes to storage when the frame can't carry it")
+	_check(profile.load_preset(0), "back to the saved preset")
+
 	# --- Upgrades -------------------------------------------------------------------
 	profile.scrap = 200
 	_check(profile.buy_upgrade("fabrication") and profile.scrap == 80, "Fabrication Discount level 1 costs 120")
@@ -117,8 +152,8 @@ func _run_checks() -> void:
 	_check((report.unlocked as Array).has("outrider_twin_guns"), "a new schematic is unlocked on extraction")
 	_check(profile.scrap == 80 + 15, "run scrap is banked")
 	var unknown := profile.unknown_schematics(Parts.OUTRIDER_DROPS)
-	_check(unknown.size() == 1 and unknown[0] == "outrider_light_plating", "drops only offer schematics you don't own")
-	_check(profile.unknown_schematics(Parts.OUTRIDER_DROPS, ["outrider_light_plating"]).is_empty(), "nor ones already picked up this run")
+	_check(unknown.size() == 2 and unknown.has("outrider_light_plating") and unknown.has("coolant_loop"), "drops only offer schematics you don't own")
+	_check(profile.unknown_schematics(Parts.OUTRIDER_DROPS, ["outrider_light_plating", "coolant_loop"]).is_empty(), "nor ones already picked up this run")
 
 	# --- Wreck: penalty, rebuild, free starter ----------------------------------------
 	profile.scrap = 500

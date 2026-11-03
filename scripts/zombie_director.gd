@@ -130,6 +130,16 @@ func _spawn_pack(limit: int) -> void:
 		spawn_budget -= 1
 
 
+## Wake one pooled shambler at `at`, outside the spawn budget (tests).
+func spawn_at(at: Vector2) -> Zombie:
+	for candidate in _pool:
+		if not candidate.active:
+			candidate.activate(at)
+			_active.append(candidate)
+			return candidate
+	return null
+
+
 func pick_spawn_point() -> Vector2:
 	var from := target.position if target != null else T.WORLD_SIZE * 0.5
 	var far: Array[Vector2] = []

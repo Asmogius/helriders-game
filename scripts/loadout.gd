@@ -1,22 +1,40 @@
 extends RefCounted
 ## Turns a loadout (which part sits in which slot) into one flat dictionary of
-## rig stats that vehicle.gd applies. The Garage will edit loadouts; this is
-## the only place that knows how parts combine.
+## rig stats that vehicle.gd applies. This is the only place that knows how
+## parts combine.
 ##
 ## A loadout looks like Parts.STARTER_LOADOUT:
 ##   chassis / engine / drive / armor: one part id each
 ##   weapons / utility / internal: arrays of part ids, limited by the chassis
+##
+## The stats keep the first weapon's numbers at the top level (fire_rate,
+## bullet_damage...) for simple readers, and list every weapon in "weapons".
 
 const Parts := preload("res://scripts/parts.gd")
 const T := preload("res://scripts/tuning.gd")
 
 
-## Speed/acceleration multiplier for a build drawing `used` power from an
-## engine making `output`. 1.0 within budget; lower when overloaded.
-static func mobility_factor(used: float, output: float) -> float:
-	if output <= 0.0 or used <= output:
+## Speed/acceleration multiplier for `used` against a budget of `limit`
+## (power against output, weight against capacity). 1.0 within budget.
+static func mobility_factor(used: float, limit: float) -> float:
+	if limit <= 0.0 or used <= limit:
 		return 1.0
-	return clampf(pow(output / used, T.OVERLOAD_EXPONENT), T.OVERLOAD_MIN_MOBILITY, 1.0)
+	return clampf(pow(limit / used, T.OVERLOAD_EXPONENT), T.OVERLOAD_MIN_MOBILITY, 1.0)
+
+
+## Both budgets together: power overload and weight overload stack.
+static func mobility(stats: Dictionary) -> float:
+	var power := mobility_factor(float(stats.get("power_draw", 0.0)), float(stats.get("power_output", 0.0)))
+	var weight := mobility_factor(float(stats.get("weight", 0.0)), float(stats.get("weight_capacity", 0.0)))
+	return maxf(power * weight, T.OVERLOAD_MIN_MOBILITY)
+
+
+## Damage per second of every weapon in a stats dictionary.
+static func total_dps(stats: Dictionary) -> float:
+	var dps := 0.0
+	for w: Dictionary in stats.get("weapons", []):
+		dps += float(w.fire_rate) * float(w.bullet_damage) * int(w.get("pellets", 1))
+	return dps
 
 
 static func build(loadout: Dictionary) -> Dictionary:
@@ -27,16 +45,66 @@ static func build(loadout: Dictionary) -> Dictionary:
 
 	# Slotted parts: keep what fits the chassis, report what didn't.
 	var dropped: Array[String] = []
-	var weapons := _fit(loadout.get("weapons", []), "Weapon", int(chassis.get("hardpoints", 0)), dropped)
+	var weapon_parts := _fit(loadout.get("weapons", []), "Weapon", int(chassis.get("hardpoints", 0)), dropped)
 	var utility := _fit(loadout.get("utility", []), "Utility", int(chassis.get("utility_slots", 0)), dropped)
 	var internal := _fit(loadout.get("internal", []), "Internal", int(chassis.get("internal_slots", 0)), dropped)
 	if not dropped.is_empty():
 		push_warning("Loadout: no slot for %s" % ", ".join(dropped))
 
-	# One weapon drives the gun stats for now; more hardpoints come later.
-	var weapon: Dictionary = weapons[0] if not weapons.is_empty() else {}
+	# Internal modifiers.
+	var fire_mult := 1.0
+	var damage_mult := 1.0
+	var lock_mult := 1.0
+	var aim_mult := 1.0
+	var armor_bonus := 0.0
+	var ram_bonus := 0.0
+	var has_targeting := false
+	for part: Dictionary in internal:
+		fire_mult *= float(part.get("fire_rate_mult", 1.0))
+		damage_mult *= float(part.get("damage_mult", 1.0))
+		lock_mult *= float(part.get("lock_range_mult", 1.0))
+		aim_mult *= float(part.get("turret_aim_mult", 1.0))
+		armor_bonus += float(part.get("armor_bonus", 0.0))
+		ram_bonus += float(part.get("ram_bonus", 0.0))
+		has_targeting = has_targeting or bool(part.get("enables_lock", false))
 
-	var stats := {
+	# Every weapon, modifiers applied. Lock needs a targeting system AND a
+	# weapon that supports it; the longest lock range wins.
+	var weapons: Array[Dictionary] = []
+	var lock_range := 0.0
+	for part: Dictionary in weapon_parts:
+		var w := {
+			"id": part.id,
+			"mount": int(part.get("mount", 0)),
+			"fire_rate": float(part.get("fire_rate", 0.0)) * fire_mult,
+			"bullet_damage": float(part.get("bullet_damage", 0.0)) * damage_mult,
+			"bullet_speed": float(part.get("bullet_speed", 1000.0)),
+			"spread_deg": float(part.get("spread_deg", 0.0)),
+			"turret_turn_rate": float(part.get("turret_turn_rate", 0.0)) * aim_mult,
+			"lock_range": float(part.get("lock_range", 0.0)) * lock_mult,
+			"pellets": int(part.get("pellets", 1)),
+		}
+		weapons.append(w)
+		if has_targeting:
+			lock_range = maxf(lock_range, float(w.lock_range))
+	var first: Dictionary = weapons[0] if not weapons.is_empty() else {}
+
+	var abilities: Array[Dictionary] = []
+	for part: Dictionary in utility:
+		abilities.append(part)
+
+	var draw := 0.0
+	var weight := 0.0
+	for part: Dictionary in [chassis, engine, drive, armor]:
+		draw += float(part.get("power", 0.0))
+		weight += float(part.get("weight", 0.0))
+	for list: Array in [weapon_parts, utility, internal]:
+		for part: Dictionary in list:
+			draw += float(part.get("power", 0.0))
+			weight += float(part.get("weight", 0.0))
+
+	var body: Array = chassis.get("body", [64.0, 36.0])
+	return {
 		"name": chassis.get("name", "Rig"),
 		"max_speed": float(chassis.get("max_speed", 400.0)) * float(drive.get("speed_mult", 1.0)),
 		"reverse_speed": float(chassis.get("reverse_speed", 200.0)),
@@ -45,43 +113,35 @@ static func build(loadout: Dictionary) -> Dictionary:
 		"coast": float(chassis.get("coast", 280.0)),
 		"turn_rate": float(chassis.get("turn_rate", 3.0)) * float(drive.get("turn_mult", 1.0)),
 		"grip": float(drive.get("grip", 5.0)),
-		"armor": float(chassis.get("armor", 0.0)) + float(armor.get("armor", 0.0)),
-		"ram_damage": float(armor.get("ram_damage", 30.0)),
-		"mount": int(weapon.get("mount", 0)),
-		"fire_rate": float(weapon.get("fire_rate", 0.0)),
-		"bullet_damage": float(weapon.get("bullet_damage", 0.0)),
-		"bullet_speed": float(weapon.get("bullet_speed", 1000.0)),
-		"spread_deg": float(weapon.get("spread_deg", 0.0)),
-		"turret_turn_rate": float(weapon.get("turret_turn_rate", 0.0)),
-		"lock_range": 0.0,
+		"armor": float(chassis.get("armor", 0.0)) + float(armor.get("armor", 0.0)) + armor_bonus,
+		"ram_damage": float(armor.get("ram_damage", 30.0)) + ram_bonus,
+		"mount": int(first.get("mount", 0)),
+		"fire_rate": float(first.get("fire_rate", 0.0)),
+		"bullet_damage": float(first.get("bullet_damage", 0.0)),
+		"bullet_speed": float(first.get("bullet_speed", 1000.0)),
+		"spread_deg": float(first.get("spread_deg", 0.0)),
+		"turret_turn_rate": float(first.get("turret_turn_rate", 0.0)),
+		"pellets": int(first.get("pellets", 1)),
+		"weapons": weapons,
+		"lock_range": lock_range,
+		"abilities": abilities,
 		"power_output": float(engine.get("power_output", 0.0)),
-		"power_draw": 0.0,
+		"power_draw": draw,
+		"weight": weight,
+		"weight_capacity": float(chassis.get("weight_capacity", 0.0)),
+		"body": [float(body[0]), float(body[1])],
 		"dropped": dropped,
 		# Which parts are on, so the rig can draw them.
 		"look": {
 			"chassis": chassis.get("id", ""),
 			"drive": drive.get("id", ""),
 			"armor": armor.get("id", ""),
-			"weapon": weapon.get("id", ""),
+			"weapon": first.get("id", ""),
+			"weapons": weapons.map(func(w: Dictionary) -> String: return str(w.id)),
 			"internal": internal.map(func(p: Dictionary) -> String: return str(p.id)),
 			"utility": utility.map(func(p: Dictionary) -> String: return str(p.id)),
 		},
 	}
-
-	# Constant draw from everything bolted on.
-	var draw := 0.0
-	for part: Dictionary in [chassis, engine, drive, armor]:
-		draw += float(part.get("power", 0.0))
-	for list: Array in [weapons, utility, internal]:
-		for part: Dictionary in list:
-			draw += float(part.get("power", 0.0))
-	stats["power_draw"] = draw
-
-	# Lock needs a lock-capable weapon AND a targeting system in an internal slot.
-	for part: Dictionary in internal:
-		if part.get("enables_lock", false):
-			stats["lock_range"] = float(weapon.get("lock_range", 0.0))
-	return stats
 
 
 static func _fit(ids: Array, category: String, slots: int, dropped: Array[String]) -> Array[Dictionary]:
