@@ -50,7 +50,8 @@ const MISSIONS := {
 		"reward": [60, 72, 84, 98, 114, 130],
 		"shamblers": [30, 34, 38, 42, 46, 50],
 		"hunters": [1, 1, 1, 1, 2, 2],
-		"outriders": [0, 0, 1, 1, 2, 2],
+		"outriders": [0, 0, 0, 1, 2, 2],
+		"bulwarks": [0, 0, 1, 1, 1, 1],
 		"cap": [24, 26, 27, 28, 28, 28],
 	},
 	"survive": {
@@ -63,10 +64,10 @@ const MISSIONS := {
 		"events": [
 			[[60, "hunter"]],
 			[[55, "hunter"], [105, "hunter"]],
-			[[45, "hunter"], [90, "outrider"]],
-			[[45, "hunter"], [90, "outrider"], [110, "hunter"]],
-			[[35, "hunter"], [70, "outrider"], [100, "hunter"], [140, "hunter"]],
-			[[30, "hunter"], [60, "outrider"], [95, "hunter"], [120, "outrider"]],
+			[[45, "hunter"], [90, "bulwark"]],
+			[[45, "hunter"], [90, "outrider"], [110, "hunter"], [130, "bulwark"]],
+			[[35, "hunter"], [70, "outrider"], [100, "hunter"], [120, "bulwark"], [140, "hunter"]],
+			[[30, "hunter"], [60, "outrider"], [95, "hunter"], [120, "outrider"], [150, "bulwark"]],
 		],
 	},
 	"hunt": {
@@ -75,6 +76,7 @@ const MISSIONS := {
 		"elite_armor": [1.6, 1.75, 1.9, 2.1, 2.3, 2.5],
 		"elite_damage": [1.0, 1.1, 1.15, 1.25, 1.3, 1.4],
 		"escorts": [0, 0, 0, 0, 1, 1],
+		"bulwark_escorts": [0, 0, 1, 1, 1, 1],
 		"hunters": [0, 0, 1, 1, 1, 1],
 		"cap": [12, 14, 15, 17, 18, 20],
 	},
@@ -154,6 +156,16 @@ const OUTRIDER_SPAWN_TIME := 45.0
 const OUTRIDER_SPAWN_KILLS := 20
 const OUTRIDER_SCRAP := 25
 
+# --- Bulwark (enemy rig: heavy rammer; approved in the "Helriders: Bulwark
+# Draft" doc) ---------------------------------------------------------------------
+const BULWARK_FRONT_MULT := 0.5     # damage from hits on its armored front...
+const BULWARK_FRONT_ARC := 0.785    # ...within 45 degrees either side of the nose
+const BULWARK_BACKOFF := 0.5        # seconds it backs off after ramming you
+const BULWARK_SCRAP := 40
+const BULWARK_SCRAP_CACHE := 40     # dropped instead of a schematic
+const BULWARK_SPAWN_TIME := 60.0    # Clear: seconds in, or...
+const BULWARK_SPAWN_KILLS := 25     # ...after this many kills
+
 # --- Economy (scrap is the only currency) --------------------------------------
 const START_SCRAP := 60
 const SCHEMATIC_DROP_CHANCE := 0.5     # a wrecked Outrider drops a schematic, else a scrap cache
@@ -213,6 +225,26 @@ const OUTRIDER := {
 	"bullet_damage": 6.0,
 	"bullet_speed": 1200.0,
 	"spread_deg": 4.0,
+	"turret_turn_rate": 0.0,
+	"lock_range": 0.0,
+}
+
+const BULWARK := {
+	"name": "Bulwark",
+	"max_speed": 430.0,        # slower than you: out-run it, out-turn it
+	"reverse_speed": 200.0,
+	"acceleration": 420.0,
+	"brake": 1400.0,
+	"coast": 300.0,
+	"turn_rate": 1.9,          # 109 deg/s
+	"grip": 8.0,
+	"armor": 520.0,            # front quarter takes half (BULWARK_FRONT_MULT)
+	"ram_damage": 80.0,
+	"mount": 1,                # one light gun fixed forward
+	"fire_rate": 3.0,
+	"bullet_damage": 5.0,
+	"bullet_speed": 1100.0,
+	"spread_deg": 5.0,
 	"turret_turn_rate": 0.0,
 	"lock_range": 0.0,
 }

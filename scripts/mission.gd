@@ -1,7 +1,7 @@
 extends Node2D
 ## One mission in the Outer Blocks, set by the job taken in Comms
 ## (Profile.active_mission). Four types share the block:
-##   Clear    kill every shambler, Hunter and Outrider on the list
+##   Clear    kill every shambler, Hunter and enemy rig on the list
 ##   Survive  hold out until the timer runs down; waves and specials escalate
 ##   Hunt     wreck the named Elite Outrider and grab the schematic it drops
 ##   Courier  hit every checkpoint in order; the faster, the better the pay
@@ -18,6 +18,7 @@ const Splats := preload("res://scripts/splats.gd")
 const ZombieDirector := preload("res://scripts/zombie_director.gd")
 const Vehicle := preload("res://scripts/vehicle.gd")
 const EnemyRig := preload("res://scripts/enemy_rig.gd")
+const BulwarkRig := preload("res://scripts/bulwark_rig.gd")
 const Hunter := preload("res://scripts/hunter.gd")
 const BulletPool := preload("res://scripts/bullet_pool.gd")
 const MinePool := preload("res://scripts/mine_pool.gd")
@@ -56,6 +57,8 @@ var hunter: Hunter               # the first Hunter (tests use it)
 var outriders: Array[EnemyRig] = []   # built up front, added when they spawn
 var outrider: EnemyRig           # the first Outrider (tests use it)
 var elite: EnemyRig              # the Hunt target, if any
+var bulwarks: Array[EnemyRig] = []    # heavy rammers, built up front like Outriders
+var bulwark: BulwarkRig          # the first Bulwark (tests use it)
 var bullets: BulletPool
 var mines: MinePool
 var fx: Fx
@@ -171,6 +174,8 @@ func _ready() -> void:
 		h.let_go.connect(_on_hunter_let_go)
 	for rig in outriders:
 		rig.wrecked.connect(_on_outrider_wrecked.bind(rig))
+	for rig in bulwarks:
+		rig.wrecked.connect(_on_bulwark_wrecked.bind(rig))
 	if elite != null:
 		elite.wrecked.connect(_on_elite_wrecked)
 	hud.restart_requested.connect(return_to_garage)
@@ -186,14 +191,18 @@ func _configure_mission() -> void:
 	var cap: int = Missions.stat(spec, "cap")
 	zombies.cap = cap
 	var outrider_count := 0
+	var bulwark_count := 0
 	match mission_type:
 		"clear":
 			var shamblers: int = Missions.stat(spec, "shamblers")
 			var hunter_count: int = Missions.stat(spec, "hunters")
 			outrider_count = Missions.stat(spec, "outriders")
+			bulwark_count = Missions.stat(spec, "bulwarks")
 			zombies.spawn_budget = shamblers
 			zombies.start_count = mini(T.ZOMBIE_START, cap)
-			target_kills = shamblers + hunter_count + outrider_count
+			target_kills = shamblers + hunter_count + outrider_count + bulwark_count
+			for i in bulwark_count:
+				_events.append([T.BULWARK_SPAWN_TIME + 40.0 * i, "bulwark", T.BULWARK_SPAWN_KILLS if i == 0 else -1, false])
 			for i in hunter_count:
 				_events.append([T.HUNTER_SPAWN_TIME + 35.0 * i, "hunter", T.HUNTER_SPAWN_KILLS if i == 0 else -1, false])
 			for i in outrider_count:
@@ -206,6 +215,8 @@ func _configure_mission() -> void:
 				_events.append([float(e[0]), str(e[1]), -1, false])
 				if e[1] == "outrider":
 					outrider_count += 1
+				elif e[1] == "bulwark":
+					bulwark_count += 1
 		"hunt":
 			zombies.spawn_budget = 1000000
 			zombies.start_count = mini(8, cap)
@@ -215,6 +226,9 @@ func _configure_mission() -> void:
 			outrider_count = Missions.stat(spec, "escorts")
 			for i in outrider_count:
 				_events.append([3.0, "escort", -1, false])
+			bulwark_count = Missions.stat(spec, "bulwark_escorts")
+			for i in bulwark_count:
+				_events.append([3.0, "bulwark_escort", -1, false])
 			for i in int(Missions.stat(spec, "hunters")):
 				_events.append([40.0 + 40.0 * i, "hunter", -1, false])
 		"courier":
@@ -233,6 +247,10 @@ func _configure_mission() -> void:
 	for i in clampi(maxi(outrider_count, 1), 1, room):
 		outriders.append(EnemyRig.new())
 	outrider = outriders[0]
+	# Same for Bulwarks: one always ready, never past the cap together.
+	for i in clampi(maxi(bulwark_count, 1), 1, maxi(room - outrider_count, 1)):
+		bulwarks.append(BulwarkRig.new())
+	bulwark = bulwarks[0] as BulwarkRig
 
 
 func _physics_process(delta: float) -> void:
@@ -326,6 +344,7 @@ func _exit_tree() -> void:
 
 func _all_enemy_rigs() -> Array[EnemyRig]:
 	var all: Array[EnemyRig] = outriders.duplicate()
+	all.append_array(bulwarks)
 	if elite != null:
 		all.append(elite)
 	return all
@@ -351,6 +370,11 @@ func _run_events() -> void:
 			"escort":
 				var near: Vector2 = elite.global_position + Vector2(randf_range(-80, 80), randf_range(-80, 80)) if elite.is_inside_tree() else zombies.pick_spawn_point()
 				e[3] = spawn_outrider(near) != null
+			"bulwark":
+				e[3] = spawn_bulwark(zombies.pick_spawn_point()) != null
+			"bulwark_escort":
+				var near: Vector2 = elite.global_position + Vector2(randf_range(-120, 120), randf_range(-120, 120)) if elite.is_inside_tree() else zombies.pick_spawn_point()
+				e[3] = spawn_bulwark(near) != null
 
 
 ## Activates a pooled Hunter. Returns it, or null if both are already out.
@@ -371,6 +395,18 @@ func spawn_outrider(at: Vector2) -> EnemyRig:
 			rig.rotation = (vehicle.global_position - at).angle()
 			rigs.add_child(rig)
 			hud.banner("ENEMY RIG INBOUND", T.COL_ENEMY)
+			return rig
+	return null
+
+
+## Sends in the next Bulwark. Returns it, or null if they're all out.
+func spawn_bulwark(at: Vector2) -> EnemyRig:
+	for rig in bulwarks:
+		if not rig.is_inside_tree():
+			rig.position = at
+			rig.rotation = (vehicle.global_position - at).angle()
+			rigs.add_child(rig)
+			hud.banner("BULWARK INBOUND  -  HIT ITS SIDES", T.COL_ENEMY)
 			return rig
 	return null
 
@@ -577,6 +613,13 @@ func _on_outrider_wrecked(rig: EnemyRig) -> void:
 	_drop(rig.global_position, "outrider", false, T.SCRAP_CACHE)
 	hud.banner("RIG DOWN  -  GRAB THE SALVAGE", T.COL_CYAN)
 	_add_kill(T.OUTRIDER_SCRAP)
+
+
+func _on_bulwark_wrecked(rig: EnemyRig) -> void:
+	camera.shake(0.8)
+	_drop(rig.global_position, "bulwark", false, T.BULWARK_SCRAP_CACHE)
+	hud.banner("BULWARK DOWN  -  GRAB THE SALVAGE", T.COL_CYAN)
+	_add_kill(T.BULWARK_SCRAP)
 
 
 func _on_elite_wrecked() -> void:

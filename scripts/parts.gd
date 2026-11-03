@@ -193,6 +193,7 @@ const DROP_POOLS := {
 	"clear": ["riot_plating", "spiked_ram_plate", "scattergun_turret", "roll_cage"],
 	"survive": ["structural_bracing", "belt_feed", "patched_v8", "emergency_patch"],
 	"courier": ["courier_frame", "turbo_four", "off_road_tires"],
+	"bulwark": ["riot_plating", "spiked_ram_plate", "structural_bracing", "roll_cage"],
 }
 
 

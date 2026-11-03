@@ -24,7 +24,7 @@ The day loop works: open **COMMS**, take one of today's jobs, tune your rig in t
 - Each district's board rolls inside its skull band: Outer Blocks 1-4, Midtown 2-5, Industrial 3-6, Core 4-6.
 - A job can pay a schematic from its type's pool. Odds by skulls 1-6: 0 / 15 / 30 / 50 / 75 / 100%. Courier only pays one for a gold time; a Hunt Elite always drops one.
 - Job types:
-  - **Clear:** kill every shambler, Hunter and Outrider on the list (1 skull: 30 shamblers and a Hunter; 6 skulls: 50 shamblers, 2 Hunters, 2 Outriders). Pays Riot Plating, Spiked Ram Plate, the Scattergun or the Roll Cage.
+  - **Clear:** kill every shambler, Hunter and enemy rig on the list (1 skull: 30 shamblers and a Hunter; 6 skulls: 50 shamblers, 2 Hunters, 2 Outriders and a Bulwark). Pays Riot Plating, Spiked Ram Plate, the Scattergun or the Roll Cage.
   - **Survive:** hold out for 2:00 to 3:00 while the crowd grows; Hunters and Outriders arrive on a schedule. Pays Structural Bracing, Belt Feed, the Patched V8 or Emergency Patch.
   - **Hunt:** a named Elite Outrider (gold stripe, 1.6x to 2.5x armor). Wreck it and grab the Rare schematic it always drops (Bulwark Frame, Diesel Block, Half-Track, Composite Plating, Heavy MG, Advanced Targeting Computer, Mine Dropper).
   - **Courier:** 5 to 7 checkpoints in order. Gold, silver and bronze par times pay 100%, 75% and 50%; late pays 25%. Gold can pay the Courier Frame, Turbo Four or Off-Road Tires.
@@ -68,6 +68,7 @@ The day loop works: open **COMMS**, take one of today's jobs, tune your rig in t
 - **Ramming:** fast hits kill shamblers and Hunters. Slow pushes get you clogged in the crowd.
 - **Hunter:** it pulses red before it leaps. If it latches on, it chews armor until you crush it into a wall, scrape it along one, or shoot it.
 - **Outrider:** a fast enemy rig with forward guns that makes strafing passes. Wreck it and it drops a schematic you don't own yet, or a scrap cache once you have them all. Drive over the crate to grab it.
+- **Bulwark** (from 3 skulls in Clear, Survive and Hunt): a slow, heavy rammer that never stops driving at you, with a light forward gun. Its armored front takes half damage (grey sparks); out-turn it and shoot its sides. It drops heavy parts (Riot Plating, Spiked Ram Plate, Structural Bracing, Roll Cage) or a 40-scrap cache.
 - Edge arrows point at off-screen threats: red for the Outrider, rust for the Hunter, cyan for salvage, orange for the last few shamblers.
 - Success banks the run's kill scrap, the job's pay and any schematics. A wreck loses them.
 
@@ -111,6 +112,7 @@ scripts/
   tuning.gd             all balance numbers, colors, collision layers
   vehicle.gd            any rig: drift handling, weapons, lock-on, ramming, armor
   enemy_rig.gd          Outrider AI (extends vehicle.gd)
+  bulwark_rig.gd        Bulwark AI and armored front (extends enemy_rig.gd)
   hostile.gd            shared base for shamblers and Hunters
   zombie.gd             pooled shambler
   hunter.gd             the Hunter: chase, pounce, latch
@@ -158,7 +160,7 @@ From DESIGN §13:
 - [x] Android build pipeline
 - [x] Target lock button (per-weapon lock range)
 - [x] Hunter zombie (fast, latches for damage over time)
-- [x] One enemy vehicle (Outrider) that drops a part
+- [x] Enemy vehicles that drop parts: Outrider (flanker), Bulwark (rammer)
 - [x] Parts, slots and an Armored Core-style power budget (lock needs the Targeting Computer)
 - [x] Garage screen: swap parts between runs, presets, upgrades, saved progress
 - [x] Comms screen: daily job board with Clear, Survive, Hunt and Courier; districts

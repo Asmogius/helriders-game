@@ -44,6 +44,13 @@ func sparks(at: Vector2, normal: Vector2) -> void:
 		emit(at, dir * randf_range(180.0, 420.0), randf_range(0.12, 0.25), 3.0, T.COL_ORANGE.lightened(0.3), 6.0)
 
 
+## A hit blunted by heavy armor: grey, shorter sparks.
+func deflect(at: Vector2, normal: Vector2) -> void:
+	for i in 4:
+		var dir := normal.rotated(randf_range(-1.2, 1.2))
+		emit(at, dir * randf_range(120.0, 300.0), randf_range(0.1, 0.2), 3.0, Color(0.78, 0.78, 0.76), 7.0)
+
+
 func gore(at: Vector2, direction: Vector2) -> void:
 	for i in 9:
 		var dir := direction.rotated(randf_range(-1.2, 1.2)) if direction != Vector2.ZERO else Vector2.RIGHT.rotated(randf() * TAU)

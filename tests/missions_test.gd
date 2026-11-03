@@ -33,10 +33,12 @@ func _process(_delta: float) -> bool:
 	match step:
 		0:
 			_check_board()
+			_check_bulwark_tables()
 			_start(Missions.make("clear", 1, 7), true)
 		1:
 			if frame == 3:
 				_check(mission.skulls == 1 and mission.target_kills == 31, "Clear 1 skull: 30 shamblers + 1 Hunter, no Outrider")
+				_check(mission.bulwarks.size() == 1 and not mission.bulwark.is_inside_tree(), "one Bulwark is built up front but stays out of a 1-skull Clear")
 				_check(mission.zombies.cap == 24, "Clear 1 skull: crowd capped at 24")
 				_next()
 		2:
@@ -64,6 +66,7 @@ func _process(_delta: float) -> bool:
 			if frame == 300:
 				var e := mission.elite
 				_check(e != null and e.is_inside_tree() and e.is_elite(), "Hunt: the Elite rolls in")
+				_check(mission.bulwark.is_inside_tree(), "a 4-skull Hunt brings a Bulwark escort")
 				print("  4-skull Elite armor %d" % roundi(e.armor_max))
 				_check(is_equal_approx(e.armor_max, T.OUTRIDER.armor * 2.1) and e.lock_priority > mission.outrider.lock_priority, "4-skull Elite has 2.1x armor and is first in line for lock")
 				e.take_damage(99999.0)
@@ -136,6 +139,25 @@ func _start(m: Dictionary, specials: bool) -> void:
 func _next() -> void:
 	frame = 0
 	step += 1
+
+
+func _check_bulwark_tables() -> void:
+	var clear3 := Missions.make("clear", 3, 7)
+	_check(Missions.threats_text(clear3).contains("1 Bulwark") and not Missions.threats_text(clear3).contains("Outrider"), "a 3-skull Clear lists a Bulwark instead of an Outrider")
+	_check(not Missions.threats_text(Missions.make("clear", 2, 7)).contains("Bulwark"), "no Bulwarks below 3 skulls")
+	_check(Missions.threats_text(Missions.make("survive", 6, 7)).contains("1 Bulwark"), "a 6-skull Survive sends a Bulwark")
+	_check(not Missions.threats_text(Missions.make("courier", 6, 7)).contains("Bulwark"), "Courier jobs stay Bulwark-free")
+	var most := 0
+	for type: String in ["clear", "survive", "hunt"]:
+		for level in range(1, T.MAX_SKULLS + 1):
+			var m := Missions.make(type, level, 7)
+			var rigs := 0
+			for key: String in ["outriders", "escorts", "bulwarks", "bulwark_escorts"]:
+				rigs += Missions._count(m, key)
+			if type == "hunt":
+				rigs += 1  # the Elite
+			most = maxi(most, rigs)
+	_check(most <= T.MAX_ENEMY_RIGS, "no job sends more than 3 enemy rigs (most: %d)" % most)
 
 
 func _check_board() -> void:

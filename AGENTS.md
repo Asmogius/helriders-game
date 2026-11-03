@@ -35,7 +35,7 @@ The owner works from a phone and has no computer, so nobody opens the Godot edit
 ## How enemies are built
 
 - Anything shootable that isn't a rig extends `hostile.gd` (`take_hit`, `is_targetable`, `lock_priority`, `died`). Pool it.
-- Enemy rigs extend `vehicle.gd` and only decide stick inputs (`drive_input`, `fire_trigger`), the way `enemy_rig.gd` does. They share the player's driving model, so builds feel the same on both sides.
+- Enemy rigs extend `vehicle.gd` and only decide stick inputs (`drive_input`, `fire_trigger`), the way `enemy_rig.gd` (Outrider) and `bulwark_rig.gd` (Bulwark) do. They share the player's driving model, so builds feel the same on both sides. Their flat stat sheets live in `tuning.gd` (`OUTRIDER`, `BULWARK`). Armor that blunts hits implements `deflects(at)` so bullets throw grey sparks.
 - Bullets carry a team (`bullet_pool.gd`). Each team's ray mask decides what it can hit, so nobody shoots their own side.
 - New mission-level enemies get a `spawn_*` function in `mission.gd` that tests can call directly (`auto_spawn_specials = false`).
 - Mission types and their tables live in `tuning.gd` (`MISSIONS`, six entries per stat, one per skull 1-6); `missions.gd` builds the daily board inside the district's skull band; `mission.gd` runs any type. Tests set `mission_override` to run a specific mission and `apply_rig()` to swap the player's build mid-run.

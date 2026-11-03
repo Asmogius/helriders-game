@@ -114,10 +114,13 @@ static func threats_text(mission: Dictionary) -> String:
 			bits.append("%d checkpoints" % int(stat(mission, "checkpoints")))
 	var hunters := _count(mission, "hunters")
 	var rigs := _count(mission, "outriders") + _count(mission, "escorts")
+	var heavies := _count(mission, "bulwarks") + _count(mission, "bulwark_escorts")
 	if hunters > 0:
 		bits.append("%d Hunter%s" % [hunters, "" if hunters == 1 else "s"])
 	if rigs > 0:
 		bits.append("%d Outrider%s" % [rigs, "" if rigs == 1 else "s"])
+	if heavies > 0:
+		bits.append("%d Bulwark%s" % [heavies, "" if heavies == 1 else "s"])
 	return ", ".join(bits)
 
 
@@ -125,7 +128,7 @@ static func _count(mission: Dictionary, key: String) -> int:
 	if str(mission.type) == "survive":
 		var n := 0
 		for e: Array in stat(mission, "events"):
-			if (key == "hunters" and e[1] == "hunter") or (key == "outriders" and e[1] == "outrider"):
+			if (key == "hunters" and e[1] == "hunter") or (key == "outriders" and e[1] == "outrider") or (key == "bulwarks" and e[1] == "bulwark"):
 				n += 1
 		return n
 	return int(stat(mission, key)) if has_stat(mission, key) else 0

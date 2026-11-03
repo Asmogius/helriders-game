@@ -87,7 +87,11 @@ func _physics_process(delta: float) -> void:
 				if _team[i] == TEAM_PLAYER:
 					hits += 1
 			if fx != null:
-				fx.sparks(hit.position, hit.normal)
+				# Armor that blunts the hit (a Bulwark's front) throws grey sparks.
+				if collider != null and collider.has_method("deflects") and collider.call("deflects", hit.position):
+					fx.call("deflect", hit.position, hit.normal)
+				else:
+					fx.sparks(hit.position, hit.normal)
 			_remove(i)
 			continue
 		_pos[i] = to

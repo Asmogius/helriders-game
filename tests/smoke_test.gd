@@ -2,7 +2,8 @@ extends SceneTree
 ## Headless smoke test. Boots the main scene, fakes thumb-stick and button
 ## input, and checks each core mechanic in its own short scenario:
 ## driving, lock-on, the Hunter (latch, shoot off, crush), the Outrider
-## (hunts and shoots you, drops salvage), power and weight overload, two
+## (hunts and shoots you, drops salvage), the Bulwark (charges, rams, armored
+## front, drops salvage), power and weight overload, two
 ## weapons with pellets, fixed guns, the utilities, crew (passives, Hard
 ## Line, Overcharge, big-hit injuries, turret aim rule), and the wreck.
 ##
@@ -259,8 +260,46 @@ func _process(_delta: float) -> bool:
 		_check(main.mines.detonations >= 1 and main.kills > int(armor_mark), "a shambler on an armed mine sets it off and dies")
 		_check(rig.armor > 50.0, "your own mines don't hurt you")
 
-	# --- Crew: passives, Hard Line, Overcharge, aim rule, big-hit injuries -------
+	# --- Bulwark: drives at the parked rig, rams, shoots, armored front ----------
 	if frame == 2630:
+		main.apply_rig(Loadout.build(LOCK_BUILD))
+		_reset_rig(OPEN_SPOT, 0.0)
+		main.zombies.clear_all()
+		main.spawn_bulwark(OPEN_SPOT + Vector2(640, 0))
+		mark = OPEN_SPOT + Vector2(640, 0)
+		enemy_damage = 0.0
+		shots_mark = main.bullets.enemy_shots
+	if frame > 2630 and frame < 2750:
+		main.hud.left_stick.output = Vector2.ZERO
+		rig.armor = rig.armor_max
+	if frame == 2750:
+		var bw := main.bulwark
+		print("  bulwark traveled %.0f px, rams %d, shots %d, damage dealt %.0f" % [bw.global_position.distance_to(mark), bw.backoffs, main.bullets.enemy_shots - shots_mark, enemy_damage])
+		_check(bw.is_inside_tree() and bw.backoffs >= 1, "the Bulwark drives straight at you and rams")
+		_check(main.bullets.enemy_shots > shots_mark, "its light forward gun fires")
+		_check(enemy_damage > 0.0, "the Bulwark hurts the rig")
+		# Armored front: the same hit does half on the nose.
+		bw.armor = bw.armor_max
+		var forward := Vector2.RIGHT.rotated(bw.rotation)
+		bw.take_hit(20.0, -forward * 140.0)
+		var front := bw.armor_max - bw.armor
+		bw.armor = bw.armor_max
+		bw.take_hit(20.0, forward * 140.0)
+		var rear := bw.armor_max - bw.armor
+		print("  20-damage hit on the front %.0f, on the rear %.0f" % [front, rear])
+		_check(is_equal_approx(front, 10.0) and is_equal_approx(rear, 20.0), "hits on its armored front do half damage")
+		armor_mark = float(main.pickups.get_child_count())
+		# Step away first, so the salvage isn't scooped up on the spot.
+		rig.global_position = bw.global_position + Vector2(0, 420)
+		bw.take_damage(99999.0)
+	if frame == 2755:
+		_check(main.bulwark.is_wrecked and main.pickups.get_child_count() == int(armor_mark) + 1, "a wrecked Bulwark drops salvage")
+		var pickup: Node = main.pickups.get_child(main.pickups.get_child_count() - 1)
+		var part: Dictionary = pickup.get("part")
+		_check(Parts.DROP_POOLS.bulwark.has(str(part.get("id", ""))), "its schematic comes from the heavy-parts pool")
+
+	# --- Crew: passives, Hard Line, Overcharge, aim rule, big-hit injuries -------
+	if frame == 2770:
 		main.apply_rig(Loadout.build(LOCK_BUILD))
 		rig.set_crew(main.profile.seated_crew())
 		main.call("_sync_hud_to_rig")
@@ -276,12 +315,14 @@ func _process(_delta: float) -> bool:
 		_check(rig.overcharge_active() and rig.crew_fire > 1.3 and rig.crew_damage > 1.1, "Overcharge boosts fire rate and damage")
 		_check(not rig.use_crew_ability(0), "Hard Line has a cooldown")
 		# Chip damage isn't a big hit; a burst over 15% of max armor is.
+		var hits_before := rig.big_hits
+		rig._dmg_buckets.fill(0.0)
 		rig.take_damage(rig.armor_max * 0.05)
-		_check(rig.big_hits == 0, "chip damage never counts as a big hit")
+		_check(rig.big_hits == hits_before, "chip damage never counts as a big hit")
 		rig.take_damage(rig.armor_max * 0.12)
-		_check(rig.big_hits == 1, "a burst over 15% of max armor in a second is a big hit")
+		_check(rig.big_hits == hits_before + 1, "a burst over 15% of max armor in a second is a big hit")
 		rig.armor = rig.armor_max
-	if frame == 2640:
+	if frame == 2780:
 		var aim_before := rig.crew_aim
 		rig.injure_crew(1)
 		print("  injured Gunner: turret aim x%.2f (was x%.2f)" % [rig.crew_aim, aim_before])
@@ -290,7 +331,7 @@ func _process(_delta: float) -> bool:
 		rig.injure_crew(0)
 		_check(is_equal_approx(rig.crew_turn, 0.5) and is_equal_approx(rig.crew_grip, 0.0), "an injured Driver halves turn rate")
 		_check(main.injured_crew_ids().size() == 2, "the run remembers who was hurt")
-	if frame == 2645:
+	if frame == 2785:
 		var bare := Parts.STARTER_LOADOUT.duplicate(true)
 		main.apply_rig(Loadout.build(bare))
 		rig.set_crew(main.profile.seated_crew().filter(func(m: Dictionary) -> bool: return m.role == "driver"))
@@ -302,11 +343,11 @@ func _process(_delta: float) -> bool:
 		main.call("_sync_hud_to_rig")
 
 	# --- Wreck -------------------------------------------------------------------
-	if frame == 2650:
-		rig.take_damage(99999.0)
-	if frame == 2660:
-		_check(main.state == Main.State.WRECKED, "wreck ends the run")
 	if frame == 2790:
+		rig.take_damage(99999.0)
+	if frame == 2800:
+		_check(main.state == Main.State.WRECKED, "wreck ends the run")
+	if frame == 2930:
 		_check(main.hud.is_result_visible(), "results card shown")
 		_check(main.hud.result_text().contains("Crew lost"), "results card names the crew lost")
 		_check((main.profile.crew as Array).is_empty(), "a wreck kills everyone seated")
