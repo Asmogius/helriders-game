@@ -96,7 +96,7 @@ Each class has a passive, and each hire rolls a specialty within the class that 
 
 - Gunner: Passive spread/turret aim (Epic+ lock range). Gunslinger: Overcharge. Marksman: Deadeye. Breacher: Piercing Rounds.
 
-- Mechanic: Passive damage reduction. Patcher: Field Repair (armor, throws off Hunters; Epic+ short damage reduction). Welder: Weld Plates.
+- Mechanic: Passive damage reduction. Fixer (renamed from Patcher; code rename pending): Field Repair (armor, throws off Hunters; Epic+ short damage reduction). Welder: Weld Plates.
 
 - Spotter: Passive utility cooldowns. Marker: Mark (damage amp on the priority target). Scout: Flare (slow and amp shamblers nearby).
 
@@ -156,7 +156,7 @@ Agreed details: Brute 200 HP, bullets do half (rams full), speed 70, 8 dmg/s, sh
 
 ## Enemy Vehicles
 
-Archetypes (refine later): Outrider (light flanker), Bulwark (heavy frontal), Gunner Rig (turret), Scrapper (utility), Convoy Lead (rarer mixed).
+Archetypes (refine later): Outrider (light flanker), Bulwark (heavy frontal), Gunner Rig (turret), Scrapper (hazard layer, see §14), Patcher (support, see §14), Convoy Lead (rarer mixed).
 
 Gunner Rig (agreed): a standoff turret rig. 340 armor, speed 500, ram 40. Keeps 350-550 px from the player, circling, backing off when closed on. A slow turret (2.5 rad/s) fires 4-round bursts of 7 every 1.4 s (~20 damage/s); it turns on zombies within 120 px of it first. Clear: 1 from 3 skulls; Survive: one joins the waves from 4 skulls; Hunt: escorts the Elite at 5-6 skulls (when there's room under the 3-rig cap); Courier: from 4 skulls it guards a checkpoint halfway along the route. Pays 30 scrap; drops the Burst Turret, Belt Feed or Coolant Loop, or a 30-scrap cache. Burst Turret (new Uncommon weapon): 4-round bursts of 14 every 0.9 s (~62 DPS), spread 1.5, bullet speed 1800, turret turn 8, lock 600, 40 power, 15 weight, 110 scrap. Spawn with simple roles; react opportunistically (focus damaged targets, screen allies, deal with zombies). Max 3 active. Destroying them is primary source of better parts.
 
@@ -213,3 +213,49 @@ Art pipeline note: modular voxel attachments on shared chassis bases; zombie var
 Prove the loop: Comms select Clear → assign Driver+Gunner → tight urban block with Shamblers, one Hunter, one enemy vehicle → clear → return with scrap + part (possible injury flag) → swap the new part → ready for next day. Must show build feel in first 30 seconds, readable threats, and quick recovery from loss.
 
 This briefing is the source of truth for implementation. Enemy vehicle archetype details are the primary area left for later refinement. All other systems are specified to the level required to begin production of the vertical slice and full game.
+# 14. Agreed in Principle — Numbers to Draft
+
+Agreed with the owner on 2026-11-03. **Do not implement until the numbers are drafted and approved.** Where this section changes an earlier one, this section wins.
+
+## Mods and Perks
+
+- Part mods: pre-attached per schematic, visible while locked, unlocked by part level. Tier sets the unlock level: Minor 3, Major 7, Signature 11, Unique 18 (Legendary only). Rarity's max level decides which tiers a part can reach: Common Minor; Uncommon + Major; Rare + Signature; Epic + a second Major at 14; Legendary + Unique. The +4% per level stays. Mods belong to the schematic, like levels.
+- Crew perks become tiered conditional mods tied to specialty: Minor at picks 3 and 6, Major at 9 and 12, Signature at 15 and 18. The 4 shared perks stay. Each specialty needs about 2 Minor, 2 Major and 2 Signature perks.
+- Keywords connect part mods and crew perks: RAM, DRIFT, BURST, MARKED, STUNNED, OVERLOAD, SLICK, BURNING, CORRODED, GOOPED. Players discover interactions; no named synergies for now.
+- Feedback: no floating text. Each keyword has one symbol, one animation and one fixed color (not reusing threat colors), in combat and on garage cards, throttled on busy screens.
+
+## Extract or Push
+
+- After the objective: an extraction marker (cyan) and a push beacon (orange). Driving into one decides.
+- Push: 60-90 s at the job's skulls +1 (cap 6; at 6, an extra rig instead), plus one extra rig. Success: scrap x1.5 and one extra schematic roll. A wreck loses everything as usual.
+- About 3 in 4 jobs allow it; never the onboarding mission or the day after a wreck. Hidden until the objective is done.
+
+## New Enemy Rigs
+
+- Patcher (support): unarmed. Grappling hook with a physical cable (~400 px) tethers it to an ally it repairs; the ally can drag it. Hook pops on a big hit (>15% max armor in 1 s) or hard physical impact on either rig, or the player ramming the cable at speed. Re-hook: 3 s with a visible wind-up. With no ally alive, revives a wreck at 10% max armor over 4 s, unlimited; any player damage to the Patcher interrupts. A revived rig's uncollected crate goes back into it; one crate's worth of loot per rig per mission. From 3 skulls, only alongside another rig; counts toward the 3-rig cap. Drops repair and self-buff parts.
+- Scrapper (hazard layer): unarmed. Lays oil (grip loss like slime; ignited by explosions and fire; burning oil damages everything, player included) and spike strips (temporary speed debuff). Cuts across the player's path; lays hazards behind it when chased. Spawns alone from 2 skulls; counts toward the cap; Courier's signature rig. Drops hazard utilities (Mine Dropper, Oil Slick and Spike Strip droppers) and grip parts.
+
+## Hazards
+
+- The player never damages themselves. Player-placed hazards never hurt the player; only battlefield hazards can (barrels, enemy oil even when the player lit it).
+- Barrels: Explosive, Fire, Acid, Slime, Boomer. Shot or rammed; hit everything in range. Fixed spots per layout; type rolled per mission.
+
+## Maps
+
+- Layouts are shared across districts; districts change art and enemy mix. Each job type draws suitable layouts.
+- Per-mission variation: blocked roads, shifted props, different spawn sides.
+- Target: at least 4 layouts per job type (~12 total), to expand later.
+
+## New Weapons
+
+- Harpoon: Rare, Bulwark drop, fixed mount. Tethers rigs only; pierces several zombies; sets off barrels. Mass decides who is pulled. Tether breaks by the Patcher rules; firing again releases.
+- Mortar: Uncommon, Gunner Rig drop, turret. Lobs over buildings; long range, slow shells, minimum range. Stick push sets distance (landing circle); LOCK aims at the predicted position.
+- Shock Pulse: utility. Short-range shock burst around the rig, long cooldown. Shock is a damage type other parts can carry (e.g., a Shock Mortar).
+
+## Status, Resistance, Shields, Damage Types
+
+- Every status uses buildup: hits fill a bar that drains over time and triggers the status when full. Shock -> STUNNED, Fire -> BURNING, Acid -> CORRODED (increased damage taken), Slime -> SLICK, Goop -> GOOPED.
+- Every rig (player and enemy) has a resistance per status. Player resistances come from armor parts (each armor type has a profile) and internals (e.g., an EMP-hardened computer).
+- HUD: player buildup bars next to the armor bar, shown only while building. Enemy rigs: small bar under the rig while building. Zombies: none.
+- Shields: recharging layer, usually much lower than armor, recovering after a delay. Better shields: higher max, shorter delay and/or faster recharge. From internal-slot generators: light but power-hungry. Armor is heavy; only specialized armor costs power. An active shield adds bonus resistance to every status. Some enemy rigs have shields.
+- Damage types: Kinetic (bullets, rams) all-round; Shock bonus vs. shields; Acid bonus vs. armor; Fire bonus vs. zombies and spreads between them.
