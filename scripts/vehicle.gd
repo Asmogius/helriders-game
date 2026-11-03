@@ -45,8 +45,7 @@ var spread := 0.0
 var turret_turn_rate := 0.0
 var lock_range := 0.0             # 0 = no lock (weapon can't, or no targeting system)
 var power_output := 0.0            # engine budget (0 = no power model, e.g. enemy rigs)
-var power_draw := 0.0              # constant draw of everything equipped
-var lock_power := 0.0              # extra draw while lock is switched on
+var power_draw := 0.0              # constant draw of everything installed
 
 var team := BulletPool.TEAM_PLAYER
 var armor := 0.0
@@ -112,7 +111,6 @@ func apply_stats(s: Dictionary) -> void:
 	lock_range = s.lock_range
 	power_output = s.get("power_output", 0.0)
 	power_draw = s.get("power_draw", 0.0)
-	lock_power = s.get("lock_power", 0.0)
 	armor = armor_max
 	if not can_lock():
 		lock_enabled = false
@@ -122,9 +120,9 @@ func can_lock() -> bool:
 	return lock_range > 0.0
 
 
-## Power in use right now: everything equipped, plus lock if it's switched on.
+## Power drawn by the build. Fixed by what's installed, not by what's switched on.
 func power_load() -> float:
-	return power_draw + (lock_power if lock_enabled else 0.0)
+	return power_draw
 
 
 func is_overloaded() -> bool:

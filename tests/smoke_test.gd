@@ -67,8 +67,8 @@ func _process(_delta: float) -> bool:
 		main.hud.press_lock()
 		_check(rig.lock_enabled, "lock button turns lock on")
 		print("  power with lock on %.0f / %.0f, mobility %.2f" % [rig.power_load(), rig.power_output, rig.mobility()])
-		_check(is_equal_approx(rig.power_load(), rig.power_draw + rig.lock_power), "lock draws the targeting computer's power")
-		_check(rig.is_overloaded() and rig.mobility() < 1.0, "starter rig overloads with lock on")
+		_check(is_equal_approx(rig.power_load(), rig.power_draw), "switching lock on costs no extra power")
+		_check(not rig.is_overloaded() and rig.mobility() == 1.0, "starter rig runs at full mobility with lock on")
 		shots_mark = main.bullets.shots_fired
 	if frame > 200 and frame < 1200:
 		main.hud.left_stick.output = Vector2.RIGHT.rotated(frame * 0.01) * 0.6
@@ -142,16 +142,19 @@ func _process(_delta: float) -> bool:
 	if frame == 2215:
 		_check(main.salvage.size() == 1, "driving over salvage collects it")
 
-	# --- Overload is felt: same straight run as the start, lock on -------------------
+	# --- Overload is felt: same straight run as the start, over-budget build ---------
 	if frame == 2220:
+		# Two Targeting Computers: identical handling, 25 power over budget.
+		var greedy := Parts.STARTER_LOADOUT.duplicate(true)
+		greedy.internal = ["targeting_computer", "targeting_computer"]
+		rig.apply_stats(Loadout.build(greedy))
 		_reset_rig(ROAD_EAST, 0.0)
-		main.hud.press_lock()
 		mark = rig.global_position
 		main.hud.left_stick.output = Vector2.RIGHT
 	if frame == 2340:
 		var moved := rig.global_position.distance_to(mark)
-		print("  overloaded run %.0f px vs %.0f px with lock off" % [moved, free_run])
-		_check(rig.lock_enabled and moved < free_run * 0.95, "overload costs speed")
+		print("  overloaded build (%.0f / %.0f) ran %.0f px vs %.0f px in budget" % [rig.power_load(), rig.power_output, moved, free_run])
+		_check(rig.is_overloaded() and moved < free_run * 0.95, "an over-budget build costs speed")
 		main.hud.left_stick.output = Vector2.ZERO
 
 	# --- Wreck -------------------------------------------------------------------
@@ -172,8 +175,8 @@ func _check_loadouts(rig: Vehicle) -> void:
 	var starter := Loadout.build(Parts.STARTER_LOADOUT)
 	_check(is_equal_approx(starter.max_speed, 560.0) and is_equal_approx(starter.armor, 150.0) and is_equal_approx(starter.acceleration, 640.0), "starter parts add up to the starter rig")
 	_check(rig.can_lock() and main.hud.is_lock_button_visible(), "targeting computer in a slot enables lock")
-	print("  starter power %.0f / %.0f, lock costs %.0f" % [rig.power_draw, rig.power_output, rig.lock_power])
-	_check(rig.power_draw <= rig.power_output and rig.lock_power > 0.0, "starter fits its power budget; lock has a cost")
+	print("  starter power %.0f / %.0f" % [rig.power_draw, rig.power_output])
+	_check(rig.power_draw <= rig.power_output, "starter fits its power budget")
 
 	var no_targeting := Parts.STARTER_LOADOUT.duplicate(true)
 	no_targeting.internal = []
@@ -182,7 +185,8 @@ func _check_loadouts(rig: Vehicle) -> void:
 	bare.apply_stats(stats)
 	bare.lock_enabled = true
 	_check(not bare.can_lock() and not bare.lock_enabled, "no targeting computer, no lock")
-	_check(is_equal_approx(bare.power_load(), rig.power_draw), "empty slot frees its power")
+	var computer: float = Parts.CATALOG.targeting_computer.power
+	_check(computer > 0.0 and is_equal_approx(bare.power_load(), rig.power_draw - computer), "pulling the targeting computer frees its power")
 	bare.free()
 
 	var fixed_guns := Parts.STARTER_LOADOUT.duplicate(true)

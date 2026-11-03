@@ -105,7 +105,7 @@ func _ready() -> void:
 	outrider.wrecked.connect(_on_outrider_wrecked)
 	hud.restart_requested.connect(restart)
 	hud.lock_toggled.connect(func(on: bool) -> void: vehicle.lock_enabled = on)
-	hud.set_lock_available(vehicle.can_lock(), vehicle.lock_power)
+	hud.set_lock_available(vehicle.can_lock())
 	_refresh_hud()
 
 

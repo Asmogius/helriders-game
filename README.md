@@ -22,7 +22,7 @@ One "Clear" mission in an Outer Blocks city block: 40 shamblers, one Hunter, and
 - **Right thumb:** aim the turret. Push past halfway to fire. Manual aim always overrides lock.
 - **LOCK button** (above the right stick): toggles target lock. While on, the turret picks the most dangerous target in range, leads it, and fires by itself. Priority: a Hunter on your hull, then enemy rigs, then Hunters, then the nearest shambler.
 - **Lock comes from a part.** The Targeting Computer schematic sits in one of the chassis's internal slots, and the weapon has to support lock (the turret does, fixed guns don't). Without both, there's no LOCK button.
-- **Power.** The thin bar under armor is power in use against the engine's output. The starter rig draws 85 of 100. Switching lock on draws another 25, which overloads the engine (110/100). Overload cuts acceleration and top speed (about 13% here) until you switch lock off.
+- **Power** works like Armored Core's energy load. Every installed part draws power all the time, against the engine's output. The thin bar under armor shows the total. The starter rig sits at exactly 100/100, and the Targeting Computer is 25 of that, so lock is a build decision. Pull the computer to free 25 power for something else. Go over budget and the rig is overloaded: acceleration and top speed drop until the build fits again. Switching lock on or off costs nothing extra.
 - **Ramming:** fast hits kill shamblers and Hunters. Slow pushes get you clogged in the crowd.
 - **Hunter:** shows up 25 seconds in (or after 10 kills). It pulses red before it leaps. If it latches on, it chews armor until you crush it into a wall, scrape it along one, or shoot it.
 - **Outrider:** a fast enemy rig with forward guns. It arrives 45 seconds in (or after 20 kills) and makes strafing passes. Wreck it and it drops a salvage part; drive over the crate to grab it.
@@ -102,7 +102,7 @@ From DESIGN §13:
 - [x] Target lock button (per-weapon lock range)
 - [x] Hunter zombie (fast, latches for damage over time)
 - [x] One enemy vehicle (Outrider) that drops a part
-- [x] Parts, slots and power budget (lock needs the Targeting Computer)
+- [x] Parts, slots and an Armored Core-style power budget (lock needs the Targeting Computer)
 - [ ] Garage screen: swap a part between runs
 - [ ] Comms screen: pick the mission
 - [ ] Driver + Gunner crew with passive and triggered abilities

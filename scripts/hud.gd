@@ -118,11 +118,8 @@ func set_power(used: float, output: float) -> void:
 
 
 ## Only rigs with a targeting system (and a lock-capable weapon) get the button.
-## `cost` is the power it draws while on, shown under the button.
-func set_lock_available(available: bool, cost: float) -> void:
+func set_lock_available(available: bool) -> void:
 	_lock_button.visible = available
-	_lock_button.cost = cost
-	_lock_button.queue_redraw()
 
 
 func set_status(kills: int, target: int, scrap: int) -> void:
@@ -274,7 +271,6 @@ class LockButton extends Control:
 	const T := preload("res://scripts/tuning.gd")
 	var on := false
 	var has_target := false
-	var cost := 0.0
 
 	func _ready() -> void:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -314,8 +310,6 @@ class LockButton extends Control:
 			draw_circle(c, 5.0, accent)
 		var font := ThemeDB.fallback_font
 		draw_string(font, Vector2(0.0, size.y + 18.0), "LOCK", HORIZONTAL_ALIGNMENT_CENTER, size.x, 18, Color(accent, 0.9))
-		if cost > 0.0:
-			draw_string(font, Vector2(0.0, size.y + 36.0), "%d PWR" % roundi(cost), HORIZONTAL_ALIGNMENT_CENTER, size.x, 14, Color(accent, 0.7))
 
 
 class ThreatArrows extends Control:

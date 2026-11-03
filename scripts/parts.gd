@@ -2,10 +2,10 @@ extends RefCounted
 ## Part schematics: every part the player can own, by category (DESIGN §4).
 ## loadout.gd turns a set of these into a rig's final stats.
 ##
-## Power: the engine's `power_output` is the budget. Every part's `power` is a
-## constant draw while equipped. A part's `power_active` is drawn only while
-## its system is switched on (the Targeting Computer, while lock is on).
-## Going over budget is an overload: the rig loses mobility (tuning.gd).
+## Power works like Armored Core's energy load: the engine's `power_output` is
+## the budget, and every part's `power` is drawn all the time it's installed.
+## Fitting a part is the cost, not using it. Going over budget is an overload:
+## the rig loses mobility (tuning.gd), so it's a build decision.
 
 const RARITY_COLORS := {
 	"Common": Color(0.75, 0.75, 0.72),
@@ -18,7 +18,7 @@ const RARITY_COLORS := {
 const CATALOG := {
 	# --- Chassis: slots and base handling --------------------------------------
 	"scrap_frame": {
-		"name": "Scrap Frame", "category": "Chassis", "rarity": "Common", "power": 20.0,
+		"name": "Scrap Frame", "category": "Chassis", "rarity": "Common", "power": 15.0,
 		"hardpoints": 1, "utility_slots": 1, "internal_slots": 2,
 		"armor": 60.0, "max_speed": 560.0, "reverse_speed": 230.0, "coast": 280.0, "turn_rate": 3.4,
 	},
@@ -29,7 +29,7 @@ const CATALOG := {
 	},
 	# --- Drive: grip, braking, handling ----------------------------------------
 	"street_wheels": {
-		"name": "Street Wheels", "category": "Drive", "rarity": "Common", "power": 15.0,
+		"name": "Street Wheels", "category": "Drive", "rarity": "Common", "power": 10.0,
 		"grip": 5.5, "brake": 1500.0, "speed_mult": 1.0, "turn_mult": 1.0,
 	},
 	"outrider_sport_wheels": {
@@ -58,13 +58,14 @@ const CATALOG := {
 	},
 	# --- Internal systems (passive, take internal capacity) -----------------------
 	"targeting_computer": {
-		"name": "Targeting Computer", "category": "Internal", "rarity": "Common", "power": 0.0,
-		"power_active": 25.0, "enables_lock": true,
+		"name": "Targeting Computer", "category": "Internal", "rarity": "Common", "power": 25.0,
+		"enables_lock": true,
 	},
 }
 
-# What the player's rig rolls out with. Lock works because the Targeting
-# Computer is in an internal slot; take it out and the LOCK button goes away.
+# What the player's rig rolls out with: exactly 100 / 100 power. Lock works
+# because the Targeting Computer is in an internal slot; pull it and the LOCK
+# button goes away, but 25 power frees up for something else.
 const STARTER_LOADOUT := {
 	"chassis": "scrap_frame",
 	"engine": "junk_v6",

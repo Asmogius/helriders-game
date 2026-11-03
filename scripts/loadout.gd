@@ -47,7 +47,6 @@ static func build(loadout: Dictionary) -> Dictionary:
 		"lock_range": 0.0,
 		"power_output": float(engine.get("power_output", 0.0)),
 		"power_draw": 0.0,
-		"lock_power": 0.0,
 		"dropped": dropped,
 	}
 
@@ -64,7 +63,6 @@ static func build(loadout: Dictionary) -> Dictionary:
 	for part: Dictionary in internal:
 		if part.get("enables_lock", false):
 			stats["lock_range"] = float(weapon.get("lock_range", 0.0))
-			stats["lock_power"] = float(stats["lock_power"]) + float(part.get("power_active", 0.0))
 	return stats
 
 
