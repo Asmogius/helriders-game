@@ -259,3 +259,11 @@ Agreed with the owner on 2026-11-03. **Do not implement until the numbers are dr
 - HUD: player buildup bars next to the armor bar, shown only while building. Enemy rigs: small bar under the rig while building. Zombies: none.
 - Shields: recharging layer, usually much lower than armor, recovering after a delay. Better shields: higher max, shorter delay and/or faster recharge. From internal-slot generators: light but power-hungry. Armor is heavy; only specialized armor costs power. An active shield adds bonus resistance to every status. Some enemy rigs have shields.
 - Damage types: Kinetic (bullets, rams) all-round; Shock bonus vs. shields; Acid bonus vs. armor; Fire bonus vs. zombies and spreads between them.
+
+## Combat Contract and Loss
+
+- Time to wreck (focused, standing still): 15 / 13 / 11 / 9 / 7.5 / 6 s at skulls 1-6. Anchor damage numbers to this.
+- Rig loss is minor: the day after a wreck, the player can rebuild close to their last build and run the same skull level.
+- Lost crew return: after 3 days (Uncommon), +1 day per rarity step (Rare 4, Epic 5, Legendary 6, Mythic 7), they enter a rehire pool at level 1 with the same specialty and rarity (perks reset).
+- Saloon rehire section: one extra card a day, drawn at random from the rehire pool. A rehire can be dismissed permanently, which returns them to the general hire pool.
+- Rehire price: 20% below a normal hire of that rarity. Saloon upgrade Old Faces: 3 steps, each a further 10% off (max 50%).
