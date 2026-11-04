@@ -20,6 +20,10 @@ const Research := preload("res://scripts/research.gd")
 const Crew := preload("res://scripts/crew.gd")
 const Missions := preload("res://scripts/missions.gd")
 const MISSION_SCENE := "res://scenes/mission.tscn"
+const GameMenu := preload("res://scripts/game_menu.gd")
+
+var auto_resume := true    # closed mid-job last time: go straight back in (tests switch it off)
+var menu: GameMenu
 
 # Slot tags: the loadout slot, where its line points on the rig (rig-local
 # pixels), and which screen side the tag sits on (0 left, 1 right). Second
@@ -87,6 +91,9 @@ var _crew_line: Button
 
 func _ready() -> void:
 	profile = get_node("/root/Profile")
+	if auto_resume and profile.resume_job():
+		# Agreed with the owner: a job quit or closed mid-fight starts over.
+		get_tree().change_scene_to_file.call_deferred(MISSION_SCENE)
 	theme = UI.make()
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 
@@ -408,7 +415,7 @@ func _build_top_bar() -> void:
 	var bar := HBoxContainer.new()
 	bar.anchor_left = 1.0
 	bar.anchor_right = 1.0
-	bar.offset_left = -760.0
+	bar.offset_left = -900.0
 	bar.offset_right = -20.0
 	bar.offset_top = 10.0
 	bar.offset_bottom = 60.0
@@ -416,6 +423,9 @@ func _build_top_bar() -> void:
 	bar.add_theme_constant_override("separation", 10)
 	add_child(bar)
 
+	var menu_button := _button("MENU", 120)
+	menu_button.pressed.connect(open_menu)
+	bar.add_child(menu_button)
 	var presets := _button("PRESETS", 150)
 	presets.pressed.connect(_open_presets)
 	bar.add_child(presets)
@@ -1420,3 +1430,22 @@ class FloorGrid extends Control:
 		draw_circle(c, 150.0, Color(0, 0, 0, 0.25))
 		draw_arc(c, 150.0, 0.0, TAU, 64, Color(T.COL_CYAN, 0.18), 2.0)
 		draw_arc(c, 158.0, 0.0, TAU, 64, Color(T.COL_ORANGE, 0.12), 1.0)
+
+
+## The garage's menu: settings, the Database, quit.
+func open_menu() -> GameMenu:
+	if menu != null:
+		return menu
+	menu = GameMenu.new()
+	menu.setup(profile, false)
+	menu.closed.connect(func() -> void: menu = null)
+	add_child(menu)
+	return menu
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
+		if menu != null:
+			menu.back()
+		else:
+			open_menu()

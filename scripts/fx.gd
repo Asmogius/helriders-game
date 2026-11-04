@@ -5,6 +5,9 @@ extends Node2D
 const T := preload("res://scripts/tuning.gd")
 const MAX_PARTICLES := 320
 
+var density := 1.0      # share of particles drawn (quality preset)
+var _skip := 0.0
+
 var _pos := PackedVector2Array()
 var _vel := PackedVector2Array()
 var _life := PackedFloat32Array()
@@ -28,6 +31,12 @@ func _ready() -> void:
 func emit(at: Vector2, velocity: Vector2, life: float, size: float, color: Color, drag := 3.0) -> void:
 	if _count >= MAX_PARTICLES:
 		return
+	if density < 1.0:
+		# Lower quality presets draw a share of the particles.
+		_skip += density
+		if _skip < 1.0:
+			return
+		_skip -= 1.0
 	_pos[_count] = at
 	_vel[_count] = velocity
 	_life[_count] = life

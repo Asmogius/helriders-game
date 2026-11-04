@@ -26,8 +26,11 @@ func set_bounds(bounds: Rect2) -> void:
 	limit_bottom = int(bounds.end.y)
 
 
+var shake_mult := 1.0     # quality preset and the shake setting
+
+
 func shake(amount: float) -> void:
-	_shake = clampf(maxf(_shake, amount), 0.0, 1.0)
+	_shake = clampf(maxf(_shake, amount * shake_mult), 0.0, 1.0)
 
 
 func _physics_process(delta: float) -> void:

@@ -238,9 +238,12 @@ func _check_saloon_and_old_save() -> void:
 
 func _check_abandon() -> void:
 	var day := profile.day
+	profile.active_mission = Missions.make("clear", 1, 7)
 	profile.start_run()
 	profile.call("_ready")  # what happens on the next launch
-	_check(profile.day == day + 1 and not profile.run_active and profile.notice != "", "quitting mid-run costs the day, nothing else")
+	_check(profile.day == day and profile.run_active and profile.resume_job(), "quitting mid-run costs nothing: the next launch drops you back into the job")
+	profile.run_active = false
+	profile.active_mission = {}
 
 
 func _check(ok: bool, what: String) -> void:

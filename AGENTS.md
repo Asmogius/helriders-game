@@ -18,6 +18,8 @@ The owner works from a phone and has no computer, so nobody opens the Godot edit
 
 - Statuses (§14): `status_bars.gd` holds the six bars (shock fire acid toxic slime goop -> STUNNED, BURNING, CORRODED, TOXIC, SLICK, GOOPED) for every rig (`vehicle.status`) and zombie (`zombie.status`). Typed damage passes a `dtype` through `take_hit` / `take_damage` and builds its status; `add_buildup` / `fill_status` for fixed amounts. Rig resistances: enemy sheets give `resist`; the player's come from `Loadout.resistances()` (base 30, plus each plate's profile step, plus chassis/accessory `resist_bonus`; cap 95). Barrels are `barrel.gd`, placed per job at `Arena.BARREL_SPOTS`; fire ground lives in `ground_hazards.gd`.
 
+- Pause menu and Database: `game_menu.gd` (one panel: pause, settings, Database; `in_job` decides RESUME / RESTART JOB). Settings live in their own file (`profile.settings`, `T.QUALITY` presets; the mission applies `fx.density`, `splats.density`, `camera.shake_mult`). A job quit or closed mid-fight resumes at relaunch (`profile.resume_job()`, the garage switches straight to the mission). The Database's contents are `codex.gd`; `profile.discover(category, id)` marks what the player has met; call it where something new is met.
+
 - `scripts/profile.gd` (autoload `Profile`) is the save game: scrap, schematics, storage, the rig, presets, upgrades. Every change saves to `user://`. Economy rules agreed with the owner are listed at the top of that file; don't change them without asking.
 
 ## Engine rules
@@ -70,6 +72,7 @@ godot --headless --fixed-fps 60 --path . -s res://tests/status_test.gd     # mus
 godot --headless --fixed-fps 60 --path . -s res://tests/patcher_test.gd    # must end "PATCHER TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/weapons_test.gd    # must end "WEAPONS TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/rehire_test.gd     # must end "REHIRE TEST PASSED"
+godot --headless --fixed-fps 60 --path . -s res://tests/menu_test.gd       # must end "MENU TEST PASSED"
 ```
 
 - Tests must call `Profile.new_game()` with `persist = false` first, so they never touch a real save.

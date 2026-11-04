@@ -4,6 +4,7 @@ extends CanvasLayer
 ## card. The vehicle stays the visual focus.
 
 signal restart_requested
+signal pause_pressed
 signal lock_toggled(on: bool)
 signal ability_pressed(index: int)
 signal crew_picked(index: int)
@@ -29,6 +30,7 @@ var _wheel: CrewWheel
 var crew_wheel_cooldown := 0.0
 var _status: Label
 var _fps: Label
+var pause_button: Button
 var _hint: Label
 var _banner: Label
 var _banner_tween: Tween
@@ -125,6 +127,19 @@ func _ready() -> void:
 	_lock_button.toggled.connect(func(on: bool) -> void: lock_toggled.emit(on))
 	_root.add_child(_lock_button)
 	right_stick.blockers.append(_lock_button)
+	pause_button = Button.new()
+	pause_button.text = "II"
+	pause_button.focus_mode = Control.FOCUS_NONE
+	pause_button.anchor_left = 1.0
+	pause_button.anchor_right = 1.0
+	pause_button.offset_left = -96.0
+	pause_button.offset_right = -24.0
+	pause_button.offset_top = 46.0
+	pause_button.offset_bottom = 110.0
+	pause_button.add_theme_font_size_override("font_size", 28)
+	pause_button.pressed.connect(func() -> void: pause_pressed.emit())
+	_root.add_child(pause_button)
+	right_stick.blockers.append(pause_button)
 
 	_crew_button = CrewButton.new()
 	_crew_button.anchor_left = 1.0

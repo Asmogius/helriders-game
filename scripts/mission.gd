@@ -38,9 +38,12 @@ const Pickup := preload("res://scripts/pickup.gd")
 const LockReticle := preload("res://scripts/lock_reticle.gd")
 const ChaseCamera := preload("res://scripts/chase_camera.gd")
 const Hud := preload("res://scripts/hud.gd")
+const GameMenu := preload("res://scripts/game_menu.gd")
 const NavGrid := preload("res://scripts/nav_grid.gd")
 const ProfileScript := preload("res://scripts/profile.gd")
 const GARAGE_SCENE := "res://scenes/garage.tscn"
+const MISSION_SCENE := "res://scenes/mission.tscn"
+const STATUS_IDS := ["shock", "fire", "acid", "toxic", "slime", "goop"]
 const HUNTER_POOL := 2
 
 enum State { RUNNING, WRECKED, CLEARED, FAILED }
@@ -133,6 +136,8 @@ var optional_taken := false
 var optional_index := -1
 var optional_name := ""
 
+var menu: GameMenu              # the pause menu while it's open
+var _seen_timer := 0.0
 var _events: Array = []          # [seconds, kind, kills that also trigger it (-1 = none), fired]
 
 
@@ -256,6 +261,8 @@ func _ready() -> void:
 		h.died.connect(_on_hunter_died.bind(h))
 		h.latched_on.connect(func() -> void: hud.set_alert("HUNTER ON THE HULL  -  SCRAPE IT ON A WALL"))
 		h.let_go.connect(_on_hunter_let_go)
+	for rig in _all_enemy_rigs():
+		rig.tree_entered.connect(func() -> void: profile.discover("enemies", _rig_key(rig)))
 	for rig in outriders:
 		rig.wrecked.connect(_on_outrider_wrecked.bind(rig))
 	for rig in bulwarks:
@@ -281,6 +288,14 @@ func _ready() -> void:
 		truck.site_done.connect(_on_site_done)
 		hud.choice_made.connect(_on_optional_choice)
 	hud.restart_requested.connect(return_to_garage)
+	hud.pause_pressed.connect(open_menu)
+	for b in barrels:
+		b.died.connect(func(_at: Vector2) -> void: profile.discover("hazards", "barrel_" + b.kind))
+	# Quality preset: how much is drawn, and how hard the camera shakes.
+	var q := profile.quality()
+	fx.density = float(q.fx)
+	splats.density = float(q.splats)
+	camera.shake_mult = float(q.shake) if bool(profile.settings.get("shake", true)) else 0.0
 	hud.lock_toggled.connect(func(on: bool) -> void: vehicle.lock_enabled = on)
 	hud.ability_pressed.connect(use_ability)
 	hud.crew_picked.connect(use_crew_ability)
@@ -466,6 +481,11 @@ func _physics_process(delta: float) -> void:
 		vehicle.aim_input = Vector2.ZERO
 		return
 	elapsed += delta
+	_seen_timer -= delta
+	if _seen_timer <= 0.0:
+		_seen_timer = 1.0
+		for z in zombies.active_zombies():
+			profile.discover("enemies", str(z.kind))
 	vehicle.drive_input = hud.left_stick.output
 	vehicle.aim_input = hud.right_stick.output
 	if auto_spawn_specials:
@@ -605,6 +625,78 @@ func return_to_garage() -> void:
 	get_tree().change_scene_to_file(GARAGE_SCENE)
 
 
+## The Database id of an enemy rig.
+func _rig_key(rig: EnemyRig) -> String:
+	if rig.is_elite():
+		return "elite"
+	if rig is ConvoyRig:
+		return "convoy"
+	if rig is BulwarkRig:
+		return "bulwark"
+	if rig is ScrapperGunnerRig:
+		return "scrapper_gunner"
+	if rig is ScrapperRig:
+		return "scrapper"
+	if rig is PatcherRig:
+		return "patcher"
+	if rig is GunnerRig:
+		return "gunner"
+	return "outrider"
+
+
+# --- Pause menu ------------------------------------------------------------------------
+
+## Pause and open the menu (the HUD's II button, the phone's back button, or
+## the app going to the background). Not over a result card or the driver's
+## radio call.
+func open_menu() -> GameMenu:
+	if menu != null or state != State.RUNNING or hud.is_result_visible() or get_tree().paused:
+		return menu
+	hud.close_crew_wheel(false)
+	Engine.time_scale = 1.0
+	get_tree().paused = true
+	menu = GameMenu.new()
+	menu.setup(profile, true)
+	menu.resumed.connect(_on_menu_closed)
+	menu.restart_requested.connect(restart_job)
+	hud.add_child(menu)
+	return menu
+
+
+func _on_menu_closed() -> void:
+	menu = null
+	get_tree().paused = false
+
+
+## The fight starts over: same job, same rig and crew, nothing lost.
+func restart_job() -> void:
+	menu = null
+	get_tree().paused = false
+	Engine.time_scale = 1.0
+	if mission_override.is_empty():
+		get_tree().change_scene_to_file(MISSION_SCENE)
+		return
+	# Tests run a job from an override: rebuild it in place.
+	var again := (load(MISSION_SCENE) as PackedScene).instantiate()
+	again.set("mission_override", mission_override)
+	again.set("auto_spawn_specials", auto_spawn_specials)
+	var parent := get_parent()
+	queue_free()
+	parent.add_child(again)
+
+
+func _notification(what: int) -> void:
+	match what:
+		NOTIFICATION_WM_GO_BACK_REQUEST:
+			if menu != null:
+				menu.back()
+			else:
+				open_menu()
+		NOTIFICATION_APPLICATION_PAUSED, NOTIFICATION_APPLICATION_FOCUS_OUT:
+			if not DisplayServer.get_name() == "headless":
+				open_menu()
+
+
 func _exit_tree() -> void:
 	Engine.time_scale = 1.0
 	if is_inside_tree():
@@ -693,6 +785,7 @@ func spawn_hunter(at: Vector2) -> Hunter:
 	for h in hunters:
 		if not h.active:
 			h.activate(at)
+			profile.discover("enemies", "hunter")
 			hud.banner("HUNTER IN THE BLOCK", T.COL_HUNTER)
 			return h
 	return null
@@ -1257,6 +1350,12 @@ func _apply_slime(delta: float) -> void:
 func _ground_on(rig: Vehicle, delta: float) -> void:
 	if rig == null or rig.is_wrecked:
 		return
+	if rig == vehicle and _seen_timer >= 0.99:   # once a second, the tick the timer resets
+		var at := rig.global_position
+		for pair: Array in [["oil", hazards.oil_at(at, rig.team)], ["spikes", hazards.spike_at(at, rig.team)],
+				["fire", hazards.fire_at(at, rig.team)], ["slime", hazards.slime_at(at)], ["bile", hazards.is_marked(rig)]]:
+			if bool(pair[1]):
+				profile.discover("hazards", str(pair[0]))
 	rig.set_on_slime(hazards.slick_at(rig.global_position, rig.team), delta)
 	rig.set_on_spikes(hazards.spike_at(rig.global_position, rig.team), delta)
 	if hazards.fire_at(rig.global_position, rig.team):
@@ -1265,6 +1364,7 @@ func _ground_on(rig: Vehicle, delta: float) -> void:
 
 ## A status started on your rig. GOOPED marks it for the horde.
 func _on_status_started(k: int) -> void:
+	profile.discover("hazards", "status_" + str(STATUS_IDS[k]))
 	if k == StatusBars.GOOP:
 		hazards.mark(vehicle)
 
@@ -1447,6 +1547,8 @@ func _collect_pickups() -> void:
 
 
 func _take_salvage(pickup: Pickup) -> void:
+	if not pickup.part.is_empty():
+		profile.discover("parts", str(pickup.part.id))
 	if pickup.part.is_empty():
 		scrap += pickup.scrap_value
 		hud.banner("SCRAP CACHE  +%d" % pickup.scrap_value, T.COL_ORANGE, 2.0)
