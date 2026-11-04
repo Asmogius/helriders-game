@@ -518,6 +518,15 @@ const QUALITY := {
 }
 const QUALITY_ORDER := ["Low", "Medium", "High", "Ultra"]
 
+# Tutorial (optional, from MENU): the Training Run's loaner rig and the part
+# it salvages for the garage tour.
+const TUTORIAL_LOADOUT := {
+	"chassis": "scrap_frame", "engine": "patched_v8", "drive": "street_wheels",
+	"armor_front": "scrap_plating", "armor_sides": "scrap_plating", "armor_rear": "scrap_plating",
+	"weapons": ["pintle_turret"], "utility": [], "internal": ["advanced_targeting"],   # V8 carries the computer
+}
+const TUTORIAL_PART := "riot_plating"
+
 const CREW_PRICES := {"Common": 0, "Uncommon": 80, "Rare": 200, "Epic": 450, "Legendary": 900, "Mythic": 1600}
 # Lost crew (§14; agreed with the owner): a crew member lost in a wreck turns
 # up again after 3 days (Uncommon), a day more per rarity step, and joins the

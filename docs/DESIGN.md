@@ -204,6 +204,8 @@ Dramatic and short: final hit, voxel plates explode, fire/dust, zombies swarm in
 
 Start with basic pre-built vehicle + two free Common crew. One scripted low-threat Clear teaches stick movement, aim/fire, target lock, and one part swap on return. Subsequent days introduce stations naturally. Clear statement that crew are lost only on vehicle destruction.
 
+**Built (2026-11-04).** Agreed with the owner: the tutorial is optional and lives in MENU only (TUTORIAL; replayable). It runs on a loaner rig and crew (the starter build with an Advanced Targeting Computer, so lock-on can be taught), costs no day, pays nothing and keeps nothing; then a guided garage tour (fit the salvaged part, then Comms, the Inn, the Saloon and Research, ending on "crew are lost only if your rig is wrecked") on a sandbox copy that's put back afterwards. Gap-fillers: the Training Run is five steps (drive 350 px; shoot four Shamblers; turn LOCK on, then four more; wreck a softened Outrider at 60% toughness; drive over its crate, a Riot Plating schematic); the loaner can't be wrecked (a killing blow patches it up) and swaps the Junk V6 and Junk Emitter for a Patched V8 to carry the computer; the pause menu offers LEAVE TUTORIAL; closing the app mid-tutorial doesn't bring you back to it; what you meet in it still counts toward the Database; DEPLOY is blocked during the tour.
+
 # 12. Mobile Performance and Scope
 
 - Target: stable 30 fps on ~2020 3–4 GB Android devices; 60 fps mid-range+. iOS equivalent from iPhone 8 era.

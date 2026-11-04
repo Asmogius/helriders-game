@@ -131,6 +131,7 @@ var armor_max: float:
 		hp = minf(hp, hp_max)
 var traction := 1.0                # grip multiplier: slime lowers it (set_on_slime)
 var is_wrecked := false
+var cannot_wreck := false          # the tutorial's loaner: patched up instead of wrecked
 var lock_priority := 3             # when someone else locks onto this rig
 var lock_radius := 40.0
 
@@ -1340,6 +1341,10 @@ func take_damage(amount: float, from := Vector2.ZERO, splash := false, dtype := 
 	if not crew.is_empty() and hp > 0.0:
 		_dmg_buckets[_bucket_i] += amount
 		_check_big_hit()
+	if hp <= 0.0 and cannot_wreck:
+		hp = hp_max * 0.5
+		for i in 4:
+			facing_armor[i] = facing_max[i]
 	if hp <= 0.0:
 		hp = 0.0
 		_wreck()

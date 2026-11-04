@@ -93,6 +93,10 @@ var last_wreck_survivors: Array[String] = []  # names Last Rites saved on the la
 var discovered := {}                # Database: category -> ids the player has met
 var settings := {}                  # quality, shake, music, effects (own file; survives new games)
 var settings_path := "user://helriders_settings.cfg"
+var tutorial_active := false        # the next mission is the Training Run (not saved)
+var tour_active := false            # the garage tour after it runs on a sandbox copy
+var _tour_snapshot := {}
+var _tour_persist := true
 var lost: Array = []                # crew lost in wrecks, on their way back: member + "back_in" days
 var rehire_pool: Array = []         # lost crew who turned up again (level 1, perks reset)
 var rehire_day := 0                 # the day today's rehire card was drawn
@@ -1220,7 +1224,17 @@ func load_preset(index: int) -> bool:
 func save_game() -> void:
 	if not persist:
 		return
-	var data := {
+	var data := save_data()
+	var file := FileAccess.open(save_path, FileAccess.WRITE)
+	if file == null:
+		push_warning("Profile: can't write save (%s)" % FileAccess.get_open_error())
+		return
+	file.store_string(JSON.stringify(data, "\t"))
+
+
+## Everything the save file holds.
+func save_data() -> Dictionary:
+	return {
 		"version": SAVE_VERSION,
 		"scrap": scrap,
 		"schematics": schematics,
@@ -1252,11 +1266,6 @@ func save_game() -> void:
 		"rehire_pick": rehire_pick,
 		"rehire_taken": rehire_taken,
 	}
-	var file := FileAccess.open(save_path, FileAccess.WRITE)
-	if file == null:
-		push_warning("Profile: can't write save (%s)" % FileAccess.get_open_error())
-		return
-	file.store_string(JSON.stringify(data, "\t"))
 
 
 func load_game() -> bool:
@@ -1266,7 +1275,11 @@ func load_game() -> bool:
 	if not parsed is Dictionary:
 		push_warning("Profile: save file unreadable, starting fresh")
 		return false
-	var data: Dictionary = parsed
+	return apply_data(parsed)
+
+
+## Load the game from a save_data() dictionary (the file, or a snapshot).
+func apply_data(data: Dictionary) -> bool:
 	_ready_state = true
 	scrap = int(data.get("scrap", T.START_SCRAP))
 	schematics.clear()
@@ -1590,3 +1603,32 @@ func apply_settings() -> void:
 		var v := float(settings.get(bus.to_lower(), 0.8))
 		AudioServer.set_bus_volume_db(i, linear_to_db(maxf(v, 0.0001)))
 		AudioServer.set_bus_mute(i, v <= 0.0)
+
+
+# --- Tutorial (optional, from MENU; agreed with the owner) --------------------------
+
+## The garage tour after the Training Run: a sandbox copy of the game with
+## the salvaged part in storage. Nothing done in it is saved; end_tour()
+## puts everything back.
+func begin_tour() -> void:
+	if tour_active:
+		return
+	_tour_snapshot = JSON.parse_string(JSON.stringify(save_data()))
+	_tour_persist = persist
+	persist = false
+	tour_active = true
+	if not schematics.has(T.TUTORIAL_PART):
+		schematics.append(T.TUTORIAL_PART)
+	storage[T.TUTORIAL_PART] = int(storage.get(T.TUTORIAL_PART, 0)) + 1
+	changed.emit()
+
+
+func end_tour() -> void:
+	if not tour_active:
+		return
+	tour_active = false
+	apply_data(_tour_snapshot)
+	_tour_snapshot = {}
+	persist = _tour_persist
+	save_game()
+	changed.emit()

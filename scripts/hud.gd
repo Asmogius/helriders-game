@@ -31,6 +31,7 @@ var crew_wheel_cooldown := 0.0
 var _status: Label
 var _fps: Label
 var pause_button: Button
+var tip: Label                     # the tutorial's instructions
 var _hint: Label
 var _banner: Label
 var _banner_tween: Tween
@@ -139,6 +140,16 @@ func _ready() -> void:
 	pause_button.add_theme_font_size_override("font_size", 28)
 	pause_button.pressed.connect(func() -> void: pause_pressed.emit())
 	_root.add_child(pause_button)
+	tip = _label(26, Color(1.0, 0.92, 0.7))
+	tip.anchor_left = 0.5
+	tip.anchor_right = 0.5
+	tip.offset_left = -430.0
+	tip.offset_right = 430.0
+	tip.offset_top = 150.0
+	tip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tip.autowrap_mode = TextServer.AUTOWRAP_WORD
+	tip.visible = false
+	_root.add_child(tip)
 	right_stick.blockers.append(pause_button)
 
 	_crew_button = CrewButton.new()
@@ -1015,3 +1026,9 @@ class ArmorBar extends Control:
 		var fill := T.COL_CYAN if ratio > 0.35 else T.COL_ORANGE
 		draw_rect(Rect2(Vector2(2, 2), Vector2((size.x - 4.0) * ratio, size.y - 4.0)), fill)
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0.5, 0.5, 0.5, 0.5), false, 1.0)
+
+
+## The tutorial's instruction line ("" hides it).
+func set_tip(text: String) -> void:
+	tip.text = text
+	tip.visible = text != ""
