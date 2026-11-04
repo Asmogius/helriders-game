@@ -7,7 +7,7 @@ extends Node2D
 
 const MAX := 160
 
-var atlas: RefCounted          # fx_atlas_local.gd (P0 stand-in)
+var atlas: RefCounted          # art_atlas.gd (P0)
 var density := 1.0
 var _skip := 0.0
 

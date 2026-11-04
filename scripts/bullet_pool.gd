@@ -253,7 +253,7 @@ func _chain_hit(first: Node2D, at: Vector2, damage: float, team: int, dtype: Str
 
 # --- V4.3 style sample (P2): tracers with a short glowing tail from the fx
 # atlas (additive). Missing atlas -> the line + dot below (fallback). --------
-const AtlasLocal := preload("res://scripts/fx_atlas_local.gd")   # P0 stand-in
+const ArtAtlas := preload("res://scripts/art_atlas.gd")   # P0 atlas loader
 var _tracer: RefCounted
 var _tracer_tried := false
 
@@ -261,8 +261,8 @@ var _tracer_tried := false
 func _tracer_atlas() -> RefCounted:
 	if not _tracer_tried:
 		_tracer_tried = true
-		_tracer = AtlasLocal.open("res://art/fx/fx_atlas.json")
-		if _tracer != null and _tracer.has("tracer_glow"):
+		_tracer = ArtAtlas.load_atlas("res://art/fx/fx_atlas")
+		if _tracer.ok() and _tracer.has("tracer_glow"):
 			var m := CanvasItemMaterial.new()
 			m.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
 			material = m
@@ -274,8 +274,8 @@ func _tracer_atlas() -> RefCounted:
 
 func _draw_tracers(a: RefCounted) -> void:
 	var tex: Texture2D = a.texture
-	var glow: Rect2 = a.rect("tracer_glow")
-	var core: Rect2 = a.rect("tracer_core")
+	var glow: Rect2 = a.region("tracer_glow")
+	var core: Rect2 = a.region("tracer_core")
 	for i in _count:
 		var head := _pos[i]
 		var ang := _vel[i].angle()

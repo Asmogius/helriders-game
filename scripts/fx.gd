@@ -20,8 +20,8 @@ var _count := 0
 # --- V4 style sample (P2): atlas sprites for the explosion. Missing atlas ->
 # the square particles below stay the whole look (fallback). -----------------
 const FxGlow := preload("res://scripts/fx_glow.gd")
-const AtlasLocal := preload("res://scripts/fx_atlas_local.gd")   # P0 stand-in
-const ATLAS_JSON := "res://art/fx/fx_atlas.json"
+const ArtAtlas := preload("res://scripts/art_atlas.gd")   # P0 atlas loader
+const ATLAS_BASE := "res://art/fx/fx_atlas"
 var atlas: RefCounted
 var glow: Node2D       # additive: flash, fireball, shockwave
 var smoke: Node2D      # normal blend: smoke column, debris chips
@@ -36,7 +36,9 @@ func _ready() -> void:
 	_size.resize(MAX_PARTICLES)
 	_drag.resize(MAX_PARTICLES)
 	_col.resize(MAX_PARTICLES)
-	atlas = AtlasLocal.open(ATLAS_JSON)
+	atlas = ArtAtlas.load_atlas(ATLAS_BASE)
+	if not atlas.ok():
+		atlas = null
 	if atlas != null:
 		decals = FxGlow.new()
 		decals.setup(atlas, false)

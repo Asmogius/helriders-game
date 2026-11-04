@@ -35,6 +35,7 @@ func _initialize() -> void:
 		_add("garage_" + t.to_lower(), _show_tab.bind(t))
 	_add("rarity_tiers", _show_rarity)
 	_add("fight", _show_fight)
+	_add("fx_sample", _show_fx_sample)   # P2 V4 style sample
 
 
 func _add(shot: String, setup: Callable) -> void:
@@ -75,6 +76,15 @@ func _show_rarity() -> void:
 func _show_fight() -> void:
 	_strip.queue_free()
 	change_scene_to_file("res://scenes/mission.tscn")
+
+
+## P2 V4 sample: an explosion and tracers in the running fight.
+func _show_fx_sample() -> void:
+	var m := current_scene
+	var p: Vector2 = m.vehicle.global_position
+	m.fx.explosion(p + Vector2(140, -50), Vector2.ZERO)
+	for i in 6:
+		m.bullets.fire(p + Vector2(30 + i * 22, -10), Vector2(900, -120), 0.0, m.bullets.TEAM_PLAYER)
 
 
 func _process(_delta: float) -> bool:
