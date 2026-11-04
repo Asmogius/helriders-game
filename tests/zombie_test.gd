@@ -10,7 +10,9 @@ extends SceneTree
 const Mission := preload("res://scripts/mission.gd")
 const Missions := preload("res://scripts/missions.gd")
 const ZombieDirector := preload("res://scripts/zombie_director.gd")
-const Zombie := preload("res://scripts/zombie.gd")
+# No `const Zombie := preload(...)` here: a test-level reference to zombie.gd next
+# to mission.gd keeps both scripts alive past exit (5 resources still in use).
+# Reach it through the director instead.
 const T := preload("res://scripts/tuning.gd")
 
 const SPOT := Vector2(1600, 1200)     # the player start: open ground
@@ -19,7 +21,7 @@ var main: Mission
 var frame := 0
 var step := 0
 var failures: Array[String] = []
-var z: Zombie
+var z: Node2D   # a zombie.gd instance
 var mark := {}
 
 
@@ -35,6 +37,8 @@ func _initialize() -> void:
 
 
 func _process(_delta: float) -> bool:
+	if main == null:
+		return false   # finished: tearing down
 	frame += 1
 	var rig := main.vehicle
 	match step:
@@ -71,7 +75,7 @@ func _process(_delta: float) -> bool:
 				mark.armor = rig.armor
 				mark.pos = rig.global_position
 			if frame == 5:
-				_check(z.is_charging() and z.charge == Zombie.Charge.WINDUP, "Tank: roars before it charges")
+				_check(z.is_charging() and z.charge == ZombieDirector.Zombie.Charge.WINDUP, "Tank: roars before it charges")
 			if frame == 120:
 				_check(z.charge_hits == 1, "Tank: the charge lands")
 				_check(mark.armor - rig.armor >= T.TANK_CHARGE_DAMAGE, "Tank: a charge hit deals %d" % int(T.TANK_CHARGE_DAMAGE))
@@ -113,12 +117,12 @@ func _process(_delta: float) -> bool:
 				_check(main.hazards.is_marked(rig), "Boomer: the burst marks a rig caught in it")
 				_check(is_equal_approx(main.scrap - float(mark.scrap), 3.0 * _scrap_mult()), "Boomer pays 3 scrap")
 			if frame == 3:
-				_check((mark.near as Zombie).frenzy and not (mark.far as Zombie).frenzy, "marked: zombies within %d rush the rig, others don't" % int(T.BILE_MARK_RANGE))
+				_check((mark.near as Object).get("frenzy") and not (mark.far as Object).get("frenzy"), "marked: zombies within %d rush the rig, others don't" % int(T.BILE_MARK_RANGE))
 			if frame == 3 + roundi(T.BILE_MARK_TIME * 60.0) + 5:
-				_check(not main.hazards.is_marked(rig) and not (mark.near as Zombie).frenzy, "the mark wears off")
-				(mark.far as Zombie).global_position = SPOT + Vector2(80, 0)
+				_check(not main.hazards.is_marked(rig) and not (mark.near as Object).get("frenzy"), "the mark wears off")
+				(mark.far as Node2D).global_position = SPOT + Vector2(80, 0)
 			if frame == 3 + roundi(T.BILE_MARK_TIME * 60.0) + 7:
-				var in_pool := mark.far as Zombie
+				var in_pool: Node2D = mark.far
 				_check(main.hazards.bile_at(in_pool.global_position) and in_pool.frenzy, "a zombie standing in bile frenzies")
 				main.zombies.clear_all()
 				# Far away: no mark.
@@ -228,6 +232,15 @@ func _check(ok: bool, what: String) -> void:
 
 
 func _finish() -> void:
+	# Teardown: free the mission, drop the test's node refs, and let a few
+	# frames pass so everything is gone at exit.
+	step = -1   # _process stops driving the test
+	z = null
+	mark.clear()
+	main.queue_free()
+	main = null
+	for i in 3:
+		await process_frame
 	if failures.is_empty():
 		print("ZOMBIE TEST PASSED")
 		quit(0)
