@@ -21,8 +21,8 @@ sys.path.insert(0, HERE)
 from palette import PALETTE, OUTLINE, shade  # noqa: E402
 
 # --- defaults (see docs/ART_PIPELINE.md) ---
-DIRECTIONS = 16      # headings per sheet
-PX_PER_VOXEL = 2     # 1 voxel = 2x2 game px; a 32x18 hull = 64x36 px (vehicle.gd body)
+DIRECTIONS = 32      # headings per sheet
+PX_PER_VOXEL = 1     # 1 voxel = 1 game px; a 64x36 hull = 64x36 px (vehicle.gd body)
 TILT_DEG = 30.0      # camera tilt off straight-down; 0 = pure top-down
 SAMPLES = 3          # face samples per voxel edge per pixel (anti-hole)
 LIGHT = np.array([-0.45, -0.55, 0.70])  # from upper-left of the screen, above
@@ -67,7 +67,7 @@ def render_frame(grid, colors, heading_deg, ppv=PX_PER_VOXEL, tilt=TILT_DEG, can
     out = np.zeros((H, W, 4), dtype=np.uint8)
     filled = np.argwhere(grid > 0)
     occ = grid > 0
-    k = max(2, SAMPLES * ppv)
+    k = max(3, SAMPLES * ppv)
     offs = (np.arange(k) + 0.5) / k
     uu, vv = np.meshgrid(offs, offs)
     uu, vv = uu.ravel(), vv.ravel()
@@ -132,27 +132,61 @@ def outline(img):
     return img
 
 
-def render_sheet(name, grid, colors, outdir, directions=DIRECTIONS, ppv=PX_PER_VOXEL):
-    frames = [render_frame(grid, colors, i * 360.0 / directions, ppv) for i in range(directions)]
+def _canvas(shape, ppv):
+    r = math.hypot(shape[0], shape[1]) / 2 + 1
+    c = int(math.ceil(2 * r * ppv + shape[2] * math.sin(math.radians(TILT_DEG)) * ppv)) + 4
+    return c + c % 2
+
+
+def _sheet(frames, cols):
     fw, fh = frames[0].shape[1], frames[0].shape[0]
-    cols = 4 if directions <= 16 else 8
-    rows = math.ceil(directions / cols)
+    rows = math.ceil(len(frames) / cols)
     sheet = Image.new("RGBA", (fw * cols, fh * rows))
     for i, f in enumerate(frames):
         sheet.paste(Image.fromarray(f), ((i % cols) * fw, (i // cols) * fh))
+    return sheet
+
+
+def render_model(name, chunks, colors, outdir, directions=DIRECTIONS, ppv=PX_PER_VOXEL):
+    """chunks: {chunk_name: grid} (same shape). Writes <name>.png (all chunks),
+    <name>__<chunk>.png per chunk (wreck pieces, aligned to the same frame
+    centre) and <name>.json describing frames and per-heading chunk offsets."""
+    shape = next(iter(chunks.values())).shape
+    canvas = _canvas(shape, ppv)
+    cols = 8
+    full = np.zeros(shape, np.int16)
+    for g in chunks.values():
+        full = np.where(g > 0, g, full)
     os.makedirs(outdir, exist_ok=True)
-    png = os.path.join(outdir, f"{name}.png")
-    sheet.save(png)
-    meta = {"frame_w": fw, "frame_h": fh, "columns": cols, "directions": directions,
-            "px_per_voxel": ppv, "tilt_deg": TILT_DEG, "heading_0": "+x (Vector2.RIGHT)"}
+    heads = [i * 360.0 / directions for i in range(directions)]
+    frames = [render_frame(full, colors, h, ppv, canvas=canvas) for h in heads]
+    _sheet(frames, cols).save(os.path.join(outdir, f"{name}.png"))
+    write_import(os.path.join(outdir, f"{name}.png"))
+    meta = {"sheet": f"{name}.png", "frame_w": canvas, "frame_h": canvas, "columns": cols,
+            "directions": directions, "px_per_voxel": ppv, "tilt_deg": TILT_DEG,
+            "heading_0": "+x (Vector2.RIGHT), frames turn clockwise",
+            "origin": "frame centre = model footprint centre at ground level",
+            "chunks": {}}
+    for cname, g in chunks.items():
+        cf = [render_frame(g, colors, h, ppv, canvas=canvas) for h in heads]
+        fn = f"{name}__{cname}.png"
+        _sheet(cf, cols).save(os.path.join(outdir, fn))
+        write_import(os.path.join(outdir, fn))
+        offs = []
+        for f in cf:   # centroid of the chunk's pixels, relative to frame centre
+            ys, xs = np.nonzero(f[:, :, 3])
+            offs.append([round(float(xs.mean()) + 0.5 - canvas / 2, 1),
+                         round(float(ys.mean()) + 0.5 - canvas / 2, 1)] if len(xs) else [0, 0])
+        meta["chunks"][cname] = {"sheet": fn, "voxels": int((g > 0).sum()), "offsets": offs}
     json.dump(meta, open(os.path.join(outdir, f"{name}.json"), "w"), indent=1)
-    write_import(png)
-    return sheet, meta
+    return meta
 
 
 def write_import(png):
-    """Godot 4 .import: no filter is a project/CanvasItem setting; here: no mipmaps, lossless."""
+    """Godot 4 .import: lossless, no mipmaps. Nearest filtering is set on the node."""
     rel = os.path.relpath(png, os.path.join(HERE, "..", "..")).replace(os.sep, "/")
+    if os.path.exists(png + ".import"):   # keep Godot's uid once it has imported
+        return
     open(png + ".import", "w").write(f"""[remap]
 
 importer="texture"
@@ -193,13 +227,13 @@ def main():
     a = ap.parse_args()
     if a.vox:
         grid, pal = load_vox(a.vox)
-        render_sheet(a.name or os.path.splitext(os.path.basename(a.vox))[0], grid,
-                     [(0, 0, 0, 0)] + [p for p in pal], a.out, a.directions)
+        render_model(a.name or os.path.splitext(os.path.basename(a.vox))[0], {"body": grid},
+                     [(0, 0, 0, 0)] + list(pal), a.out, a.directions)
         return
     import models
-    for name, (grid, colors) in models.ALL().items():
-        render_sheet(name, grid, colors, a.out, a.directions)
-        print("rendered", name)
+    for name, (m, colors) in models.ALL().items():
+        render_model(name, m.chunks, colors, a.out, a.directions)
+        print("rendered", name, list(m.chunks))
 
 
 if __name__ == "__main__":
