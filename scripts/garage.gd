@@ -13,6 +13,7 @@ const Mods := preload("res://scripts/mods.gd")
 const Loadout := preload("res://scripts/loadout.gd")
 const Vehicle := preload("res://scripts/vehicle.gd")
 const UI := preload("res://scripts/ui_theme.gd")
+const RigUpgrades := preload("res://scripts/rig_upgrades.gd")
 const ProfileScript := preload("res://scripts/profile.gd")
 const Comms := preload("res://scripts/comms.gd")
 const Inn := preload("res://scripts/inn.gd")
@@ -1082,7 +1083,7 @@ func _open_upgrades() -> void:
 	var body := VBoxContainer.new()
 	body.add_theme_constant_override("separation", 12)
 	body.add_child(UI.label("Scrap  %d" % profile.scrap, 22, T.COL_ORANGE))
-	for key: String in ["fabrication", "loot", "salvage"]:
+	for key: String in RigUpgrades.KEYS:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 14)
 		var info := VBoxContainer.new()
@@ -1106,23 +1107,7 @@ func _open_upgrades() -> void:
 
 
 func _upgrade_effect(key: String) -> String:
-	var level := profile.upgrade_level(key)
-	var step: float = T.UPGRADES[key].per_level
-	var next := level + 1
-	var max_level: int = (T.UPGRADES[key].costs as Array).size()
-	var now_text := ""
-	var next_text := ""
-	match key:
-		"fabrication":
-			now_text = "Parts cost %d%% less" % roundi(step * level * 100.0)
-			next_text = "%d%%" % roundi(step * next * 100.0)
-		"loot":
-			now_text = "Outrider schematic drop chance %d%%" % roundi(profile.schematic_chance() * 100.0)
-			next_text = "%d%%" % roundi(minf(T.SCHEMATIC_DROP_CHANCE + step * next, 0.95) * 100.0)
-		"salvage":
-			now_text = "Scrap from kills +%d%%" % roundi(step * level * 100.0)
-			next_text = "+%d%%" % roundi(step * next * 100.0)
-	return now_text if level >= max_level else "%s    (next: %s)" % [now_text, next_text]
+	return RigUpgrades.effect_text(profile, key)
 
 
 func _on_tab(tab_name: String) -> void:

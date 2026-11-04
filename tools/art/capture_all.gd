@@ -3,6 +3,7 @@ extends SceneTree
 ##   xvfb-run -s "-screen 0 1280x720x24" godot --rendering-driver opengl3 --path . -s res://tools/art/capture_all.gd -- out_dir
 ## Writes into out_dir (default user://captures):
 ##   garage_<tab>.png for GARAGE, RESEARCH, SALOON, INN, COMMS
+##   research_rig_upgrades.png (Research screen, RIG UPGRADES view)
 ##   rarity_tiers.png  (all six rarity frames side by side)
 ##   art_swatches.png (every art-only colour in tuning.gd, named)
 ##   fight.png         (the mission scene after a few seconds)
@@ -39,6 +40,7 @@ func _initialize() -> void:
 	for t: String in TABS:
 		_add("garage_" + t.to_lower(), _show_tab.bind(t))
 	_add("garage_part_cards", _show_part_cards)
+	_add("research_rig_upgrades", _show_rig_upgrades)
 	_add("rarity_tiers", _show_rarity)
 	_add("art_swatches", _show_swatches)
 	_add("fight", _show_fight)
@@ -57,6 +59,14 @@ func _show_tab(t: String) -> void:
 		_garage = (load("res://scenes/garage.tscn") as PackedScene).instantiate()
 		root.add_child(_garage)
 	_garage.show_tab(t)
+
+
+func _show_rig_upgrades() -> void:
+	var profile: Node = root.get_node("Profile")
+	profile.scrap = 420   # enough to show live BUY buttons; later shots ignore scrap
+	_show_tab("RESEARCH")
+	_garage._research.refresh()
+	_garage._research.show_rig_upgrades(true)
 
 
 func _show_part_cards() -> void:
