@@ -12,7 +12,8 @@ const UI := preload("res://scripts/ui_theme.gd")
 const T := preload("res://scripts/tuning.gd")
 
 const TABS := ["GARAGE", "RESEARCH", "SALOON", "INN", "COMMS"]
-const SETTLE := 12   # frames to wait before each shot
+const SETTLE := 30   # frames to wait before each shot (after fades and slides)
+const WAITS := {"fight": 150, "garage_slide_mid": 6, "results_tick_mid": 18, "results_tick_done": 60}
 
 var _dir := "user://captures"
 var _steps: Array[Callable] = []
@@ -33,8 +34,11 @@ func _initialize() -> void:
 	profile.new_game()
 	for t: String in TABS:
 		_add("garage_" + t.to_lower(), _show_tab.bind(t))
+	_add("garage_slide_mid", _show_tab.bind("SALOON"))   # V6.5: mid slide-in
 	_add("rarity_tiers", _show_rarity)
 	_add("fight", _show_fight)
+	_add("results_tick_mid", _show_results)    # V6.5: numbers counting up
+	_add("results_tick_done", func() -> void: pass)
 
 
 func _add(shot: String, setup: Callable) -> void:
@@ -77,6 +81,10 @@ func _show_fight() -> void:
 	change_scene_to_file("res://scenes/mission.tscn")
 
 
+func _show_results() -> void:
+	current_scene.hud.show_result("JOB DONE", "Job pay +120    Kill scrap +45    Time 3:12", "RETURN TO GARAGE", T.COL_ORANGE)
+
+
 func _process(_delta: float) -> bool:
 	if _wait > 0:
 		_wait -= 1
@@ -90,5 +98,5 @@ func _process(_delta: float) -> bool:
 		quit()
 		return true
 	_steps[_step].call()
-	_wait = 150 if _names[_step] == "fight" else SETTLE
+	_wait = int(WAITS.get(_names[_step], SETTLE))
 	return false

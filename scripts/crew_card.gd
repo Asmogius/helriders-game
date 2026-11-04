@@ -12,6 +12,7 @@ var status := ""
 var status_color := UI.TEXT_DIM
 var selected := false
 var dim := false            # resting or already hired
+static var _seen_level := {}   # V6.5: member id -> level last shown, for the level-up flash
 
 
 func _ready() -> void:
@@ -19,6 +20,12 @@ func _ready() -> void:
 	focus_mode = Control.FOCUS_NONE
 	custom_minimum_size = SIZE
 	action_mode = BaseButton.ACTION_MODE_BUTTON_RELEASE
+	if not member.is_empty() and member.has("id"):
+		var lv := Crew.level(member)
+		var key := str(member.id)
+		if _seen_level.has(key) and lv > int(_seen_level[key]):
+			preload("res://scripts/ui_transitions.gd").flash(self)
+		_seen_level[key] = lv
 
 
 func _draw() -> void:

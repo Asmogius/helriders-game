@@ -259,7 +259,7 @@ Make the home base a place with distinct areas you move between: lit, animated a
   - status icons;
   - a cleaner LOCK, crew and utility look (keep the controller and keyboard badges);
   - the touch sticks get a subtle textured look (hidden in mouse-and-keyboard mode on a PC).
-- [ ] **V6.5 Transitions:** screen fade or wipe between garage and fight, cards slide in, results counters tick up, a level-up flash on crew cards.
+- [x] **V6.5 Transitions:** screen fade or wipe between garage and fight, cards slide in, results counters tick up, a level-up flash on crew cards.
 
 ## V7. Remaining code-drawn things to bring to voxel art
 
