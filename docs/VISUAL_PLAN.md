@@ -236,7 +236,7 @@ Make the home base a place with distinct areas you move between: lit, animated a
 - [ ] **V5.6 Map edges:** a real boundary (barricade walls of cars and containers, a burning wreck line) instead of a flat grey border.
 
 **Layout:**
-- [ ] **V5.7 More and better layouts.**
+- [x] **V5.7 More and better layouts.**
   - Go from 6 to 12 layouts: 3 per district, each with at least 1 landmark.
   - Landmarks: a gas station, a collapsed overpass, a mall car park, a rail bridge, a stadium gate, a factory yard and so on.
   - Each layout should have:
