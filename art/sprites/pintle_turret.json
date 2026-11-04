@@ -1,0 +1,9 @@
+{
+ "frame_w": 42,
+ "frame_h": 42,
+ "columns": 4,
+ "directions": 16,
+ "px_per_voxel": 2,
+ "tilt_deg": 30.0,
+ "heading_0": "+x (Vector2.RIGHT)"
+}
