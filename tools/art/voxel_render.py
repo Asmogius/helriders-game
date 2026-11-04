@@ -76,7 +76,10 @@ def render_frame(grid, colors, heading_deg, ppv=PX_PER_VOXEL, tilt=TILT_DEG, can
     uu, vv = np.meshgrid(offs, offs)
     uu, vv = uu.ravel(), vv.ravel()
     L = LIGHT / np.linalg.norm(LIGHT)
-    view = np.array([0.0, -st, ct])
+    # Screen y grows with world +y (py = wy*cos t - z*sin t) and nearer points
+    # have larger depth (wy*sin t + z*cos t), so the camera sits on the +y
+    # (south) side: south-facing sides and tops face it, north sides don't.
+    view = np.array([0.0, st, ct])
     cols = np.array([[shade(colors[c], lv) for lv in range(3)] for c in range(len(colors))], dtype=np.uint8)
     for n in ((1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)):
         n = np.array(n)

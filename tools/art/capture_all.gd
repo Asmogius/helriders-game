@@ -92,6 +92,7 @@ func _process(_delta: float) -> bool:
 		var path := "%s/%s.png" % [_dir, _steps[_step].shot]
 		root.get_texture().get_image().save_png(path)
 		print("saved ", path)
+		_steps[_step].after(self)
 	_step += 1
 	if _step >= _steps.size():
 		quit()

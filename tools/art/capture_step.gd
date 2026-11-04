@@ -5,7 +5,8 @@ extends RefCounted
 ##
 ## A step overrides `run(cap)` to set the screen up; `cap` is the capture_all
 ## SceneTree (shared `garage`, `strip`, `profile`, and helpers `show_tab()`,
-## `new_strip()`). The PNG is saved `wait()` frames later as `<shot>.png`.
+## `new_strip()`). The PNG is saved `wait()` frames later as `<shot>.png`, then
+## `after(cap)` runs: undo anything global the shot changed (input mode...).
 
 const UI := preload("res://scripts/ui_theme.gd")
 const T := preload("res://scripts/tuning.gd")
@@ -21,3 +22,7 @@ func run(_cap: SceneTree) -> void:
 
 func wait() -> int:
 	return SETTLE
+
+
+func after(_cap: SceneTree) -> void:
+	pass
