@@ -487,14 +487,15 @@ func is_district_open(index: int) -> bool:
 
 ## Extracted: bank the run's scrap and schematics. Returns a report for the
 ## results card. Drops never repeat a known schematic, so all are new.
-func bank_run(run_scrap: int, salvaged: Array[String]) -> Dictionary:
+func bank_run(run_scrap: int, salvaged: Array[String], cleared := true) -> Dictionary:
 	var unlocked: Array[String] = []
 	for id in salvaged:
 		if not schematics.has(id):
 			schematics.append(id)
 			unlocked.append(id)
 	scrap += run_scrap
-	record.clears = int(record.clears) + 1
+	if cleared:   # a failed job (the truck lost) banks its haul but isn't a clear
+		record.clears = int(record.clears) + 1
 	save_game()
 	changed.emit()
 	return {"scrap": run_scrap, "unlocked": unlocked}

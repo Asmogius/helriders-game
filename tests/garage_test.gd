@@ -138,6 +138,21 @@ func _run_checks() -> void:
 	profile.apply_data(snap)
 	_check(profile.preset_name(0) == "Brawler build", "names round-trip through the save")
 	garage._close_overlay()
+	# The phone's back button steps back a level at a time.
+	garage.open_slot(DRIVE)
+	garage.go_back()
+	_check(garage.selected == -1 and garage.menu == null, "back closes the part sheet")
+	garage._open_presets()
+	garage.go_back()
+	_check((garage._overlay == null or not is_instance_valid(garage._overlay) or garage._overlay.is_queued_for_deletion()) and garage.menu == null, "back closes an open panel")
+	garage.show_tab("INN")
+	garage.go_back()
+	_check(garage.tab == "GARAGE" and garage.menu == null, "back leaves a station for the garage")
+	garage.go_back()
+	_check(garage.menu != null, "back on the garage itself opens MENU")
+	garage.go_back()
+	_check(garage.menu == null or garage.menu.is_queued_for_deletion(), "and back again closes it")
+	garage.menu = null
 
 	# --- Weight, frames with more slots, two weapons --------------------------------
 	profile.scrap = 1000

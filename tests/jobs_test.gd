@@ -166,12 +166,16 @@ func _process(_delta: float) -> bool:
 			if frame == 3:
 				mark.scrap = profile.get("scrap")
 				mark.day = profile.get("day")
+				mark.clears = int((profile.get("record") as Dictionary).clears)
 				main.scrap = 10.0
+				main.drop_cache(main.vehicle.global_position + Vector2(0, 900), 50)   # left on the ground
 				main.truck.take_damage(100000.0)
 			if frame == 5:
 				_check(main.state == Mission.State.FAILED and main.hud.result_text().begins_with("TRUCK LOST"), "truck wrecked: the job fails")
 				_check(int(profile.get("day")) == int(mark.day) + 1 and int(profile.get("scrap")) == int(mark.scrap) + 10, "the day passes; no job pay, you keep your kill scrap")
 				_check(profile.call("has_rig"), "your rig and crew come home (no wreck)")
+				_check(int((profile.get("record") as Dictionary).clears) == int(mark.clears), "a failed job isn't a clear (Expeditions unlock on clears)")
+				_check(int(profile.get("scrap")) == int(mark.scrap) + 10, "a crate left on the ground stays there")
 				_finish()
 	return false
 

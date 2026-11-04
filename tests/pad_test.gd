@@ -246,6 +246,27 @@ func _process(_delta: float) -> bool:
 			profile.settings_path = old_path
 			profile.persist = false
 			pad.call("reset_map")
+			# The Database (text only) scrolls with the right stick; sliders take focus.
+			_button(JOY_BUTTON_START)
+			main.menu.show_page("database")
+			pad.set("override", {"right": Vector2(0, 1)})
+			mark.scroll = main.menu.find_children("*", "ScrollContainer", true, false)[0]
+		46:
+			pass
+		54:
+			var box: ScrollContainer = mark.scroll
+			_check(box.scroll_vertical > 0, "the right stick scrolls the Database (%d px)" % box.scroll_vertical)
+			pad.set("override", {})
+			main.menu.show_page("settings")
+		60:
+			var sliders := main.menu.find_children("*", "HSlider", true, false)
+			_check(not sliders.is_empty() and (sliders[0] as Control).focus_mode == Control.FOCUS_ALL, "the volume sliders can take the pad's focus")
+			var slider := sliders[0] as HSlider
+			slider.grab_focus()
+			var before := slider.value
+			_action("ui_left")
+			_check(slider.value < before, "and the D-pad moves them")
+			main.menu.resume()
 			_check(int(pad.call("binding", "lock")) == JOY_BUTTON_RIGHT_SHOULDER and int(pad.call("binding", "fire")) == 100 + JOY_AXIS_TRIGGER_RIGHT and not bool(pad.call("sticks_swapped")), "RESET TO DEFAULT puts it all back")
 			_finish()
 	return false

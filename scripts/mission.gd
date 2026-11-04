@@ -944,11 +944,12 @@ func _wreck_sequence(aboard: Array[String]) -> void:
 	_in_wreck = false
 
 
-## A tap during the wreck skips to the card.
+## A tap (or any pad button) during the wreck skips to the card.
 func _input(event: InputEvent) -> void:
 	if not _in_wreck:
 		return
-	if (event is InputEventScreenTouch and (event as InputEventScreenTouch).pressed) or (event is InputEventMouseButton and (event as InputEventMouseButton).pressed):
+	if (event is InputEventScreenTouch and (event as InputEventScreenTouch).pressed) or (event is InputEventMouseButton and (event as InputEventMouseButton).pressed) \
+			or (event is InputEventJoypadButton and (event as InputEventJoypadButton).pressed):
 		wreck_skipped = true
 
 
@@ -1718,9 +1719,8 @@ func _fail(title: String, detail: String) -> void:
 	state = State.FAILED
 	if _music != null:
 		_music.end_combat()
-	for p in pickups.get_children():
-		_take_salvage(p as Pickup)
-	bank_report = profile.bank_run(int(scrap), _pending_ids())
+	# Only what you picked up comes home (a cleared job hauls in the rest).
+	bank_report = profile.bank_run(int(scrap), _pending_ids(), false)
 	profile.finish_day()
 	profile.bank_crew(0, _rest_ids(), bool(vehicle.crew_mod("triage")), vehicle.has_sp("sp_clean_bandage"))
 	var lines := detail + "\nKill scrap +%d    Time %s" % [int(scrap), _clock(elapsed)]
