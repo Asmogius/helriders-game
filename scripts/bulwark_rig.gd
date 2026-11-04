@@ -13,6 +13,20 @@ var backoffs := 0            # times it rammed you and backed off (tests)
 var front_hits := 0          # hits its armor blunted (tests)
 
 
+## Voxel art: art/sprites/bulwark.json (see docs/ART_PIPELINE.md).
+func art_id() -> String:
+	return "bulwark"
+
+
+## While it charges (ATTACK), the plow seams glow: the charge_glow layer.
+func art_layers() -> Array[String]:
+	var ids := super()
+	if _hull_art != null and mode == Mode.ATTACK and not is_wrecked \
+			and (_hull_art.meta.get("layers", {}) as Dictionary).has("charge_glow"):
+		ids.append("charge_glow")
+	return ids
+
+
 func _init() -> void:
 	team = BulletPool.TEAM_ENEMY
 	apply_stats(T.BULWARK)
@@ -111,6 +125,8 @@ func take_hit(damage: float, impulse: Vector2, cause := "shot", dtype := "") -> 
 
 
 func _draw() -> void:
+	if _hull_art != null:
+		return   # the voxel sheet draws the rig
 	var half_l := body_len * 0.5
 	var half_w := body_wid * 0.5
 	var hull := Color(0.2, 0.21, 0.22)

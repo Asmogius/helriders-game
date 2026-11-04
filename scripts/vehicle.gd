@@ -180,6 +180,8 @@ const DirectionalSprite := preload("res://scripts/directional_sprite.gd")
 ## Art lookup is by id: a chassis, weapon or enemy rig with id X wears
 ## res://art/sprites/X.json when that file exists (see docs/ART_PIPELINE.md).
 const ART_DIR := "res://art/sprites/"
+## Weapon ids that share a name with a rig id get their own sheet name.
+const ART_WEAPON_ALIASES := {"": "pintle_turret", "scrapper": "scrapper_turret"}
 const WRECK_PIECE_LIFE := 1.4       # s a flung wreck piece lasts (fades over the last half)
 var wreck_pieces: Array[Node2D] = []   # the pieces flung by the last wreck (tests read it)
 var _hull_texture: Texture2D = null
@@ -319,7 +321,7 @@ func _sync_parts() -> void:
 		sprite.enemy = team != BulletPool.TEAM_PLAYER
 		sprite.position = turret_position(i, count)
 		add_child(sprite)
-		var tpath := art_path(sprite.kind if sprite.kind != "" else "pintle_turret")
+		var tpath := art_path(str(ART_WEAPON_ALIASES.get(sprite.kind, sprite.kind)))
 		if tpath != "":
 			var ta: Sprite2D = DirectionalSprite.new()
 			if ta.load_meta(tpath):
@@ -353,7 +355,8 @@ func _sync_fixed_art() -> void:
 	for w in gun_stats:
 		if int(w.mount) != Mount.FIXED:
 			continue
-		var path := art_path(str(w.get("id", "")))
+		var wid := str(w.get("id", ""))
+		var path := art_path(str(ART_WEAPON_ALIASES.get(wid, wid))) if wid != "" else ""
 		if path == "":
 			continue
 		var a: Sprite2D = DirectionalSprite.new()
@@ -1873,6 +1876,8 @@ func _draw() -> void:
 
 ## A flung wreck piece: drifts out, slows, spins and fades, then frees itself.
 class WreckPiece extends Sprite2D:
+	## Counts as wreckage for rig caps (mission.active_rig_count) while it flies.
+	var is_wrecked := true
 	var velocity := Vector2.ZERO
 	var spin := 0.0
 	var life := 1.4

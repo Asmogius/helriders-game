@@ -27,6 +27,11 @@ var _hook_t := 0.0
 var _circle_side := 1.0
 
 
+## Voxel art: art/sprites/patcher.json (see docs/ART_PIPELINE.md).
+func art_id() -> String:
+	return "patcher"
+
+
 func _init() -> void:
 	team = BulletPool.TEAM_ENEMY
 	apply_stats(T.PATCHER)
@@ -276,6 +281,8 @@ func _nearest_wreck() -> Vehicle:
 
 
 func _draw() -> void:
+	if _hull_art != null:
+		return   # the voxel sheet draws the rig
 	var half_l := body_len * 0.5
 	var half_w := body_wid * 0.5
 	var hull := Color(0.24, 0.27, 0.22)
@@ -304,21 +311,33 @@ func _draw() -> void:
 	draw_rect(Rect2(-half_l - 1.0, -4.0, 3.0, 8.0), T.COL_ENEMY)
 	if vuln_left > 0.0:
 		draw_arc(Vector2.ZERO, half_l + 8.0, 0.0, TAU, 28, Color(0.95, 0.3, 0.25, 0.85), 2.5)
+	_draw_cable(self, winch)
+
+
+## The cable, hook wind-up and revive ring from the winch. Drawn by code, or
+## over the voxel sheet from its projected winch point.
+func _draw_cable(ci: CanvasItem, winch: Vector2) -> void:
 	var cable_col := Color(0.85, 0.8, 0.55)
 	if hooked_to != null and is_instance_valid(hooked_to):
-		var end := to_local(hooked_to.global_position)
-		draw_line(winch, end, cable_col, 2.0)
-		draw_circle(end, 5.0, Color(0.35, 0.95, 0.5, 0.8))   # repairs flowing
+		var end: Vector2 = ci.to_local(hooked_to.global_position)
+		ci.draw_line(winch, end, cable_col, 2.0)
+		ci.draw_circle(end, 5.0, Color(0.35, 0.95, 0.5, 0.8))   # repairs flowing
 	elif _seek != null and wind_left < T.PATCHER_REHOOK:
 		# Wind-up: the hook spins faster as it's about to fly.
 		var t := 1.0 - wind_left / T.PATCHER_REHOOK
 		var spin := Time.get_ticks_msec() * 0.001 * (4.0 + 14.0 * t)
 		var hook_at := winch + Vector2(16.0 + 8.0 * t, 0.0).rotated(spin)
-		draw_line(winch, hook_at, cable_col, 1.5)
-		draw_circle(hook_at, 4.0, Color(0.95, 0.75, 0.25))
-		draw_arc(winch, 26.0, -PI * 0.5, -PI * 0.5 + TAU * t, 24, Color(0.95, 0.75, 0.25, 0.8), 2.0)
+		ci.draw_line(winch, hook_at, cable_col, 1.5)
+		ci.draw_circle(hook_at, 4.0, Color(0.95, 0.75, 0.25))
+		ci.draw_arc(winch, 26.0, -PI * 0.5, -PI * 0.5 + TAU * t, 24, Color(0.95, 0.75, 0.25, 0.8), 2.0)
 	if reviving != null and is_instance_valid(reviving):
-		var at := to_local(reviving.global_position)
+		var at: Vector2 = ci.to_local(reviving.global_position)
 		var t := 1.0 - revive_left / T.PATCHER_REVIVE_TIME
-		draw_line(winch, at, cable_col, 1.5)
-		draw_arc(at, 44.0, -PI * 0.5, -PI * 0.5 + TAU * t, 32, Color(0.35, 0.95, 0.5, 0.9), 4.0)
+		ci.draw_line(winch, at, cable_col, 1.5)
+		ci.draw_arc(at, 44.0, -PI * 0.5, -PI * 0.5 + TAU * t, 32, Color(0.35, 0.95, 0.5, 0.9), 4.0)
+
+
+func _draw_art_overlay() -> void:
+	super()
+	if _hull_art != null:
+		_draw_cable(_art_overlay, _hull_art.point_offset("winch").rotated(-global_rotation))

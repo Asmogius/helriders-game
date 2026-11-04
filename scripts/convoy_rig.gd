@@ -13,6 +13,11 @@ var trailer: ConvoyTrailer
 var unhitched := false        # lost its trailer
 
 
+## Voxel art: art/sprites/convoy.json (see docs/ART_PIPELINE.md).
+func art_id() -> String:
+	return "convoy"
+
+
 func _init() -> void:
 	team = BulletPool.TEAM_ENEMY
 	apply_stats(T.CONVOY)
@@ -55,6 +60,8 @@ func _wreck() -> void:
 
 
 func _draw() -> void:
+	if _hull_art != null:
+		return   # the voxel sheet draws the rig
 	var half_l := body_len * 0.5
 	var half_w := body_wid * 0.5
 	var hull := Color(0.24, 0.22, 0.21)
