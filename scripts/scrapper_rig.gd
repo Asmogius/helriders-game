@@ -1,14 +1,19 @@
 extends "res://scripts/gunner_rig.gd"
-## Scrapper: fast, light enemy trap layer (DESIGN §8; agreed with the owner).
+## Scrapper: fast, light, unarmed hazard layer (§14; agreed with the owner).
 ## It weaves back and forth across the road ahead of you, 250-400 px out, and
-## every 6 s drops a trap behind it: a mine (40 damage to your rig, zombies set
-## it off too), then an oil slick (you slide like on slime), alternating. One
-## weak turret plinks at you. Hunt it down before the street fills with traps.
-## Shares the Gunner Rig's turret aiming; only the driving and traps differ.
+## every 3 s lays a hazard behind it: oil (slide like on slime; fire lights
+## it), then a spike strip (30% slower for 3 s), alternating. At most 6 of its
+## hazards are down at once; the oldest go first. Hunt it down before the
+## street fills up. The Scrapper Gunner (scrapper_gunner_rig.gd) adds a turret
+## and mines. Built on the Gunner Rig's turret aiming (unused when unarmed).
 
 var enemy_mines: Node2D       # MinePool with enemy = true (mission sets it)
 var traps_dropped := 0        # tests
-var next_trap := "mine"       # alternates "mine" / "oil"
+var cycle: Array[String] = ["oil", "spikes"]   # what it lays, in turn
+var next_trap := "oil"
+var trap_every := T.SCRAPPER_TRAP_EVERY
+var laid: Array = []          # [kind, slot] of its live hazards, oldest first
+var _cycle_i := 0
 
 var _trap_timer := 0.0
 var _weave := 1.0             # which side of your path it's crossing to
@@ -22,7 +27,7 @@ func _init() -> void:
 	lock_priority = 3
 	lock_radius = 40.0
 	self_defense = false
-	_trap_timer = T.SCRAPPER_TRAP_EVERY * 0.5
+	_trap_timer = trap_every * 0.5
 
 
 func _enter_tree() -> void:
@@ -36,25 +41,40 @@ func _physics_process(delta: float) -> void:
 		return
 	_trap_timer -= delta
 	if _trap_timer <= 0.0:
-		_trap_timer = T.SCRAPPER_TRAP_EVERY
+		_trap_timer = trap_every
 		drop_trap()
 
 
-## Drop the next trap behind the rig. Returns what it dropped.
+## Lay the next hazard in the cycle behind the rig. Returns what it laid.
 func drop_trap() -> String:
 	var back := -Vector2.RIGHT.rotated(rotation)
 	var kind := next_trap
-	if kind == "mine":
-		if enemy_mines != null:
-			enemy_mines.call("drop", global_position + back * (body_len * 0.5 + 20.0), T.SCRAPPER_MINE_DAMAGE,
-				T.SCRAPPER_MINE_RADIUS, T.SCRAPPER_MINE_ARM, T.SCRAPPER_MINE_LIFE)
-		next_trap = "oil"
-	else:
-		if hazards != null:
-			hazards.call("add_oil", global_position + back * (body_len * 0.5 + T.OIL_RADIUS * 0.6), T.OIL_RADIUS, T.OIL_TIME_SCRAPPER)
-		next_trap = "mine"
+	match kind:
+		"mine":
+			if enemy_mines != null:
+				enemy_mines.call("drop", global_position + back * (body_len * 0.5 + 20.0), T.SCRAPPER_MINE_DAMAGE,
+					T.SCRAPPER_MINE_RADIUS, T.SCRAPPER_MINE_ARM, T.SCRAPPER_MINE_LIFE)
+		"oil":
+			if hazards != null:
+				var slot := int(hazards.call("add_oil", global_position + back * (body_len * 0.5 + T.SCRAPPER_OIL_RADIUS * 0.6),
+					T.SCRAPPER_OIL_RADIUS, T.SCRAPPER_OIL_TIME, team))
+				_keep(["oil", slot])
+		"spikes":
+			if hazards != null:
+				_keep(["spike", lay_spikes(T.SPIKE_LENGTH, T.SPIKE_TIME)])
+	_cycle_i = (_cycle_i + 1) % cycle.size()
+	next_trap = cycle[_cycle_i]
 	traps_dropped += 1
 	return kind
+
+
+## Track a hazard it laid; past the cap, the oldest still down vanishes.
+func _keep(entry: Array) -> void:
+	laid = laid.filter(func(e: Array) -> bool: return bool(hazards.call("is_live", str(e[0]), int(e[1]))))
+	laid.append(entry)
+	while laid.size() > T.SCRAPPER_MAX_HAZARDS:
+		var old: Array = laid.pop_front()
+		hazards.call("expire", str(old[0]), int(old[1]))
 
 
 ## Weave across the road ahead of the player, inside 250-400 px.

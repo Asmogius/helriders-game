@@ -165,6 +165,7 @@ func _steer(delta: float) -> void:
 			zombie.oiled = hazards.oil_at(zombie.position)
 			if hazards.fire_at(zombie.position):
 				zombie.add_buildup(StatusBars.FIRE, T.STATUS_POOL_BUILDUP * delta)
+			zombie.spiked = hazards.spike_at(zombie.position)
 			if zombie.kind != "slimer" and hazards.slime_at(zombie.position):
 				zombie.add_buildup(StatusBars.SLIME, T.STATUS_POOL_BUILDUP * delta)
 			if zombie.kind == "slimer":

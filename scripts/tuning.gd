@@ -269,13 +269,35 @@ const GUNNER_SCRAP_CACHE := 30      # dropped instead of a schematic
 const GUNNER_SPAWN_TIME := 75.0     # Clear: seconds in, or...
 const GUNNER_SPAWN_KILLS := 30      # ...after this many kills
 
-# --- Scrapper (enemy rig: trap layer; agreed with the owner) ------------------
-# Fast and light. Circles you at 250-400 px, cutting across your path, and
-# every 6 s drops a trap behind it: a mine, then an oil slick, alternating.
-# One weak turret. Drops the Oil Slick utility.
+# --- Scrapper (enemy rig: hazard layer; §14, agreed with the owner) -----------
+# Fast, light and unarmed. Cuts across your path 250-400 px out and every 3 s
+# lays a hazard behind it, alternating oil and a spike strip; at most 6 of its
+# hazards at once (the oldest go first). Drops hazard utilities and grip parts.
 const SCRAPPER_RANGE_MIN := 250.0
 const SCRAPPER_RANGE_MAX := 400.0
-const SCRAPPER_TRAP_EVERY := 6.0
+const SCRAPPER_TRAP_EVERY := 3.0
+const SCRAPPER_MAX_HAZARDS := 6
+const SCRAPPER_OIL_RADIUS := 45.0   # 90 px wide...
+const SCRAPPER_OIL_TIME := 12.0     # ...for 12 s
+# The Scrapper Gunner (agreed with the owner): the original Scrapper, a little
+# harder. Tougher, with a weak turret, and every 4 s it lays a mine, oil or a
+# spike strip in turn. From 4 skulls, half the jobs that bring a Scrapper
+# bring one of these instead (seeded per job, shown on Comms).
+const SCRAPPER_GUNNER_TRAP_EVERY := 4.0
+const SCRAPPER_GUNNER_SKULLS := 4
+const SCRAPPER_GUNNER_CHANCE := 0.5
+const SCRAPPER_GUNNER_SCRAP := 35
+const SCRAPPER_GUNNER_SCRAP_CACHE := 35
+# Spike strips (Scrapper and the Spike Strip Dropper): a strip laid across the
+# road behind the rig. Rigs crossing it (of the other side) drive 30% slower
+# for 3 s; zombies on it take 10 damage a second and move at half speed.
+const SPIKE_LENGTH := 120.0
+const SPIKE_TIME := 15.0
+const SPIKE_HALF_WIDTH := 14.0      # how close to the strip counts as on it
+const SPIKE_RIG_SPEED := 0.7
+const SPIKE_RIG_TIME := 3.0
+const SPIKE_ZOMBIE_DPS := 10.0
+const SPIKE_ZOMBIE_SPEED := 0.5
 const SCRAPPER_MINE_DAMAGE := 40.0
 const SCRAPPER_MINE_RADIUS := 70.0
 const SCRAPPER_MINE_ARM := 0.6
@@ -587,6 +609,28 @@ const SCRAPPER := {
 	"armor": 230.0,            # total of the layers below (§14 table; was 200)
 	"hp": 90.0, "front": 35.0, "side": 35.0, "rear": 35.0,
 	"resist": [50.0, 30.0, 50.0, 50.0, 90.0, 50.0],   # shock fire acid toxic slime goop
+	"ram_damage": 30.0,
+	"mount": 1,
+	"fire_rate": 0.0,          # unarmed (§14)
+	"bullet_damage": 0.0,
+	"bullet_speed": 1000.0,
+	"spread_deg": 0.0,
+	"turret_turn_rate": 0.0,
+	"lock_range": 0.0,
+}
+
+const SCRAPPER_GUNNER := {
+	"name": "Scrapper Gunner",
+	"max_speed": 580.0,
+	"reverse_speed": 260.0,
+	"acceleration": 680.0,
+	"brake": 1500.0,
+	"coast": 280.0,
+	"turn_rate": 3.5,
+	"grip": 6.5,
+	"armor": 290.0,            # total of the layers below
+	"hp": 110.0, "front": 45.0, "side": 45.0, "rear": 45.0,
+	"resist": [50.0, 30.0, 50.0, 50.0, 90.0, 50.0],   # as the Scrapper
 	"ram_damage": 30.0,
 	"mount": 0,                # one weak turret
 	"gun_id": "scrapper",

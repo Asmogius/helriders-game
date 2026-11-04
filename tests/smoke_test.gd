@@ -371,7 +371,7 @@ func _process(_delta: float) -> bool:
 		gun.take_damage(100000.0)
 		_check(gun.is_wrecked and main.kills == kills_before + 2, "a wrecked Gunner Rig counts as a kill")
 		var scr := main.spawn_scrapper(rig.global_position + Vector2(0, -900))
-		_check(scr != null and scr.call("drop_trap") == "mine" and main.enemy_mines.active_count() >= 1, "a Scrapper lays mines")
+		_check(scr != null and not scr.has_weapon() and scr.call("drop_trap") == "oil" and main.hazards.oil_count() >= 1, "an unarmed Scrapper lays oil (§14)")
 		scr.take_damage(100000.0)
 		_check(scr.is_wrecked and main.kills == kills_before + 3, "a wrecked Scrapper counts as a kill")
 		var semi := main.spawn_convoy(rig.global_position + Vector2(-900, 0))

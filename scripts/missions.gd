@@ -81,6 +81,16 @@ static func has_convoy(mission: Dictionary) -> bool:
 	return rng.randf() < chance
 
 
+## From 4 skulls, half the jobs that bring a Scrapper bring the Scrapper
+## Gunner instead (seeded, so the Comms card and the mission agree).
+static func has_scrapper_gunner(mission: Dictionary) -> bool:
+	if skulls(mission) < T.SCRAPPER_GUNNER_SKULLS or _count(mission, "scrappers") <= 0:
+		return false
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("helriders-scrapper-gunner-%d" % int(mission.get("seed", 0)))
+	return rng.randf() < T.SCRAPPER_GUNNER_CHANCE
+
+
 ## The mission tests and a fresh mission scene fall back to.
 static func default_mission() -> Dictionary:
 	return make("clear", 3, 1)
@@ -152,7 +162,8 @@ static func threats_text(mission: Dictionary) -> String:
 	if gunners > 0:
 		bits.append("%d Gunner Rig%s" % [gunners, "" if gunners == 1 else "s"])
 	if scrappers > 0:
-		bits.append("%d Scrapper%s" % [scrappers, "" if scrappers == 1 else "s"])
+		var what := "Scrapper Gunner" if has_scrapper_gunner(mission) else "Scrapper"
+		bits.append("%d %s%s" % [scrappers, what, "" if scrappers == 1 else "s"])
 	var kinds := zombie_kinds_text(mission)
 	if kinds != "":
 		bits.append(kinds)

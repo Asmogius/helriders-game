@@ -100,6 +100,7 @@ var last_facing := -1              # the facing the last hit landed on (tests, H
 var status := StatusBars.new()
 var resist: Array = [50.0, 50.0, 50.0, 50.0, 50.0, 50.0]
 var _burn_angle := 0.0
+var spike_left := 0.0               # seconds of shredded tyres left after a spike strip
 var _status_bar: EnemyStatusBar   # enemy rigs: a small bar under the hull while building
 
 ## Everything left before a wreck: HP plus every facing's armor plus the shield.
@@ -660,7 +661,8 @@ func _drive(delta: float) -> void:
 	# An overloaded power plant can't deliver full speed or acceleration.
 	var power := mobility()
 	if throttle > 0.0:
-		var target := throttle * max_speed * power * crew_speed
+		var spiked := T.SPIKE_RIG_SPEED if spike_left > 0.0 else 1.0
+		var target := throttle * max_speed * power * crew_speed * spiked
 		var rate := acceleration * power * crew_accel if fwd_speed < target else coast
 		if fwd_speed < 0.0:
 			rate = brake
@@ -920,8 +922,12 @@ func use_ability(index: int) -> bool:
 				fx.call("repair", global_position)
 		"oil":
 			if hazards != null:
+				# Your own oil only catches the other side (§14).
 				var back := -Vector2.RIGHT.rotated(rotation)
-				hazards.call("add_oil", global_position + back * (body_len * 0.5 + float(a.oil_radius) * 0.6), float(a.oil_radius), float(a.oil_time))
+				hazards.call("add_oil", global_position + back * (body_len * 0.5 + float(a.oil_radius) * 0.6), float(a.oil_radius), float(a.oil_time), team)
+		"spikes":
+			if hazards != null:
+				lay_spikes(float(a.spike_length), float(a.spike_time))
 		"mines":
 			if mines != null:
 				var back := -Vector2.RIGHT.rotated(rotation)
@@ -942,6 +948,23 @@ func ability_charge(index: int) -> float:
 
 
 # --- Damage ----------------------------------------------------------------------
+
+## A spike strip across the road behind the rig, tagged with its team (it
+## only catches the other side). Returns the hazard slot.
+func lay_spikes(length: float, seconds: float) -> int:
+	var back := -Vector2.RIGHT.rotated(rotation)
+	var centre := global_position + back * (body_len * 0.5 + 24.0)
+	var across := back.orthogonal() * length * 0.5
+	return int(hazards.call("add_spike", centre - across, centre + across, seconds, team))
+
+
+## Crossing a spike strip: 30% slower for a few seconds.
+func set_on_spikes(on: bool, delta: float) -> void:
+	if on:
+		spike_left = T.SPIKE_RIG_TIME
+	elif spike_left > 0.0:
+		spike_left = maxf(spike_left - delta, 0.0)
+
 
 ## Slime and oil on the ground build SLICK (§14); while SLICK the tyres keep
 ## only T.SLIME_GRIP of their grip (see _tick_status).

@@ -22,6 +22,7 @@ const EnemyRig := preload("res://scripts/enemy_rig.gd")
 const BulwarkRig := preload("res://scripts/bulwark_rig.gd")
 const GunnerRig := preload("res://scripts/gunner_rig.gd")
 const ScrapperRig := preload("res://scripts/scrapper_rig.gd")
+const ScrapperGunnerRig := preload("res://scripts/scrapper_gunner_rig.gd")
 const ConvoyRig := preload("res://scripts/convoy_rig.gd")
 const FriendlyTruck := preload("res://scripts/friendly_truck.gd")
 const StatusBars := preload("res://scripts/status_bars.gd")
@@ -74,6 +75,9 @@ var gunners: Array[EnemyRig] = []     # standoff turret rigs, built up front too
 var gunner: GunnerRig            # the first Gunner Rig (tests use it)
 var scrappers: Array[EnemyRig] = []   # trap layers, built up front too
 var scrapper: ScrapperRig        # the first Scrapper (tests use it)
+var scrapper_gunners: Array[EnemyRig] = []   # the harder variant, built up front too
+var scrapper_gunner: ScrapperGunnerRig       # the first one (tests use it)
+var use_scrapper_gunner := false             # this job's Scrapper is the Gunner variant
 var convoys: Array[EnemyRig] = []     # elite semis with trailers, built up front too
 var convoy: ConvoyRig            # the first Convoy Lead (tests use it)
 var enemy_mines: MinePool        # the Scrappers' mines (hurt you and zombies)
@@ -248,6 +252,8 @@ func _ready() -> void:
 		rig.wrecked.connect(_on_gunner_wrecked.bind(rig))
 	for rig in scrappers:
 		rig.wrecked.connect(_on_scrapper_wrecked.bind(rig))
+	for rig in scrapper_gunners:
+		rig.wrecked.connect(_on_scrapper_gunner_wrecked.bind(rig))
 	for rig in convoys:
 		rig.wrecked.connect(_on_convoy_wrecked.bind(rig))
 		(rig as ConvoyRig).trailer.wrecked.connect(_on_trailer_lost.bind(rig))
@@ -418,9 +424,13 @@ func _configure_mission() -> void:
 	for i in maxi(gunner_count, 1):
 		gunners.append(GunnerRig.new())
 	gunner = gunners[0] as GunnerRig
-	for i in maxi(scrapper_count, 1):
+	use_scrapper_gunner = Missions.has_scrapper_gunner(spec)
+	for i in (1 if use_scrapper_gunner else maxi(scrapper_count, 1)):
 		scrappers.append(ScrapperRig.new())
 	scrapper = scrappers[0] as ScrapperRig
+	for i in (maxi(scrapper_count, 1) if use_scrapper_gunner else 1):
+		scrapper_gunners.append(ScrapperGunnerRig.new())
+	scrapper_gunner = scrapper_gunners[0] as ScrapperGunnerRig
 	for i in maxi(convoy_count, 1):
 		convoys.append(ConvoyRig.new())
 	convoy = convoys[0] as ConvoyRig
@@ -585,6 +595,7 @@ func _all_enemy_rigs() -> Array[EnemyRig]:
 	all.append_array(bulwarks)
 	all.append_array(gunners)
 	all.append_array(scrappers)
+	all.append_array(scrapper_gunners)
 	all.append_array(convoys)
 	if elite != null:
 		all.append(elite)
@@ -694,11 +705,13 @@ func spawn_gunner(at: Vector2, announce := true) -> EnemyRig:
 	return null
 
 
-## Sends in the next Scrapper, if there's room under the rig cap.
-func spawn_scrapper(at: Vector2) -> EnemyRig:
+## Sends in the next Scrapper (this job's variant), if there's room under the
+## rig cap. `gunner` forces the Scrapper Gunner (tests).
+func spawn_scrapper(at: Vector2, gunner := false) -> EnemyRig:
 	if active_rig_count() >= T.MAX_ENEMY_RIGS:
 		return null
-	for rig in scrappers:
+	var pool := scrapper_gunners if (gunner or use_scrapper_gunner) else scrappers
+	for rig in pool:
 		if not rig.is_inside_tree():
 			var s := rig as ScrapperRig
 			s.enemy_mines = enemy_mines
@@ -706,7 +719,7 @@ func spawn_scrapper(at: Vector2) -> EnemyRig:
 			rig.position = at
 			rig.rotation = (vehicle.global_position - at).angle()
 			rigs.add_child(rig)
-			hud.banner("SCRAPPER INBOUND  -  WATCH FOR TRAPS", T.COL_ENEMY)
+			hud.banner(("SCRAPPER GUNNER" if rig is ScrapperGunnerRig else "SCRAPPER") + " INBOUND  -  WATCH FOR TRAPS", T.COL_ENEMY)
 			return rig
 	return null
 
@@ -1181,8 +1194,9 @@ func _apply_slime(delta: float) -> void:
 func _ground_on(rig: Vehicle, delta: float) -> void:
 	if rig == null or rig.is_wrecked:
 		return
-	rig.set_on_slime(hazards.slick_at(rig.global_position), delta)
-	if hazards.fire_at(rig.global_position):
+	rig.set_on_slime(hazards.slick_at(rig.global_position, rig.team), delta)
+	rig.set_on_spikes(hazards.spike_at(rig.global_position, rig.team), delta)
+	if hazards.fire_at(rig.global_position, rig.team):
 		rig.add_buildup(StatusBars.FIRE, T.STATUS_POOL_BUILDUP * delta)
 
 
@@ -1265,6 +1279,14 @@ func _on_scrapper_wrecked(rig: EnemyRig) -> void:
 	_drop(rig.global_position, "scrapper", false, T.SCRAPPER_SCRAP_CACHE)
 	hud.banner("SCRAPPER DOWN  -  GRAB THE SALVAGE", T.COL_CYAN)
 	_add_kill(T.SCRAPPER_SCRAP, true)
+	_salvage_plating()
+
+
+func _on_scrapper_gunner_wrecked(rig: EnemyRig) -> void:
+	camera.shake(0.55)
+	_drop(rig.global_position, "scrapper", false, T.SCRAPPER_GUNNER_SCRAP_CACHE)
+	hud.banner("SCRAPPER GUNNER DOWN  -  GRAB THE SALVAGE", T.COL_CYAN)
+	_add_kill(T.SCRAPPER_GUNNER_SCRAP, true)
 	_salvage_plating()
 
 
