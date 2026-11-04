@@ -167,15 +167,37 @@ func _design_issues(arena: Arena, nav: NavGrid, start: Vector2, built: Dictionar
 		out.append("only one route to %s (vary %d)" % [str(far), vary])
 	for cell: Vector2i in shut:
 		nav.astar.set_point_solid(cell, false)
-	var clusters := 0
+	# Real clusters: connected groups (union-find, links within 300 px) of at
+	# least two barrel spots. Lone spots don't count.
 	var spots: Array = arena.barrel_spots
+	var parent: Array[int] = []
+	for i in spots.size():
+		parent.append(i)
 	for i in spots.size():
 		for j in range(i + 1, spots.size()):
 			if (spots[i] as Vector2).distance_to(spots[j]) <= 300.0:
-				clusters += 1
+				var ri := _root(parent, i)
+				var rj := _root(parent, j)
+				if ri != rj:
+					parent[ri] = rj
+	var sizes := {}
+	for i in spots.size():
+		var r := _root(parent, i)
+		sizes[r] = int(sizes.get(r, 0)) + 1
+	var clusters := 0
+	for r: int in sizes:
+		if int(sizes[r]) >= 2:
+			clusters += 1
 	if clusters < 2:
 		out.append("only %d barrel clusters (vary %d)" % [clusters, vary])
 	return out
+
+
+func _root(parent: Array[int], i: int) -> int:
+	while parent[i] != i:
+		parent[i] = parent[parent[i]]
+		i = parent[i]
+	return i
 
 
 func _wall_near(nav: NavGrid, p: Vector2, dir: Vector2) -> bool:

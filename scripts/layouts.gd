@@ -235,7 +235,7 @@ const LAYOUTS := {
 		],
 		"barrel_spots": [
 			Vector2(1250, 950), Vector2(1950, 950), Vector2(1250, 1450), Vector2(1950, 1450), Vector2(955, 730), Vector2(2245, 730),
-			Vector2(955, 1670), Vector2(2245, 1670), Vector2(600, 730), Vector2(2600, 1670), Vector2(1250, 1200), Vector2(1600, 2150),
+			Vector2(955, 1670), Vector2(2245, 1670), Vector2(600, 730), Vector2(2500, 1670), Vector2(1250, 1200), Vector2(1600, 2150),
 		],
 		"spawn_points": [
 			Vector2(955, 60), Vector2(2245, 60), Vector2(955, 2340), Vector2(2245, 2340), Vector2(1600, 60), Vector2(1600, 2340),
