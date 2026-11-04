@@ -45,6 +45,7 @@ func _initialize() -> void:
 	_add("fight_crates", _show_crates)
 	_add("results_finds", _show_finds)
 	_add("fight_hud", _show_fight_hud)
+	_add("fx_sample", _show_fx_sample)   # P2 V4 style sample
 
 
 func _add(shot: String, setup: Callable) -> void:
@@ -90,7 +91,8 @@ func _show_rarity() -> void:
 const SWATCHES := [
 	"COL_OB_GRASS", "COL_OB_PAVE", "COL_OB_SIDING", "COL_OB_ROOF", "COL_OB_GRADE", "COL_OB_MOTE",
 	"COL_FX_HOT", "COL_FX_WHITE_HOT", "COL_FX_EMBER", "COL_FX_SCORCH",
-	"COL_FX_SCORCH_EDGE", "COL_FX_SMOKE",
+	"COL_FX_SCORCH_EDGE", "COL_FX_SMOKE", "COL_FX_TRACER_RIVET",
+	"COL_FX_TRACER_ENEMY_CORE", "COL_FX_TRACER_HARPOON_CABLE", "COL_FX_TRACER_HARPOON_STEEL",
 	"COL_GARAGE_FLOOR", "COL_GARAGE_FLOOR_LINE", "COL_GARAGE_OIL", "COL_GARAGE_PEGBOARD",
 	"COL_GARAGE_WALL", "COL_GARAGE_STREET_NIGHT", "COL_GARAGE_GAS_RED",
 	"COL_GARAGE_DUST", "COL_GARAGE_SPARK",
@@ -159,6 +161,15 @@ func _show_fight_hud() -> void:
 	var kinds: Array[String] = ["overcharge", "hard_line", "spikes"]
 	hud.set_abilities(kinds)
 	hud.banner("SCHEMATIC: OUTRIDER SPORT WHEELS", T.COL_ORANGE, 3.0)
+
+
+## P2 V4 sample: an explosion and tracers in the running fight.
+func _show_fx_sample() -> void:
+	var m := current_scene
+	var p: Vector2 = m.vehicle.global_position
+	m.fx.explosion(p + Vector2(140, -50), Vector2.ZERO)
+	for i in 6:
+		m.bullets.fire(p + Vector2(30 + i * 22, -10), Vector2(900, -120), 0.0, m.bullets.TEAM_PLAYER)
 
 
 func _process(_delta: float) -> bool:

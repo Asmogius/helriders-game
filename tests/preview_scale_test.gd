@@ -34,7 +34,9 @@ func _run() -> void:
 		else:
 			v.call("_update_art")
 			check(is_equal_approx(hull.scale.x, sc), "hull art copies the rig scale (%.2f vs %.2f)" % [hull.scale.x, sc])
-			for t in v.get("_turrets"):
+			for t: Node2D in v.get("_turrets"):
+				if t == null:
+					continue
 				var a: Variant = t.get("art")
 				if a != null:
 					check(is_equal_approx(a.scale.x, sc), "turret art copies the rig scale")

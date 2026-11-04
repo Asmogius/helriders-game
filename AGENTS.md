@@ -98,6 +98,8 @@ godot --headless --fixed-fps 60 --path . -s res://tests/rarity_test.gd     # mus
 godot --headless --fixed-fps 60 --path . -s res://tests/garage_room_test.gd # must end "GARAGE ROOM TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/preview_scale_test.gd # must end "PREVIEW SCALE TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/garage_layout_test.gd # must end "GARAGE LAYOUT TEST PASSED"
+godot --headless --fixed-fps 60 --path . -s res://tests/fx_sample_test.gd # must end "FX SAMPLE TEST PASSED"
+godot --headless --fixed-fps 60 --path . -s res://tests/tracer_styles_test.gd # must end "TRACER STYLES TEST PASSED"
 ```
 
 - Tests must call `Profile.new_game()` with `persist = false` first, so they never touch a real save.
