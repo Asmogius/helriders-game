@@ -33,7 +33,8 @@ func _init() -> void:
 ## and first in line for the player's lock after a Hunter on the hull.
 func make_elite(title: String, armor_mult: float, damage_mult: float) -> void:
 	var s: Dictionary = T.OUTRIDER.duplicate()
-	s.armor = float(s.armor) * armor_mult
+	for k: String in ["armor", "hp", "front", "side", "rear"]:   # every layer (§14)
+		s[k] = float(s[k]) * armor_mult
 	s.bullet_damage = float(s.bullet_damage) * damage_mult
 	apply_stats(s)
 	elite_name = title

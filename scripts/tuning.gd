@@ -249,8 +249,7 @@ const OUTRIDER_SCRAP := 25
 
 # --- Bulwark (enemy rig: heavy rammer; approved in the "Helriders: Bulwark
 # Draft" doc) ---------------------------------------------------------------------
-const BULWARK_FRONT_MULT := 0.5     # damage from hits on its armored front...
-const BULWARK_FRONT_ARC := 0.785    # ...within 45 degrees either side of the nose
+const BULWARK_FRONT_ARC := 0.785    # its heavy front plate: grey sparks within 45 deg of the nose
 const BULWARK_BACKOFF := 0.5        # seconds it backs off after ramming you
 const BULWARK_SCRAP := 40
 const BULWARK_SCRAP_CACHE := 40     # dropped instead of a schematic
@@ -333,7 +332,8 @@ const TRUCK := {
 	"coast": 300.0,
 	"turn_rate": 2.0,
 	"grip": 8.0,
-	"armor": 400.0,
+	"armor": 400.0,            # total of the layers below
+	"hp": 120.0, "front": 70.0, "side": 70.0, "rear": 70.0,
 	"ram_damage": 40.0,
 	"mount": 1,
 	"fire_rate": 0.0,          # no guns: that's your job
@@ -426,7 +426,7 @@ const RESEARCH_DAILY_CAP := 3          # levels you can buy per day (Second Shif
 # Which stats grow, by category. Power draw and weight never change.
 # Internal parts grow their modifier instead (see Parts.at_level).
 const RESEARCH_STATS := {
-	"Chassis": ["armor", "weight_capacity"],
+	"Chassis": ["hp", "weight_capacity"],
 	"Engine": ["power_output", "acceleration"],
 	"Drive": ["turn_mult", "grip"],
 	"Armor": ["armor"],
@@ -452,13 +452,26 @@ const CREW_PRICES := {"Common": 0, "Uncommon": 80, "Rare": 200, "Epic": 450, "Le
 # The player's rig is built from parts: see parts.gd (schematics and the
 # starter loadout) and loadout.gd (how parts combine into these stats).
 
+# --- Defense layers (§14; agreed with the owner) --------------------------------
+# Every rig: shield (recharges) -> armor per facing (never regenerates
+# mid-run) -> HP (zero = wreck). Facings are four 90-degree arcs: front, left,
+# right, rear. A hit drains its arc's armor; a stripped facing passes hits to
+# HP. Explosions hit the nearest facing in full and each adjacent one at
+# SPLASH_ADJACENT, and never reduce HP while any armor remains. Repairs go
+# to the most damaged facing (never past its max; the rest is lost).
+const SPLASH_ADJACENT := 0.25
+const DEFAULT_SHIELD_DELAY := 3.0
+const DEFAULT_SHIELD_REFILL := 5.0
+const COL_SHIELD := Color(0.55, 0.75, 1.0)
+
 # Overload (DESIGN §4: overload reduces mobility). Power drawn over the
 # engine's output, or weight over the chassis's capacity, scales acceleration
 # and top speed by (limit / load) ^ exponent. Both together multiply.
 const OVERLOAD_EXPONENT := 1.5
 const OVERLOAD_MIN_MOBILITY := 0.5   # never worse than this
 
-# Enemy rigs still use one flat stat dictionary each.
+# Enemy rigs still use one flat stat dictionary each. `hp`, `front`, `side`
+# and `rear` are their defense layers (§14); `armor` is their total.
 # mount: 0 = turret (aims independently), 1 = fixed (aims with the vehicle).
 const OUTRIDER := {
 	"name": "Outrider",
@@ -469,7 +482,8 @@ const OUTRIDER := {
 	"coast": 280.0,
 	"turn_rate": 3.6,
 	"grip": 6.5,
-	"armor": 260.0,
+	"armor": 260.0,            # total of the layers below (§14 table)
+	"hp": 100.0, "front": 40.0, "side": 40.0, "rear": 40.0,
 	"ram_damage": 40.0,
 	"mount": 1,                # twin guns fixed forward
 	"fire_rate": 8.0,
@@ -489,7 +503,9 @@ const GUNNER := {
 	"coast": 280.0,
 	"turn_rate": 3.0,
 	"grip": 7.0,
-	"armor": 340.0,
+	"armor": 340.0,            # total of the layers below (§14 table)
+	"hp": 120.0, "front": 60.0, "side": 55.0, "rear": 55.0,
+	"shield": 30.0, "shield_skulls": 4, "shield_delay": 3.0, "shield_refill": 5.0,   # a shield from 4 skulls
 	"ram_damage": 40.0,
 	"mount": 0,                # turret on top
 	"gun_id": "gunner_rig",
@@ -512,7 +528,8 @@ const SCRAPPER := {
 	"coast": 280.0,
 	"turn_rate": 3.5,
 	"grip": 6.5,
-	"armor": 200.0,
+	"armor": 200.0,            # total of the layers below (§14 table)
+	"hp": 90.0, "front": 35.0, "side": 35.0, "rear": 35.0,
 	"ram_damage": 30.0,
 	"mount": 0,                # one weak turret
 	"gun_id": "scrapper",
@@ -533,7 +550,9 @@ const CONVOY := {
 	"coast": 300.0,
 	"turn_rate": 1.5,          # a wide circle: get beside or behind it
 	"grip": 8.0,
-	"armor": 650.0,            # the front ram takes half (BULWARK_FRONT_MULT)
+	"armor": 650.0,            # total of the layers below (agreed with the owner)
+	"hp": 200.0, "front": 250.0, "side": 70.0, "rear": 60.0,   # the plow is a very heavy front plate
+	"shield": 30.0, "shield_skulls": 4, "shield_delay": 3.0, "shield_refill": 5.0,   # cab only, from 4 skulls
 	"ram_damage": 120.0,
 	"mount": 1,                # two small guns fixed on the nose, alternating
 	"gun_id": "convoy_nose",
@@ -554,7 +573,8 @@ const CONVOY_TRAILER := {
 	"coast": 300.0,
 	"turn_rate": 1.5,
 	"grip": 8.0,
-	"armor": 300.0,
+	"armor": 300.0,            # total of the layers below (agreed with the owner)
+	"hp": 120.0, "front": 50.0, "side": 65.0, "rear": 50.0,
 	"ram_damage": 60.0,
 	"mount": 0,                # the heavy turret
 	"gun_id": "convoy_turret",
@@ -575,7 +595,8 @@ const BULWARK := {
 	"coast": 300.0,
 	"turn_rate": 1.9,          # 109 deg/s
 	"grip": 8.0,
-	"armor": 520.0,            # front quarter takes half (BULWARK_FRONT_MULT)
+	"armor": 520.0,            # total of the layers below (§14 table)
+	"hp": 180.0, "front": 180.0, "side": 55.0, "rear": 50.0,   # a very heavy front plate
 	"ram_damage": 80.0,
 	"mount": 1,                # one light gun fixed forward
 	"fire_rate": 3.0,

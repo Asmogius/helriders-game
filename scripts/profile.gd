@@ -59,7 +59,7 @@ const Missions := preload("res://scripts/missions.gd")
 const Crew := preload("res://scripts/crew.gd")
 
 const SAVE_VERSION := 1
-const SINGLE_SLOTS := ["chassis", "engine", "drive", "armor"]
+const SINGLE_SLOTS := ["chassis", "engine", "drive", "armor_front", "armor_sides", "armor_rear"]
 const LIST_SLOTS := ["weapons", "utility", "internal"]
 const REQUIRED_SLOTS := ["chassis", "engine", "drive"]
 
@@ -157,7 +157,8 @@ func _starter_crew() -> void:
 # --- Loadouts -------------------------------------------------------------------
 
 static func empty_loadout() -> Dictionary:
-	return {"chassis": "", "engine": "", "drive": "", "armor": "", "weapons": [], "utility": [], "internal": []}
+	return {"chassis": "", "engine": "", "drive": "", "armor_front": "", "armor_sides": "", "armor_rear": "",
+		"weapons": [], "utility": [], "internal": []}
 
 
 ## Every part id in a loadout, one entry per installed part.
@@ -1319,9 +1320,21 @@ static func _clean_loadout(raw: Variant) -> Dictionary:
 	if not raw is Dictionary:
 		return out
 	var d: Dictionary = raw
+	# Saves from before the three armor slots (§14): the one plate goes on all
+	# three (a front-only ram plate on the front only).
+	if d.has("armor") and not d.has("armor_front"):
+		var old := str(d.armor)
+		d = d.duplicate()
+		d["armor_front"] = old
+		var front_only := bool(Parts.get_part(old).get("front_only", false))
+		d["armor_sides"] = "" if front_only else old
+		d["armor_rear"] = "" if front_only else old
 	for key in SINGLE_SLOTS:
 		var id := str(d.get(key, ""))
 		out[key] = id if Parts.CATALOG.has(id) else ""
+	for key in ["armor_sides", "armor_rear"]:
+		if bool(Parts.get_part(str(out[key])).get("front_only", false)):
+			out[key] = ""
 	for key in LIST_SLOTS:
 		var list: Array = []
 		for id: Variant in d.get(key, []):

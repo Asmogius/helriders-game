@@ -120,7 +120,7 @@ func deflects(_at: Vector2) -> bool:
 
 
 ## Called by the director once per physics tick with the steering it wants.
-## `target` is the player rig (duck-typed: take_damage(amount), velocity).
+## `target` is the player rig (duck-typed: take_damage(amount, from), velocity).
 func step(delta: float, desired: Vector2, target: Node2D) -> void:
 	_knock = _knock.move_toward(Vector2.ZERO, 900.0 * delta)
 	if tick_status(delta):
@@ -171,7 +171,7 @@ func step(delta: float, desired: Vector2, target: Node2D) -> void:
 			if kind == "boomer":
 				burst = true
 				return
-			target.call("take_damage", float(_stats.dps) * delta)
+			target.call("take_damage", float(_stats.dps) * delta, position - target.position)
 			if kind == "brute" or kind == "tank":
 				var push := (target.position - position).normalized() * T.BRUTE_SHOVE * delta
 				target.set("velocity", (target.get("velocity") as Vector2) + push)
@@ -219,7 +219,7 @@ func _charge_contact(target: Node2D, touching: bool, wall_normal: Vector2) -> vo
 	var hit := target != null and (touching or position.distance_to(target.position) < radius + 40.0)
 	if hit:
 		charge_hits += 1
-		target.call("take_damage", T.TANK_CHARGE_DAMAGE)
+		target.call("take_damage", T.TANK_CHARGE_DAMAGE, position - target.position)
 		target.set("velocity", (target.get("velocity") as Vector2) + charge_dir * T.TANK_SHOVE)
 		target.rotation += randf_range(0.2, 0.4) * (1.0 if randf() < 0.5 else -1.0)
 		charge = Charge.WALK

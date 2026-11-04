@@ -16,7 +16,7 @@ extends RefCounted
 ## parts are.
 ##
 ## Internal modifiers (multiply or add to the build): fire_rate_mult,
-## damage_mult, armor_bonus, ram_bonus, lock_range_mult, turret_aim_mult,
+## damage_mult, hp_bonus (max HP), ram_bonus, lock_range_mult, turret_aim_mult,
 ## injury_mult (crew injury chance).
 ##
 ## Aiming: a turret needs a seated Gunner or a part with `manual_aim` to turn
@@ -48,19 +48,19 @@ const CATALOG := {
 	"scrap_frame": {
 		"name": "Scrap Frame", "category": "Chassis", "rarity": "Common", "cost": 50, "power": 15.0,
 		"hardpoints": 1, "utility_slots": 1, "internal_slots": 2, "weight_capacity": 100.0,
-		"armor": 60.0, "max_speed": 560.0, "reverse_speed": 230.0, "coast": 280.0, "turn_rate": 3.4,
+		"hp": 150.0, "max_speed": 560.0, "reverse_speed": 230.0, "coast": 280.0, "turn_rate": 3.4,
 		"body": [64.0, 36.0], "seats": ["driver", "gunner", "open"],
 	},
 	"courier_frame": {
 		"name": "Courier Frame", "category": "Chassis", "rarity": "Uncommon", "cost": 90, "power": 12.0,
 		"hardpoints": 1, "utility_slots": 2, "internal_slots": 1, "weight_capacity": 80.0,
-		"armor": 45.0, "max_speed": 610.0, "reverse_speed": 250.0, "coast": 260.0, "turn_rate": 3.8,
+		"hp": 105.0, "max_speed": 610.0, "reverse_speed": 250.0, "coast": 260.0, "turn_rate": 3.8,
 		"body": [66.0, 32.0], "seats": ["driver", "open"],
 	},
 	"bulwark_frame": {
 		"name": "Bulwark Frame", "category": "Chassis", "rarity": "Rare", "cost": 180, "power": 20.0,
 		"hardpoints": 2, "utility_slots": 1, "internal_slots": 2, "weight_capacity": 160.0,
-		"armor": 110.0, "max_speed": 500.0, "reverse_speed": 210.0, "coast": 300.0, "turn_rate": 3.0,
+		"hp": 270.0, "max_speed": 500.0, "reverse_speed": 210.0, "coast": 300.0, "turn_rate": 3.0,
 		"body": [76.0, 42.0], "seats": ["driver", "gunner", "open", "open"],
 	},
 	# --- Engines: acceleration and the power budget -------------------------------
@@ -98,29 +98,34 @@ const CATALOG := {
 		"grip": 9.0, "brake": 2000.0, "speed_mult": 0.88, "turn_mult": 0.9,
 	},
 	# --- Armor -----------------------------------------------------------------------
+	# Armor (§14 defense layers): `armor` is per facing. A rig has three armor
+	# slots, Front, Sides (one part covers both flanks) and Rear; `weight` and
+	# `power` are for a Front or Rear slot, `weight_sides` / `power_sides` for
+	# the Sides slot. `front_only` plates (rams) fit the Front slot only. The
+	# Front slot's plate gives the rig its ram damage.
 	"scrap_plating": {
-		"name": "Scrap Plating", "category": "Armor", "rarity": "Common", "cost": 30, "power": 0.0, "weight": 35.0,
-		"armor": 90.0, "ram_damage": 70.0,
+		"name": "Scrap Plating", "category": "Armor", "rarity": "Common", "cost": 30, "power": 0.0, "weight": 12.0,
+		"weight_sides": 21.0, "armor": 80.0, "ram_damage": 70.0,
 	},
 	"outrider_light_plating": {
-		"name": "Outrider Light Plating", "category": "Armor", "rarity": "Uncommon", "cost": 60, "power": 0.0, "weight": 20.0,
-		"armor": 70.0, "ram_damage": 45.0,
+		"name": "Outrider Light Plating", "category": "Armor", "rarity": "Uncommon", "cost": 60, "power": 0.0, "weight": 7.0,
+		"weight_sides": 12.0, "armor": 62.0, "ram_damage": 45.0,
 	},
 	"riot_plating": {
-		"name": "Riot Plating", "category": "Armor", "rarity": "Uncommon", "cost": 80, "power": 0.0, "weight": 55.0,
-		"armor": 130.0, "ram_damage": 80.0,
+		"name": "Riot Plating", "category": "Armor", "rarity": "Uncommon", "cost": 80, "power": 0.0, "weight": 18.0,
+		"weight_sides": 33.0, "armor": 115.0, "ram_damage": 80.0,
 	},
 	"spiked_ram_plate": {
-		"name": "Spiked Ram Plate", "category": "Armor", "rarity": "Uncommon", "cost": 70, "power": 0.0, "weight": 45.0,
-		"armor": 80.0, "ram_damage": 130.0,
+		"name": "Zed Sled", "category": "Armor", "rarity": "Uncommon", "cost": 70, "power": 0.0, "weight": 15.0,
+		"armor": 71.0, "ram_damage": 130.0, "front_only": true,
 	},
 	"cowcatcher_ram": {
-		"name": "Cowcatcher Ram", "category": "Armor", "rarity": "Rare", "cost": 180, "power": 0.0, "weight": 65.0,
-		"armor": 140.0, "ram_damage": 170.0,
+		"name": "Cowcatcher Ram", "category": "Armor", "rarity": "Rare", "cost": 180, "power": 0.0, "weight": 22.0,
+		"armor": 124.0, "ram_damage": 170.0, "front_only": true,
 	},
 	"composite_plating": {
-		"name": "Composite Plating", "category": "Armor", "rarity": "Rare", "cost": 170, "power": 10.0, "weight": 50.0,
-		"armor": 160.0, "ram_damage": 75.0,
+		"name": "Composite Plating", "category": "Armor", "rarity": "Rare", "cost": 170, "power": 4.0, "weight": 17.0,
+		"power_sides": 7.0, "weight_sides": 30.0, "armor": 142.0, "ram_damage": 75.0,
 	},
 	# --- Weapons (hardpoints). lock_range 0 = this weapon can't be locked ---------
 	"pintle_turret": {
@@ -157,6 +162,13 @@ const CATALOG := {
 		"burst": 4, "burst_rate": 12.0,
 	},
 	# --- Internal systems (passive, take internal capacity) -----------------------
+	# Shield generators (§14): a recharging layer in front of the armor.
+	# `shield_delay` seconds after the last hit it starts refilling, taking
+	# `shield_refill` seconds from empty to full.
+	"junk_emitter": {
+		"name": "Junk Emitter", "category": "Internal", "rarity": "Common", "cost": 30, "power": 25.0, "weight": 5.0,
+		"shield": 30.0, "shield_delay": 3.0, "shield_refill": 5.0,
+	},
 	"targeting_computer": {
 		"name": "Targeting Computer", "category": "Internal", "rarity": "Common", "cost": 30, "power": 25.0, "weight": 5.0,
 		"manual_aim": true,
@@ -171,7 +183,7 @@ const CATALOG := {
 	},
 	"structural_bracing": {
 		"name": "Structural Bracing", "category": "Internal", "rarity": "Uncommon", "cost": 50, "power": 0.0, "weight": 15.0,
-		"armor_bonus": 25.0, "ram_bonus": 15.0,
+		"hp_bonus": 25.0, "ram_bonus": 15.0,
 	},
 	"advanced_targeting": {
 		"name": "Advanced Targeting Computer", "category": "Internal", "rarity": "Rare", "cost": 140, "power": 30.0, "weight": 5.0,
@@ -197,22 +209,26 @@ const CATALOG := {
 	},
 }
 
-# What the player's rig rolls out with: 75 / 100 power, 80 / 100 weight. The
-# Gunner seated on it aims the turret, so it carries no targeting computer and
-# has no LOCK until you find the Advanced Targeting Computer.
+# What the player's rig rolls out with: 100 / 100 power, 95 / 100 weight.
+# Scrap Plating on all three armor slots and a Junk Emitter shield, so a new
+# player sees every defense layer (§14). The Gunner seated on it aims the
+# turret, so it carries no targeting computer and has no LOCK until you find
+# the Advanced Targeting Computer.
 const STARTER_LOADOUT := {
 	"chassis": "scrap_frame",
 	"engine": "junk_v6",
 	"drive": "street_wheels",
-	"armor": "scrap_plating",
+	"armor_front": "scrap_plating",
+	"armor_sides": "scrap_plating",
+	"armor_rear": "scrap_plating",
 	"weapons": ["pintle_turret"],
 	"utility": [],
-	"internal": [],
+	"internal": ["junk_emitter"],
 }
 
 # Schematics a new game starts with: the starter's parts plus the Targeting
 # Computer, for rigs that run a turret with no Gunner.
-const STARTER_SCHEMATICS := ["scrap_frame", "junk_v6", "street_wheels", "scrap_plating", "pintle_turret", "targeting_computer"]
+const STARTER_SCHEMATICS := ["scrap_frame", "junk_v6", "street_wheels", "scrap_plating", "pintle_turret", "targeting_computer", "junk_emitter"]
 
 # What an Outrider can drop when you wreck it.
 const OUTRIDER_DROPS := ["outrider_twin_guns", "outrider_light_plating", "outrider_sport_wheels", "coolant_loop"]
@@ -264,7 +280,7 @@ static func at_level(part: Dictionary, level: int) -> Dictionary:
 		for key: String in ["fire_rate_mult", "damage_mult", "lock_range_mult", "turret_aim_mult"]:
 			if out.has(key):
 				out[key] = 1.0 + (float(out[key]) - 1.0) * scale
-		for key: String in ["armor_bonus", "ram_bonus"]:
+		for key: String in ["hp_bonus", "ram_bonus", "shield"]:
 			if out.has(key):
 				out[key] = float(out[key]) * scale
 		if out.has("injury_mult"):

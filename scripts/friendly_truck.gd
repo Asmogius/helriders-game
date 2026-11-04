@@ -33,7 +33,7 @@ func _init() -> void:
 
 
 ## A friendly bump from your rig doesn't hurt it.
-func receive_ram(_damage: float) -> void:
+func receive_ram(_damage: float, _from := Vector2.INF) -> void:
 	pass
 
 

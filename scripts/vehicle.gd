@@ -43,7 +43,6 @@ var brake := 0.0
 var coast := 0.0
 var turn_rate := 0.0
 var grip := 0.0
-var armor_max := 0.0
 var ram_damage := 0.0
 var mount := Mount.TURRET
 var fire_rate := 0.0
@@ -81,7 +80,45 @@ var crew_fire := 1.0
 var crew_damage := 1.0
 
 var team := BulletPool.TEAM_PLAYER
-var armor := 0.0
+
+# Defense layers (§14): shield (recharges) -> armor per facing -> HP (zero =
+# wreck). Facings: FRONT, LEFT, RIGHT, REAR.
+enum { FRONT, LEFT, RIGHT, REAR }
+var hp := 0.0
+var hp_max := 0.0
+var facing_armor := PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
+var facing_max := PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
+var shield := 0.0
+var shield_max := 0.0
+var shield_delay := T.DEFAULT_SHIELD_DELAY
+var shield_refill := T.DEFAULT_SHIELD_REFILL
+var shield_skulls := 0             # enemy rigs: the shield only comes up from this many skulls
+var last_facing := -1              # the facing the last hit landed on (tests, HUD)
+
+## Everything left before a wreck: HP plus every facing's armor plus the shield.
+## Kept for the many readers that think in one number. Setting it refills from
+## the bottom up: HP first, then armor (evenly), then the shield.
+var armor: float:
+	get:
+		return hp + _armor_total() + shield
+	set(value):
+		var left := maxf(value, 0.0)
+		hp = minf(left, hp_max)
+		left -= hp
+		var room := _armor_max_total()
+		var fill := clampf(left / room, 0.0, 1.0) if room > 0.0 else 0.0
+		for i in 4:
+			facing_armor[i] = facing_max[i] * fill
+		left -= room * fill
+		shield = clampf(left, 0.0, shield_max)
+## The full total. Setting it resizes HP so the total matches (tests use a
+## huge value to make a rig unkillable).
+var armor_max: float:
+	get:
+		return hp_max + _armor_max_total() + shield_max
+	set(value):
+		hp_max = maxf(value - _armor_max_total() - shield_max, 1.0)
+		hp = minf(hp, hp_max)
 var traction := 1.0                # grip multiplier: slime lowers it (set_on_slime)
 var slime_left := 0.0               # seconds of slick tyres left after leaving slime
 var is_wrecked := false
@@ -127,7 +164,10 @@ var _lock_check := 0.0
 var _lock_blind := 0.0
 var _ray := PhysicsRayQueryParameters2D.new()
 var _active := {}                  # crew ability kind -> its numbers + "left"
-var _base_armor := 0.0
+var _base_hp := 0.0
+var _base_facings := PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
+var _shield_wait := 0.0
+var _sheet_shield := 0.0
 var _streak_timer := 0.0
 # Damage taken per 0.1 s over the last second (big-hit check). No allocation.
 var _dmg_buckets := PackedFloat32Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
@@ -147,8 +187,7 @@ func apply_stats(s: Dictionary) -> void:
 	coast = s.coast
 	turn_rate = s.turn_rate
 	grip = s.grip
-	_base_armor = s.armor
-	armor_max = _base_armor * float(crew_mods.armor)   # Reinforced keeps across a part swap
+	_set_layers(s)
 	ram_damage = s.ram_damage
 	mount = s.mount
 	fire_rate = s.fire_rate
@@ -192,7 +231,7 @@ func apply_stats(s: Dictionary) -> void:
 		var copy := a.duplicate()
 		copy["ready_in"] = 0.0
 		abilities.append(copy)
-	armor = armor_max
+	armor = armor_max   # rolls out with every layer full
 	if not can_lock():
 		lock_enabled = false
 	if is_inside_tree():
@@ -284,9 +323,7 @@ func _refresh_crew_mods() -> void:
 	crew_fire = float(crew_mods.fire)
 	crew_damage = float(crew_mods.damage)
 	latch_mult = float(crew_mods.latch)
-	if _base_armor > 0.0:
-		armor_max = _base_armor * float(crew_mods.armor)
-		armor = minf(armor, armor_max)
+	_apply_armor_mods()
 	for t in _turrets:
 		if t != null:
 			t.set("hot", _active.has("overcharge") or _active.has("deadeye"))
@@ -321,7 +358,7 @@ func use_crew_ability(index: int) -> bool:
 			crew[patient].injured = false
 			crew_healed.emit(patient)
 		"field_repair":
-			armor = minf(armor + float(a.heal) * float(crew_mods.repair), armor_max)
+			repair_armor(float(a.heal) * float(crew_mods.repair))
 			throw_off_hunters()
 			if fx != null:
 				fx.call("repair", global_position)
@@ -556,6 +593,7 @@ func _physics_process(delta: float) -> void:
 		vuln_left -= delta
 		if vuln_left <= 0.0:
 			queue_redraw()
+	_recharge_shield(delta)
 	_drive(delta)
 	_update_lock(delta)
 	_weapons(delta)
@@ -650,7 +688,7 @@ func _resolve_collisions(pre_velocity: Vector2) -> void:
 			if team == BulletPool.TEAM_PLAYER and int(other.get("team")) == BulletPool.TEAM_PLAYER:
 				continue
 			already_hit.append(other)
-			other.call("receive_ram", ram_damage * float(crew_mods.ram) * clampf(impact / max_speed, 0.0, 1.2))
+			other.call("receive_ram", ram_damage * float(crew_mods.ram) * clampf(impact / max_speed, 0.0, 1.2), global_position)
 			if bool(crew_mods.shake_off):
 				throw_off_hunters()
 		else:
@@ -661,7 +699,7 @@ func _resolve_collisions(pre_velocity: Vector2) -> void:
 	# Only a fresh crash counts as an impact; grinding along a wall doesn't.
 	wall_impact = impact_max if hit_wall and not touching_wall else 0.0
 	if wall_impact > WALL_DAMAGE_SPEED:
-		take_damage((wall_impact - WALL_DAMAGE_SPEED) * 0.05 * float(crew_mods.wall))
+		take_damage((wall_impact - WALL_DAMAGE_SPEED) * 0.05 * float(crew_mods.wall), -normal)
 	touching_wall = hit_wall
 	wall_normal = normal
 
@@ -857,7 +895,7 @@ func use_ability(index: int) -> bool:
 	a.ready_in = float(a.cooldown) * float(crew_mods.util_cd)
 	match str(a.ability):
 		"patch":
-			armor = minf(armor + float(a.heal) * float(crew_mods.patch) * float(crew_mods.repair), armor_max)
+			repair_armor(float(a.heal) * float(crew_mods.patch) * float(crew_mods.repair))
 			if fx != null:
 				fx.call("repair", global_position)
 		"oil":
@@ -891,16 +929,19 @@ func set_on_slime(on: bool, delta: float) -> void:
 	traction = T.SLIME_GRIP if slime_left > 0.0 else 1.0
 
 
-func take_hit(damage: float, impulse: Vector2, _cause := "shot") -> void:
+## A hit from a bullet or a blast. `impulse` points the way the hit travels,
+## so it came from the opposite side; mines and other blasts splash.
+func take_hit(damage: float, impulse: Vector2, cause := "shot") -> void:
 	if not is_wrecked:
 		velocity += impulse * 0.15
 	if vuln_left > 0.0:
 		damage *= vuln
-	take_damage(damage)
+	take_damage(damage, -impulse, cause == "mine" or cause == "blast")
 
 
-func receive_ram(damage: float) -> void:
-	take_damage(damage * float(crew_mods.ram_taken))
+## Rammed by another rig at world point `from` (its position).
+func receive_ram(damage: float, from := Vector2.INF) -> void:
+	take_damage(damage * float(crew_mods.ram_taken), from - global_position if from != Vector2.INF else Vector2.ZERO)
 
 
 ## Marked by a Spotter: takes `mult` damage for `seconds`.
@@ -910,21 +951,140 @@ func apply_status(mult: float, _slow: float, seconds: float) -> void:
 	queue_redraw()
 
 
-func take_damage(amount: float) -> void:
+## Damage through the layers (§14). `from` is the direction the hit came
+## from (source minus this rig; zero = straight ahead). The shield takes it
+## first; then the facing it lands on; a stripped facing passes the rest to
+## HP. A `splash` (explosion) hits the nearest facing in full and each
+## adjacent one at T.SPLASH_ADJACENT, and only reaches HP once every facing
+## is stripped.
+func take_damage(amount: float, from := Vector2.ZERO, splash := false) -> void:
 	if is_wrecked or amount <= 0.0:
 		return
 	amount *= float(crew_mods.taken)
-	armor -= amount
+	var left := amount
+	_shield_wait = shield_delay
+	if shield > 0.0:
+		var soak := minf(shield, left)
+		shield -= soak
+		left -= soak
+	if left > 0.0:
+		var f := facing_of(from)
+		last_facing = f
+		if splash:
+			if _armor_total() <= 0.0:
+				hp -= left
+			else:
+				_strip(f, left)
+				for adj: int in _adjacent(f):
+					_strip(adj, left * T.SPLASH_ADJACENT)
+		else:
+			hp -= _strip(f, left)
 	if amount >= 2.0:
 		_flash = 1.0
 		queue_redraw()
 	damaged.emit(amount)
-	if not crew.is_empty() and armor > 0.0:
+	if not crew.is_empty() and hp > 0.0:
 		_dmg_buckets[_bucket_i] += amount
 		_check_big_hit()
-	if armor <= 0.0:
-		armor = 0.0
+	if hp <= 0.0:
+		hp = 0.0
 		_wreck()
+
+
+## Take `amount` off facing `f`'s armor; returns what got through.
+func _strip(f: int, amount: float) -> float:
+	var soak := minf(facing_armor[f], amount)
+	facing_armor[f] -= soak
+	return amount - soak
+
+
+## Which facing a hit from direction `from` (world space) lands on.
+func facing_of(from: Vector2) -> int:
+	if from == Vector2.ZERO:
+		return FRONT
+	var a := angle_difference(rotation, from.angle())
+	if absf(a) <= PI * 0.25:
+		return FRONT
+	if absf(a) >= PI * 0.75:
+		return REAR
+	return RIGHT if a > 0.0 else LEFT
+
+
+static func _adjacent(f: int) -> Array[int]:
+	if f == FRONT or f == REAR:
+		return [LEFT, RIGHT]
+	return [FRONT, REAR]
+
+
+## Repairs restore armor only, to the most damaged facing (never past its
+## max; anything over is lost). Returns what was restored.
+func repair_armor(amount: float) -> float:
+	var worst := -1
+	var gap := 0.0
+	for i in 4:
+		var g := facing_max[i] - facing_armor[i]
+		if g > gap:
+			gap = g
+			worst = i
+	if worst < 0 or amount <= 0.0:
+		return 0.0
+	var add := minf(amount, gap)
+	facing_armor[worst] += add
+	return add
+
+
+func _armor_total() -> float:
+	return facing_armor[0] + facing_armor[1] + facing_armor[2] + facing_armor[3]
+
+
+func _armor_max_total() -> float:
+	return facing_max[0] + facing_max[1] + facing_max[2] + facing_max[3]
+
+
+## Read the layers from a stat sheet (Loadout.build or a flat enemy sheet:
+## hp, front, side, rear, shield...). A sheet with only `armor` (old style)
+## puts it all in HP.
+func _set_layers(s: Dictionary) -> void:
+	if s.has("hp"):
+		_base_hp = float(s.hp)
+		_base_facings = PackedFloat32Array([float(s.get("front", 0.0)), float(s.get("side", 0.0)), float(s.get("side", 0.0)), float(s.get("rear", 0.0))])
+	else:
+		_base_hp = float(s.get("armor", 0.0))
+		_base_facings = PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
+	shield_skulls = int(s.get("shield_skulls", 0))
+	shield_max = float(s.get("shield", 0.0)) if shield_skulls == 0 else 0.0
+	_sheet_shield = float(s.get("shield", 0.0))
+	shield_delay = float(s.get("shield_delay", T.DEFAULT_SHIELD_DELAY))
+	shield_refill = float(s.get("shield_refill", T.DEFAULT_SHIELD_REFILL))
+	_apply_armor_mods()
+
+
+## Crew armor modifiers (Reinforced) on top of the parts; keeps the current
+## fill of each layer.
+func _apply_armor_mods() -> void:
+	var mult := float(crew_mods.armor)
+	hp_max = _base_hp
+	hp = minf(hp, hp_max)
+	for i in 4:
+		facing_max[i] = _base_facings[i] * mult
+		facing_armor[i] = minf(facing_armor[i], facing_max[i])
+	shield = minf(shield, shield_max)
+
+
+## Enemy rigs with a shield from N skulls: switch it on for this job.
+func arm_for_skulls(skulls: int) -> void:
+	if shield_skulls > 0:
+		shield_max = _sheet_shield if skulls >= shield_skulls else 0.0
+		shield = shield_max
+
+
+func _recharge_shield(delta: float) -> void:
+	if shield >= shield_max or shield_max <= 0.0:
+		return
+	if _shield_wait > 0.0:
+		_shield_wait -= delta
+		return
+	shield = minf(shield + shield_max / maxf(shield_refill, 0.1) * delta, shield_max)
 
 
 func _wreck() -> void:

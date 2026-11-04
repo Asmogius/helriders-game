@@ -18,6 +18,7 @@ var right_stick: ThumbStick
 
 var _root: Control
 var _armor_bar: ArmorBar
+var _rig_icon: RigIcon
 var _power_bar: PowerBar
 var _arrows: ThreatArrows
 var _lock_button: LockButton
@@ -47,18 +48,23 @@ func _ready() -> void:
 	_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_root)
 
+	_rig_icon = RigIcon.new()
+	_rig_icon.position = Vector2(20, 10)
+	_rig_icon.size = Vector2(64, 76)
+	_root.add_child(_rig_icon)
+
 	_armor_bar = ArmorBar.new()
-	_armor_bar.position = Vector2(24, 18)
+	_armor_bar.position = Vector2(94, 18)
 	_armor_bar.size = Vector2(300, 16)
 	_root.add_child(_armor_bar)
 
 	_power_bar = PowerBar.new()
-	_power_bar.position = Vector2(24, 38)
+	_power_bar.position = Vector2(94, 38)
 	_power_bar.size = Vector2(300, 8)
 	_root.add_child(_power_bar)
 
 	_status = _label(24, Color(0.85, 0.83, 0.78))
-	_status.position = Vector2(24, 52)
+	_status.position = Vector2(94, 52)
 	_root.add_child(_status)
 
 	_fps = _label(20, Color(0.6, 0.6, 0.58))
@@ -286,6 +292,16 @@ func press_ability(index: int) -> void:
 
 func set_armor(ratio: float) -> void:
 	_armor_bar.set_ratio(ratio)
+
+
+## The rig icon (§14): shield ring, each facing's plate, the HP block. All
+## 0..1; a facing with no armor fitted is -1 (drawn empty).
+func set_defense(shield_ratio: float, facings: PackedFloat32Array, hp_ratio: float) -> void:
+	_rig_icon.set_values(shield_ratio, facings, hp_ratio)
+
+
+func defense_icon_values() -> Dictionary:
+	return {"shield": _rig_icon.shield, "facings": _rig_icon.facings, "hp": _rig_icon.hp}
 
 
 ## Power in use vs the engine's budget, and weight vs the chassis's capacity.
@@ -855,6 +871,55 @@ class PowerBar extends Control:
 		if over or heavy:
 			text += "  OVERLOAD"
 		draw_string(font, Vector2(size.x + 10.0, size.y + 1.0), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, color)
+
+
+class RigIcon extends Control:
+	## A small top-down rig (pointing up): four plates for the facings, a ring
+	## for the shield, the body block drains as HP drops. Redraws on change.
+	const T := preload("res://scripts/tuning.gd")
+	var shield := -1.0
+	var facings := PackedFloat32Array([1.0, 1.0, 1.0, 1.0])
+	var hp := 1.0
+
+	func set_values(shield_ratio: float, new_facings: PackedFloat32Array, hp_ratio: float) -> void:
+		var changed := absf(shield_ratio - shield) > 0.01 or absf(hp_ratio - hp) > 0.01
+		for i in 4:
+			changed = changed or absf(new_facings[i] - facings[i]) > 0.01
+		if not changed:
+			return
+		shield = shield_ratio
+		facings = new_facings.duplicate()
+		hp = hp_ratio
+		queue_redraw()
+
+	func _plate_color(v: float) -> Color:
+		if v < 0.0:
+			return Color(0.25, 0.25, 0.27, 0.6)   # nothing fitted
+		if v <= 0.0:
+			return Color(0.45, 0.12, 0.1)          # stripped
+		return T.COL_ORANGE.lerp(T.COL_CYAN, clampf(v * 1.4 - 0.2, 0.0, 1.0)).darkened(0.35 * (1.0 - v))
+
+	func _draw() -> void:
+		var c := size * 0.5
+		var bw := 20.0
+		var bh := 34.0
+		var body := Rect2(c - Vector2(bw, bh) * 0.5, Vector2(bw, bh))
+		# Shield ring.
+		if shield >= 0.0:
+			draw_arc(c, 34.0, 0.0, TAU, 40, Color(T.COL_SHIELD, 0.18), 4.0)
+			if shield > 0.0:
+				draw_arc(c, 34.0, -PI / 2.0, -PI / 2.0 + TAU * shield, 40, Color(T.COL_SHIELD, 0.9), 4.0)
+		# HP: the body block drains from the top.
+		draw_rect(body, Color(0.08, 0.08, 0.09, 0.9))
+		var fill := clampf(hp, 0.0, 1.0)
+		var hp_col := Color(0.85, 0.83, 0.78) if fill > 0.35 else T.COL_ENEMY
+		draw_rect(Rect2(body.position + Vector2(0, bh * (1.0 - fill)), Vector2(bw, bh * fill)), Color(hp_col, 0.85))
+		# Plates: front (top), left, right, rear (bottom).
+		draw_rect(Rect2(body.position + Vector2(-2, -9), Vector2(bw + 4, 6)), _plate_color(facings[0]))
+		draw_rect(Rect2(body.position + Vector2(-9, 2), Vector2(6, bh - 4)), _plate_color(facings[1]))
+		draw_rect(Rect2(body.position + Vector2(bw + 3, 2), Vector2(6, bh - 4)), _plate_color(facings[2]))
+		draw_rect(Rect2(body.position + Vector2(-2, bh + 3), Vector2(bw + 4, 6)), _plate_color(facings[3]))
+		draw_rect(body, Color(0.5, 0.5, 0.5, 0.6), false, 1.0)
 
 
 class ArmorBar extends Control:

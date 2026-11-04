@@ -175,6 +175,7 @@ func _ready() -> void:
 		rig.player = vehicle
 		rig.bullets = bullets
 		rig.fx = fx
+		rig.arm_for_skulls(skulls)   # Gunner Rigs and the Convoy cab carry a shield from 4 skulls
 	if truck != null:
 		# Escort: the truck rolls out behind you, and the zombies and enemy
 		# rigs go for it.
@@ -1020,6 +1021,10 @@ func _fail(title: String, detail: String) -> void:
 
 func _refresh_hud() -> void:
 	hud.set_armor(vehicle.armor / vehicle.armor_max)
+	var plates := PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
+	for i in 4:
+		plates[i] = vehicle.facing_armor[i] / vehicle.facing_max[i] if vehicle.facing_max[i] > 0.0 else -1.0
+	hud.set_defense(vehicle.shield / vehicle.shield_max if vehicle.shield_max > 0.0 else -1.0, plates, vehicle.hp / maxf(vehicle.hp_max, 1.0))
 	hud.set_power(vehicle.power_load(), vehicle.power_capacity(), vehicle.weight_load, vehicle.weight_limit())
 	for i in vehicle.crew.size():
 		_crew_state(i)
@@ -1250,7 +1255,7 @@ func _on_elite_wrecked() -> void:
 ## Mechanic perk: each enemy rig wreck restores some armor.
 func _salvage_plating() -> void:
 	if bool(vehicle.crew_mod("salvage_plating")) and not vehicle.is_wrecked:
-		vehicle.armor = minf(vehicle.armor + 15.0 * float(vehicle.crew_mod("repair")), vehicle.armor_max)
+		vehicle.repair_armor(15.0 * float(vehicle.crew_mod("repair")))
 
 
 func _collect_pickups() -> void:
