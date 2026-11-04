@@ -36,13 +36,8 @@ extends RefCounted
 const T := preload("res://scripts/tuning.gd")
 const Mods := preload("res://scripts/mods.gd")
 
-const RARITY_COLORS := {
-	"Common": Color(0.75, 0.75, 0.72),
-	"Uncommon": Color(0.4, 0.85, 0.45),
-	"Rare": Color(0.35, 0.6, 1.0),
-	"Epic": Color(0.75, 0.45, 1.0),
-	"Legendary": Color(1.0, 0.72, 0.25),
-}
+## Rarity colours live in tuning.gd (V1.1); this alias keeps old callers working.
+const RARITY_COLORS: Dictionary = T.RARITY_COLORS
 
 const CATALOG := {
 	# --- Chassis: slots, weight capacity, base handling --------------------------
