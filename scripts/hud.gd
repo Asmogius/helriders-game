@@ -458,6 +458,7 @@ func show_result(title: String, subtitle: String, button_text: String, accent: C
 	_overlay.visible = true
 	_overlay.modulate.a = 0.0
 	create_tween().tween_property(_overlay, "modulate:a", 1.0, 0.35)
+	preload("res://scripts/ui_transitions.gd").tick_numbers(_subtitle)   # V6.5: counters tick up
 
 
 ## A paused, two-way choice (the Escort driver's radio call). The mission

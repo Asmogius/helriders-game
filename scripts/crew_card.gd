@@ -23,6 +23,7 @@ var status := ""
 var status_color := UI.TEXT_DIM
 var selected := false
 var dim := false            # resting or already hired
+var flashed := false           # V6.5: this card played the level-up flash (tests, capture)
 var _icons: RefCounted = UI.icons()   # V6.3: class icon in the portrait chip
 
 
@@ -31,6 +32,30 @@ func _ready() -> void:
 	focus_mode = Control.FOCUS_NONE
 	custom_minimum_size = SIZE
 	action_mode = BaseButton.ACTION_MODE_BUTTON_RELEASE
+	if not member.is_empty() and member.has("id"):
+		var lv := Crew.level(member)
+		var key := str(member.id)
+		var seen := _seen_levels()
+		if seen.has(key) and lv > int(seen[key]):
+			preload("res://scripts/ui_transitions.gd").flash(self)
+			flashed = true
+		seen[key] = lv
+
+
+## V6.5: member id -> level last shown, for the level-up flash. Kept as meta
+## on the Profile node (not a static var, which kept this script alive at exit);
+## Profile.new_game() drops it (SEEN_META), so a new game's crew (ids start
+## over) never flash against the last game's levels.
+const SEEN_META := &"crew_seen_level"
+
+
+func _seen_levels() -> Dictionary:
+	var profile := get_node_or_null("/root/Profile")
+	if profile == null:
+		return {}
+	if not profile.has_meta(SEEN_META):
+		profile.set_meta(SEEN_META, {})
+	return profile.get_meta(SEEN_META)
 
 
 func _draw() -> void:

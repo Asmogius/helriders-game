@@ -121,6 +121,7 @@ func _ready() -> void:
 
 func new_game() -> void:
 	_ready_state = true
+	remove_meta(&"crew_seen_level")   # V6.5: crew_card.gd SEEN_META; no level-up flash carried over
 	scrap = T.START_SCRAP
 	schematics.clear()
 	for id: String in Parts.STARTER_SCHEMATICS:

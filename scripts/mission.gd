@@ -174,6 +174,7 @@ var _events: Array = []          # [seconds, kind, kills that also trigger it (-
 
 
 func _ready() -> void:
+	preload("res://scripts/ui_transitions.gd").fade_in(self)   # V6.5
 	profile = get_node("/root/Profile")
 	var pad := get_node_or_null("/root/Pad")
 	if pad != null:

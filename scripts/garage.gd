@@ -102,6 +102,7 @@ var _crew_line: Button
 
 
 func _ready() -> void:
+	preload("res://scripts/ui_transitions.gd").fade_in(self)   # V6.5
 	profile = get_node("/root/Profile")
 	var pad := get_node_or_null("/root/Pad")
 	if pad != null:
@@ -1167,6 +1168,8 @@ func _on_tab(tab_name: String) -> void:
 		return
 	_close_overlay()
 	close_sheet()
+	var station: Node = {"COMMS": _comms, "INN": _inn, "SALOON": _saloon, "RESEARCH": _research}.get(tab_name)
+	preload("res://scripts/ui_transitions.gd").slide_in(station.get("_cards") if station != null else null)   # V6.5: cards slide in
 	match tab_name:
 		"COMMS":
 			_comms.selected = -1
