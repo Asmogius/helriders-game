@@ -31,11 +31,22 @@ func _ready() -> void:
 
 
 ## Reads the sheet's .json and loads the composite sheet beside it.
-func load_meta(path: String) -> bool:
+static var _meta_cache := {}   # path -> parsed sheet json (shared, read-only)
+static func read_meta(path: String) -> Variant:
+	if _meta_cache.has(path):
+		return _meta_cache[path]
 	var f := FileAccess.open(path, FileAccess.READ)
 	if f == null:
-		return false
+		return null
 	var d: Variant = JSON.parse_string(f.get_as_text())
+	_meta_cache[path] = d
+	return d
+
+
+func load_meta(path: String) -> bool:
+	var d: Variant = read_meta(path)
+	if d is Dictionary:
+		d = (d as Dictionary).duplicate(true)
 	if not d is Dictionary:
 		return false
 	meta = d

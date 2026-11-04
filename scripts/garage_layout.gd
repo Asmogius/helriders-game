@@ -214,11 +214,26 @@ const HD_DIR := "res://art/sprites_hd/"
 static var hd_enabled := true   # profile_garage.gd "sd" compares without it
 
 
+## Warm the HD sheet metadata once when the garage opens, so browsing
+## candidates never re-reads or re-parses JSON. Textures are NOT preloaded:
+## keeping every HD sheet resident measured 416 MB of texture memory.
+static var _warmed := false
+static func warm_hd() -> void:
+	if _warmed:
+		return
+	_warmed = true
+	for f in DirAccess.get_files_at(HD_DIR):
+		if f.ends_with(".json"):
+			DirectionalSprite.read_meta(HD_DIR + f)
+
+
 static func _hd_preview(g: Control, holder: Node2D) -> void:
 	var rig: Node2D = g.get("preview")
 	if rig == null:
 		return
 	var want := HD_DIR if hd_enabled and DirAccess.dir_exists_absolute(HD_DIR) else ""
+	if want != "":
+		warm_hd()
 	if rig.get("art_dir") != want:
 		rig.set("art_dir", want)
 	if holder.get_node_or_null("ContactShadow") == null:
