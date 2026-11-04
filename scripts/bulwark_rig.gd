@@ -7,10 +7,78 @@ extends "res://scripts/enemy_rig.gd"
 ## lines up. Its front plate is very heavy (§14 defense layers; it used to
 ## halve hits on the front), and bullets on it throw grey sparks.
 
+## Pre-ram wind-up, Art's contract (docs/ART_PIPELINE.md on PR #15):
+## is_winding_up(), windup_progress() 0..1, and windup_started. windup_ended
+## fires when the wind-up stops (it charges, or a ram, wreck or getting stuck
+## cuts it short). The Convoy Lead extends this script and inherits it all.
+signal windup_started
+signal windup_ended
+
 const BACKOFF_STEER := 0.5   # radians off straight back while reversing
 
 var backoffs := 0            # times it rammed you and backed off (tests)
 var front_hits := 0          # hits its armor blunted (tests)
+var charges := 0             # charges started (tests)
+var windups := 0             # wind-up telegraphs shown (tests)
+var _charge_dir := Vector2.ZERO
+
+
+## Voxel art: art/sprites/bulwark.json (see docs/ART_PIPELINE.md).
+func art_id() -> String:
+	return "bulwark"
+
+
+## Pre-ram wind-up glow (art contract, docs/ART_PIPELINE.md): the plow heats
+## to bright enemy red while the rig winds up, pulsing faster as it nears 1.
+## Read defensively: only if this rig provides is_winding_up() /
+## windup_progress() (Content's wind-up state); the optional windup_started
+## signal restarts the pulse. Without them no glow is shown.
+const WINDUP_LAYER := "windup_glow"
+var _windup_t0 := 0.0
+
+
+func _has_windup_art() -> bool:
+	return _hull_art != null and (_hull_art.meta.get("layers", {}) as Dictionary).has(WINDUP_LAYER)
+
+
+func art_winding_up() -> bool:
+	return not is_wrecked and has_method("is_winding_up") and bool(call("is_winding_up"))
+
+
+func art_windup_progress() -> float:
+	if not art_winding_up():
+		return 0.0
+	if has_method("windup_progress"):
+		return clampf(float(call("windup_progress")), 0.0, 1.0)
+	return 1.0
+
+
+func art_layers() -> Array[String]:
+	var ids := super()
+	if _has_windup_art() and art_winding_up():
+		ids.append(WINDUP_LAYER)
+	return ids
+
+
+func art_layer_modulate(id: String) -> Color:
+	if id != WINDUP_LAYER:
+		return super(id)
+	var p := art_windup_progress()
+	var t := Time.get_ticks_msec() * 0.001 - _windup_t0
+	var pulse := 0.5 + 0.5 * sin(t * TAU * lerpf(2.0, 7.0, p))   # 2 Hz -> 7 Hz
+	var a := clampf(lerpf(0.25, 0.7, p) + lerpf(0.25, 0.3, p) * pulse, 0.0, 1.0)
+	return Color(1.0, 1.0, 1.0, a)
+
+
+func _on_windup_started() -> void:
+	_windup_t0 = Time.get_ticks_msec() * 0.001
+
+
+func _ready() -> void:
+	super()
+	# Once per rig, also for subclasses (the Convoy) that call super().
+	if has_signal("windup_started") and not is_connected("windup_started", _on_windup_started):
+		connect("windup_started", _on_windup_started)
 
 
 func _init() -> void:
@@ -22,13 +90,28 @@ func _init() -> void:
 	lock_radius = 50.0
 
 
+## True during the wind-up before a charge (Art's warning glow).
+func is_winding_up() -> bool:
+	return mode == Mode.WINDUP and not is_wrecked
+
+
+## How far along the wind-up is, 0..1 (0 when not winding up).
+func windup_progress() -> float:
+	if not is_winding_up():
+		return 0.0
+	return clampf(1.0 - _mode_time / T.BULWARK_WINDUP, 0.0, 1.0)
+
+
 func _physics_process(delta: float) -> void:
+	var was_winding := mode == Mode.WINDUP
 	super(delta)
+	if was_winding and not is_winding_up():
+		windup_ended.emit()
 	if is_wrecked or player == null or mode == Mode.UNSTICK:
 		return
 	# Rammed the player this tick: back off, then come again.
 	for i in get_slide_collision_count():
-		if get_slide_collision(i).get_collider() == player and mode != Mode.PASS:
+		if get_slide_collision(i).get_collider() == player and mode != Mode.PASS and mode != Mode.WINDUP:
 			mode = Mode.PASS   # PASS doubles as "backing off" for the Bulwark
 			_mode_time = T.BULWARK_BACKOFF
 			_side = 1.0 if randf() < 0.5 else -1.0
@@ -57,6 +140,33 @@ func _think(delta: float) -> void:
 			goal = (player.global_position + player_vel * clampf(dist / max_speed, 0.0, 0.5) - global_position).normalized()
 			if player_down:
 				throttle = 0.3
+			elif _sees_player and dist >= float(T.BULWARK_CHARGE_RANGE[0]) and dist <= float(T.BULWARK_CHARGE_RANGE[1]) \
+					and absf(forward.angle_to(to_player)) <= T.BULWARK_CHARGE_CONE and shutdown_left <= 0.0:
+				# Lined up: wind up (the telegraph), then charge.
+				mode = Mode.WINDUP
+				_mode_time = T.BULWARK_WINDUP
+				windups += 1
+				windup_started.emit()
+				queue_redraw()
+		Mode.WINDUP:
+			# Engine roar and headlight flare: it holds and keeps its nose on you.
+			goal = to_player.normalized()   # keeps rolling in, nose on you
+			if _mode_time <= 0.0:
+				mode = Mode.CHARGE
+				_mode_time = T.BULWARK_CHARGE_TIME
+				_charge_dir = forward
+				charges += 1
+		Mode.CHARGE:
+			# Straight line at top speed; it doesn't steer, so it can overshoot.
+			goal = _charge_dir
+			if _mode_time <= 0.0:
+				mode = Mode.RECOVER   # missed: a slow turn with its sides open
+				_mode_time = T.BULWARK_RECOVER
+		Mode.RECOVER:
+			goal = to_player.normalized()
+			throttle = 0.25
+			if _mode_time <= 0.0:
+				mode = Mode.ATTACK
 		Mode.PASS:
 			# Backing off after a ram: stick behind us reverses a slow rig.
 			goal = -forward.rotated(_side * BACKOFF_STEER)
@@ -67,12 +177,12 @@ func _think(delta: float) -> void:
 			if _mode_time <= 0.0:
 				mode = Mode.ATTACK
 
-	if mode == Mode.ATTACK:
+	if mode == Mode.ATTACK or mode == Mode.RECOVER:
 		goal = _avoid_walls(goal, forward)
 	drive_input = goal * throttle
 
 	fire_trigger = (
-		mode == Mode.ATTACK
+		(mode == Mode.ATTACK or mode == Mode.WINDUP)   # the gun works only while lining up
 		and not player_down
 		and _sees_player
 		and dist < gun_range()
@@ -80,7 +190,7 @@ func _think(delta: float) -> void:
 	)
 
 	# Wedged against a wall (not the player): back out.
-	if mode == Mode.ATTACK and get_real_velocity().length() < 30.0 and dist > body_len:
+	if (mode == Mode.ATTACK or mode == Mode.CHARGE) and get_real_velocity().length() < 30.0 and dist > body_len and _mode_time < T.BULWARK_CHARGE_TIME - 0.4:
 		_stuck_time += delta
 		if _stuck_time > 1.0:
 			mode = Mode.UNSTICK
@@ -111,6 +221,8 @@ func take_hit(damage: float, impulse: Vector2, cause := "shot", dtype := "") -> 
 
 
 func _draw() -> void:
+	if _hull_art != null:
+		return   # the voxel sheet draws the rig
 	var half_l := body_len * 0.5
 	var half_w := body_wid * 0.5
 	var hull := Color(0.2, 0.21, 0.22)
@@ -152,3 +264,10 @@ func _draw() -> void:
 	draw_rect(Rect2(-half_l - 1.0, -6.0, 3.0, 12.0), T.COL_ENEMY)
 	draw_rect(Rect2(half_l - 18.0, -half_w + 2.0, 4.0, 5.0), T.COL_ENEMY)
 	draw_rect(Rect2(half_l - 18.0, half_w - 7.0, 4.0, 5.0), T.COL_ENEMY)
+	if mode == Mode.WINDUP:
+		# Charge telegraph: headlights flare ahead of the plow.
+		var flare := Color(1.0, 0.95, 0.75, 0.75)
+		for sy: float in [-1.0, 1.0]:
+			draw_circle(Vector2(half_l + 6.0, sy * (half_w - 8.0)), 9.0, flare)
+		draw_colored_polygon(PackedVector2Array([Vector2(half_l + 6.0, -half_w), Vector2(half_l + 120.0, -half_w - 30.0),
+			Vector2(half_l + 120.0, half_w + 30.0), Vector2(half_l + 6.0, half_w)]), Color(1.0, 0.95, 0.75, 0.18))

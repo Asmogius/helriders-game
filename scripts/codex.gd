@@ -27,6 +27,8 @@ const ENEMIES := [
 	["scrapper_gunner", "Scrapper Gunner", "A tougher Scrapper with a weak turret that lays mines too."],
 	["convoy", "Convoy Lead", "An armored semi with a ram, towing a turret trailer. Shoot the trailer off or wreck the cab."],
 	["patcher", "Patcher", "Unarmed tow truck. Hooks an ally on a cable and repairs it, and brings wrecks back. Cut the cable."],
+	["torcher", "Torcher", "Fire skirmisher with a flame nozzle. Its fuel tank is on the back: hit it there and it goes up."],
+	["sludger", "Sludger", "Lobs acid and goop shells from long range. Close in and it backs off."],
 	["elite", "Hunt Target", "A named enemy rig with every layer hardened. Its wreck always carries a schematic."],
 ]
 
@@ -38,6 +40,7 @@ const HAZARDS := [
 	["barrel_boomer", "Boomer Barrel", "Goops everything nearby. The horde rushes whoever's covered."],
 	["slime", "Slime", "Rigs on it lose grip; zombies wade through."],
 	["bile", "Bile", "A Boomer's burst. It marks you for the horde."],
+	["acid", "Acid Puddle", "Acid on the ground. Plates corrode while you sit in it."],
 	["oil", "Oil Slick", "Slippery. Fire or an explosion lights it, and burning oil hurts everyone."],
 	["spikes", "Spike Strip", "Rigs crossing it slow down; zombies on it bleed."],
 	["fire", "Burning Ground", "Builds BURNING on anything standing in it."],

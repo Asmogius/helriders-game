@@ -71,11 +71,17 @@ godot --headless --fixed-fps 60 --path . -s res://tests/jobs_test.gd       # mus
 godot --headless --fixed-fps 60 --path . -s res://tests/defense_test.gd    # must end "DEFENSE TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/status_test.gd     # must end "STATUS TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/patcher_test.gd    # must end "PATCHER TEST PASSED"
+godot --headless --fixed-fps 60 --path . -s res://tests/content_test.gd    # must end "CONTENT TEST PASSED"
+godot --headless --fixed-fps 60 --path . -s res://tests/mods_test.gd       # must end "MODS TEST PASSED"
+godot --headless --fixed-fps 60 --path . -s res://tests/perks_test.gd      # must end "PERKS TEST PASSED"
+godot --headless --fixed-fps 60 --path . -s res://tests/perks2_test.gd     # must end "PERKS2 TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/weapons_test.gd    # must end "WEAPONS TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/rehire_test.gd     # must end "REHIRE TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/menu_test.gd       # must end "MENU TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/tutorial_test.gd   # must end "TUTORIAL TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/layouts_test.gd    # must end "LAYOUTS TEST PASSED"
+godot --headless --fixed-fps 60 --path . -s res://tests/art_sheet_test.gd   # must end "art_sheet_test: PASS"
+godot --headless --fixed-fps 60 --path . -s res://tests/art_content_test.gd # must end "art_content_test: PASS"
 ```
 
 - Tests must call `Profile.new_game()` with `persist = false` first, so they never touch a real save.

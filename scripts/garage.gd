@@ -9,6 +9,7 @@ extends Control
 
 const T := preload("res://scripts/tuning.gd")
 const Parts := preload("res://scripts/parts.gd")
+const Mods := preload("res://scripts/mods.gd")
 const Loadout := preload("res://scripts/loadout.gd")
 const Vehicle := preload("res://scripts/vehicle.gd")
 const UI := preload("res://scripts/ui_theme.gd")
@@ -766,6 +767,7 @@ func _make_card(slot: Dictionary, id: String, current: String, now: Dictionary) 
 			card.subtitle += "  LV %d" % int(part.level)
 		card.rarity_color = Parts.color_of(part)
 		card.headline = _headline(part)
+		card.mod_line = mod_line(part)
 	if id == current:
 		card.installed = true
 	else:
@@ -821,6 +823,17 @@ func _headline(part: Dictionary) -> String:
 		"Utility":
 			return "PWR %d  WT %d  EVERY %dS" % [int(part.power), int(part.weight), int(part.cooldown)]
 	return "PWR %d" % int(part.get("power", 0))
+
+
+## The part's mods on one line: unlocked ones by name, locked ones with the
+## level they open at (mods show while locked; DESIGN §14).
+static func mod_line(part: Dictionary) -> String:
+	var bits: Array[String] = []
+	var level := int(part.get("level", 1))
+	for m: Array in Mods.reachable(str(part.get("id", "")), Parts.max_level(part)):
+		var at := Mods.unlock_level(str(m[0]))
+		bits.append(str(m[2]).to_upper() + ("" if level >= at else " LV%d" % at))
+	return ("MODS  " + "  /  ".join(bits)) if not bits.is_empty() else ""
 
 
 ## What an internal or utility part does, in a few words.
@@ -1116,6 +1129,7 @@ class PartCard extends Button:
 	var title := ""
 	var subtitle := ""
 	var headline := ""
+	var mod_line := ""
 	var deltas: Array = []          # [text, better] pairs
 	var status := ""
 	var status_color := Color.WHITE
@@ -1159,6 +1173,8 @@ class PartCard extends Button:
 				y += 18.0
 			draw_string(font, Vector2(x, y), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(UI.GOOD if d[1] else UI.BAD, dim))
 			x += w + 12.0
+		if mod_line != "":
+			draw_string(font, Vector2(12, size.y - 54.0), mod_line, HORIZONTAL_ALIGNMENT_LEFT, size.x - 24.0, 12, Color(UI.TEXT_DIM, 0.8 * dim))
 		if warning != "":
 			draw_string(font, Vector2(12, size.y - 34.0), warning, HORIZONTAL_ALIGNMENT_LEFT, size.x - 24.0, 14, UI.BAD)
 		draw_string(font, Vector2(12, size.y - 12.0), status, HORIZONTAL_ALIGNMENT_LEFT, size.x - 24.0, 16, status_color)

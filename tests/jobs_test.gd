@@ -37,6 +37,7 @@ func _start(spec: Dictionary) -> void:
 		main.queue_free()
 	main = (load("res://scenes/mission.tscn") as PackedScene).instantiate() as Mission
 	main.mission_override = spec
+	main.push_override = 0   # push_test covers Extract or Push
 	root.add_child(main)
 	frame = 0
 
@@ -177,7 +178,7 @@ func _process(_delta: float) -> bool:
 
 func _check_tables() -> void:
 	_check(Missions.TYPES.has("retrieve") and Missions.TYPES.has("escort"), "both jobs are on the Comms board's list")
-	_check(Parts.DROP_POOLS.retrieve == ["turbo_four", "off_road_tires", "oil_slick", "mine_dropper"], "Retrieve pool: Turbo Four, Off-Road Tires, Oil Slick, Mine Dropper")
+	_check(Parts.DROP_POOLS.retrieve == ["turbo_four", "off_road_tires", "oil_slick", "mine_dropper", "raider_frame"], "Retrieve pool: Turbo Four, Off-Road Tires, Oil Slick, Mine Dropper, Raider Frame (proposal 01)")
 	_check(Parts.DROP_POOLS.escort == ["structural_bracing", "riot_plating", "emergency_patch", "burst_turret"], "Escort pool: Bracing, Riot Plating, Emergency Patch, Burst Turret")
 	var clear: Array = T.MISSIONS.clear.reward
 	var ret: Array = T.MISSIONS.retrieve.reward

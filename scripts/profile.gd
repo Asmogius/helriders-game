@@ -91,6 +91,7 @@ var exp_board_day := 0
 var expeditions: Array = []         # trips under way: offer + "team" ids + "days_left" + "odds"
 var expedition_reports: Array = []  # lines about the trips that came back last
 var last_wreck_survivors: Array[String] = []  # names Last Rites saved on the last wreck
+var wreck_day := 0                # the day of the last wreck (Extract or Push skips the day after)
 var discovered := {}                # Database: category -> ids the player has met
 var settings := {}                  # quality, shake, music, effects (own file; survives new games)
 var settings_path := "user://helriders_settings.cfg"
@@ -145,6 +146,7 @@ func new_game() -> void:
 	expeditions = []
 	expedition_reports = []
 	last_wreck_survivors = []
+	wreck_day = 0
 	discovered = {}
 	lost = []
 	rehire_pool = []
@@ -499,6 +501,7 @@ func bank_run(run_scrap: int, salvaged: Array[String]) -> Dictionary:
 ## penalty paid.
 func record_wreck() -> int:
 	record.wrecks = int(record.wrecks) + 1
+	wreck_day = day
 	var penalty := wreck_penalty(rig)
 	scrap -= penalty
 	if is_complete(rig):
@@ -912,7 +915,7 @@ func rehire_done_today() -> bool:
 ## injured goes to the Inn to rest (a day less with Tough, or with a Medic's
 ## Triage on the run). Call after finish_day(), so tonight's rest doesn't
 ## count. Returns lines for the results card.
-func bank_crew(skulls: int, injured_ids: Array, triage := false) -> Array[String]:
+func bank_crew(skulls: int, injured_ids: Array, triage := false, half_rest := false) -> Array[String]:
 	var lines: Array[String] = []
 	var riders := seated_crew()
 	if riders.is_empty():
@@ -933,6 +936,8 @@ func bank_crew(skulls: int, injured_ids: Array, triage := false) -> Array[String
 				days -= 1
 			if triage:
 				days -= 1
+			if half_rest:
+				days = ceili(days / 2.0)   # Clean Bandage (Field Medic): half the rest days, rounded up
 			m.rest = rest_days(days)
 			m.seated = false
 			line += ", injured: resting %d day%s" % [int(m.rest), "" if int(m.rest) == 1 else "s"]
@@ -1249,6 +1254,7 @@ func save_data() -> Dictionary:
 		"record": record,
 		"notice": notice,
 		"day": day,
+		"wreck_day": wreck_day,
 		"board": board,
 		"active_mission": active_mission,
 		"run_active": run_active,
@@ -1375,6 +1381,7 @@ func apply_data(data: Dictionary) -> bool:
 	ensure_saloon()
 	# Expeditions (saves from before them have none).
 	exp_board_day = int(data.get("exp_board_day", 0))
+	wreck_day = int(data.get("wreck_day", 0))
 	exp_board = []
 	for raw: Variant in data.get("exp_board", []):
 		var e := _clean_expedition(raw)
@@ -1441,7 +1448,7 @@ static func _clean_member(raw: Variant) -> Dictionary:
 	}
 	# Crew from before specialties keep their ability: Wheelman, Gunslinger.
 	out.specialty = Crew.specialty(out)
-	var pool := Crew.perk_pool(out)
+	var pool := Crew.perk_known(out)
 	for p: Variant in d.get("perks", []):
 		if pool.has(str(p)) and not (out.perks as Array).has(str(p)):
 			(out.perks as Array).append(str(p))
@@ -1636,3 +1643,8 @@ func end_tour() -> void:
 	persist = _tour_persist
 	save_game()
 	changed.emit()
+
+
+## Extract or Push (§14): never the day after a wreck.
+func push_blocked_today() -> bool:
+	return wreck_day > 0 and day == wreck_day + 1

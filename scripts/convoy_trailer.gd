@@ -16,6 +16,11 @@ var _sight_timer := 0.0
 var _sees_player := false
 
 
+## Voxel art: art/sprites/convoy_trailer.json (see docs/ART_PIPELINE.md).
+func _art_meta_path() -> String:
+	return art_path("convoy_trailer")
+
+
 func _init() -> void:
 	team = BulletPool.TEAM_ENEMY
 	apply_stats(T.CONVOY_TRAILER)
@@ -89,6 +94,8 @@ func _aim(delta: float) -> void:
 
 
 func _draw() -> void:
+	if _hull_art != null:
+		return   # the voxel sheet draws the trailer
 	var half_l := body_len * 0.5
 	var half_w := body_wid * 0.5
 	var box := Color(0.3, 0.26, 0.22)

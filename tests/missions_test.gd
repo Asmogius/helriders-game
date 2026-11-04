@@ -72,7 +72,11 @@ func _process(_delta: float) -> bool:
 				# Back off first, or a drop landing beside you is picked up at once.
 				var away := mission.vehicle.global_position - e.global_position
 				mission.vehicle.global_position = e.global_position + (away.normalized() if away.length() > 1.0 else Vector2.RIGHT) * 500.0
-				mark = {"crates": mission.pickups.get_child_count()}   # a Tank may have left a crate already
+				# A stray cache elsewhere on the ground (a Tank's, say) must not
+				# stop the Hunt finishing: place one every run, so this is tested
+				# every time rather than only when a Tank happens to drop one.
+				mission.drop_cache(mission.vehicle.global_position + Vector2(0, 900), 10)
+				mark = {"crates": mission.pickups.get_child_count()}
 				e.take_damage(99999.0)
 			if frame == 305:
 				_check(mission.pickups.get_child_count() == int(mark.crates) + 1, "the Elite always drops something")
@@ -132,6 +136,7 @@ func _start(m: Dictionary, specials: bool) -> void:
 	mission = (load("res://scenes/mission.tscn") as PackedScene).instantiate() as Mission
 	mission.mission_override = m
 	mission.auto_spawn_specials = specials
+	mission.push_override = 0   # these runs test objectives; push_test covers Extract or Push
 	root.add_child(mission)
 	# Keep the rig alive: these runs test objectives, not survival.
 	mission.vehicle.armor_max = 1000000.0

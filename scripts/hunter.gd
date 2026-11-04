@@ -33,6 +33,9 @@ var _nav_point := Vector2.ZERO
 var _ray := PhysicsRayQueryParameters2D.new()
 
 
+var pinned_left := 0.0
+
+
 func _ready() -> void:
 	motion_mode = CharacterBody2D.MOTION_MODE_FLOATING
 	lock_priority = 2
@@ -169,6 +172,9 @@ func _chase(delta: float) -> void:
 	else:
 		_stuck_time = 0.0
 
+	if pinned_left > 0.0:
+		pinned_left -= delta   # Pinned (Scout perk): no pounce inside the Flare
+		return
 	if dist < T.HUNTER_POUNCE_RANGE and not target.is_wrecked and _can_see(target.global_position):
 		state = State.WINDUP
 		_timer = T.HUNTER_WINDUP

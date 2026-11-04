@@ -19,6 +19,11 @@ var _trap_timer := 0.0
 var _weave := 1.0             # which side of your path it's crossing to
 
 
+## Voxel art: art/sprites/scrapper.json (see docs/ART_PIPELINE.md).
+func art_id() -> String:
+	return "scrapper"
+
+
 func _init() -> void:
 	team = BulletPool.TEAM_ENEMY
 	apply_stats(T.SCRAPPER)
@@ -97,6 +102,8 @@ func _steer(_delta: float, engaging: bool, to_player: Vector2, forward: Vector2)
 
 
 func _draw() -> void:
+	if _hull_art != null:
+		return   # the voxel sheet draws the rig
 	var half_l := body_len * 0.5
 	var half_w := body_wid * 0.5
 	var hull := Color(0.33, 0.27, 0.18)
