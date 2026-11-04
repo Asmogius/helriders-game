@@ -35,6 +35,8 @@ func _initialize() -> void:
 		_add("garage_" + t.to_lower(), _show_tab.bind(t))
 	_add("rarity_tiers", _show_rarity)
 	_add("fight", _show_fight)
+	_add("fight_gauges", _show_gauges)       # V6.4: armor gauge + shield rail, button plates, textured sticks
+	_add("fight_gauges_kbm", _show_kbm)      # V6.4: mouse-and-keyboard mode, no touch sticks
 
 
 func _add(shot: String, setup: Callable) -> void:
@@ -75,6 +77,24 @@ func _show_rarity() -> void:
 func _show_fight() -> void:
 	_strip.queue_free()
 	change_scene_to_file("res://scenes/mission.tscn")
+
+
+func _show_gauges() -> void:
+	var m: Node = current_scene
+	m.set_process(false)   # hold these HUD values for the shot
+	m.set_physics_process(false)
+	m.hud.set_lock_available(true)
+	var kinds: Array[String] = ["overcharge", "mines"]
+	m.hud.set_abilities(kinds)
+	m.hud.set_armor(0.62)
+	m.hud.set_defense(0.4, PackedFloat32Array([0.8, 0.5, 0.6, 0.3]), 0.9)
+
+
+func _show_kbm() -> void:
+	var pad: Node = root.get_node_or_null("Pad")
+	if pad != null:
+		pad.set("kbm", true)
+	current_scene.hud._pad_badges()
 
 
 func _process(_delta: float) -> bool:

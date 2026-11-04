@@ -120,6 +120,21 @@ func _draw_gauges(at: Vector2) -> void:
 		draw_arc(at, r, -PI * 0.5, -PI * 0.5 + TAU * fill, maxi(4, roundi(48.0 * fill)), col, 4.0)
 
 
+## V6.4: the resting stick, textured: a knurled outer ring (tick marks), a
+## faint well and a ridged knob. Subtle, so it never competes with the fight.
+func _draw_rest(at: Vector2, accent: Color) -> void:
+	draw_circle(at, radius, Color(0, 0, 0, 0.12))
+	draw_arc(at, radius, 0.0, TAU, 48, Color(accent, 0.22), 3.0)
+	for k in 36:
+		var a := TAU * k / 36.0
+		var d := Vector2.RIGHT.rotated(a)
+		draw_line(at + d * (radius - 7.0), at + d * (radius - 2.0), Color(accent, 0.14), 2.0)
+	draw_circle(at, 34.0, Color(accent, 0.12))
+	draw_arc(at, 34.0, 0.0, TAU, 32, Color(accent, 0.2), 2.0)
+	for k in 3:
+		draw_line(at + Vector2(-12, -8 + k * 8), at + Vector2(12, -8 + k * 8), Color(accent, 0.18), 2.0)
+
+
 func _draw() -> void:
 	var size := get_viewport_rect().size
 	var accent := T.COL_CYAN if left_side else T.COL_ORANGE
@@ -127,9 +142,10 @@ func _draw() -> void:
 		if not enabled:
 			return
 		var rest := Vector2(170.0, size.y - 160.0) if left_side else Vector2(size.x - 170.0, size.y - 160.0)
-		draw_arc(rest, radius, 0.0, TAU, 48, Color(accent, 0.22), 3.0)
-		draw_circle(rest, 34.0, Color(accent, 0.12))
-		_draw_gauges(rest)
+		var pad := get_node_or_null("/root/Pad")
+		if pad == null or not bool(pad.get("kbm")):   # V6.4: no touch sticks in mouse-and-keyboard mode
+			_draw_rest(rest, accent)
+		_draw_gauges(rest)   # ammo and heat rings stay in every mode
 		return
 	draw_circle(_base, radius, Color(0.0, 0.0, 0.0, 0.25))
 	_draw_gauges(_base)
