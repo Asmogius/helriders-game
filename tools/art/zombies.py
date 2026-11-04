@@ -38,6 +38,8 @@ STEEL = (79, 82, 85)           # COL_STEEL
 BLOOD = (77, 23, 18)           # COL_BLOOD (opaque here)
 # Sample-local (proposed for tuning.gd via UI/P0): 6 Shambler clothing palettes
 # (shirt, trousers), muted so they stay below the lights in saturation.
+# Colours below are mirrored in tuning.gd: COL_ZOMBIE_SHIRT_n / COL_ZOMBIE_PANTS_n,
+# COL_ZOMBIE_EYE, COL_ZOMBIE_FLASH, COL_TANK_*. Change both together.
 CLOTHES = [
     ((112, 90, 70), (63, 61, 70)),     # brown jacket, grey jeans
     ((90, 102, 119), (73, 63, 53)),     # faded denim blue, brown trousers

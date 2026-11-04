@@ -1,6 +1,7 @@
 extends SceneTree
 ## V3 style sample: Shambler and Tank voxel sheets, poses, fallback.
 
+const T := preload("res://scripts/tuning.gd")
 const Zombie := preload("res://scripts/zombie.gd")
 var fails := 0
 
@@ -55,5 +56,17 @@ func _run() -> void:
 	var f := _z("shambler")
 	check(not f.has_art(), "fallback without the atlas")
 	f.queue_redraw()
+	# The baked atlas colours match tuning.gd's COL_ZOMBIE_* (PR #42).
+	var sc: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(Zombie.ZOMBIE_ATLAS + ".json")).get("sample_colours", {})
+	var c8 := func(c: Color) -> Array: return [c.r8, c.g8, c.b8]
+	for k in sc.keys():   # JSON numbers load as floats
+		sc[k] = Array(sc[k]).map(func(x: Variant) -> int: return int(x))
+	var shirts := [T.COL_ZOMBIE_SHIRT_0, T.COL_ZOMBIE_SHIRT_1, T.COL_ZOMBIE_SHIRT_2, T.COL_ZOMBIE_SHIRT_3, T.COL_ZOMBIE_SHIRT_4, T.COL_ZOMBIE_SHIRT_5]
+	var pants := [T.COL_ZOMBIE_PANTS_0, T.COL_ZOMBIE_PANTS_1, T.COL_ZOMBIE_PANTS_2, T.COL_ZOMBIE_PANTS_3, T.COL_ZOMBIE_PANTS_4, T.COL_ZOMBIE_PANTS_5]
+	for i in 6:
+		var want: Array = c8.call(shirts[i]) + c8.call(pants[i])
+		check(sc.get("ZOMBIE_CLOTH_%d" % i, []) == want, "cloth %d matches tuning" % i)
+	check(sc.get("ZOMBIE_EYE", []) == c8.call(T.COL_ZOMBIE_EYE), "eye matches tuning")
+	check(sc.get("ZOMBIE_FLASH", []) == c8.call(T.COL_ZOMBIE_FLASH), "flash matches tuning")
 	print("ZOMBIE SAMPLE TEST ", "PASSED" if fails == 0 else "FAILED (%d)" % fails)
 	quit(1 if fails else 0)
