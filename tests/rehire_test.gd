@@ -37,7 +37,7 @@ func _process(_delta: float) -> bool:
 		_start_wreck()
 	if frame == 10:
 		mission.vehicle.take_damage(1000000.0)
-	if frame == 140:   # the card comes up after the wreck burns for 1.6 s
+	if frame == 330:   # the card comes up after the ~4 s wreck sequence
 		var text := str((mission.hud.get("_subtitle") as Label).text)
 		_check(text.contains("turn up at the Saloon again") and text.contains("in 2 days"), "the wreck card says who'll turn up again, and when: " + text.replace("\n", " / "))
 		_finish()

@@ -54,7 +54,7 @@ func _process(_delta: float) -> bool:
 	if frame == 8:
 		riders = profile.seated_crew().map(func(m: Dictionary) -> int: return int(m.id))
 		mission.vehicle.wrecked.emit()
-	if frame == 8 + 60 * 3:
+	if frame == 8 + 60 * 5:   # the wreck sequence runs ~4 s first
 		var text := str(mission.hud._subtitle.text)
 		_check(text.contains("Last Rites:") and not text.contains("Crew lost"), "the wreck card says who Last Rites saved")
 		_check(riders.size() == 2 and profile.crew.size() == 6, "both seated crew survived the wreck")

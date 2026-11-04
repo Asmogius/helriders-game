@@ -200,6 +200,8 @@ Sparse industrial. Distorted bass, metallic percussion, detuned synths, low dron
 
 Dramatic and short: final hit, voxel plates explode, fire/dust, zombies swarm inside and haul crew out. Then results card and one-tap return. Injury on success is lighter (icon + rest timer only).
 
+**Built (2026-11-04).** Agreed with the owner: about 4 s, and a tap skips to the results card; everyone aboard is shown dragged out the same way, names in red (who Last Rites saved is told on the card). Gap-fillers: the final hit plays at 30% speed for the first 0.8 s; plates, a fireball and dust burst off, the wreck keeps burning; six Shamblers close in from about 280 px; crew are hauled out one every 0.7 s; sticks, buttons and hints disappear as it starts.
+
 ## Onboarding
 
 Start with basic pre-built vehicle + two free Common crew. One scripted low-threat Clear teaches stick movement, aim/fire, target lock, and one part swap on return. Subsequent days introduce stations naturally. Clear statement that crew are lost only on vehicle destruction.

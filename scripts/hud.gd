@@ -421,14 +421,7 @@ func _process(delta: float) -> void:
 
 
 func show_result(title: String, subtitle: String, button_text: String, accent: Color) -> void:
-	left_stick.enabled = false
-	right_stick.enabled = false
-	_lock_button.visible = false
-	close_crew_wheel(false)
-	_crew_button.visible = false
-	for b in _ability_buttons:
-		b.visible = false
-	set_alert("")
+	hide_controls()
 	_title.text = title
 	_title.add_theme_color_override("font_color", accent)
 	_subtitle.text = subtitle
@@ -1032,3 +1025,20 @@ class ArmorBar extends Control:
 func set_tip(text: String) -> void:
 	tip.text = text
 	tip.visible = text != ""
+
+
+## The fight's over: sticks, buttons and hints go (the wreck sequence, the
+## results card).
+func hide_controls() -> void:
+	left_stick.enabled = false
+	right_stick.enabled = false
+	left_stick.set_gauges([] as Array[Dictionary])
+	right_stick.set_gauges([] as Array[Dictionary])
+	_lock_button.visible = false
+	close_crew_wheel(false)
+	_crew_button.visible = false
+	pause_button.visible = false
+	_hint.visible = false
+	for b in _ability_buttons:
+		b.visible = false
+	set_alert("")
