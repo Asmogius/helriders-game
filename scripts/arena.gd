@@ -18,12 +18,18 @@ var checkpoints: Array = []    # Courier stops, Retrieve caches, Escort sites
 var barrel_spots: Array = []
 var spawn_points: Array[Vector2] = []
 
-# --- P4 style sample (VISUAL_PLAN V5.5): Outer Blocks corner ------------------
-# Off by default until the owner approves the sample; captures turn it on.
+# --- P4 Outer Blocks map style (VISUAL_PLAN V5.5) -----------------------------
+# Off by default until the owner approves it; captures turn it on. When on, an
+# Outer Blocks layout (layouts.gd `district`) is baked whole-map from art/map/
+# into a few chunk textures (map_art.gd); missing art keeps the code-drawn look.
+# Purely visual: collision and layout data are untouched.
 const MapArt := preload("res://scripts/map_art.gd")
 const MapAmbient := preload("res://scripts/map_ambient.gd")
-static var style_sample := false
-var _corner_tex: Texture2D
+const STYLED_DISTRICTS := ["outer_blocks"]
+static var outer_blocks_style := false
+var _chunks: Array = []        # [[Rect2, Texture2D], ...] from MapArt.bake_chunks
+var bake_ms := 0.0             # last bake time (perf captures)
+var bake_bytes := 0            # GPU bytes of the baked chunks
 
 
 func _init() -> void:
@@ -59,20 +65,27 @@ func _ready() -> void:
 		_add_box(solid, b.get_center(), b.size, 0.0)
 	for p: Array in props:
 		_add_box(solid, p[0], p[1], p[2])
-	if style_sample:
-		_setup_style_sample()
+	if outer_blocks_style and STYLED_DISTRICTS.has(str(layout.get("district", ""))):
+		_setup_style()
 
 
-func _setup_style_sample() -> void:
-	_corner_tex = MapArt.bake(self)   # null when art is missing: code-drawn look stays
-	if _corner_tex == null:
+func is_styled() -> bool:
+	return not _chunks.is_empty()
+
+
+func _setup_style() -> void:
+	var t0 := Time.get_ticks_usec()
+	_chunks = MapArt.bake_chunks(self)   # empty when art is missing: code-drawn look stays
+	bake_ms = (Time.get_ticks_usec() - t0) / 1000.0
+	if _chunks.is_empty():
 		return
+	bake_bytes = MapArt.chunk_bytes(_chunks)
 	var profile := get_node_or_null("/root/Profile")
 	var low := profile != null and profile.has_method("quality") and float(profile.quality().fx) < 0.5
 	if not low:
 		var motes := MapAmbient.new()
 		motes.z_index = 5
-		motes.setup(MapArt.CORNER, 48)
+		motes.setup(Rect2(Vector2.ZERO, T.WORLD_SIZE), 160)
 		add_child(motes)
 
 
@@ -90,6 +103,12 @@ func _draw() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 1337
 	var w := T.WORLD_SIZE
+	if not _chunks.is_empty():
+		# Baked Outer Blocks look: ground, buildings and decor, one draw per chunk.
+		for c: Array in _chunks:
+			draw_texture_rect(c[1], c[0], false, T.COL_OB_GRADE)
+		_draw_props_and_wall(w)
+		return
 	draw_rect(Rect2(Vector2.ZERO, w), T.COL_CONCRETE)
 
 	# Patchy lots so the concrete isn't flat.
@@ -136,9 +155,10 @@ func _draw() -> void:
 	for b: Rect2 in buildings:
 		_draw_building(b, rng)
 
-	if _corner_tex != null:   # P4 sample: one baked texture, one draw
-		draw_texture(_corner_tex, MapArt.CORNER.position, T.COL_OB_GRADE)
+	_draw_props_and_wall(w)
 
+
+func _draw_props_and_wall(w: Vector2) -> void:
 	for p: Array in props:
 		_draw_prop(p[0], p[1], p[2], p[3])
 

@@ -12,8 +12,56 @@ const T := preload("res://scripts/tuning.gd")
 const TILES := "res://art/map/outer_tiles"
 const HOUSE := "res://art/map/outer_house"
 const PROPS := "res://art/map/outer_props"   # optional: no props atlas = no decor
-## The sample corner (north-west of the map). Not a rollout: one corner only.
+## The round-2 sample corner (north-west of the map); kept for the capture tool.
 const CORNER := Rect2(0, 0, 1500, 880)
+## Whole-map bakes are cut into chunks no side of which exceeds this (Android
+## GL ES texture limits and upload spikes); 3200x2400 -> four 1600x1200 chunks.
+const CHUNK_MAX := 2048
+## Decor density per million px (the round-2 corner had 60 tries on 1.32 Mpx).
+const GREEN_TRIES_PER_MPX := 45.0
+
+
+## Whole-map bake, cut into chunks: [[Rect2 world rect, ImageTexture], ...].
+## Empty when the art is missing (the arena keeps its code-drawn look).
+## Ground is opaque, so chunks are stored RGB565 (2 bytes/px, no mipmaps):
+## ~14.6 MB for the whole map instead of ~29 MB as RGBA8.
+static func bake_chunks(arena: Object) -> Array:
+	var full := Rect2(Vector2.ZERO, T.WORLD_SIZE)
+	var img := bake_image(arena, full)
+	if img == null:
+		return []
+	var nx := ceili(full.size.x / CHUNK_MAX)
+	var ny := ceili(full.size.y / CHUNK_MAX)
+	var cw := ceili(full.size.x / nx)
+	var chh := ceili(full.size.y / ny)
+	var out: Array = []
+	for gy in ny:
+		for gx in nx:
+			var r := Rect2i(gx * cw, gy * chh, mini(cw, int(full.size.x) - gx * cw), mini(chh, int(full.size.y) - gy * chh))
+			var part := img.get_region(r)
+			part.convert(Image.FORMAT_RGB565)
+			out.append([Rect2(r), ImageTexture.create_from_image(part)])
+	return out
+
+
+## Bytes the chunks hold on the GPU (RGB565, no mipmaps).
+static func chunk_bytes(chunks: Array) -> int:
+	var n := 0
+	for c: Array in chunks:
+		var t: Texture2D = c[1]
+		n += t.get_width() * t.get_height() * 2
+	return n
+
+
+## Same layout data in -> same picture out; a different seeded variation
+## (nudged props, barricades, mirroring) -> different decor.
+static func seed_for(arena: Object) -> int:
+	var key := ""
+	var l: Variant = arena.get("layout")
+	if l is Dictionary:
+		key += str((l as Dictionary).get("id", ""))
+	key += str(arena.buildings) + str(arena.props) + str(arena.checkpoints)
+	return hash(key)
 const TILE := 64
 const WALL_H := 30
 const ROOF_TILE := 32
@@ -27,6 +75,11 @@ const XGAP := 8           # gap between junction box and crosswalk
 ## `arena` is any object with buildings, roads, props, checkpoints and
 ## barrel_spots (arena.gd). Same arena in, same picture out (seeded).
 static func bake(arena: Object, corner := CORNER) -> ImageTexture:
+	var img := bake_image(arena, corner)
+	return ImageTexture.create_from_image(img) if img != null else null
+
+
+static func bake_image(arena: Object, corner: Rect2) -> Image:
 	var tiles: RefCounted = ArtAtlas.load_atlas(TILES)
 	var house: RefCounted = ArtAtlas.load_atlas(HOUSE)
 	if not tiles.ok() or not house.ok():
@@ -40,7 +93,7 @@ static func bake(arena: Object, corner := CORNER) -> ImageTexture:
 	var size := Vector2i(corner.size)
 	var img := Image.create(size.x, size.y, false, Image.FORMAT_RGBA8)
 	var rng := RandomNumberGenerator.new()
-	rng.seed = 5150
+	rng.seed = seed_for(arena)
 	var off := corner.position
 	var roads: Array = []
 	for r: Rect2 in arena.roads:
@@ -79,11 +132,23 @@ static func bake(arena: Object, corner := CORNER) -> ImageTexture:
 		var s: float = maxf((p[1] as Vector2).x, (p[1] as Vector2).y)
 		keep_off.append(Rect2((p[0] as Vector2) - off - Vector2(s, s) * 0.6, Vector2(s, s) * 1.2))
 	var points: Array = []
-	for q: Vector2 in arena.checkpoints + arena.barrel_spots:
+	var chokes: Array = []
+	var l: Variant = arena.get("layout")
+	if l is Dictionary:
+		chokes = (l as Dictionary).get("chokes", [])
+	for q: Vector2 in arena.checkpoints + arena.barrel_spots + chokes:
 		points.append(q - off)
+	var start: Variant = arena.get("player_start")
+	if start is Vector2:
+		points.append((start as Vector2) - off)
+	var prop_boxes: Array = []
+	for p: Array in arena.props:
+		var s2: float = maxf((p[1] as Vector2).x, (p[1] as Vector2).y)
+		prop_boxes.append(Rect2((p[0] as Vector2) - off - Vector2(s2, s2) * 0.6, Vector2(s2, s2) * 1.2))
 	var lanes: Array = []   # drive lanes: only flat decals there
 	for r: Rect2 in roads:
 		lanes.append(r.grow(-6))
+	var road_lanes: Array = lanes.duplicate()
 	for j: Rect2 in junctions:
 		lanes.append(j.grow(XGAP + XWALK + 24))
 
@@ -94,7 +159,7 @@ static func bake(arena: Object, corner := CORNER) -> ImageTexture:
 	var green_off: Array = keep_off.duplicate()
 	for r: Rect2 in roads:
 		green_off.append(r.grow(SIDEWALK + 4))
-	for i in 60:
+	for i in int(GREEN_TRIES_PER_MPX * corner.size.x * corner.size.y / 1.0e6):
 		var tree := rng.randf() < 0.3
 		var id := ("tree_%d" % rng.randi_range(0, 1)) if tree else ("bush_%d" % rng.randi_range(0, 2))
 		if not tiles.has(id):
@@ -115,11 +180,11 @@ static func bake(arena: Object, corner := CORNER) -> ImageTexture:
 		_building(img, hi, house, pi, props, b, style, rng)
 		style += 1
 	if pi != null:
-		_street_props(img, pi, props, roads, junctions, inside, keep_off + lanes, points, rng)
+		_street_props(img, pi, props, roads, junctions, inside, keep_off + lanes, points, rng, prop_boxes + road_lanes)
 	# Buildings that cross the corner edge keep their code-drawn look.
 	for b: Rect2 in straddle:
 		img.fill_rect(Rect2i(b.grow(4).position.floor(), b.grow(4).size.ceil() + Vector2(18, 18)), Color(0, 0, 0, 0))
-	return ImageTexture.create_from_image(img)
+	return img
 
 
 ## Every overlap of a horizontal and a vertical road.
@@ -359,7 +424,7 @@ static func _sprite(img: Image, pi: Image, atlas: RefCounted, id: String, at: Ve
 ## the junctions, wrecked and burnt cars on the verges, a sandbag and barrier
 ## checkpoint, fences behind the lots, a dumpster by the shop block. Lanes,
 ## stops and barrel spots stay clear, so nothing looks like a hidden wall.
-static func _street_props(img: Image, pi: Image, atlas: RefCounted, roads: Array, junctions: Array, houses: Array, keep_off: Array, points: Array, rng: RandomNumberGenerator) -> void:
+static func _street_props(img: Image, pi: Image, atlas: RefCounted, roads: Array, junctions: Array, houses: Array, keep_off: Array, points: Array, rng: RandomNumberGenerator, hard_off: Array = []) -> void:
 	var items: Array = []   # [bottom y, id, top-left, shadow]
 	var taken: Array = keep_off.duplicate()
 	var place := func(id: String, foot: Vector2, shadow: float, force: bool) -> bool:
@@ -371,7 +436,11 @@ static func _street_props(img: Image, pi: Image, atlas: RefCounted, roads: Array
 		var box := Rect2(at, sz).grow(4)
 		if not Rect2(Vector2.ZERO, Vector2(img.get_size())).encloses(Rect2(at, sz)):
 			return false
-		if not force and (_hits(box, taken) or _near(foot, points, 64.0)):
+		# Forced pieces may overlap other decor, never a lane, a prop, a stop,
+		# a barrel spot, a choke or the start (mirrored layouts move those).
+		if _hits(box, hard_off) or _near(foot, points, 64.0):
+			return false
+		if not force and _hits(box, taken):
 			return false
 		taken.append(box)
 		items.append([foot.y, id, at, shadow])
@@ -509,7 +578,7 @@ static func _building(img: Image, src: Image, atlas: RefCounted, pi: Image, prop
 		wing_w = floorf(b.size.x * 0.32 / 32.0) * 32.0
 	var main := Rect2(b.position, Vector2(b.size.x - wing_w, b.size.y))
 	var roof := Rect2(main.position, Vector2(main.size.x, main.size.y - WALL_H))
-	if style % 2 == 0:
+	if style % 2 == 0 and roof.size.x >= roof.size.y:   # tall lots get the north-south gable
 		_roof_hip(img, src, atlas, roof, roof_v, rng)
 	else:
 		_roof_gable_ns(img, src, atlas, roof, roof_v, rng)
@@ -684,12 +753,21 @@ static func _shadow(img: Image, r: Rect2, by: Vector2, alpha: float) -> void:
 
 
 ## A soft drop shadow shaped like the sprite (alpha only). Bake time only.
+static var _sil_cache := {}
+
+
 static func _silhouette(src: Image, r: Rect2i, alpha: float) -> Image:
+	var key := "%d:%s:%.2f" % [src.get_instance_id(), str(r), alpha]
+	if _sil_cache.has(key):
+		return _sil_cache[key]
+	if _sil_cache.size() > 256:
+		_sil_cache.clear()
 	var out := src.get_region(r)
 	for y in out.get_height():
 		for x in out.get_width():
 			var a := out.get_pixel(x, y).a
 			out.set_pixel(x, y, Color(0, 0, 0, a * alpha))
+	_sil_cache[key] = out
 	return out
 
 

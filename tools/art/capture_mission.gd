@@ -5,6 +5,9 @@ extends SceneTree
 ##   ... -s res://tools/art/capture_mission.gd -- out.png --layout=crossroads [--seed=N] [--type=clear]
 ## Every layout, one <dir>/<id>.png each (layout i uses seed N+i; a banner names the layout):
 ##   ... -s res://tools/art/capture_mission.gd -- out_dir --all-layouts [--seed=N] [--type=clear]
+## --style forces the Outer Blocks map style on (arena.gd `outer_blocks_style`; only
+## Outer Blocks layouts change). --perf prints bake time, draw calls, texture memory
+## and FPS for each capture (FPS is meaningless under software rendering / vsync).
 ## Under --headless there is no rendered image: it prints an error and exits with code 2.
 ## With a layout picked, the camera pulls out to show the whole map.
 ## Tool only: runs on a throwaway profile (no save written), changes no gameplay.
@@ -21,7 +24,9 @@ var _type := ""
 var _all := false
 var _current: Node = null
 var _layout := ""
-var _index := -1            # position in the --all-layouts run (seed = _seed + _index)
+var _index := -1
+var _perf := false
+var _fps: Array = []            # position in the --all-layouts run (seed = _seed + _index)
 
 
 func _init() -> void:
@@ -40,6 +45,10 @@ func _init() -> void:
 			layout = a.substr(9)
 		elif a.begins_with("--seed="):
 			_seed = a.substr(7).to_int()
+		elif a == "--style":
+			load("res://scripts/arena.gd").outer_blocks_style = true
+		elif a == "--perf":
+			_perf = true
 		elif a.begins_with("--type="):
 			_type = a.substr(7)
 		elif a.begins_with("--"):
@@ -93,6 +102,7 @@ func _next() -> void:
 	if _all:
 		_add_banner(mission, "%s  (seed %d)" % [_layout, _seed + _index])
 	_frames = 0
+	_fps.clear()
 
 
 func _process(_delta: float) -> bool:
@@ -106,7 +116,11 @@ func _process(_delta: float) -> bool:
 				cam.zoom = Vector2(2.5, 2.5)
 			else:
 				_frame_whole_map(cam)
+	if _frames > 150 and _frames < 160:
+		_fps.append(Performance.get_monitor(Performance.TIME_FPS))
 	if _frames == 160:
+		if _perf:
+			_print_perf()
 		var path := _out.path_join(_layout + ".png") if _all else _out
 		var tex := root.get_texture()
 		var img: Image = tex.get_image() if tex != null else null
@@ -118,6 +132,25 @@ func _process(_delta: float) -> bool:
 		print("saved ", path)
 		_next.call_deferred()
 	return false
+
+
+func _print_perf() -> void:
+	var arena: Variant = _current.get("arena")
+	var styled := false
+	var bake := 0.0
+	var bytes := 0
+	if arena is Object and is_instance_valid(arena) and (arena as Object).has_method("is_styled"):
+		styled = arena.is_styled()
+		bake = float(arena.bake_ms)
+		bytes = int(arena.bake_bytes)
+	var fps := 0.0
+	for f: float in _fps:
+		fps += f
+	fps /= maxf(1.0, _fps.size())
+	print("PERF layout=%s styled=%s bake_ms=%.0f map_tex_mb=%.1f draw_calls=%d tex_mem_mb=%.1f fps=%.1f" % [
+		_layout, str(styled), bake, bytes / 1048576.0,
+		int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)),
+		Performance.get_monitor(Performance.RENDER_TEXTURE_MEM_USED) / 1048576.0, fps])
 
 
 func _frame_whole_map(cam: Camera2D) -> void:

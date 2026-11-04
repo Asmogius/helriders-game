@@ -114,7 +114,7 @@ func _show_map_corner(sample: bool, zoom := 0.84, at := Vector2(750, 440), crowd
 	_garage = null
 	_strip = null
 	var Arena := load("res://scripts/arena.gd")
-	Arena.style_sample = sample
+	Arena.outer_blocks_style = sample
 	_map = Node2D.new()
 	root.add_child(_map)
 	var arena: Node2D = Arena.new()
@@ -194,7 +194,7 @@ func _show_fight() -> void:
 	for n: Node in [_strip, _map]:
 		if n != null and is_instance_valid(n):
 			n.queue_free()
-	load("res://scripts/arena.gd").style_sample = false
+	load("res://scripts/arena.gd").outer_blocks_style = false
 	change_scene_to_file("res://scenes/mission.tscn")
 
 

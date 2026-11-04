@@ -13,7 +13,9 @@ from palette import tuning_color, PALETTE
 T = 64
 OUT = os.path.join(os.path.dirname(__file__), "..", "..", "art", "map")
 # Lawn kept a step darker than COL_OB_GRASS so zombies (COL_ZOMBIE_DARK) stay readable on it.
-GRASS = np.array(tuning_color("COL_OB_GRASS"), float) * 0.84
+# Temporary: once COL_OB_GRASS itself is retuned in tuning.gd, set this to 1.0 and rerun.
+GRASS_DARKEN = 0.84
+GRASS = np.array(tuning_color("COL_OB_GRASS"), float) * GRASS_DARKEN
 PAVE = np.array(tuning_color("COL_OB_PAVE"), float)
 ROAD = np.array(tuning_color("COL_ROAD"), float)
 LINE = np.array(tuning_color("COL_ROAD_LINE"), float)
