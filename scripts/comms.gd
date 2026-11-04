@@ -113,6 +113,7 @@ func refresh() -> void:
 		card.taken = str(m.id) == taken_id
 		card.selected = i == selected
 		card.schematic_odds = _schematic_odds(m)
+		card.odds_rarity = _best_rarity(m)
 		card.pressed.connect(select.bind(i))
 		_cards.add_child(card)
 	_take.disabled = selected < 0 or (selected >= 0 and str(profile.board[selected].id) == taken_id)
@@ -137,6 +138,15 @@ func take_selected() -> bool:
 	profile.choose_mission(selected)
 	job_taken.emit()
 	return true
+
+
+## The best rarity among the schematics this job can still drop (V1.3).
+func _best_rarity(m: Dictionary) -> String:
+	var pool: Array = Parts.DROP_POOLS.get("elite" if m.type == "hunt" else str(m.type), [])
+	var best := 0
+	for id in profile.unknown_schematics(pool):
+		best = maxi(best, UI.rarity_tier(str(Parts.get_part(str(id)).get("rarity", ""))))
+	return str(T.RARITY_ORDER[best - 1]) if best > 0 else ""
 
 
 ## The chance of a schematic in the pay, shown on the card ("" if none).
@@ -239,6 +249,7 @@ class MissionCard extends Button:
 	var taken := false
 	var selected := false
 	var schematic_odds := ""
+	var odds_rarity := ""   # best rarity on offer: the odds line takes its colour
 
 	func _ready() -> void:
 		flat = true
@@ -271,7 +282,8 @@ class MissionCard extends Button:
 		_wrapped(font, Missions.threats_text(mission), Vector2(16, 182), w, 13, UI.TEXT, 5, 3.0)
 		draw_string(font, Vector2(16, size.y - 52), "PAYS %d SCRAP" % int(mission.reward), HORIZONTAL_ALIGNMENT_LEFT, w, 20, T.COL_ORANGE)
 		if schematic_odds != "":
-			UI.draw_fit(self, font, Vector2(16, size.y - 28), "+ " + schematic_odds, HORIZONTAL_ALIGNMENT_LEFT, w, 15, UI.GOOD)
+			var oc := UI.rarity_color(odds_rarity) if odds_rarity != "" else UI.GOOD
+			UI.draw_fit(self, font, Vector2(16, size.y - 28), "+ " + schematic_odds, HORIZONTAL_ALIGNMENT_LEFT, w, 15, oc)
 		if taken:
 			draw_string(font, Vector2(16, size.y - 8), "TAKEN", HORIZONTAL_ALIGNMENT_RIGHT, w, 15, T.COL_CYAN)
 
