@@ -306,6 +306,22 @@ const SCRAPPER_SCRAP := 25
 const SCRAPPER_SCRAP_CACHE := 25
 const SCRAPPER_SPAWN_TIME := 60.0   # Clear: seconds in, or...
 const SCRAPPER_SPAWN_KILLS := 20    # ...after this many kills
+# --- New weapons (§14; agreed with the owner) ----------------------------------
+# Harpoon: a spear on a 500 px cable from a fixed mount. It pierces zombies
+# (up to 4) and stops in the first rig, tethering it; the cable reels in, and
+# mass (hull size) decides who gets pulled. It pops like the Patcher's hook
+# (a big hit to either rig or a hard crash); firing again lets go first.
+const HARPOON_REEL_TO := 200.0      # reels in to this length...
+const HARPOON_REEL_SPEED := 100.0   # ...this fast (px/s)
+const HARPOON_POP_HIT := 0.15       # share of a rig's max taken in 1 s that pops it
+const HARPOON_POP_CRASH := 380.0    # wall crash speed that pops it
+# Mortar: lobs shells over buildings (walls don't stop them). The right
+# stick's push sets the distance (300-1200 px, shown as a landing circle) and
+# it fires while held; LOCK aims at where the target will be. Blast damage
+# falls off to half at the edge.
+const MORTAR_EDGE_DAMAGE := 0.5
+const MORTAR_AIM_CONE := 0.12       # radians off the aim the turret will still fire
+const SHELL_CAP := 12
 # --- Patcher (support enemy rig, §14; agreed with the owner) -----------------
 # Unarmed. Hooks a cable onto an ally and repairs it; the ally can drag it.
 # The hook pops on a big hit to either rig (over 15% of its max in 1 s), a
@@ -473,7 +489,7 @@ const RESEARCH_STATS := {
 	"Engine": ["power_output", "acceleration"],
 	"Drive": ["turn_mult", "grip"],
 	"Armor": ["armor"],
-	"Weapon": ["bullet_damage"],
+	"Weapon": ["bullet_damage", "zombie_damage"],
 }
 
 # --- Crew (DESIGN §6; role tables live in crew.gd) ----------------------------

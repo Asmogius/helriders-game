@@ -643,7 +643,7 @@ class AbilityButton extends Control:
 	## the right stick ignores this area.
 	signal pressed
 	const T := preload("res://scripts/tuning.gd")
-	const LABELS := {"patch": "PATCH", "mines": "MINES", "oil": "OIL", "spikes": "SPIKES", "hard_line": "HARD LINE", "overcharge": "OVERCHARGE"}
+	const LABELS := {"patch": "PATCH", "mines": "MINES", "oil": "OIL", "spikes": "SPIKES", "pulse": "PULSE", "hard_line": "HARD LINE", "overcharge": "OVERCHARGE"}
 	var kind := ""      # "hard_line", "overcharge", "patch", "mines" or "oil"
 	var charge := 0.0   # 0 ready, 1 just used
 	var disabled := false
@@ -711,6 +711,11 @@ class AbilityButton extends Control:
 				for k in 5:
 					var x := c.x - 16.0 + k * 8.0
 					draw_colored_polygon(PackedVector2Array([Vector2(x - 3.0, c.y + 2.0), Vector2(x, c.y - 10.0), Vector2(x + 3.0, c.y + 2.0)]), tint)
+			"pulse":
+				# A spark inside two rings.
+				draw_arc(c, 8.0, 0.0, TAU, 16, tint, 2.5)
+				draw_arc(c, 16.0, 0.0, TAU, 24, Color(tint, 0.6), 2.0)
+				draw_polyline(PackedVector2Array([c + Vector2(-3, -12), c + Vector2(3, -2), c + Vector2(-3, 2), c + Vector2(3, 12)]), tint, 2.5)
 			"oil":
 				# A drop over a puddle.
 				draw_colored_polygon(PackedVector2Array([c + Vector2(0, -18), c + Vector2(8, -2), c + Vector2(-8, -2)]), tint)

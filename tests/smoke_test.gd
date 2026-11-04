@@ -383,6 +383,8 @@ func _process(_delta: float) -> bool:
 		_check(fixer != null and not fixer.has_weapon() and fixer.has_method("hook"), "an unarmed Patcher rolls in (§14)")
 		fixer.take_damage(100000.0)
 		_check(fixer.is_wrecked and main.kills == kills_before + 5, "a wrecked Patcher counts as a kill")
+		# §14 weapons (full checks in weapons_test.gd).
+		_check(main.vehicle.shells == main.shells and main.shells.launch(rig.global_position, rig.global_position + Vector2(400, 0), 0.5, 1.0, 40.0, 0), "the Mortar's shell pool is wired up")
 		# Barrels and statuses (full checks in status_test.gd).
 		var barrel: Node = main.barrels[0]
 		_check(main.barrels.size() == T.BARRELS_PER_JOB and bool(barrel.get("active")), "barrels stand at their spots")

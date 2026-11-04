@@ -156,6 +156,18 @@ const CATALOG := {
 		"mount": 0, "fire_rate": 9.0, "bullet_damage": 11.0, "bullet_speed": 1700.0,
 		"spread_deg": 2.5, "turret_turn_rate": 6.5, "lock_range": 600.0, "pellets": 1,
 	},
+	"harpoon": {
+		"name": "Harpoon", "category": "Weapon", "rarity": "Rare", "cost": 170, "power": 40.0, "weight": 20.0,
+		"mount": 1, "kind": "harpoon", "fire_rate": 0.4, "bullet_damage": 45.0, "zombie_damage": 30.0, "pierce": 4,
+		"bullet_speed": 1600.0, "range": 600.0, "cable": 500.0, "mag": 1, "reload": 2.5,
+		"spread_deg": 0.0, "turret_turn_rate": 0.0, "lock_range": 600.0, "pellets": 1,
+	},
+	"mortar": {
+		"name": "Mortar", "category": "Weapon", "rarity": "Uncommon", "cost": 120, "power": 45.0, "weight": 25.0,
+		"mount": 0, "kind": "mortar", "fire_rate": 1.6667, "bullet_damage": 60.0, "blast": 90.0,
+		"min_range": 300.0, "max_range": 1200.0, "flight": 1.2, "mag": 3, "reload": 4.0,
+		"bullet_speed": 1000.0, "spread_deg": 0.0, "turret_turn_rate": 3.0, "lock_range": 1200.0, "pellets": 1,
+	},
 	"hood_guns": {
 		"name": "Hood Guns", "category": "Weapon", "rarity": "Rare", "cost": 170, "power": 40.0, "weight": 20.0,
 		"mount": 1, "fire_rate": 8.0, "bullet_damage": 7.0, "bullet_speed": 1300.0,
@@ -184,6 +196,14 @@ const CATALOG := {
 	"flux_coil": {
 		"name": "Flux Coil", "category": "Internal", "rarity": "Uncommon", "cost": 110, "power": 30.0, "weight": 5.0,
 		"shield": 45.0, "shield_delay": 2.5, "shield_refill": 1.0,
+	},
+	"emp_computer": {
+		"name": "EMP-Hardened Computer", "category": "Internal", "rarity": "Uncommon", "cost": 90, "power": 30.0, "weight": 5.0,
+		"manual_aim": true, "resist_bonus": [15.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+	},
+	"reflex_emitter": {
+		"name": "Reflex Emitter", "category": "Internal", "rarity": "Rare", "cost": 160, "power": 40.0, "weight": 5.0,
+		"shield": 45.0, "shield_delay": 1.0, "shield_refill": 3.0,
 	},
 	"targeting_computer": {
 		"name": "Targeting Computer", "category": "Internal", "rarity": "Common", "cost": 30, "power": 25.0, "weight": 5.0,
@@ -223,6 +243,10 @@ const CATALOG := {
 		"name": "Spike Strip Dropper", "category": "Utility", "rarity": "Uncommon", "cost": 90, "power": 15.0, "weight": 15.0,
 		"ability": "spikes", "cooldown": 12.0, "spike_length": 120.0, "spike_time": 15.0,
 	},
+	"shock_pulse": {
+		"name": "Shock Pulse", "category": "Utility", "rarity": "Uncommon", "cost": 90, "power": 20.0, "weight": 10.0,
+		"ability": "pulse", "cooldown": 18.0, "pulse_radius": 180.0, "pulse_damage": 15.0, "pulse_buildup": 90.0,
+	},
 	"mine_dropper": {
 		"name": "Mine Dropper", "category": "Utility", "rarity": "Rare", "cost": 160, "power": 15.0, "weight": 15.0,
 		"ability": "mines", "cooldown": 15.0, "mines": 3, "mine_damage": 60.0, "mine_radius": 90.0,
@@ -252,17 +276,17 @@ const STARTER_LOADOUT := {
 const STARTER_SCHEMATICS := ["scrap_frame", "junk_v6", "street_wheels", "scrap_plating", "pintle_turret", "targeting_computer", "junk_emitter"]
 
 # What an Outrider can drop when you wreck it.
-const OUTRIDER_DROPS := ["outrider_twin_guns", "outrider_light_plating", "outrider_sport_wheels", "coolant_loop"]
+const OUTRIDER_DROPS := ["outrider_twin_guns", "outrider_light_plating", "outrider_sport_wheels", "coolant_loop", "shock_pulse"]
 
 # Schematic pools by source (approved in the parts draft).
 const DROP_POOLS := {
 	"outrider": OUTRIDER_DROPS,
-	"elite": ["bulwark_frame", "diesel_block", "half_track", "composite_plating", "heavy_mg_turret", "advanced_targeting", "mine_dropper"],
+	"elite": ["bulwark_frame", "diesel_block", "half_track", "composite_plating", "heavy_mg_turret", "advanced_targeting", "mine_dropper", "reflex_emitter"],
 	"clear": ["riot_plating", "spiked_ram_plate", "scattergun_turret", "roll_cage"],
 	"survive": ["structural_bracing", "belt_feed", "patched_v8", "emergency_patch"],
 	"courier": ["courier_frame", "turbo_four", "off_road_tires"],
-	"bulwark": ["riot_plating", "spiked_ram_plate", "structural_bracing", "roll_cage"],
-	"gunner": ["burst_turret", "belt_feed", "coolant_loop"],
+	"bulwark": ["riot_plating", "spiked_ram_plate", "structural_bracing", "roll_cage", "harpoon"],
+	"gunner": ["burst_turret", "belt_feed", "coolant_loop", "mortar", "emp_computer"],
 	"scrapper": ["oil_slick", "spike_strip", "mine_dropper", "off_road_tires"],   # the Scrapper Gunner shares it
 	"retrieve": ["turbo_four", "off_road_tires", "oil_slick", "mine_dropper"],
 	"escort": ["structural_bracing", "riot_plating", "emergency_patch", "burst_turret"],

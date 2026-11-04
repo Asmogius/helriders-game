@@ -40,7 +40,13 @@ static func mobility(stats: Dictionary) -> float:
 static func total_dps(stats: Dictionary) -> float:
 	var dps := 0.0
 	for w: Dictionary in stats.get("weapons", []):
-		dps += float(w.fire_rate) * float(w.bullet_damage) * int(w.get("pellets", 1)) * int(w.get("burst", 1))
+		var per_shot := float(w.bullet_damage) * int(w.get("pellets", 1)) * int(w.get("burst", 1))
+		var mag := int(w.get("mag", 0))
+		if mag > 0 and float(w.fire_rate) > 0.0:
+			# A magazine: fire it dry, then reload (the reload starts on the last round).
+			dps += per_shot * mag / ((mag - 1) / float(w.fire_rate) + float(w.get("reload", 0.0)))
+		else:
+			dps += float(w.fire_rate) * per_shot
 	return dps
 
 
@@ -111,7 +117,16 @@ static func build(loadout: Dictionary, levels: Dictionary = {}) -> Dictionary:
 			"pellets": int(part.get("pellets", 1)),
 			"burst": int(part.get("burst", 1)),
 			"burst_rate": float(part.get("burst_rate", 0.0)),
+			"kind": str(part.get("kind", "")),
+			"mag": int(part.get("mag", 0)),
+			"reload": float(part.get("reload", 0.0)),
 		}
+		# Special weapons carry their own numbers (Harpoon, Mortar).
+		for key: String in ["range", "cable", "pierce", "blast", "min_range", "max_range", "flight"]:
+			if part.has(key):
+				w[key] = part[key]
+		if part.has("zombie_damage"):
+			w["zombie_damage"] = float(part.zombie_damage) * damage_mult
 		weapons.append(w)
 		if has_targeting:
 			lock_range = maxf(lock_range, float(w.lock_range))

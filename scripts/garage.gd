@@ -788,8 +788,15 @@ func _headline(part: Dictionary) -> String:
 			var where := "FRONT ONLY" if bool(part.get("front_only", false)) else "WT %d/%d" % [int(part.weight), int(part.get("weight_sides", part.weight))]
 			return "%d / FACING  RAM %d  %s" % [int(part.armor), int(part.ram_damage), where]
 		"Weapon":
-			var dps := float(part.fire_rate) * float(part.bullet_damage) * int(part.get("pellets", 1)) * int(part.get("burst", 1))
+			var dps := Loadout.total_dps({"weapons": [part]})
 			var burst := "  x%d BURST" % int(part.burst) if int(part.get("burst", 1)) > 1 else ""
+			if int(part.get("mag", 0)) > 0:
+				burst += "  MAG %d" % int(part.mag)
+			match str(part.get("kind", "")):
+				"harpoon":
+					burst += "  TETHERS RIGS"
+				"mortar":
+					burst += "  LOBS %d-%d" % [int(part.min_range), int(part.max_range)]
 			return "DPS %d  PWR %d  WT %d%s%s" % [roundi(dps), int(part.power), int(part.weight), burst, "  LOCK" if float(part.lock_range) > 0.0 else ""]
 		"Internal":
 			return "PWR %d  WT %d  %s" % [int(part.power), int(part.weight), effect_text(part)]
@@ -813,6 +820,11 @@ static func effect_text(part: Dictionary) -> String:
 			bits.append("%s +%d%%" % [str(labels[key]), roundi((float(part[key]) - 1.0) * 100.0)])
 	if part.has("hp_bonus"):
 		bits.append("HP +%d" % int(part.hp_bonus))
+	var res_names := ["SHOCK", "FIRE", "ACID", "TOXIC", "SLIME", "GOOP"]
+	var res: Array = part.get("resist_bonus", [])
+	for k in mini(res.size(), 6):
+		if float(res[k]) > 0.0:
+			bits.append("%s RES +%d" % [str(res_names[k]), int(res[k])])
 	if part.has("shield"):
 		bits.append("SHIELD %d" % int(part.shield))
 	if part.has("ram_bonus"):
@@ -826,6 +838,8 @@ static func effect_text(part: Dictionary) -> String:
 			bits.append("SLICK %d WIDE, %dS, ENEMIES ONLY" % [int(float(part.oil_radius) * 2.0), int(part.oil_time)])
 		"spikes":
 			bits.append("STRIP %d LONG, %dS" % [int(part.spike_length), int(part.spike_time)])
+		"pulse":
+			bits.append("SHOCK BURST %d PX, %d DMG" % [int(part.pulse_radius), int(part.pulse_damage)])
 	return "  ".join(bits)
 
 

@@ -209,8 +209,8 @@ func _run_checks() -> void:
 	_check((report.unlocked as Array).has("outrider_twin_guns"), "a new schematic is unlocked on extraction")
 	_check(profile.scrap == 80 + 15, "run scrap is banked")
 	var unknown := profile.unknown_schematics(Parts.OUTRIDER_DROPS)
-	_check(unknown.size() == 2 and unknown.has("outrider_light_plating") and unknown.has("coolant_loop"), "drops only offer schematics you don't own")
-	_check(profile.unknown_schematics(Parts.OUTRIDER_DROPS, ["outrider_light_plating", "coolant_loop"]).is_empty(), "nor ones already picked up this run")
+	_check(unknown.size() == 3 and unknown.has("outrider_light_plating") and unknown.has("coolant_loop") and unknown.has("shock_pulse"), "drops only offer schematics you don't own")
+	_check(profile.unknown_schematics(Parts.OUTRIDER_DROPS, ["outrider_light_plating", "coolant_loop", "shock_pulse"]).is_empty(), "nor ones already picked up this run")
 
 	# --- Wreck: penalty, rebuild, free starter ----------------------------------------
 	profile.scrap = 500

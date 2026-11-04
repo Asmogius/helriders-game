@@ -194,9 +194,9 @@ func _check_board() -> void:
 
 	_check(profile.district_score() == 0, "starter schematics don't count toward districts")
 	var drops: Array[String] = []
-	drops.assign(Parts.OUTRIDER_DROPS)
+	drops.assign(Parts.OUTRIDER_DROPS.slice(0, 4))   # four Uncommons
 	profile.bank_run(0, drops)
-	print("  district score after the four Outrider drops: %d" % profile.district_score())
+	print("  district score after four Outrider drops: %d" % profile.district_score())
 	_check(profile.district_score() == 8 and not profile.is_district_open(1) and profile.is_district_open(0), "four Uncommons score 8 of Midtown's 40")
 	profile.new_game()
 
