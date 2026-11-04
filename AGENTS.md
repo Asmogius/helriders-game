@@ -5,6 +5,7 @@ The owner works from a phone and has no computer, so nobody opens the Godot edit
 ## Source of truth
 
 - `docs/DESIGN.md` is the design. Systems marked "locked" are locked. Enemy vehicle archetypes are the main open area.
+- `docs/VISUAL_PLAN.md` is the visual upgrade plan (garage areas, zombies, effects, maps, rarity colours, interface): read its rules before any art or look change, and take tasks from it in its order.
 - `scripts/tuning.gd` holds every balance number, color and collision layer. Tune there, not inside gameplay scripts.
 - `scripts/parts.gd` holds part schematics (stats, slots, power, weight), the drop pools and the starter loadout. Part numbers were approved by the owner in the "Helriders: New Parts Draft" doc; don't change them without asking. `scripts/loadout.gd` is the only place that combines parts into rig stats (weapons list, internal modifiers, abilities, power and weight budgets). Player capabilities come from parts and crew: for example, lock exists only with the Advanced Targeting Computer in an internal slot and a weapon whose `lock_range` > 0, and a turret aims only with a seated Gunner or a targeting computer.
 - Utility parts are abilities: `vehicle.gd` `use_ability(i)` runs them, `hud.gd` shows a button each. A new utility needs a case there and, if it spawns things, a pooled single-node drawer like `mine_pool.gd`.
