@@ -48,6 +48,7 @@ var _alert_t := 0.0
 
 
 func _ready() -> void:
+	UI.apply_fonts()   # V6.1: a resumed job opens straight into the fight
 	layer = 10
 	_root = Control.new()
 	_root.set_anchors_preset(Control.PRESET_FULL_RECT)

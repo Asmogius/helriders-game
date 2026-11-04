@@ -111,7 +111,6 @@ var _ready_state := false           # set once a game is loaded or started
 
 
 func _ready() -> void:
-	preload("res://scripts/ui_theme.gd").apply_fonts()   # V6.1 interface font
 	# Tests may have started a game before the autoload is ready; keep it.
 	if not _ready_state and not load_game():
 		new_game()
