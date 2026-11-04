@@ -4,20 +4,34 @@ extends RefCounted
 ## map packages to draw regions from one texture in a single drawer.
 ## Missing or broken files give an empty atlas (`ok()` false) so callers keep
 ## their code-drawn fallback (VISUAL_PLAN rule: fallback stays).
+## Loaded atlases are cached per path on the SceneTree root (meta CACHE_META),
+## not in a static var, so they are freed with the tree. An atlas loaded before
+## the tree exists (no main loop / root yet) isn't cached: each such call loads
+## a fresh copy.
 
 var texture: Texture2D
 var regions := {}
 
-static var _cache := {}
+# One atlas per path, kept on the SceneTree root (meta CACHE_META) rather than in
+# a static var: a static var holding objects keeps this script alive past the
+# tree, which Godot reports at exit as "resources still in use" / leaked
+# instances. The root is freed when the tree goes, and the cache goes with it.
+const CACHE_META := &"art_atlas_cache"
 
 
-## Cached per path (without extension), e.g. load_atlas("res://art/fx/fx").
+## Shared per path (without extension), e.g. load_atlas("res://art/fx/fx").
 static func load_atlas(base: String) -> RefCounted:
-	if _cache.has(base):
-		return _cache[base]
+	var tree := Engine.get_main_loop() as SceneTree
+	var cache: Dictionary = {}
+	if tree != null and tree.root != null:
+		if not tree.root.has_meta(CACHE_META):
+			tree.root.set_meta(CACHE_META, {})
+		cache = tree.root.get_meta(CACHE_META)
+		if cache.has(base):
+			return cache[base]
 	var a := new()
 	a._load(base)
-	_cache[base] = a
+	cache[base] = a
 	return a
 
 

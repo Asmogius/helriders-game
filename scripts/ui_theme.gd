@@ -12,6 +12,18 @@ const GOOD := Color(0.45, 0.85, 0.5)
 const BAD := Color(0.95, 0.38, 0.3)
 
 
+# --- Icons (P7 / V6.3) ------------------------------------------------------------
+# 16 px white glyphs from tools/art/icons.py, tinted when drawn.
+const ArtAtlas := preload("res://scripts/art_atlas.gd")
+const STATUS_ICONS := ["shock", "fire", "acid", "toxic", "slime", "goop"]   # T.STATUS_NAMES order
+
+
+## The icon atlas (art_atlas.gd). Drawers load it once and keep it in a
+## member var; `ok()` is false when the art is missing (draw the old way).
+static func icons() -> RefCounted:
+	return ArtAtlas.load_atlas("res://art/ui/icons")
+
+
 static func make() -> Theme:
 	var th := Theme.new()
 	th.default_font_size = 22
