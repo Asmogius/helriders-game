@@ -1,6 +1,6 @@
 # Content Proposal 01 — APPROVED (2026-11-03)
 
-> **Status: APPROVED by Cameron (2026-11-03)**, with the changes recorded in **Decisions for Cameron** below. One item is **pending confirmation**: how Extract or Push works with Retrieve and Escort (§3.3). Not built in this PR.
+> **Status: APPROVED by Cameron (2026-11-03)**, with the changes recorded in **Decisions for Cameron** below. Everything is now approved, including Extract or Push in Retrieve and Escort (§3.3) and the numbers the bots invented while building it (2026-11-04).
 
 ## 0. Baseline read (what exists today)
 
@@ -108,7 +108,7 @@ Keeps current built stats; adds behavior, shield step and spawn rules.
 
 | Weapon | Rarity / source | Mount | Ammo | Stats | Raw DPS | **Sustained DPS** | Power / weight / scrap |
 |---|---|---|---|---|---|---|---|
-| **Rivet Gun** | Common / Clear pool | Fixed | Magazine 12, reload 2.2 s | 4/s x 16 kinetic, speed 1600, spread 2°, pierces 1 shambler | 64 | 12x16 / (3 + 2.2) = **37** | 40 / 15 / 45 |
+| **Rivet Gun** | Common / Clear pool | Fixed | Magazine 12, reload 2.2 s | 4/s x 16 kinetic, speed 1600, spread 2°, pierces 1 shambler | 64 | 12x16 / (2.75 + 2.2) = **39** (the first round fires at once) | 40 / 15 / 45 |
 | **Flame Sprayer** | Uncommon / Torcher | Fixed | Heat 4 s, lockout 2.5 s | 10 ticks/s x 4 fire, 220 px, 30° cone, pierces all | 40 (60 vs zombies) | 40 x 4/6.5 = **25** (37 vs zombies) + BURNING | 35 / 12 / 100 |
 | **Acid Lobber** | Uncommon / Sludger | Turret | Magazine 5, 0.5 s interval, reload 2.5 s | 22 acid per glob, 70 px splash, 60 px puddle 4 s (25 acid/s); 250-750 px; lobs over zombies, not buildings | 44 | 5x22 / (2.5 + 2.5) = **22** (33 vs armor) | 40 / 15 / 110 |
 | **Arc Projector** | Rare / Hunt Elite pool & Sludger 5% | Turret | Heat 5 s, lockout 3 s | 6/s x 6 shock, 380 px, chains to 1 extra target within 150 px for 50% | 36 (+18 chain) | 36 x 5/8 = **23** (+11 chain; 34 vs shields) | 55 / 20 / 180 |
@@ -256,7 +256,9 @@ On garage cards: the glyph sits in a 20 px chip in the keyword color on the mod 
 2. Patcher revives capped at **3 per job** (all skulls). **APPROVED (changed).**
 3. BURNING `#FF5A1F` orange; GOOPED `#E0A458` mustard; STUNNED `#F2F5FF`, SLICK `#2EC4A6`. **APPROVED.**
 4. Extract or Push on **33%** of jobs (not 75%); everything else as drafted. **APPROVED (changed).**
-5. Extract or Push with Retrieve (beacon after the non-deep caches) and Escort (only if the optional site was skipped): **PENDING CONFIRMATION**; the draft recommendation is used.
+5. Extract or Push with Retrieve (beacon after the non-deep caches) and Escort (only if the optional site was skipped): **APPROVED (2026-11-04).**
+9. The numbers invented while building (Clear Out x2, Juggernaut fling 0.8, Slingshot 250 px/s / 1.0 / 1.5 s, Tail Swipe 0.6 s, near miss 60 px, Racing Line cap +3 s, Shrapnel 50%, Shrapnel Storm 15 / 80 px, Bait Drones orbit 160 px and 8 dps, drone orbit 70 px, drone range 380 px, second charge pause 0.5 s, Outrider break gives up after 3 s): **APPROVED (2026-11-04).**
+10. DRIFT, OVERLOAD, Mobile Workshop and the items waiting on them: **APPROVED to build with gap-filler definitions (2026-11-04).**
 6. Torcher and Sludger added. **APPROVED.**
 7. Outrider and Bulwark designs, four weapons, four parts, Raider and Hauler frames, three crew, tiered perk numbers, keyword symbols/animations/colors, Harpoon/Mortar/Shock Pulse mods. **APPROVED as drafted.**
 8. Scrapper own-oil rule: **APPROVED** by Cameron (lit Scrapper oil burns the Scrapper too; no immunity).

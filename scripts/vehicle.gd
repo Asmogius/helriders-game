@@ -2693,7 +2693,7 @@ func _area_hit(at: Vector2, radius: float, damage: float, dtype: String) -> int:
 
 # --- Implement-04: the remaining Major / Signature perks -----------------------------
 # Numbers: proposal 01 §3.1 and DESIGN §14 crew perk table (approved). Numbers
-# neither gives are T.* constants marked DRAFT in tuning.gd.
+# neither gives are T.* constants in tuning.gd (agreed with the owner).
 
 var neuro_left := 0.0              # Neurotoxin: -25% speed, half turret turn while > 0
 var slung_left := 0.0              # Slingshot: flung off a chain; a wall crash is a RAM

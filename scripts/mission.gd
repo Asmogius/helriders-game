@@ -2191,7 +2191,7 @@ func _mission_reward_schematic(pay_mult: float) -> String:
 # --- Extract or Push (§14, proposal 01) ------------------------------------------
 
 ## Can this job offer the push now? Escort only if the risky site was
-## skipped (pending the owner's confirmation, T.PUSH_RETRIEVE_ESCORT_DRAFT).
+## skipped (agreed with the owner, T.PUSH_RETRIEVE_ESCORT).
 func _push_offerable() -> bool:
 	if not push_allowed:
 		return false

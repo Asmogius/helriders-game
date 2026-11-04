@@ -519,20 +519,20 @@ const STRIP_MINE_PER := 40.0         # armor per scrap
 const STRIP_MINE_CAP := 25.0
 const TAIL_SWIPE_SHARE := 0.6
 const RACING_LINE_ADD := 0.5
-# DRAFT (invented, pending review):
-const CLEAR_OUT_PUSH := 2.0          # DRAFT: Shockwave knockback x2 with Clear Out
-const JUGGERNAUT_FLING := 0.8        # DRAFT: the rammed rig is thrown at 1.8x the impact speed
-const SLINGSHOT_SPEED := 250.0       # DRAFT: "at speed" = over 250 px/s when Chain Drag ends
-const SLINGSHOT_FLING := 1.0         # DRAFT: the flung rig gets 100% of your velocity
-const SLINGSHOT_TIME := 1.5          # DRAFT: a wall crash within 1.5 s counts as the RAM
-const TAIL_SWIPE_TIME := 0.6         # DRAFT: "while swinging" = 0.6 s after the Bootleg Turn
-const NEAR_MISS_RANGE := 60.0        # DRAFT: an enemy round within 60 px that flies on
-const RACING_LINE_CAP := 3.0         # DRAFT: at most +3 s per Hard Line
-const SHRAPNEL_DAMAGE := 0.5         # DRAFT: splash = 50% of the round
-const SHRAPNEL_STORM_DAMAGE := 15.0  # DRAFT: per pulled item
-const SHRAPNEL_STORM_RADIUS := 80.0  # DRAFT: around where it lay
-const DRONE_BAIT_ORBIT := 160.0      # DRAFT: Bait Drones hover further out
-const DRONE_ZOMBIE_DPS := 8.0        # DRAFT: a zombie touching a drone (shambler dps)
+# Agreed with the owner (2026-11-04; first drafted by the Grok content bots):
+const CLEAR_OUT_PUSH := 2.0          # Shockwave knockback x2 with Clear Out
+const JUGGERNAUT_FLING := 0.8        # the rammed rig is thrown at 1.8x the impact speed
+const SLINGSHOT_SPEED := 250.0       # "at speed" = over 250 px/s when Chain Drag ends
+const SLINGSHOT_FLING := 1.0         # the flung rig gets 100% of your velocity
+const SLINGSHOT_TIME := 1.5          # a wall crash within 1.5 s counts as the RAM
+const TAIL_SWIPE_TIME := 0.6         # "while swinging" = 0.6 s after the Bootleg Turn
+const NEAR_MISS_RANGE := 60.0        # an enemy round within 60 px that flies on
+const RACING_LINE_CAP := 3.0         # at most +3 s per Hard Line
+const SHRAPNEL_DAMAGE := 0.5         # splash = 50% of the round
+const SHRAPNEL_STORM_DAMAGE := 15.0  # per pulled item
+const SHRAPNEL_STORM_RADIUS := 80.0  # around where it lay
+const DRONE_BAIT_ORBIT := 160.0      # Bait Drones hover further out
+const DRONE_ZOMBIE_DPS := 8.0        # a zombie touching a drone (shambler dps)
 const POWER_DIVERT_CAP := 80.0       # +1 shield per unused power point, cap 80
 const DRONE_ORBIT := 70.0            # gap-filler: drones circle this far out
 const DRONE_RANGE := 380.0           # gap-filler: same reach as a 1000 px/s gun
@@ -980,7 +980,7 @@ const PUSH_MARKER_GAP := 600.0       # extract and push markers at least this fa
 const PUSH_RADIUS := 110.0
 const PUSH_EXTRACT_WINDOW := 20.0    # after the timer: drive in within this, or it ends on its own
 const PUSH_NO_TYPES := ["courier"]   # never offered on these
-# PENDING the owner's confirmation (proposal 01 §3.3): Retrieve offers the push
-# beacon once every non-deep cache is taken; Escort offers it only if the
-# optional site was skipped. Flip to false to keep Push off both job types.
-const PUSH_RETRIEVE_ESCORT_DRAFT := true
+# Agreed with the owner (proposal 01 §3.3): Retrieve offers the push beacon
+# once every non-deep cache is taken; Escort offers it only if the optional
+# site was skipped. Flip to false to keep Push off both job types.
+const PUSH_RETRIEVE_ESCORT := true   # agreed: Retrieve after the non-deep caches, Escort only if the optional site was skipped

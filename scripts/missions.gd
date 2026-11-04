@@ -143,7 +143,7 @@ static func has_push(mission: Dictionary) -> bool:
 	var type := str(mission.get("type", ""))
 	if T.PUSH_NO_TYPES.has(type):
 		return false
-	if (type == "retrieve" or type == "escort") and not T.PUSH_RETRIEVE_ESCORT_DRAFT:
+	if (type == "retrieve" or type == "escort") and not T.PUSH_RETRIEVE_ESCORT:
 		return false
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash("helriders-push-%d" % int(mission.get("seed", 0)))
