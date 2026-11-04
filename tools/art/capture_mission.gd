@@ -5,7 +5,7 @@ extends SceneTree
 ##   ... -s res://tools/art/capture_mission.gd -- out.png --layout=crossroads [--seed=N] [--type=clear]
 ## Every layout, one <dir>/<id>.png each (layout i uses seed N+i; a banner names the layout):
 ##   ... -s res://tools/art/capture_mission.gd -- out_dir --all-layouts [--seed=N] [--type=clear]
-## --style forces the Outer Blocks map style on (arena.gd `outer_blocks_style`; only
+## --style forces the Outer Blocks map style on (arena.gd `set_outer_blocks_style()`; only
 ## Outer Blocks layouts change). --perf prints bake time, draw calls, texture memory
 ## and FPS for each capture (peak RAM: tools/art/bake_mem.gd, one fresh process per layout) (FPS is meaningless under software rendering / vsync).
 ## Under --headless there is no rendered image: it prints an error and exits with code 2.
@@ -24,9 +24,10 @@ var _type := ""
 var _all := false
 var _current: Node = null
 var _layout := ""
-var _index := -1
+var _index := -1               # position in the --all-layouts run (seed = _seed + _index)
 var _perf := false
-var _fps: Array = []            # position in the --all-layouts run (seed = _seed + _index)
+var _style := false             # --style; applied per mission (the root meta is not up in _initialize)
+var _fps: Array = []
 
 
 func _init() -> void:
@@ -46,7 +47,7 @@ func _init() -> void:
 		elif a.begins_with("--seed="):
 			_seed = a.substr(7).to_int()
 		elif a == "--style":
-			load("res://scripts/arena.gd").outer_blocks_style = true
+			_style = true
 		elif a == "--perf":
 			_perf = true
 		elif a.begins_with("--type="):
@@ -86,6 +87,8 @@ func _next() -> void:
 		return
 	_layout = str(_queue.pop_front())
 	_index += 1
+	if _style:
+		load("res://scripts/arena.gd").set_outer_blocks_style(true)
 	var mission := (load("res://scenes/mission.tscn") as PackedScene).instantiate()
 	if _layout != "":
 		var jobs: Array = Layouts.LAYOUTS[_layout].jobs

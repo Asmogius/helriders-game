@@ -18,7 +18,7 @@ func run(cap: SceneTree) -> void:
 		cap.strip.queue_free()
 		cap.strip = null
 	var Arena := load("res://scripts/arena.gd")
-	Arena.outer_blocks_style = sample
+	Arena.set_outer_blocks_style(sample)
 	_map = Node2D.new()
 	cap.root.add_child(_map)
 	var arena: Node2D = Arena.new()
@@ -59,4 +59,4 @@ func after(_cap: SceneTree) -> void:
 	if _map != null and is_instance_valid(_map):
 		_map.queue_free()
 	_map = null
-	load("res://scripts/arena.gd").outer_blocks_style = false
+	load("res://scripts/arena.gd").set_outer_blocks_style(false)

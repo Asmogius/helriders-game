@@ -29,6 +29,7 @@ class Canvas extends RefCounted:
 	var image: Image
 	var view: Rect2i      # this image's rect inside the bake area
 	var size: Vector2i    # whole bake area (what the painters see)
+	var sil_cache := {}   # drop-shadow silhouettes, shared by one bake's chunks
 
 	func _init(area: Vector2i, v: Rect2i) -> void:
 		size = area
@@ -70,10 +71,36 @@ class Canvas extends RefCounted:
 ## RenderingDevice backends report it. The GL Compatibility renderer (ours)
 ## exposes no query, so it gets 0 and the map stays in 4 chunks of <= 2048
 ## (the V5.1 single-draw exception). Tests force a size with the override.
-static var max_texture_override := 0
+# Test overrides live in a tree-root meta (like zombie.gd's art cache), not
+# static vars, so nothing keeps this script alive past exit.
+const SETTINGS_META := &"map_art_settings"   # root meta: {"max_texture": int, "tiles": String}
+
+
+static func _settings() -> Dictionary:
+	var tree := Engine.get_main_loop() as SceneTree
+	var root: Window = tree.root if tree != null else null
+	if root != null and root.has_meta(SETTINGS_META):
+		return root.get_meta(SETTINGS_META)
+	var st := {"max_texture": 0, "tiles": TILES}
+	if root != null:
+		root.set_meta(SETTINGS_META, st)
+	return st
+
+
+## Tests: force max_texture_size() (0 = ask the renderer).
+static func set_max_texture_override(n: int) -> void:
+	_settings().max_texture = n
+
+
+## Tests: point the tiles atlas elsewhere (a missing file checks the fallback).
+static func set_tiles_path(path: String) -> void:
+	_settings().tiles = path
+
+
 static func max_texture_size() -> int:
-	if max_texture_override > 0:
-		return max_texture_override
+	var o := int(_settings().max_texture)
+	if o > 0:
+		return o
 	var rd := RenderingServer.get_rendering_device()
 	if rd == null:
 		return 0
@@ -82,9 +109,8 @@ static func max_texture_size() -> int:
 
 ## Atlas images, read on the main thread (texture reads are not thread-safe).
 ## Empty when the art is missing.
-static var tiles_path := TILES   # tests point this at a missing file (fallback check)
 static func load_sources() -> Dictionary:
-	var tiles: RefCounted = ArtAtlas.load_atlas(tiles_path)
+	var tiles: RefCounted = ArtAtlas.load_atlas(str(_settings().tiles))
 	var house: RefCounted = ArtAtlas.load_atlas(HOUSE)
 	if not tiles.ok() or not house.ok():
 		return {}
@@ -120,10 +146,12 @@ static func bake_images(data: Dictionary, src: Dictionary, single: bool) -> Arra
 	if single:
 		whole = Image.create(int(full.size.x), int(full.size.y), false, Image.FORMAT_RGB565)
 	var out: Array = []
+	var sil := {}   # silhouette cache for this bake only
 	for gy in ny:
 		for gx in nx:
 			var r := Rect2i(gx * cw, gy * chh, mini(cw, int(full.size.x) - gx * cw), mini(chh, int(full.size.y) - gy * chh))
 			var cv := Canvas.new(Vector2i(full.size), r)
+			cv.sil_cache = sil
 			_paint(cv, data, full, src)
 			var part := cv.image
 			cv.image = null
@@ -134,7 +162,6 @@ static func bake_images(data: Dictionary, src: Dictionary, single: bool) -> Arra
 				out.append([Rect2(r), part])
 	if single:
 		out.append([full, whole])
-	_sil_cache.clear()
 	return out
 
 
@@ -301,7 +328,7 @@ static func _paint(img: Canvas, arena: Variant, corner: Rect2, src: Dictionary) 
 		var box := Rect2(at, reg.size)
 		if _hits(box, green_off) or _near(box.get_center(), points, 70.0 + reg.size.x * 0.5):
 			continue
-		var sil := _silhouette(ti, Rect2i(reg), 0.32)
+		var sil := _silhouette(img.sil_cache, ti, Rect2i(reg), 0.32)
 		img.blend_rect(sil, Rect2i(Vector2i.ZERO, sil.get_size()), Vector2i(at + Vector2(8, 6)))
 		img.blend_rect(ti, Rect2i(reg), Vector2i(at))
 		green_off.append(box)
@@ -610,7 +637,7 @@ static func _sprite(img: Canvas, pi: Image, atlas: RefCounted, id: String, at: V
 		return Rect2()
 	var reg := Rect2i(atlas.region(id))
 	if shadow > 0.0:
-		var sil := _silhouette(pi, reg, shadow)
+		var sil := _silhouette(img.sil_cache, pi, reg, shadow)
 		_blend_sub(img, sil, Rect2i(Vector2i.ZERO, sil.get_size()), at + Vector2(6, 4))
 	_blend_sub(img, pi, reg, at)
 	return Rect2(at, Vector2(reg.size))
@@ -948,22 +975,20 @@ static func _shadow(img: Canvas, r: Rect2, by: Vector2, alpha: float) -> void:
 	img.blend_rect(sh, Rect2i(Vector2i.ZERO, sh.get_size()), Vector2i(s.position))
 
 
-## A soft drop shadow shaped like the sprite (alpha only). Bake time only.
-static var _sil_cache := {}
-
-
-static func _silhouette(src: Image, r: Rect2i, alpha: float) -> Image:
+## A soft drop shadow shaped like the sprite (alpha only). Bake time only;
+## cached per bake on the Canvas (no static state: bakes run on workers).
+static func _silhouette(cache: Dictionary, src: Image, r: Rect2i, alpha: float) -> Image:
 	var key := "%d:%s:%.2f" % [src.get_instance_id(), str(r), alpha]
-	if _sil_cache.has(key):
-		return _sil_cache[key]
-	if _sil_cache.size() > 256:
-		_sil_cache.clear()
+	if cache.has(key):
+		return cache[key]
+	if cache.size() > 256:
+		cache.clear()
 	var out := src.get_region(r)
 	for y in out.get_height():
 		for x in out.get_width():
 			var a := out.get_pixel(x, y).a
 			out.set_pixel(x, y, Color(0, 0, 0, a * alpha))
-	_sil_cache[key] = out
+	cache[key] = out
 	return out
 
 

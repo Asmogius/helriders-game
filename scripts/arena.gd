@@ -26,7 +26,6 @@ var spawn_points: Array[Vector2] = []
 const MapArt := preload("res://scripts/map_art.gd")
 const MapAmbient := preload("res://scripts/map_ambient.gd")
 const STYLED_DISTRICTS := ["outer_blocks"]
-static var outer_blocks_style := false
 var _chunks: Array = []        # [[Rect2, Texture2D], ...] from MapArt.bake_chunks
 var bake_ms := 0.0             # last bake, start to textures ready (perf captures)
 var bake_main_ms := 0.0        # of which spent on the main thread (atlas reads, uploads)
@@ -36,28 +35,55 @@ var _task := -1                # WorkerThreadPool task while baking
 var _task_out: Array = []
 var _bake_t0 := 0
 # Last bake, keyed by layout + variation (seed_for) + texture mode; one entry,
-# so RESTART of the same job skips the bake and memory stays bounded.
-static var _cache_key := ""
-static var _cache_chunks: Array = []
-# Bakes whose arena left the tree mid-bake: never waited on there (a quit must
-# not stall); reaped here once their worker finishes, results discarded.
-static var _orphans: Array[int] = []
+# so RESTART of the same job skips the bake and memory stays bounded. Held in a
+# tree-root meta cache (like zombie.gd's art), not static vars, so nothing keeps
+# this script or the baked textures alive past exit. Its "orphans" are bakes
+# whose arena left the tree mid-bake: never waited on there (a quit must not
+# stall); reaped once their worker finishes, results discarded.
+const MAP_META := &"arena_map_cache"   # root meta: {"key": String, "chunks": Array, "orphans": Array, "style": bool}
 
 signal bake_finished
+
+
+static func _map_cache() -> Dictionary:
+	var tree := Engine.get_main_loop() as SceneTree
+	var root: Window = tree.root if tree != null else null
+	if root != null and root.has_meta(MAP_META):
+		return root.get_meta(MAP_META)
+	var c := {"key": "", "chunks": [], "orphans": [], "style": false}
+	if root != null:
+		root.set_meta(MAP_META, c)
+	return c
+
+
+## The Outer Blocks style flag (off by default; captures and tests turn it on).
+static func set_outer_blocks_style(on: bool) -> void:
+	_map_cache().style = on
+
+
+static func outer_blocks_style() -> bool:
+	return bool(_map_cache().style)
 
 
 ## Drops the restart cache (the mission calls this when the player leaves the
 ## job for the garage or menu; RESTART keeps it).
 static func clear_cache() -> void:
-	_cache_key = ""
-	_cache_chunks = []
+	var c := _map_cache()
+	c.key = ""
+	c.chunks = []
+
+
+## The cached chunks (tests).
+static func cached_chunks() -> Array:
+	return _map_cache().chunks
 
 
 static func _reap_orphans() -> void:
-	for id: int in _orphans.duplicate():
+	var orphans: Array = _map_cache().orphans
+	for id: int in orphans.duplicate():
 		if WorkerThreadPool.is_task_completed(id):
 			WorkerThreadPool.wait_for_task_completion(id)
-			_orphans.erase(id)
+			orphans.erase(id)
 
 
 func _init() -> void:
@@ -93,7 +119,7 @@ func _ready() -> void:
 		_add_box(solid, b.get_center(), b.size, 0.0)
 	for p: Array in props:
 		_add_box(solid, p[0], p[1], p[2])
-	if outer_blocks_style and STYLED_DISTRICTS.has(str(layout.get("district", ""))):
+	if outer_blocks_style() and STYLED_DISTRICTS.has(str(layout.get("district", ""))):
 		_setup_style()
 
 
@@ -107,14 +133,14 @@ func _setup_style() -> void:
 	var single := MapArt.max_texture_size() >= 4096
 	var data := MapArt.snapshot(self)
 	var key := "%s:%d:%d:%s" % [str(layout.get("id", "")), MapArt.seed_for(data), hash(str(layout.get("surfaces", []))), str(single)]
-	if key == _cache_key and not _cache_chunks.is_empty():
+	var cache := _map_cache()
+	if key == cache.key and not (cache.chunks as Array).is_empty():
 		bake_cached = true
-		_use_chunks(_cache_chunks)
+		_use_chunks(cache.chunks)
 		bake_main_ms = (Time.get_ticks_usec() - _bake_t0) / 1000.0
 		bake_ms = bake_main_ms
 		return
-	_cache_key = ""
-	_cache_chunks = []   # drop the old map before baking the new one
+	clear_cache()   # drop the old map before baking the new one
 	var src := MapArt.load_sources()   # main thread: texture reads
 	if src.is_empty():
 		return   # missing art: code-drawn look stays
@@ -154,7 +180,7 @@ func _exit_tree() -> void:
 	# Quit mid-bake: don't block on the worker. It only writes into its own
 	# array (not this node), so let it finish; it is reaped later, unused.
 	if _task >= 0:
-		_orphans.append(_task)
+		(_map_cache().orphans as Array).append(_task)
 		_task = -1
 		_task_out = []
 
@@ -172,8 +198,9 @@ func _bake_done() -> void:
 	if chunks.is_empty():
 		bake_finished.emit()
 		return
-	_cache_key = str(get_meta("bake_key", ""))
-	_cache_chunks = chunks
+	var cache := _map_cache()
+	cache.key = str(get_meta("bake_key", ""))
+	cache.chunks = chunks
 	_use_chunks(chunks)
 	bake_finished.emit()
 

@@ -32,11 +32,11 @@ func _run() -> void:
 	var profile := root.get_node("Profile")
 	profile.persist = false
 	profile.new_game()
-	Arena.outer_blocks_style = false
+	Arena.set_outer_blocks_style(false)
 	var a := _arena("lots", 3)
 	_check(not a.is_baking() and not a.is_styled(), "flag off: no bake, code-drawn")
 	a.free()
-	Arena.outer_blocks_style = true
+	Arena.set_outer_blocks_style(true)
 	a = _arena("alleys", 3)
 	_check(not a.is_baking() and not a.is_styled(), "flag on, other district: code-drawn")
 	a.free()
@@ -49,17 +49,17 @@ func _run() -> void:
 	_check(a.is_styled() and a.bake_cached and not a.is_baking(), "restart: same map comes from the cache")
 	_check((a._chunks as Array).size() == (1 if MapArt.max_texture_size() >= 4096 else 4), "default: one texture only on a confirmed 4096 query")
 	a.free()
-	MapArt.max_texture_override = 2048
+	MapArt.set_max_texture_override(2048)
 	a = _arena("lots", 4)
 	a.finish_bake()
 	_check((a._chunks as Array).size() == 4, "no 4096 textures: four chunks")
 	a.free()
-	MapArt.max_texture_override = 4096
+	MapArt.set_max_texture_override(4096)
 	a = _arena("lots", 5)
 	a.finish_bake()
 	_check((a._chunks as Array).size() == 1, "confirmed 4096 textures: one map texture")
 	a.free()
-	MapArt.max_texture_override = 0
+	MapArt.set_max_texture_override(0)
 	if RenderingServer.get_rendering_device() == null:
 		_check(MapArt.max_texture_size() == 0, "no query (Compatibility): size 0, chunks")
 	# Quitting mid-bake must not block on the worker.
@@ -68,14 +68,14 @@ func _run() -> void:
 	a.free()
 	_check(Time.get_ticks_usec() - t0 < 20000, "quit mid-bake returns at once")
 	Arena.clear_cache()
-	_check(Arena._cache_chunks.is_empty(), "clear_cache drops the map")
-	MapArt.tiles_path = "res://art/map/missing_tiles"
+	_check(Arena.cached_chunks().is_empty(), "clear_cache drops the map")
+	MapArt.set_tiles_path("res://art/map/missing_tiles")
 	a = _arena("crossroads", 9)
 	a.finish_bake()
 	_check(not a.is_styled() and not a.is_baking(), "missing art: code-drawn fallback")
 	a.free()
-	MapArt.tiles_path = MapArt.TILES
-	Arena.outer_blocks_style = false
+	MapArt.set_tiles_path(MapArt.TILES)
+	Arena.set_outer_blocks_style(false)
 	var l := Layouts.build("lots", 6)
 	var bare := l.duplicate(true)
 	bare.surfaces = []
@@ -93,7 +93,7 @@ func _run() -> void:
 
 ## The job start waits behind the loading screen while the styled map bakes.
 func _mission_hold() -> void:
-	Arena.outer_blocks_style = true
+	Arena.set_outer_blocks_style(true)
 	Arena.clear_cache()
 	var spec: Dictionary = Missions.default_mission().duplicate(true)
 	spec["layout"] = "lots"
@@ -121,8 +121,8 @@ func _mission_hold() -> void:
 	again.queue_free()
 	await process_frame
 	await process_frame
-	_check(Arena._cache_chunks.is_empty(), "leaving the job frees the cached map")
-	Arena.outer_blocks_style = false
+	_check(Arena.cached_chunks().is_empty(), "leaving the job frees the cached map")
+	Arena.set_outer_blocks_style(false)
 	var off: Node = (load("res://scenes/mission.tscn") as PackedScene).instantiate()
 	off.set("mission_override", spec)
 	off.set("auto_spawn_specials", false)
