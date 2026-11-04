@@ -146,8 +146,9 @@ func _check_specialties() -> void:
 	var hl := Crew.ability(_member("driver", "Mythic", "wheelman"))
 	_check(is_equal_approx(float(hl.time), 5.5) and is_equal_approx(float(hl.cooldown), 14.0), "Hard Line keeps its approved table")
 	_check(not bool(Crew.ability(_member("mechanic", "Rare", "patcher")).epic) and bool(Crew.ability(_member("mechanic", "Epic", "patcher")).epic), "Field Repair adds damage cover from Epic up")
-	var weld := _member("mechanic", "Common", "welder")
-	_check(Crew.specialty_name(weld) == "Welder" and Crew.ability_name(weld) == "Weld Plates" and Crew.summary(weld).contains("WELD PLATES"), "cards name the specialty and its ability")
+	var gear := _member("mechanic", "Common", "gearhead")
+	_check(Crew.specialty_name(gear) == "Gearhead" and Crew.ability_name(gear) == "Tune-Up" and Crew.summary(gear).contains("TUNE-UP"), "cards name the specialty and its ability")
+	_check(Crew.specialty(_member("mechanic", "Common", "welder")) == "gearhead" and Crew.specialty(_member("medic", "Common", "combat_medic")) == "poisoner" and Crew.specialty(_member("engineer", "Common", "overclocker")) == "conduit", "old saves: Welder, Combat Medic and Overclocker become Gearhead, Poisoner and Conduit")
 
 
 func _check_perks() -> void:
@@ -182,8 +183,8 @@ func _check_perks() -> void:
 
 	# Perk effects.
 	_check(is_equal_approx(float(Crew.passive(_member("mechanic", "Common", "", ["veteran"])).taken), 0.05), "Veteran: passive +25%")
-	var quick := Crew.ability(_member("mechanic", "Common", "welder", ["quick_hands", "endurance"]))
-	_check(is_equal_approx(float(quick.cooldown), 20.0) and is_equal_approx(float(quick.time), 5.2), "Quick Hands: cooldown -20%; Endurance: lasts 30% longer")
+	var quick := Crew.ability(_member("mechanic", "Common", "gearhead", ["quick_hands", "endurance"]))
+	_check(is_equal_approx(float(quick.cooldown), 17.6) and is_equal_approx(float(quick.time), 7.8), "Quick Hands: cooldown -20%; Endurance: lasts 30% longer")
 	var driver := _member("driver")
 	var morale := _mods([driver, _member("medic", "Common", "", ["morale"])])
 	var plain := _mods([driver])
@@ -345,8 +346,8 @@ func _mission_step(f: int) -> void:
 		rig.global_position = OPEN_SPOT
 		rig.rotation = 0.0
 		rig.velocity = Vector2.ZERO
-		# Speedster, Marksman, Welder.
-		_seat([_member("driver", "Common", "speedster"), _member("gunner", "Common", "marksman"), _member("mechanic", "Common", "welder")])
+		# Speedster, Marksman, Gearhead.
+		_seat([_member("driver", "Common", "speedster"), _member("gunner", "Common", "marksman"), _member("mechanic", "Common", "gearhead")])
 		_check(mission.hud.crew_wheel_size() == 3, "the crew wheel has a slice for each rider")
 		_check(is_equal_approx(float(rig.crew_mod("taken")), 0.96), "a seated Mechanic takes 4% off damage")
 		var hp := rig.armor
@@ -355,12 +356,13 @@ func _mission_step(f: int) -> void:
 		var speed: float = rig.crew_speed
 		_check(mission.use_crew_ability(0) and is_equal_approx(rig.crew_speed, speed * 1.35) and is_equal_approx(rig.crew_accel, 1.5), "Floor It: +35% top speed, +50% acceleration")
 		_check(mission.use_crew_ability(1) and is_equal_approx(rig.crew_spread, 0.0) and is_equal_approx(float(rig.crew_mod("bullet_speed")), 1.5) and is_equal_approx(rig.crew_damage, 1.25), "Deadeye: no spread, bullets +50% faster, +25% damage")
-		_check(mission.use_crew_ability(2) and is_equal_approx(float(rig.crew_mod("taken")), 0.48), "Weld Plates: damage taken halved")
+		var fire := float(rig.crew_mod("fire"))
+		_check(mission.use_crew_ability(2) and is_equal_approx(rig.crew_speed, speed * 1.35 * 1.15) and is_equal_approx(float(rig.crew_mod("fire")), fire * 1.15), "Tune-Up: +15% speed and fire rate")
 		_check(mission.hud.is_crew_disabled(0) == false and rig.crew_charge(0) > 0.9, "a used ability cools down on the wheel")
 	if f == 200:
-		_check(not rig.ability_active("floor_it") and rig.ability_active("weld") and is_equal_approx(rig.crew_speed, 1.0), "Floor It ends after 3 s; Weld Plates still holds")
+		_check(not rig.ability_active("floor_it") and rig.ability_active("tune_up") and is_equal_approx(rig.crew_speed, 1.15), "Floor It ends after 3 s; Tune-Up still holds")
 	if f == 250:
-		_check(not rig.ability_active("weld") and is_equal_approx(float(rig.crew_mod("taken")), 0.96), "Weld Plates ends after 4 s")
+		_check(rig.ability_active("tune_up") and is_equal_approx(float(rig.crew_mod("taken")), 0.96), "Tune-Up lasts past 4 s (6 s)")
 		# Bootlegger, Breacher, Epic Patcher.
 		_seat([_member("driver", "Common", "bootlegger"), _member("gunner", "Common", "breacher"), _member("mechanic", "Epic", "patcher")])
 		rig.global_position = OPEN_SPOT
@@ -388,15 +390,16 @@ func _mission_step(f: int) -> void:
 		_check(pierced == 3 and hits == 4, "one piercing round hits four shamblers in a row")
 		mission.zombies.clear_all()
 		near.clear()
-		# Marker, Overclocker, Magpie on an overloaded rig.
+		# Marker, Conduit, Magpie on an overloaded rig.
 		mission.apply_rig(Loadout.build(OVERLOAD_BUILD))
-		_seat([_member("driver"), _member("spotter", "Common", "marker"), _member("engineer", "Common", "overclocker"), _member("scavenger", "Common", "magpie")])
+		_seat([_member("driver"), _member("spotter", "Common", "marker"), _member("engineer", "Common", "conduit"), _member("scavenger", "Common", "magpie")])
 		rig.global_position = OPEN_SPOT
 		rig.velocity = Vector2.ZERO
 		print("  overloaded: power %.0f / %.0f, mobility %.2f" % [rig.power_load(), rig.power_capacity(), rig.mobility()])
 		_check(is_equal_approx(rig.power_capacity(), rig.power_output * 1.05), "a seated Engineer adds 5% power output")
 		_check(rig.is_power_overloaded() and rig.mobility() < 1.0, "the test build is still overloaded")
-		_check(mission.use_crew_ability(2) and is_equal_approx(rig.mobility(), 1.0) and is_equal_approx(rig.crew_speed, 1.2), "Overclock: ignores overload, +20% speed")
+		var sh_max: float = rig.shield_max
+		_check(mission.use_crew_ability(2) and rig.ability_active("power_divert") and is_equal_approx(rig.shield_max, sh_max), "Power Divert: an overloaded rig has no spare power, so no bonus shield")
 		mark = {"hunter": mission.spawn_hunter(OPEN_SPOT + Vector2(0, 320))}
 		var close := Pickup.new()
 		close.scrap_value = 10
@@ -449,26 +452,13 @@ func _mission_step(f: int) -> void:
 		mission.zombies.clear_all()
 		near.clear()
 	if f == 290:
-		# Combat Medic, Bracer, Tinkerer on a Courier with utilities.
+		# Poisoner, Bracer, Tinkerer on a Courier with utilities.
 		mission.apply_rig(Loadout.build(COURIER_BUILD))
-		_seat([_member("driver"), _member("medic", "Common", "combat_medic"), _member("bruiser", "Common", "bracer"), _member("engineer", "Common", "tinkerer")])
-		var turn: float = rig.crew_turn
-		_check(mission.use_crew_ability(1) and bool(rig.crew_mod("immune")) and is_equal_approx(rig.crew_turn - 1.0, (turn - 1.0) * 1.5), "Stim: no injuries, other passives +50%")
-		var hits: int = rig.big_hits
-		rig._dmg_buckets.fill(0.0)
-		for k in 30:
-			rig._dmg_buckets.fill(0.0)
-			rig.take_damage(rig.armor_max * 0.2)
-			rig.armor = rig.armor_max
-		var hurt := 0
-		for i in rig.crew.size():
-			hurt += 1 if rig.is_crew_injured(i) else 0
-		_check(rig.big_hits == hits + 30 and hurt == 0, "Stim: 30 big hits and nobody gets hurt")
+		_seat([_member("driver"), _member("medic", "Common", "poisoner"), _member("bruiser", "Common", "bracer"), _member("engineer", "Common", "tinkerer")])
+		_check(mission.use_crew_ability(1) and rig.ability_active("miasma") and float(rig.status.left[3]) <= 0.0, "Miasma: the cloud is up and your own rig is immune")
 		var ram: float = rig.crew_mod("ram")
 		_check(mission.use_crew_ability(2) and is_equal_approx(float(rig.crew_mod("ram")), ram * 1.5) and is_equal_approx(float(rig.crew_mod("taken")), 0.4), "Brace: damage taken -60%, ram +50%")
-		var patch_cd := float(rig.abilities[0].cooldown)
-		_check(mission.use_ability(0) and is_equal_approx(float(rig.abilities[0].ready_in), patch_cd), "the patch starts its cooldown")
-		_check(mission.use_crew_ability(3) and is_equal_approx(float(rig.abilities[0].ready_in), patch_cd * 0.5), "Reroute: utility cooldowns cut in half")
+		_check(mission.use_crew_ability(3) and rig.drones.size() == 2, "Scrap Drones: two drones launch")
 		# A Spotter trims utility cooldowns.
 		_seat([_member("driver"), _member("spotter")])
 		rig.abilities[1].ready_in = 0.0

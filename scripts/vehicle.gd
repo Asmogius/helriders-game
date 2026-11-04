@@ -396,6 +396,9 @@ func use_crew_ability(index: int) -> bool:
 			if patient < 0:
 				return false
 			crew[patient].injured = false
+			if _member_has(c, "sp_back_in_it"):
+				crew[patient].ready_in = 0.0   # Back in It
+				_perk_fired("sp_back_in_it")
 			crew_healed.emit(patient)
 		"field_repair":
 			repair_armor(float(a.heal) * float(crew_mods.repair))
@@ -414,7 +417,13 @@ func use_crew_ability(index: int) -> bool:
 			for u in abilities:
 				u.ready_in = float(u.ready_in) * (1.0 - minf(float(a.cut), 0.95))
 		"shockwave":
-			_shockwave(float(a.damage), float(a.radius))
+			var dmg := float(a.damage)
+			if _member_has(c, "sp_payback"):
+				var extra := minf(recent_taken() * 0.5, 60.0)
+				if extra > 0.0:
+					dmg += extra
+					_perk_fired("sp_payback")
+			_shockwave(dmg, float(a.radius), _member_has(c, "sp_live_wire"))
 		"static_burst":
 			static_burst(float(a.radius), float(a.shock_buildup), float(a.time) + float(a.get("jam_add", 0.0)))   # Lingering Static perk
 		"chain_drag":
@@ -434,6 +443,15 @@ func use_crew_ability(index: int) -> bool:
 			timed.left = float(a.time)
 			_active[kind] = timed
 	c.ready_in = float(a.cooldown)
+	var two := _charges_perk(kind)
+	if two != "" and _member_has(c, two):
+		c.spent = int(c.get("spent", 0)) + 1
+		if int(c.spent) < 2:
+			c.ready_in = T.SECOND_CHARGE_PAUSE   # second charge ready almost at once
+		else:
+			c.spent = 0
+		_perk_fired(two)
+	_on_ability_used(c, kind, a)
 	_refresh_crew_mods()
 	return true
 
@@ -469,7 +487,7 @@ func throw_off_hunters() -> void:
 		h.call("knock_off", away if away != Vector2.ZERO else Vector2.RIGHT)
 
 
-func _shockwave(damage: float, radius: float) -> void:
+func _shockwave(damage: float, radius: float, shock := false) -> void:
 	var shape := CircleShape2D.new()
 	shape.radius = radius
 	var query := PhysicsShapeQueryParameters2D.new()
@@ -480,7 +498,7 @@ func _shockwave(damage: float, radius: float) -> void:
 		var body: Object = hit.collider
 		if body != null and body != self and body.has_method("take_hit"):
 			var away: Vector2 = ((body as Node2D).global_position - global_position).normalized()
-			body.call("take_hit", damage, away * 500.0, "shockwave")
+			body.call("take_hit", damage, away * 500.0, "shockwave", "shock" if shock else "")   # Live Wire
 	throw_off_hunters()
 	if fx != null:
 		fx.call("blast", global_position, radius)
@@ -560,7 +578,9 @@ func _tick_crew(delta: float) -> void:
 				fx.call("emit", global_position + back + side * s, -velocity * 0.1, 0.35, 4.0, streak, 4.0)
 	if not ended.is_empty():
 		for kind in ended:
+			var done: Dictionary = _active[kind]
 			_active.erase(kind)
+			_on_ability_ended(kind, done)
 		_refresh_crew_mods()
 
 
@@ -642,6 +662,7 @@ func _physics_process(delta: float) -> void:
 		wall_impact = 0.0
 		_burn(delta)
 		return
+	_tick_perks(delta)
 	if not crew.is_empty() or not _active.is_empty():
 		_tick_crew(delta)
 	if vuln_left > 0.0:
@@ -727,6 +748,7 @@ func _resolve_collisions(pre_velocity: Vector2) -> void:
 	var already_hit: Array[Object] = []
 	var normal := Vector2.ZERO
 	var impact_max := 0.0
+	var impact_rig := 0.0
 	for i in get_slide_collision_count():
 		var collision := get_slide_collision(i)
 		var other := collision.get_collider()
@@ -751,6 +773,11 @@ func _resolve_collisions(pre_velocity: Vector2) -> void:
 				continue
 			already_hit.append(other)
 			other.call("receive_ram", ram_damage * float(crew_mods.ram) * clampf(impact / max_speed, 0.0, 1.2), global_position)
+			if has_mod("tow_hitch") and other is CharacterBody2D:
+				(other as CharacterBody2D).velocity += pre_velocity.normalized() * impact * (Mods.TOW_HITCH - 1.0)   # shoves 50% further
+				_perk_fired("tow_hitch")
+			if other.has_method("finish_off"):
+				impact_rig = maxf(impact_rig, impact)
 			if has_mod("molten_skin") and other.has_method("add_buildup"):
 				other.call("add_buildup", StatusBars.FIRE, Mods.MOLTEN_SKIN_BUILDUP)   # Molten Skin mod
 			if bool(crew_mods.shake_off):
@@ -764,6 +791,14 @@ func _resolve_collisions(pre_velocity: Vector2) -> void:
 	wall_impact = impact_max if hit_wall and not touching_wall else 0.0
 	if wall_impact > WALL_DAMAGE_SPEED:
 		take_damage((wall_impact - WALL_DAMAGE_SPEED) * 0.05 * float(crew_mods.wall), -normal)
+	# Wrecking Ball (Harpoon mod): held on its tether, a crash over 250 px/s
+	# hurts twice as much (at least 40).
+	if wrecking_by != null and is_instance_valid(wrecking_by) and wrecking_by.get("tether") != null and (wrecking_by.get("tether") as RefCounted).get("b") == self:
+		var crash := maxf(wall_impact, impact_rig)
+		if crash > Mods.WRECKING_BALL_SPEED:
+			var base := maxf(crash - WALL_DAMAGE_SPEED, 0.0) * 0.05
+			take_damage(maxf(base * 2.0, Mods.WRECKING_BALL_MIN) - base, -normal if normal != Vector2.ZERO else Vector2.ZERO)
+			wrecking_by.call("_perk_fired", "wrecking_ball")
 	touching_wall = hit_wall
 	wall_normal = normal
 
@@ -946,7 +981,7 @@ func ammo_left(i: int) -> int:
 func _spend(i: int) -> void:
 	_use_round(i)
 	var heat_time := float(gun_stats[i].get("heat_time", 0.0))
-	if heat_time > 0.0:
+	if heat_time > 0.0 and not _bottomless():
 		# Firing nonstop fills the bar in heat_time seconds, whatever the fire rate.
 		_heat[i] += _cooldowns[i] / heat_time
 		if _heat[i] >= 1.0:
@@ -994,7 +1029,7 @@ func weapon_gauges() -> Array[Dictionary]:
 
 
 func _use_round(i: int) -> void:
-	if int(gun_stats[i].get("mag", 0)) <= 0:
+	if int(gun_stats[i].get("mag", 0)) <= 0 or _bottomless():
 		return
 	_ammo[i] -= 1
 	if _ammo[i] <= 0:
@@ -1059,6 +1094,10 @@ func _lob(w: Dictionary, from: Vector2, landing: Vector2, flight: float) -> bool
 	elif dtype == "acid":
 		lobs += 1
 		extra = {"puddle_r": T.ACID_PUDDLE_RADIUS, "puddle_t": T.ACID_PUDDLE_TIME + float(w.get("puddle_add", 0.0))}   # Sticky Glob mod
+		if has_mod("etch"):
+			extra["etch"] = true
+	elif str(w.get("kind", "")) == "mortar" and has_mod("cluster_shell"):
+		extra = {"cluster": true}
 	return bool(shells.call("launch", from, landing, flight, damage, radius, team, dtype, extra))
 
 
@@ -1102,6 +1141,8 @@ func _fire_harpoon(w: Dictionary, from: Vector2, direction: Vector2) -> void:
 				tether = Tether.new(self, body as CharacterBody2D, float(w.get("cable", 500.0)))
 				tether.reel_speed = float(w.get("reel_speed", T.HARPOON_REEL_SPEED))   # Power Winch mod
 				tether.reel_to = float(w.get("reel_to", T.HARPOON_REEL_TO))
+				if has_mod("wrecking_ball"):
+					body.set("wrecking_by", self)
 			break
 		body.call("take_hit", float(w.get("zombie_damage", w.bullet_damage)) * crew_damage, direction * 250.0, "shot", "")
 		if fx != null:
@@ -1152,6 +1193,8 @@ func _lead_point(target: Node2D, speed := 1500.0) -> Vector2:
 func _shoot(w: Dictionary, muzzle: Vector2, direction: Vector2) -> void:
 	var pellets := int(w.get("pellets", 1))
 	var damage := float(w.bullet_damage) * crew_damage
+	if int(w.mount) == Mount.FIXED and _active.has("about_face"):
+		damage *= 1.25   # About Face: fixed guns +25% for 2 s after a Bootleg Turn
 	# A Hunter clinging to the hull is too close for a bullet to travel:
 	# if the gun is pointing at it, it's a point-blank hit (every pellet).
 	for h in latched:
@@ -1277,6 +1320,8 @@ func goop_shot(reach: float, radius: float) -> int:
 	for rig in near:
 		if rig.global_position.distance_to(at) <= radius + 1.0:
 			rig.call("fill_status", StatusBars.GOOP)
+			if has_mod("bait_shell"):
+				rig.set("bait_shell_left", float(T.STATUS_TIME_RIG[StatusBars.GOOP]))   # Bait Shell
 			n += 1
 	if fx != null:
 		fx.call("blast", at, radius)
@@ -1355,6 +1400,8 @@ func resistance(k: int) -> float:
 func add_buildup(k: int, amount: float) -> void:
 	if is_wrecked:
 		return
+	if k == StatusBars.SLIME and _active.has("hard_line") and has_sp("sp_sure_footing"):
+		amount *= 0.5   # Sure Footing
 	if status.add(k, amount, resistance(k), float(T.STATUS_TIME_RIG[k])):
 		status_started.emit(k)
 		queue_redraw()
@@ -1425,8 +1472,16 @@ func apply_status(mult: float, _slow: float, seconds: float) -> void:
 ## adjacent one at T.SPLASH_ADJACENT, and only reaches HP once every facing
 ## is stripped.
 func take_damage(amount: float, from := Vector2.ZERO, splash := false, dtype := "") -> void:
-	if is_wrecked or amount <= 0.0:
+	if is_wrecked or amount <= 0.0 or _invuln_left > 0.0:
 		return
+	if _active.has("floor_it"):
+		_active.floor_it.hurt = true   # Clean Run needs a clean run
+	if _active.has("brace"):
+		_active.brace.blocked = float(_active.brace.get("blocked", 0.0)) + amount * minf(float(_active.brace.dr), 0.9)   # Absorb
+		if splash and has_sp("sp_shell"):
+			splash = false   # Shell: no splash spill during Brace
+	if not _taken_ring.is_empty():
+		_taken_ring[_ring_i] += amount
 	# A typed hit builds its status (before CORRODED and crew modifiers).
 	var k := StatusBars.kind_of(dtype)
 	if k >= 0:
@@ -1462,6 +1517,12 @@ func take_damage(amount: float, from := Vector2.ZERO, splash := false, dtype := 
 	if not crew.is_empty() and hp > 0.0:
 		_dmg_buckets[_bucket_i] += amount
 		_check_big_hit()
+	if hp <= 0.0 and not _last_breath_used and has_sp("sp_last_breath"):
+		# Last Breath (Field Medic, once per mission): HP floors at 1, 1 s invulnerable.
+		_last_breath_used = true
+		hp = 1.0
+		_invuln_left = 1.0
+		_perk_fired("sp_last_breath")
 	if hp <= 0.0 and cannot_wreck:
 		hp = hp_max * 0.5
 		for i in 4:
@@ -1565,7 +1626,7 @@ func _recharge_shield(delta: float) -> void:
 		return
 	if shield >= shield_max or shield_max <= 0.0:
 		return
-	if _shield_wait > 0.0:
+	if _shield_wait > 0.0 and not _active.has("tune_up") and not _active.has("power_divert"):
 		_shield_wait -= delta
 		return
 	shield = minf(shield + shield_max / maxf(shield_refill, 0.1) * delta, shield_max)
@@ -1822,3 +1883,410 @@ class CableLine extends Node2D:
 			draw_circle(_b, 4.0, Color(0.6, 0.6, 0.62))
 		elif _flash > 0.0:
 			draw_line(_a, _b, Color(0.9, 0.9, 0.85, _flash * 4.0), 3.0)
+
+
+# --- Flag mods and specialty perks (proposal 01, implement-03) ----------------------
+# Numbers: Mods.* (proposal §2.1-2.3, §3.4) and Crew perk text (DESIGN §14 table
+# with proposal §3.1 numbers). Specialty perks change the ability they belong
+# to, so most apply while it runs; the passive ones say so.
+
+var shutdown_left := 0.0           # Marker's Shutdown: no rig abilities while > 0
+var hogtie_left := 0.0             # Wrangler's Hogtie: turn rate halved while > 0
+var zombie_taken := 1.0            # Bait Shell: zombie damage multiplier on this rig
+var bait_shell_left := 0.0
+var wrecking_by: Node2D = null     # the rig whose Wrecking Ball harpoon holds us
+var perk_hits := {}                # perk id -> times it fired (tests)
+var _last_breath_used := false
+var _full_rebuild_used := false
+var _open_road_given := 0.0
+var _invuln_left := 0.0
+var _taken_ring := PackedFloat32Array()   # damage taken, 0.1 s steps over 3 s (Payback)
+var _ring_t := 0.0
+var _ring_i := 0
+var _napalm_seen := -1
+var _ignite_t := 0.0
+
+
+func has_sp(perk: String) -> bool:
+	for c in crew:
+		if not bool(c.injured) and (c.get("perks", []) as Array).has(perk):
+			return true
+	return false
+
+
+func _perk_fired(id: String) -> void:
+	perk_hits[id] = int(perk_hits.get(id, 0)) + 1
+
+
+func _bottomless() -> bool:
+	return _active.has("overcharge") and has_sp("sp_bottomless")
+
+
+## Rail Line: Piercing Rounds bullets go through one rig.
+func rail_line_ok() -> bool:
+	return _active.has("piercing") and has_sp("sp_rail_line")
+
+
+func _is_enemy_rig(o: Object) -> bool:
+	return o != null and o.has_method("finish_off") and int(o.get("team")) != team and not bool(o.get("is_wrecked"))
+
+
+## A player bullet about to land on `target`: returns the damage it deals.
+func player_pre_hit(target: Object, dmg: float, _dtype: String, passed: int) -> float:
+	var rig := _is_enemy_rig(target)
+	if _active.has("deadeye"):
+		var d: Dictionary = _active.deadeye
+		if has_sp("sp_opening_shot") and not bool(d.get("opened", false)):
+			d.opened = true
+			dmg *= 3.0
+			_perk_fired("sp_opening_shot")
+		if rig and has_sp("sp_called_shot") and float(target.get("vuln_left")) > 0.0:
+			dmg *= 1.5
+			_perk_fired("sp_called_shot")
+		if rig and has_sp("sp_plate_splitter") and float(target.call("_armor_total")) > 0.0:
+			dmg *= 1.3
+			_perk_fired("sp_plate_splitter")
+	if passed > 0 and _active.has("piercing") and has_sp("sp_overpenetration"):
+		dmg *= 1.0 + 0.1 * passed
+		_perk_fired("sp_overpenetration")
+	if rig and has_sp("sp_fire_discipline") and bool(target.call("is_status", StatusBars.FIRE)):
+		dmg *= 1.0 + Crew.FIRE_DISCIPLINE
+		_perk_fired("sp_fire_discipline")
+	return dmg
+
+
+## After a player bullet landed on `target` for `dmg`.
+func player_post_hit(target: Object, dmg: float, dtype: String, went_through: bool) -> void:
+	if went_through and _active.has("piercing") and has_sp("sp_acid_core") and target.has_method("add_buildup"):
+		target.call("add_buildup", StatusBars.ACID, dmg * T.STATUS_HIT_BUILDUP)
+		_perk_fired("sp_acid_core")
+	if _active.has("overcharge") and has_sp("sp_siphon") and shield_max > 0.0:
+		var o: Dictionary = _active.overcharge
+		var add := minf(0.1 * dmg, 40.0 - float(o.get("siphoned", 0.0)))
+		if add > 0.0:
+			o.siphoned = float(o.get("siphoned", 0.0)) + add
+			shield = minf(shield + add, shield_max)
+			_perk_fired("sp_siphon")
+	if not _is_enemy_rig(target):
+		return
+	var v = target
+	var f: int = v.last_facing
+	var stripped: bool = f >= 0 and float(v.facing_armor[f]) <= 0.0
+	if _active.has("deadeye") and has_sp("sp_executioner") and stripped and v.hp < v.hp_max * 0.1:
+		v.finish_off()
+		_perk_fired("sp_executioner")
+		return
+	if _active.has("piercing") and has_sp("sp_bleed_through") and not stripped and f >= 0:
+		v.bleed_hp(dmg * 0.2)
+		_perk_fired("sp_bleed_through")
+	if has_sp("sp_weak_point") and v.vuln_left > 0.0 and stripped:
+		v.bleed_hp(dmg * 0.5)
+		_perk_fired("sp_weak_point")
+	if dtype == "fire" and has_mod("napalm_mix") and v.status.active(StatusBars.FIRE) and v._napalm_seen != v.status.triggers:
+		v._napalm_seen = v.status.triggers   # once per BURNING
+		v.status.left[StatusBars.FIRE] += Mods.NAPALM_BURN_ADD
+		_perk_fired("napalm_mix")
+	if dtype == "shock" and has_mod("thunderhead") and v.status.active(StatusBars.SHOCK):
+		for i in gun_stats.size():
+			if str(gun_stats[i].get("id", "")) == "arc_projector" and i < _heat.size() and not _overheated[i]:
+				_heat[i] *= 1.0 - Mods.THUNDERHEAD_VENT
+		_perk_fired("thunderhead")
+
+
+## Straight to HP (Bleed-Through, Weak Point): armor doesn't stop it.
+func bleed_hp(amount: float) -> void:
+	if is_wrecked or amount <= 0.0:
+		return
+	hp -= amount
+	damaged.emit(amount)
+	if hp <= 0.0:
+		hp = 0.0
+		_wreck()
+
+
+func finish_off() -> void:
+	if not is_wrecked:
+		hp = 0.0
+		_wreck()
+
+
+## Two-charge perks (Double Back, Second Kit, Two Hooks): the first use only
+## costs a short pause; the second starts the full cooldown.
+static func _charges_perk(kind: String) -> String:
+	match kind:
+		"bootleg":
+			return "sp_double_back"
+		"field_dressing":
+			return "sp_second_kit"
+		"chain_drag":
+			return "sp_two_hooks"
+	return ""
+
+
+func _member_has(c: Dictionary, perk: String) -> bool:
+	return not bool(c.injured) and (c.get("perks", []) as Array).has(perk)
+
+
+## Perks that hang off an ability as it's used.
+func _on_ability_used(c: Dictionary, kind: String, a: Dictionary) -> void:
+	match kind:
+		"field_repair":
+			if _member_has(c, "sp_kickstart"):
+				_shield_wait = 0.0
+				_perk_fired("sp_kickstart")
+			if _member_has(c, "sp_hull_patch"):
+				hp = minf(hp + hp_max * 0.05, hp_max)
+				_perk_fired("sp_hull_patch")
+			if _member_has(c, "sp_full_rebuild") and not _full_rebuild_used:
+				for i in 4:
+					if facing_max[i] > 0.0 and facing_armor[i] <= 0.0:
+						facing_armor[i] = facing_max[i]
+						_full_rebuild_used = true
+						_perk_fired("sp_full_rebuild")
+						break
+		"bootleg":
+			if _member_has(c, "sp_shake_off"):
+				throw_off_hunters()
+			if _member_has(c, "sp_about_face"):
+				_active["about_face"] = {"left": 2.0}
+				_perk_fired("sp_about_face")
+			if _member_has(c, "sp_oil_spin") and hazards != null:
+				hazards.call("add_oil", global_position, 120.0, 8.0, team)
+				_perk_fired("sp_oil_spin")
+		"shockwave":
+			if _member_has(c, "sp_aftershock"):
+				_active["aftershock"] = {"left": 1.0, "damage": float(a.damage) * 0.5, "radius": float(a.radius), "shock": _member_has(c, "sp_live_wire")}
+		"static_burst":
+			if _member_has(c, "sp_blind_spot"):
+				for rig in _rigs_near(float(a.radius)):
+					if bool(rig.call("is_status", StatusBars.SHOCK)):
+						rig.call("apply_status", 1.0 + float(Crew.ABILITIES.marker.effect.vuln), 1.0, 3.0)
+						_perk_fired("sp_blind_spot")
+			if _member_has(c, "sp_blackout"):
+				for rig in _rigs_near(float(a.radius)):
+					if rig.has_method("pop_hook"):
+						rig.call("pop_hook")
+						rig.set("wind_left", maxf(float(rig.get("wind_left")), 5.0))
+						_perk_fired("sp_blackout")
+		"chain_drag":
+			if _member_has(c, "sp_hogtie") and tether != null and is_instance_valid(tether.b):
+				tether.b.set("hogtie_left", float(a.time))
+				_perk_fired("sp_hogtie")
+		"tune_up":
+			if _member_has(c, "sp_crew_tune"):
+				for other in crew:
+					if other != c:
+						other.ready_in = float(other.ready_in) * 0.5
+				_perk_fired("sp_crew_tune")
+		"power_divert":
+			var bonus := minf(maxf(power_capacity() - power_load(), 0.0), T.POWER_DIVERT_CAP)
+			_active.power_divert.bonus = bonus
+			_active.power_divert.spill = _member_has(c, "sp_spillover")
+			shield_max += bonus
+			shield += bonus
+		"scrap_drones":
+			_spawn_drones(c, a)
+
+
+## Perks that act when an ability ends.
+func _on_ability_ended(kind: String, a: Dictionary) -> void:
+	match kind:
+		"aftershock":
+			_shockwave(float(a.damage), float(a.radius), bool(a.shock))
+			_perk_fired("sp_aftershock")
+		"floor_it":
+			if not bool(a.get("hurt", false)):
+				for c in crew:
+					if str(c.ability.kind) == "floor_it" and _member_has(c, "sp_clean_run"):
+						c.ready_in = float(c.ready_in) * 0.5
+						_perk_fired("sp_clean_run")
+		"brace":
+			var blocked := float(a.get("blocked", 0.0))
+			if blocked > 0.0 and has_sp("sp_absorb"):
+				shock_pulse(150.0, blocked * 0.5, blocked * 0.5 * T.STATUS_HIT_BUILDUP)
+				_perk_fired("sp_absorb")
+		"power_divert":
+			var bonus := float(a.get("bonus", 0.0))
+			var leftover := clampf(shield - (shield_max - bonus), 0.0, bonus)
+			shield_max = maxf(shield_max - bonus, 0.0)
+			shield = minf(shield, shield_max)
+			if bool(a.get("spill", false)) and leftover > 0.0:
+				repair_armor(minf(leftover * 0.5, 30.0))
+				_perk_fired("sp_spillover")
+		"miasma":
+			if has_sp("sp_lingering_cloud"):
+				_active["miasma_linger"] = {"left": 4.0, "at": global_position, "radius": float(a.radius), "buildup": float(a.buildup), "caustic": has_sp("sp_caustic_gas")}
+				_perk_fired("sp_lingering_cloud")
+
+
+## Per-tick perk and mod upkeep (Open Road, Payback ring, Miasma, timers).
+func _tick_perks(delta: float) -> void:
+	if shutdown_left > 0.0:
+		shutdown_left -= delta
+	if _invuln_left > 0.0:
+		_invuln_left -= delta
+	if hogtie_left > 0.0:
+		hogtie_left -= delta
+		crew_turn = float(crew_mods.turn) * 0.5
+		if hogtie_left <= 0.0:
+			crew_turn = float(crew_mods.turn)
+	if bait_shell_left > 0.0:
+		bait_shell_left -= delta
+		zombie_taken = 1.0 + Mods.BAIT_SHELL_ZOMBIE if status.active(StatusBars.GOOP) else 1.0
+		if bait_shell_left <= 0.0:
+			zombie_taken = 1.0
+	if crew.is_empty():
+		return
+	if _taken_ring.is_empty():
+		_taken_ring.resize(30)
+	_ring_t += delta
+	while _ring_t >= 0.1:
+		_ring_t -= 0.1
+		_ring_i = (_ring_i + 1) % 30
+		_taken_ring[_ring_i] = 0.0
+	# Open Road (Speedster, passive): above 80% top speed, 1% max armor/s to the
+	# most damaged facing, at most 20% per mission.
+	if has_sp("sp_open_road") and velocity.length() > max_speed * 0.8:
+		var cap := _armor_max_total() * 0.2
+		var give := minf(_armor_max_total() * 0.01 * delta, cap - _open_road_given)
+		if give > 0.0:
+			_open_road_given += repair_armor(give)
+	for key: String in ["miasma", "miasma_linger"]:
+		if _active.has(key):
+			var m: Dictionary = _active[key]
+			var at: Vector2 = m.get("at", global_position)
+			for rig in _rigs_near(9999.0):
+				if rig.global_position.distance_to(at) <= float(m.radius):
+					rig.call("add_buildup", StatusBars.TOXIC, float(m.buildup) * delta)
+					if bool(m.get("caustic", false)):
+						rig.call("add_buildup", StatusBars.ACID, float(m.buildup) * delta)
+			if zombies_ref != null:
+				for z in zombies_ref.call("active_zombies"):
+					if (z as Node2D).global_position.distance_to(at) <= float(m.radius):
+						z.call("add_buildup", StatusBars.TOXIC, float(m.buildup) * delta)
+	if has_mod("napalm_mix") and fire_trigger and hazards != null:
+		_ignite_t -= delta
+		if _ignite_t <= 0.0:
+			_ignite_t = 0.25
+			for w in gun_stats:
+				if str(w.get("id", "")) == "flame_sprayer":
+					var fwd := Vector2.RIGHT.rotated(rotation)
+					hazards.call("ignite_oil", global_position + fwd * 150.0, 150.0)   # Napalm Mix: lights oil out to 300 px
+
+
+var zombies_ref: Node = null       # ZombieDirector (Miasma reaches zombies)
+
+
+## Payback (Breaker): damage taken in the last 3 s.
+func recent_taken() -> float:
+	var t := 0.0
+	for v in _taken_ring:
+		t += v
+	return t
+
+
+# --- Scrap Drones (Tinkerer) ---------------------------------------------------------
+
+var drones: Array[Node2D] = []
+
+
+func _spawn_drones(c: Dictionary, a: Dictionary) -> void:
+	for d in drones:
+		if is_instance_valid(d):
+			d.queue_free()
+	drones.clear()
+	var n := int(a.drones) + (1 if _member_has(c, "sp_third_wheel") else 0)
+	for k in n:
+		var d := Drone.new()
+		d.owner_rig = self
+		d.phase = TAU * k / n
+		d.life = float(a.time)
+		d.hp = float(a.drone_hp)
+		d.damage = float(a.drone_damage)
+		d.rate = float(a.drone_rate)
+		d.kamikaze = _member_has(c, "sp_kamikaze")
+		get_parent().add_child(d)
+		d.global_position = global_position
+		drones.append(d)
+
+
+class Drone extends Node2D:
+	const T := preload("res://scripts/tuning.gd")
+	const BulletPool := preload("res://scripts/bullet_pool.gd")
+	var owner_rig: Node2D
+	var phase := 0.0
+	var life := 10.0
+	var hp := 20.0
+	var damage := 4.0
+	var rate := 3.0
+	var kamikaze := false
+	var shots := 0
+	var _cd := 0.0
+
+	func _physics_process(delta: float) -> void:
+		if owner_rig == null or not is_instance_valid(owner_rig) or bool(owner_rig.get("is_wrecked")):
+			queue_free()
+			return
+		life -= delta
+		phase += delta * 2.0
+		global_position = owner_rig.global_position + Vector2.RIGHT.rotated(phase) * T.DRONE_ORBIT
+		if life <= 0.0 or hp <= 0.0:
+			if kamikaze and life <= 0.0:
+				# Kamikaze: dives into the nearest enemy and blows (25 dmg, 60 px).
+				var near: Array = owner_rig.call("_rigs_near", T.DRONE_RANGE)
+				var at := (near[0] as Node2D).global_position if not near.is_empty() else global_position
+				owner_rig.call("_area_hit", at, 60.0, 25.0, "")
+				owner_rig.call("_perk_fired", "sp_kamikaze")
+			queue_free()
+			return
+		_cd -= delta
+		if _cd > 0.0:
+			return
+		var target := _target()
+		if target != null:
+			_cd = 1.0 / rate
+			var dir := (target.global_position - global_position).normalized()
+			var pool: Node = owner_rig.get("bullets")
+			if pool != null:
+				pool.call("fire", global_position, dir * 1000.0, damage, int(owner_rig.get("team")))
+				shots += 1
+
+	func _target() -> Node2D:
+		var near: Array = owner_rig.call("_rigs_near", T.DRONE_RANGE)
+		if not near.is_empty():
+			return near[0]
+		var zd: Node = owner_rig.get("zombies_ref")
+		if zd == null:
+			return null
+		var best: Node2D = null
+		var bd := T.DRONE_RANGE
+		for z in zd.call("active_zombies"):
+			var d := (z as Node2D).global_position.distance_to(global_position)
+			if d < bd:
+				bd = d
+				best = z
+		return best
+
+	func _draw() -> void:
+		draw_circle(Vector2.ZERO, 6.0, Color(0.55, 0.6, 0.62))
+		draw_circle(Vector2.ZERO, 2.5, T.COL_CYAN)
+
+
+## Damage everything hostile within `radius` of `at` (Kamikaze, Powder Keg).
+func _area_hit(at: Vector2, radius: float, damage: float, dtype: String) -> int:
+	var q := PhysicsShapeQueryParameters2D.new()
+	var circle := CircleShape2D.new()
+	circle.radius = radius
+	q.shape = circle
+	q.transform = Transform2D(0.0, at)
+	q.collision_mask = T.LAYER_ZOMBIE | (T.LAYER_ENEMY if team == BulletPool.TEAM_PLAYER else T.LAYER_VEHICLE)
+	var n := 0
+	for hit: Dictionary in get_world_2d().direct_space_state.intersect_shape(q, 48):
+		var body := hit.collider as Node2D
+		if body == null or body == self or not body.has_method("take_hit"):
+			continue
+		body.call("take_hit", damage, (body.global_position - at).normalized() * 300.0, "blast", dtype)
+		n += 1
+	if fx != null:
+		fx.call("blast", at, radius)
+	return n

@@ -214,7 +214,7 @@ func step(delta: float, desired: Vector2, target: Node2D) -> void:
 			if kind == "boomer":
 				burst = true
 				return
-			target.call("take_damage", float(_stats.dps) * delta, position - target.position)
+			target.call("take_damage", float(_stats.dps) * delta * _taken_by(target), position - target.position)
 			if kind == "brute" or kind == "tank":
 				var push := (target.position - position).normalized() * T.BRUTE_SHOVE * delta
 				target.set("velocity", (target.get("velocity") as Vector2) + push)
@@ -262,7 +262,7 @@ func _charge_contact(target: Node2D, touching: bool, wall_normal: Vector2) -> vo
 	var hit := target != null and (touching or position.distance_to(target.position) < radius + 40.0)
 	if hit:
 		charge_hits += 1
-		target.call("take_damage", T.TANK_CHARGE_DAMAGE, position - target.position)
+		target.call("take_damage", T.TANK_CHARGE_DAMAGE * _taken_by(target), position - target.position)
 		target.set("velocity", (target.get("velocity") as Vector2) + charge_dir * T.TANK_SHOVE)
 		target.rotation += randf_range(0.2, 0.4) * (1.0 if randf() < 0.5 else -1.0)
 		charge = Charge.WALK
@@ -334,3 +334,9 @@ func _draw_body(s: float, color: Color, dark: Color) -> void:
 	draw_rect(Rect2(Vector2(-3.0, -6.0) * s, Vector2(11.0, 12.0) * s), skin)    # head
 	draw_rect(Rect2(Vector2(4.0, -3.0) * s, Vector2(3.0, 2.0) * s), Color(0.12, 0.08, 0.06))
 	draw_rect(Rect2(Vector2(4.0, 1.0) * s, Vector2(3.0, 2.0) * s), Color(0.12, 0.08, 0.06))
+
+
+## Bait Shell (Goop Launcher mod): a GOOPED rig takes extra from zombies.
+func _taken_by(target: Node) -> float:
+	var t = target.get("zombie_taken")
+	return float(t) if t != null else 1.0

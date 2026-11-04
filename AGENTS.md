@@ -73,6 +73,7 @@ godot --headless --fixed-fps 60 --path . -s res://tests/status_test.gd     # mus
 godot --headless --fixed-fps 60 --path . -s res://tests/patcher_test.gd    # must end "PATCHER TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/content_test.gd    # must end "CONTENT TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/mods_test.gd       # must end "MODS TEST PASSED"
+godot --headless --fixed-fps 60 --path . -s res://tests/perks_test.gd      # must end "PERKS TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/weapons_test.gd    # must end "WEAPONS TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/rehire_test.gd     # must end "REHIRE TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/menu_test.gd       # must end "MENU TEST PASSED"

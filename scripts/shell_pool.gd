@@ -7,10 +7,13 @@ extends Node2D
 
 const T := preload("res://scripts/tuning.gd")
 const BulletPool := preload("res://scripts/bullet_pool.gd")
+const Mods := preload("res://scripts/mods.gd")
 
 var fx: Node2D
 var hazards: Node2D                 # GroundHazards: acid puddles
 var blasts := 0                     # tests
+var cluster_bomblets := 0           # tests
+var etched := 0                     # Etch hits (tests)
 var last_blast := Vector2.INF       # tests
 var aim_at := Vector2.INF           # the player's landing circle (INF = hidden)
 var aim_radius := 90.0
@@ -87,27 +90,47 @@ func _physics_process(delta: float) -> void:
 
 
 func _burst(i: int) -> void:
-	var at := _to[i]
-	var r := _radius[i]
+	if bool(_extra[i].get("cluster", false)):
+		# Cluster Shell mod: 3 bomblets 70 px apart, 45 px blast, 40% damage each.
+		var dir := (_to[i] - _from[i]).normalized()
+		if dir == Vector2.ZERO:
+			dir = Vector2.RIGHT
+		var side := dir.orthogonal()
+		var spots := [_to[i] + dir * Mods.CLUSTER_SPACING * 0.577,
+			_to[i] - dir * Mods.CLUSTER_SPACING * 0.289 + side * Mods.CLUSTER_SPACING * 0.5,
+			_to[i] - dir * Mods.CLUSTER_SPACING * 0.289 - side * Mods.CLUSTER_SPACING * 0.5]
+		for at: Vector2 in spots:
+			_blast(at, Mods.CLUSTER_BLAST, _dmg[i] * Mods.CLUSTER_DAMAGE, _team[i], _dtype[i], {})
+		cluster_bomblets += Mods.CLUSTER_COUNT
+		return
+	_blast(_to[i], _radius[i], _dmg[i], _team[i], _dtype[i], _extra[i])
+
+
+func _blast(at: Vector2, r: float, damage: float, team: int, dtype: String, extra: Dictionary) -> void:
 	blasts += 1
 	last_blast = at
 	if fx != null:
 		fx.call("blast", at, r)
 	_shape.radius = r
 	_query.transform = Transform2D(0.0, at)
-	_query.collision_mask = T.LAYER_ZOMBIE | (T.LAYER_ENEMY if _team[i] == BulletPool.TEAM_PLAYER else T.LAYER_VEHICLE)
+	_query.collision_mask = T.LAYER_ZOMBIE | (T.LAYER_ENEMY if team == BulletPool.TEAM_PLAYER else T.LAYER_VEHICLE)
 	for hit: Dictionary in get_world_2d().direct_space_state.intersect_shape(_query, 48):
 		var body := hit.collider as Node2D
 		if body == null or not body.has_method("take_hit"):
 			continue
 		var away := body.global_position - at
 		var falloff := lerpf(1.0, T.MORTAR_EDGE_DAMAGE, clampf(away.length() / r, 0.0, 1.0))
-		body.call("take_hit", _dmg[i] * falloff, away.normalized() * 300.0, "blast", _dtype[i])
-		var extra := _extra[i]
+		var dmg := damage * falloff
+		# Etch mod (Acid Lobber): CORRODED rigs take +20% while they have armor.
+		if bool(extra.get("etch", false)) and body.has_method("is_status") and bool(body.call("is_status", 2)) \
+				and float(body.call("_armor_total")) > 0.0:
+			dmg *= 1.0 + Mods.ETCH_ARMOR
+			etched += 1
+		body.call("take_hit", dmg, away.normalized() * 300.0, "blast", dtype)
 		if extra.has("buildup_kind") and body.has_method("add_buildup"):
 			body.call("add_buildup", int(extra.buildup_kind), float(extra.buildup))
-	if _extra[i].has("puddle_r") and hazards != null:
-		hazards.call("add_acid", at, float(_extra[i].puddle_r), float(_extra[i].puddle_t), _team[i])
+	if extra.has("puddle_r") and hazards != null:
+		hazards.call("add_acid", at, float(extra.puddle_r), float(extra.puddle_t), team)
 
 
 func _remove(i: int) -> void:

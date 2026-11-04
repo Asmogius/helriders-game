@@ -84,10 +84,10 @@ const PASSIVES := {
 const SPECIALTIES := {
 	"driver": ["wheelman", "speedster", "bootlegger"],
 	"gunner": ["gunslinger", "marksman", "breacher", "demolisher"],
-	"mechanic": ["patcher", "welder"],
+	"mechanic": ["patcher", "gearhead"],
 	"spotter": ["marker", "scout", "jammer"],
-	"engineer": ["overclocker", "tinkerer"],
-	"medic": ["field_medic", "combat_medic"],
+	"engineer": ["conduit", "tinkerer"],
+	"medic": ["field_medic", "poisoner"],
 	"scavenger": ["magpie", "salvager"],
 	"bruiser": ["bracer", "breaker", "wrangler"],
 }
@@ -106,18 +106,27 @@ const ABILITIES := {
 		"effect": {"pierce": 3.0}},
 	"patcher": {"name": "Patcher", "ability": "Field Repair", "kind": "field_repair", "time": 0.0, "cooldown": 28.0,
 		"effect": {"heal": 30.0}, "fixed": {"epic_dr": 0.3, "epic_time": 3.0}},
-	"welder": {"name": "Welder", "ability": "Weld Plates", "kind": "weld", "time": 4.0, "cooldown": 25.0,
+	"welder_old": {"name": "Welder", "ability": "Weld Plates", "kind": "weld", "time": 4.0, "cooldown": 25.0,
 		"effect": {"dr": 0.5}},
 	"marker": {"name": "Marker", "ability": "Mark", "kind": "mark", "time": 6.0, "cooldown": 20.0,
 		"effect": {"vuln": 0.3}},
 	"scout": {"name": "Scout", "ability": "Flare", "kind": "flare", "time": 5.0, "cooldown": 24.0,
 		"effect": {"slow": 0.4, "vuln": 0.2}, "fixed": {"radius": 600.0}},
-	"overclocker": {"name": "Overclocker", "ability": "Overclock", "kind": "overclock", "time": 4.0, "cooldown": 25.0,
+	"overclocker_old": {"name": "Overclocker", "ability": "Overclock", "kind": "overclock", "time": 4.0, "cooldown": 25.0,
 		"effect": {"speed": 0.2, "accel": 0.2}},
-	"tinkerer": {"name": "Tinkerer", "ability": "Reroute", "kind": "reroute", "time": 0.0, "cooldown": 30.0,
+	# DESIGN §14 specialty changes (ability numbers agreed; proposal 01 §0).
+	"gearhead": {"name": "Gearhead", "ability": "Tune-Up", "kind": "tune_up", "time": 6.0, "cooldown": 22.0,
+		"effect": {"speed": 0.15, "fire": 0.15}},
+	"conduit": {"name": "Conduit", "ability": "Power Divert", "kind": "power_divert", "time": 6.0, "cooldown": 24.0},
+	"poisoner": {"name": "Poisoner", "ability": "Miasma", "kind": "miasma", "time": 6.0, "cooldown": 22.0,
+		"fixed": {"radius": 250.0, "buildup": 25.0}},
+	"tinkerer": {"name": "Tinkerer", "ability": "Scrap Drones", "kind": "scrap_drones", "time": 10.0, "cooldown": 26.0,
+		"fixed": {"drones": 2, "drone_hp": 20.0, "drone_damage": 4.0, "drone_rate": 3.0}},
+	# Retired by the §14 rework (old saves map onto the new ones; see RENAMED).
+	"tinkerer_reroute": {"name": "Tinkerer", "ability": "Reroute", "kind": "reroute", "time": 0.0, "cooldown": 30.0,
 		"effect": {"cut": 0.5}},
 	"field_medic": {"name": "Field Medic", "ability": "Field Dressing", "kind": "field_dressing", "time": 0.0, "cooldown": 40.0},
-	"combat_medic": {"name": "Combat Medic", "ability": "Stim", "kind": "stim", "time": 6.0, "cooldown": 30.0,
+	"combat_medic_old": {"name": "Combat Medic", "ability": "Stim", "kind": "stim", "time": 6.0, "cooldown": 30.0,
 		"effect": {"passive": 0.5}},
 	"magpie": {"name": "Magpie", "ability": "Magnet", "kind": "magnet", "time": 0.0, "cooldown": 20.0,
 		"fixed": {"radius": 900.0}},
@@ -199,8 +208,7 @@ const PERKS := {
 # Major, 5-6 Signature; each pick offers 3 from that tier's 2 specialty perks
 # plus the 4 shared perks, no repeats. Rarity's level cap decides how many
 # picks a member ever gets (Common Minor 3 only ... Mythic all six).
-# Specialties whose §14 rework isn't built yet (welder, overclocker, tinkerer,
-# combat_medic) keep their class perks.
+# Every specialty is tiered now; the class perks stay valid for old saves.
 const PERK_TIER_OF_PICK := ["minor", "minor", "major", "major", "signature", "signature"]
 const SPECIALTY_PERKS := {
 	"wheelman": {"minor": ["sp_long_line", "sp_sure_footing"], "major": ["sp_clean_exit", "sp_threading"], "signature": ["sp_immovable_line", "sp_racing_line"]},
@@ -219,6 +227,10 @@ const SPECIALTY_PERKS := {
 	"breaker": {"minor": ["sp_wider_blast", "sp_quick_reset"], "major": ["sp_live_wire", "sp_clear_out"], "signature": ["sp_aftershock", "sp_payback"]},
 	"demolisher": {"minor": ["sp_long_fuse", "sp_quick_strike"], "major": ["sp_chain_reaction", "sp_shrapnel"], "signature": ["sp_powder_keg", "sp_fire_discipline"]},
 	"jammer": {"minor": ["sp_wide_band", "sp_quick_tune"], "major": ["sp_lingering_static", "sp_blind_spot"], "signature": ["sp_blackout", "sp_feedback_loop"]},
+	"gearhead": {"minor": ["sp_fine_tuning", "sp_spare_time"], "major": ["sp_tight_servos", "sp_clean_lines"], "signature": ["sp_crew_tune", "sp_afterglow"]},
+	"conduit": {"minor": ["sp_clean_routing", "sp_capacitor"], "major": ["sp_insulated_feed", "sp_spillover"], "signature": ["sp_arc_feedback", "sp_grid_priority"]},
+	"tinkerer": {"minor": ["sp_longer_leash", "sp_spare_rotors"], "major": ["sp_third_wheel", "sp_bait_drones"], "signature": ["sp_kamikaze", "sp_copycat"]},
+	"poisoner": {"minor": ["sp_thick_fumes", "sp_quick_vent"], "major": ["sp_lingering_cloud", "sp_caustic_gas"], "signature": ["sp_contagion", "sp_neurotoxin"]},
 	"wrangler": {"minor": ["sp_long_chain", "sp_quick_throw"], "major": ["sp_hogtie", "sp_slingshot"], "signature": ["sp_bulldog", "sp_two_hooks"]},
 }
 # Numeric effects on the ability (applied in ability()): time_add (s),
@@ -242,6 +254,12 @@ const SPECIALTY_PERK_FX := {
 	"sp_long_fuse": {"time_add": 1.0}, "sp_quick_strike": {"cd_mult": 0.85},
 	"sp_wide_band": {"add": {"radius": 75.0}}, "sp_quick_tune": {"cd_mult": 0.85}, "sp_lingering_static": {"add": {"jam_add": 2.0}},
 	"sp_long_chain": {"add": {"latch_range": 80.0}}, "sp_quick_throw": {"cd_mult": 0.85},
+	"sp_fine_tuning": {"time_add": 1.0}, "sp_spare_time": {"cd_mult": 0.85}, "sp_tight_servos": {"add": {"servos": 1.0}},
+	"sp_clean_routing": {"time_add": 1.0}, "sp_capacitor": {"cd_mult": 0.85}, "sp_grid_priority": {"add": {"grid": 1.0}},
+	"sp_longer_leash": {"time_add": 2.0}, "sp_spare_rotors": {"cd_mult": 0.85},
+	"sp_thick_fumes": {"time_add": 2.0}, "sp_quick_vent": {"cd_mult": 0.85}, "sp_caustic_gas": {"add": {"caustic": 1.0}},
+	"sp_full_auto": {"add": {"full_auto": 1.0}}, "sp_threading": {"add": {"threading": 1.0}},
+	"sp_live_wire": {}, "sp_clean_bandage": {},
 }
 const SPECIALTY_PERK_NAMES := {
 	"sp_long_line": ["Long Line", "Hard Line +20% duration"], "sp_sure_footing": ["Sure Footing", "SLICK builds 50% slower during Hard Line"],
@@ -294,6 +312,18 @@ const SPECIALTY_PERK_NAMES := {
 	"sp_blackout": ["Blackout", "Patcher hooks pop and can't re-hook 5 s"], "sp_feedback_loop": ["Feedback Loop", "OVERLOADed enemy weapons overheat instantly"],
 	"sp_long_chain": ["Long Chain", "Chain Drag +80 px"], "sp_quick_throw": ["Quick Throw", "Chain Drag cooldown -15%"],
 	"sp_hogtie": ["Hogtie", "Dragged rig's turn rate -50%"], "sp_slingshot": ["Slingshot", "Releasing at speed flings it; RAM damage on wall impact"],
+	"sp_fine_tuning": ["Fine Tuning", "Tune-Up +1 s"], "sp_spare_time": ["Spare Time", "Tune-Up cooldown -15%"],
+	"sp_tight_servos": ["Tight Servos", "Turrets +25% turn, LOCK +10% during Tune-Up"], "sp_clean_lines": ["Clean Lines", "Status buildup drains 2x during Tune-Up"],
+	"sp_crew_tune": ["Crew Tune", "Tune-Up halves other crew cooldowns"], "sp_afterglow": ["Afterglow", "Boosts fade linearly over 4 s"],
+	"sp_clean_routing": ["Clean Routing", "Power Divert +1 s"], "sp_capacitor": ["Capacitor", "Power Divert cooldown -15%"],
+	"sp_insulated_feed": ["Insulated Feed", "Shield status bonus doubled"], "sp_spillover": ["Spillover", "Half the leftover bonus shield goes to armor, cap 30"],
+	"sp_arc_feedback": ["Arc Feedback", "Shield hits put 30 shock on the shooter (0.5 s per attacker)"], "sp_grid_priority": ["Grid Priority", "Utility cooldowns 2x during Power Divert"],
+	"sp_longer_leash": ["Longer Leash", "Scrap Drones +2 s"], "sp_spare_rotors": ["Spare Rotors", "Scrap Drones cooldown -15%"],
+	"sp_third_wheel": ["Third Wheel", "3 drones"], "sp_bait_drones": ["Bait Drones", "Zombies prefer drones"],
+	"sp_kamikaze": ["Kamikaze", "Expiring drones dive and explode: 25 dmg, 60 px each"], "sp_copycat": ["Copycat", "Drones use your weapon's damage type and keywords"],
+	"sp_thick_fumes": ["Thick Fumes", "Miasma +2 s"], "sp_quick_vent": ["Quick Vent", "Miasma cooldown -15%"],
+	"sp_lingering_cloud": ["Lingering Cloud", "The cloud stays 4 s after Miasma"], "sp_caustic_gas": ["Caustic Gas", "Also builds CORRODED"],
+	"sp_contagion": ["Contagion", "TOXIC zombies burst: 120 px, 40 toxic buildup"], "sp_neurotoxin": ["Neurotoxin", "TOXIC rigs -25% speed, half turret turn"],
 	"sp_bulldog": ["Bulldog", "Drag reels to 120 px, then a free RAM"], "sp_two_hooks": ["Two Hooks", "2 charges"],
 }
 # Specialty perks with a number behind them (proposal §3.1) that the game reads.
@@ -371,9 +401,14 @@ static func color_of(member: Dictionary) -> Color:
 	return Parts.RARITY_COLORS.get(rarity, Color.WHITE)
 
 
+# §14 renames: Welder -> Gearhead, Overclocker -> Conduit, Combat Medic -> Poisoner.
+const RENAMED := {"welder": "gearhead", "overclocker": "conduit", "combat_medic": "poisoner"}
+
+
 static func specialty(member: Dictionary) -> String:
 	var options: Array = SPECIALTIES.get(str(member.get("role", "")), [])
 	var s := str(member.get("specialty", ""))
+	s = str(RENAMED.get(s, s))
 	if options.has(s):
 		return s
 	return str(options[0]) if not options.is_empty() else ""
@@ -771,6 +806,8 @@ static func _apply_active(m: Dictionary, active: Dictionary) -> void:
 		var a: Dictionary = active[kind]
 		match kind:
 			"hard_line":
+				if float(a.get("threading", 0.0)) > 0.0:
+					m.plow = true   # Threading: shamblers don't slow you
 				m.turn *= 1.0 + float(a.turn)
 				m.grip += float(a.grip)
 				m.speed *= 1.0 + float(a.speed)
@@ -781,6 +818,18 @@ static func _apply_active(m: Dictionary, active: Dictionary) -> void:
 			"overcharge":
 				m.fire *= 1.0 + float(a.fire)
 				m.damage *= 1.0 + float(a.damage)
+				if float(a.get("full_auto", 0.0)) > 0.0:   # Full Auto perk
+					m.aim *= 2.0
+					m.spread = 0.0
+			"tune_up":   # Gearhead (§14): +15% speed and fire rate; shield skips its delay (vehicle.gd)
+				m.speed *= 1.0 + float(a.speed)
+				m.fire *= 1.0 + float(a.fire)
+				if float(a.get("servos", 0.0)) > 0.0:   # Tight Servos
+					m.aim *= 1.25
+					m.lock *= 1.1
+			"power_divert":
+				if float(a.get("grid", 0.0)) > 0.0:   # Grid Priority: utilities cool twice as fast
+					m.util_cd *= 0.5
 			"deadeye":
 				m.spread = 0.0
 				m.bullet_speed *= 1.0 + float(a.bullet_speed)

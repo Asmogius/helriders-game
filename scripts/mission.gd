@@ -242,6 +242,8 @@ func _ready() -> void:
 	vehicle.position = arena.player_start
 	vehicle.rotation = -PI / 2.0
 	vehicle.bullets = bullets
+	bullets.player_rig = vehicle      # perk hooks on player hits (implement-03)
+	vehicle.zombies_ref = zombies
 	vehicle.mines = mines
 	vehicle.shells = shells
 	vehicle.hazards = hazards
@@ -600,6 +602,7 @@ func _physics_process(delta: float) -> void:
 
 
 func _process(_delta: float) -> void:
+	_pass_mark()
 	_refresh_hud()
 	hud.right_stick.set_gauges(vehicle.weapon_gauges())
 	bullets.big_game = float(vehicle.crew_mod("big_game"))
@@ -703,17 +706,28 @@ func _on_crew_ability(kind: String, a: Dictionary) -> void:
 			if target != null:
 				target.call("apply_status", 1.0 + float(a.vuln) + weak, 1.0, float(a.time))
 				marked = target
+				_mark_perks(target, float(a.time))
 		"flare":
 			var r2 := float(a.radius) * float(a.radius)
 			for z in zombies.active_zombies():
 				if z.global_position.distance_squared_to(vehicle.global_position) <= r2:
 					z.apply_status(1.0 + float(a.vuln) + weak, 1.0 - minf(float(a.slow), 0.9), float(a.time))
+			if vehicle.has_sp("sp_signal_flare"):
+				# Signal Flare: rigs inside become MARKED (+30%, the Mark's own number).
+				for c: Node2D in lock_candidates():
+					if int(c.get("lock_priority")) >= 2 and c.global_position.distance_squared_to(vehicle.global_position) <= r2:
+						c.call("apply_status", 1.3 + weak, 1.0, float(a.time))
+						signal_flare_marks += 1
 			fx.call("blast", vehicle.global_position, 60.0)
 		"magnet":
 			var r := float(a.radius)
 			for p in pickups.get_children():
 				if (p as Node2D).global_position.distance_to(vehicle.global_position) <= r:
 					_take_salvage(p as Pickup)
+					if vehicle.has_sp("sp_scrap_plating") and _scrap_plating < 30.0:
+						var add := minf(2.0, 30.0 - _scrap_plating)   # Scrap Plating: 2 per pickup, cap 30
+						_scrap_plating += add
+						vehicle.repair_armor(add)
 
 
 func return_to_garage() -> void:
@@ -1669,6 +1683,10 @@ func _drop(at: Vector2, pool: String, guaranteed: bool, cache: int, rig: Node = 
 		_rig_crate[rig] = pickup
 	var unknown := profile.unknown_schematics(Parts.DROP_POOLS[pool], _pending_ids())
 	var chance := minf(profile.schematic_chance() + float(vehicle.crew_mod("schematic")), 0.95)
+	if rig != null:
+		_rig_wreck_perks(at)
+		if vehicle.has_sp("sp_jackpot"):
+			guaranteed = true   # Jackpot: rig wrecks always drop a schematic
 	if not unknown.is_empty() and (guaranteed or always_drop_schematic or randf() < chance):
 		pickup.part = Parts.get_part(unknown.pick_random())
 	else:
@@ -1832,6 +1850,67 @@ func _on_elite_wrecked() -> void:
 
 
 ## Mechanic perk: each enemy rig wreck restores some armor.
+# --- Crew perks that reach past the rig (implement-03) -----------------------------
+
+var signal_flare_marks := 0     # tests
+var _scrap_plating := 0.0
+var _mark_time := 0.0
+
+
+## Exposed / Shutdown on a freshly MARKED rig.
+func _mark_perks(target: Node2D, time: float) -> void:
+	_mark_time = time
+	if int(target.get("lock_priority")) < 2:
+		return
+	if vehicle.has_sp("sp_exposed"):
+		target.set("_shield_wait", time)   # its shield stops recharging
+	if vehicle.has_sp("sp_shutdown"):
+		target.set("shutdown_left", 3.0)
+
+
+## Pass It On: when a MARKED target dies, the Mark jumps to the nearest rig.
+func _pass_mark() -> void:
+	if marked == null or not vehicle.has_sp("sp_pass_it_on"):
+		return
+	var dead := not is_instance_valid(marked) or bool(marked.get("is_wrecked")) or not bool(marked.get("active") if marked.get("active") != null else true)
+	if not dead:
+		return
+	var from := marked.global_position if is_instance_valid(marked) else vehicle.global_position
+	marked = null
+	var best := INF
+	var next: Node2D = null
+	for c: Node2D in lock_candidates():
+		if int(c.get("lock_priority")) >= 2 and not bool(c.get("is_wrecked")):
+			var d := c.global_position.distance_to(from)
+			if d < best:
+				best = d
+				next = c
+	if next != null:
+		next.call("apply_status", 1.3 + float(vehicle.crew_mod("weak_spot")), 1.0, _mark_time)
+		marked = next
+		_mark_perks(next, _mark_time)
+
+
+## Bounty (+10 scrap) and Powder Keg (wrecks during Cook Off burst like a Fire barrel).
+func _rig_wreck_perks(at: Vector2) -> void:
+	if vehicle.has_sp("sp_bounty"):
+		scrap += 10.0
+	if vehicle.has_sp("sp_powder_keg") and vehicle.ability_active("cook_off"):
+		hazards.call("add_fire", at, T.BARREL_RADIUS * 0.7, T.BARREL_FIRE_GROUND_TIME)
+		var r2 := T.BARREL_RADIUS * T.BARREL_RADIUS
+		for z in zombies.active_zombies():
+			if z.global_position.distance_squared_to(at) <= r2:
+				z.call("take_hit", T.BARREL_FIRE_DAMAGE, (z.global_position - at).normalized() * 300.0, "blast", "fire")
+		for c: Node2D in lock_candidates():
+			if int(c.get("lock_priority")) >= 2 and c.global_position.distance_squared_to(at) <= r2:
+				c.call("take_hit", T.BARREL_FIRE_DAMAGE, (c.global_position - at).normalized() * 300.0, "blast", "fire")
+		fx.call("blast", at, T.BARREL_RADIUS)
+		powder_kegs += 1
+
+
+var powder_kegs := 0   # tests
+
+
 func _salvage_plating() -> void:
 	if bool(vehicle.crew_mod("salvage_plating")) and not vehicle.is_wrecked:
 		vehicle.repair_armor(15.0 * float(vehicle.crew_mod("repair")))

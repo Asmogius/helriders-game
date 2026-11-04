@@ -118,8 +118,8 @@ func _check_perks() -> void:
 	var g := Crew.make("gunner", "Rare", dice, "gunslinger")
 	g.perks = ["sp_red_hot"]
 	_check(is_equal_approx(float(Crew.ability(g).red_hot), 0.3), "Red Hot: 30% of each shot as fire")
-	var welder := Crew.make("mechanic", "Rare", dice, "welder")
-	_check(Crew.perk_pool(welder).has("reinforced"), "unreworked specialties keep their class perks")
+	for spec in ["gearhead", "conduit", "tinkerer", "poisoner"]:
+		_check(Crew.SPECIALTY_PERKS.has(spec), "%s has tiered perks" % spec)
 	var old := Crew.make("gunner", "Rare", dice, "marksman")
 	old.perks = ["steady_aim"]
 	_check(Crew.perk_known(old).has("steady_aim"), "perks picked before tiers stay valid in saves")

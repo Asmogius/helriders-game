@@ -498,6 +498,12 @@ const EXPEDITION_NAMES := ["Fuel Depot Sweep", "Overpass Salvage", "Rail Yard Ru
 # never takes it away. Build cost and the wreck penalty ignore levels.
 const RESEARCH_MAX_LEVEL := {"Common": 5, "Uncommon": 8, "Rare": 12, "Epic": 16, "Legendary": 20}
 # Part mods (DESIGN §14): the Research level each tier unlocks at.
+# Implement-03: ability numbers from DESIGN §14 (agreed), perk numbers from
+# proposal 01 §3.1. Gap-fillers are marked.
+const POWER_DIVERT_CAP := 80.0       # +1 shield per unused power point, cap 80
+const DRONE_ORBIT := 70.0            # gap-filler: drones circle this far out
+const DRONE_RANGE := 380.0           # gap-filler: same reach as a 1000 px/s gun
+const SECOND_CHARGE_PAUSE := 0.5     # gap-filler: the second charge needs this long
 const MOD_UNLOCK := {"minor": 3, "major": 7, "signature": 11, "major2": 14, "unique": 18}
 const RESEARCH_GROWTH := 0.04          # each level past 1: +4% to the part's main stats
 # A level costs base x the level you're buying (Common L2 = 30, Rare L12 = 720).

@@ -36,6 +36,11 @@ var _dtype := PackedByteArray()    # damage type: 0 kinetic, else StatusBars kin
 var _chain := PackedByteArray()    # Arc Projector: 1 = jumps to one more target on a hit
 var _rider := PackedFloat32Array() # Cook Off: share of damage added as a fire hit
 var rider_hits := 0                # fire rider hits landed (tests)
+var _passed := PackedByteArray()   # targets a bullet has already gone through
+var _rail := PackedByteArray()     # Rail Line: rigs it may still pierce
+## The player's rig: its mods and crew perks change player hits
+## (player_pre_hit / player_post_hit on vehicle.gd).
+var player_rig: Node2D = null
 var chained := 0                   # chain jumps (tests)
 var typed_hits := 0                # typed (non-kinetic) hits landed (tests)
 var _chain_query := PhysicsShapeQueryParameters2D.new()
@@ -55,6 +60,8 @@ func _ready() -> void:
 	_dtype.resize(MAX_BULLETS)
 	_chain.resize(MAX_BULLETS)
 	_rider.resize(MAX_BULLETS)
+	_passed.resize(MAX_BULLETS)
+	_rail.resize(MAX_BULLETS)
 	var circle := CircleShape2D.new()
 	circle.radius = T.ARC_CHAIN_RANGE
 	_chain_query.shape = circle
@@ -78,6 +85,8 @@ func fire(origin: Vector2, velocity: Vector2, damage: float, team := TEAM_PLAYER
 	_dtype[_count] = StatusBars.kind_of(dtype) + 1
 	_chain[_count] = 1 if chain else 0
 	_rider[_count] = rider
+	_passed[_count] = 0
+	_rail[_count] = 1 if team == TEAM_PLAYER and player_rig != null and is_instance_valid(player_rig) and bool(player_rig.call("rail_line_ok")) else 0
 	_count += 1
 
 
@@ -112,7 +121,13 @@ func _physics_process(delta: float) -> void:
 				if _team[i] == TEAM_PLAYER and priority >= 2:
 					dmg *= big_game  # Hunters and rigs
 				var dtype := type_name(_dtype[i])
+				var by_player := _team[i] == TEAM_PLAYER and player_rig != null and is_instance_valid(player_rig)
+				if by_player:
+					dmg = float(player_rig.call("player_pre_hit", collider, dmg, dtype, int(_passed[i])))
 				collider.call("take_hit", dmg, _vel[i].normalized() * 140.0, "shot", dtype)
+				var goes_on := (_pierce[i] > 0 and priority == 1) or (_rail[i] > 0 and priority >= 2)
+				if by_player and is_instance_valid(collider):
+					player_rig.call("player_post_hit", collider, dmg, dtype, goes_on)
 				if dtype != "":
 					typed_hits += 1
 				if _rider[i] > 0.0 and is_instance_valid(collider):
@@ -122,13 +137,17 @@ func _physics_process(delta: float) -> void:
 					_chain_hit(collider as Node2D, hit.position, dmg * T.ARC_CHAIN_SHARE, _team[i], dtype)
 				if _team[i] == TEAM_PLAYER:
 					hits += 1
-				# Piercing Rounds: carry on through a shambler.
-				if _pierce[i] > 0 and priority == 1:
-					_pierce[i] -= 1
+				# Piercing Rounds: carry on through a shambler (Rail Line: one rig).
+				if goes_on:
+					if priority >= 2:
+						_rail[i] -= 1
+					else:
+						_pierce[i] -= 1
+					_passed[i] = mini(int(_passed[i]) + 1, 255)
 					pierced += 1
 					if fx != null:
 						fx.sparks(hit.position, hit.normal)
-					_pos[i] = hit.position + _vel[i].normalized() * 30.0
+					_pos[i] = hit.position + _vel[i].normalized() * (90.0 if priority >= 2 else 30.0)
 					i += 1
 					continue
 			if fx != null:
@@ -158,6 +177,8 @@ func _remove(i: int) -> void:
 	_dtype[i] = _dtype[_count]
 	_chain[i] = _chain[_count]
 	_rider[i] = _rider[_count]
+	_passed[i] = _passed[_count]
+	_rail[i] = _rail[_count]
 	if _count == 0:
 		queue_redraw()
 

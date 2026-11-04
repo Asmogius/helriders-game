@@ -83,7 +83,7 @@ func _think(delta: float) -> void:
 			if player_down:
 				throttle = 0.3
 			elif _sees_player and dist >= float(T.BULWARK_CHARGE_RANGE[0]) and dist <= float(T.BULWARK_CHARGE_RANGE[1]) \
-					and absf(forward.angle_to(to_player)) <= T.BULWARK_CHARGE_CONE:
+					and absf(forward.angle_to(to_player)) <= T.BULWARK_CHARGE_CONE and shutdown_left <= 0.0:
 				# Lined up: wind up (the telegraph), then charge.
 				mode = Mode.WINDUP
 				_mode_time = T.BULWARK_WINDUP

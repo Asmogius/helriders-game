@@ -54,6 +54,7 @@ func _think(delta: float) -> void:
 		_sees_player and not bool(player.get("is_wrecked"))
 		and dist < T.TORCHER_RANGE
 		and absf(forward.angle_to(to_player)) < 0.35
+		and shutdown_left <= 0.0   # Shutdown (Marker perk): no hose
 	)
 	# The flame lights oil it plays over.
 	if fire_trigger and hazards != null:
