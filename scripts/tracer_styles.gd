@@ -22,7 +22,7 @@ const FX_WHITE_HOT := T.COL_FX_WHITE_HOT      # (255,242,204), also in fx_sheet.
 const NO_CORE := Color(0, 0, 0, 0)
 
 const DEFAULT := {"glow": T.COL_ORANGE, "core": FX_WHITE_HOT, "length": 1.0, "width": 1.0, "dash": 0}
-const DEFAULT_ENEMY := {"glow": T.COL_ENEMY, "core": T.TRACER_ENEMY_CORE, "length": 1.0, "width": 1.0, "dash": 0}
+const DEFAULT_ENEMY := {"glow": T.COL_ENEMY, "core": T.COL_FX_TRACER_ENEMY_CORE, "length": 1.0, "width": 1.0, "dash": 0}
 
 const STYLES := {
 	# Player turrets
@@ -33,15 +33,15 @@ const STYLES := {
 	# Player fixed (nose) guns
 	"hood_guns": {"glow": T.COL_ORANGE, "core": FX_HOT, "length": 0.9, "width": 0.8, "dash": 2},
 	"outrider_twin_guns": {"glow": T.COL_ORANGE, "core": FX_HOT, "length": 0.9, "width": 0.8, "dash": 2},
-	"rivet_gun": {"glow": T.TRACER_RIVET, "core": FX_WHITE_HOT, "length": 0.5, "width": 1.7, "dash": 0},
+	"rivet_gun": {"glow": T.COL_FX_TRACER_RIVET, "core": FX_WHITE_HOT, "length": 0.5, "width": 1.7, "dash": 0},
 	"flame_sprayer": {"glow": T.STATUS_COLORS[1], "core": NO_CORE, "length": 0.6, "width": 2.0, "dash": 0},
 	"arc_projector": {"glow": T.STATUS_COLORS[0], "core": T.COL_CYAN, "length": 1.1, "width": 0.9, "dash": 3},
-	"harpoon": {"glow": T.TRACER_HARPOON_CABLE, "core": T.TRACER_HARPOON_STEEL, "length": 1.0, "width": 1.2, "dash": 0},
+	"harpoon": {"glow": T.COL_FX_TRACER_HARPOON_CABLE, "core": T.COL_FX_TRACER_HARPOON_STEEL, "length": 1.0, "width": 1.2, "dash": 0},
 	# Enemy guns (gun_id in tuning.gd); enemy red family only
 	"gunner_rig": {"glow": T.COL_ENEMY, "core": FX_WHITE_HOT, "length": 0.7, "width": 0.8, "dash": 0},
-	"convoy_nose": {"glow": T.COL_ENEMY, "core": T.TRACER_ENEMY_CORE, "length": 0.9, "width": 0.8, "dash": 2},
+	"convoy_nose": {"glow": T.COL_ENEMY, "core": T.COL_FX_TRACER_ENEMY_CORE, "length": 0.9, "width": 0.8, "dash": 2},
 	"convoy_turret": {"glow": T.COL_ENEMY, "core": FX_HOT, "length": 1.3, "width": 1.3, "dash": 0},
-	"scrapper": {"glow": T.COL_ENEMY, "core": T.TRACER_ENEMY_CORE, "length": 0.6, "width": 0.9, "dash": 0},
+	"scrapper": {"glow": T.COL_ENEMY, "core": T.COL_FX_TRACER_ENEMY_CORE, "length": 0.6, "width": 0.9, "dash": 0},
 }
 
 static var _ids: Array[String] = []

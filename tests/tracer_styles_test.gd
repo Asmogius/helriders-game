@@ -99,8 +99,8 @@ func _run() -> void:
 	for w: Dictionary in v.gun_stats:
 		check((w.get("_tracer", null) as Variant) is Vector2i, "every mounted weapon is cached")
 	# Colours come from tuning.gd (PR #55), not literals.
-	check(TS.style_for("rivet_gun").glow == TS.T.TRACER_RIVET, "rivet glow is T.TRACER_RIVET")
-	check(TS.style_for("harpoon").glow == TS.T.TRACER_HARPOON_CABLE and TS.style_for("harpoon").core == TS.T.TRACER_HARPOON_STEEL, "harpoon colours from tuning")
-	check(TS.DEFAULT_ENEMY.core == TS.T.TRACER_ENEMY_CORE, "enemy core from tuning")
+	check(TS.style_for("rivet_gun").glow == TS.T.COL_FX_TRACER_RIVET, "rivet glow is T.COL_FX_TRACER_RIVET")
+	check(TS.style_for("harpoon").glow == TS.T.COL_FX_TRACER_HARPOON_CABLE and TS.style_for("harpoon").core == TS.T.COL_FX_TRACER_HARPOON_STEEL, "harpoon colours from tuning")
+	check(TS.DEFAULT_ENEMY.core == TS.T.COL_FX_TRACER_ENEMY_CORE, "enemy core from tuning")
 	print("TRACER STYLES TEST ", "PASSED" if fails == 0 else "FAILED (%d)" % fails)
 	quit(1 if fails else 0)
