@@ -58,6 +58,15 @@ func chunk_offset(chunk: String) -> Vector2:
 	return Vector2(float(o[0]), float(o[1]))
 
 
+## Pixel offset of a named model point (e.g. "turret_mount", "pivot") from
+## the sprite centre at frame `at` (default: the current frame).
+func point_offset(point: String, at := -1) -> Vector2:
+	if not meta.has("points") or not meta.points.has(point):
+		return Vector2.ZERO
+	var o: Array = meta.points[point][frame if at < 0 else at]
+	return Vector2(float(o[0]), float(o[1]))
+
+
 ## Texture of a wreck chunk's sheet (same frame layout as the composite).
 func chunk_texture(chunk: String) -> Texture2D:
 	return load(meta_path.get_base_dir().path_join(String(meta.chunks[chunk].sheet)))

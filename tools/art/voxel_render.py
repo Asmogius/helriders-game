@@ -147,7 +147,17 @@ def _sheet(frames, cols):
     return sheet
 
 
-def render_model(name, chunks, colors, outdir, directions=DIRECTIONS, ppv=PX_PER_VOXEL):
+def project_point(pt, shape, heading_deg, ppv=PX_PER_VOXEL, tilt=TILT_DEG):
+    """Pixel offset of model point (x, y, z voxels) from the frame centre,
+    using the same projection as render_frame."""
+    sx, sy, sz = shape
+    a, t = math.radians(heading_deg), math.radians(tilt)
+    x, y, z = pt[0] - sx / 2.0, pt[1] - sy / 2.0, pt[2]
+    wx, wy = x * math.cos(a) - y * math.sin(a), x * math.sin(a) + y * math.cos(a)
+    return [round(wx * ppv, 2), round((wy * math.cos(t) - z * math.sin(t) + sz * math.sin(t) / 2) * ppv, 2)]
+
+
+def render_model(name, chunks, colors, outdir, directions=DIRECTIONS, ppv=PX_PER_VOXEL, points=None):
     """chunks: {chunk_name: grid} (same shape). Writes <name>.png (all chunks),
     <name>__<chunk>.png per chunk (wreck pieces, aligned to the same frame
     centre) and <name>.json describing frames and per-heading chunk offsets."""
@@ -166,6 +176,7 @@ def render_model(name, chunks, colors, outdir, directions=DIRECTIONS, ppv=PX_PER
             "directions": directions, "px_per_voxel": ppv, "tilt_deg": TILT_DEG,
             "heading_0": "+x (Vector2.RIGHT), frames turn clockwise",
             "origin": "frame centre = model footprint centre at ground level",
+            "points": {pn: [project_point(pt, shape, h, ppv) for h in heads] for pn, pt in (points or {}).items()},
             "chunks": {}}
     for cname, g in chunks.items():
         cf = [render_frame(g, colors, h, ppv, canvas=canvas) for h in heads]
@@ -232,7 +243,7 @@ def main():
         return
     import models
     for name, (m, colors) in models.ALL().items():
-        render_model(name, m.chunks, colors, a.out, a.directions)
+        render_model(name, m.chunks, colors, a.out, a.directions, points=m.points)
         print("rendered", name, list(m.chunks))
 
 

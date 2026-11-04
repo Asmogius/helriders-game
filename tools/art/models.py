@@ -15,6 +15,7 @@ class Model:
     def __init__(self, shape):
         self.shape = shape
         self.chunks = {}
+        self.points = {}   # name -> (x, y, z) in voxels; projected per heading
 
     def g(self, name):
         if name not in self.chunks:
@@ -79,6 +80,7 @@ def scrap_frame():
         box(fp, x, x + 1, 4, 32, 3, max(5, top), "rust")
     rivets(fp, 56, 60, 4, 32, 13, 3)
     fp[63, 5:8, 4:6] = C["cyan"]; fp[63, 28:31, 4:6] = C["cyan"]   # headlights
+    m.points["turret_mount"] = (24.0, 18.0, 11.0)   # deck between rear plates and cab
     rp = m.g("rear_plates")
     box(rp, 6, 20, 9, 27, 11, 13, "rust")
     box(rp, 8, 18, 11, 25, 13, 14, "steel_dark")
@@ -88,6 +90,7 @@ def scrap_frame():
 
 def pintle_turret():
     m = Model((30, 16, 10))
+    m.points["pivot"] = (6.5, 8.0, 0.0)   # turret ring centre: sits on the hull mount
     b = m.g("mount")
     for x in range(0, 14):                            # round base
         for y in range(0, 16):
@@ -122,6 +125,7 @@ def outrider():
     box(ck, 18, 34, 9, 23, 10, 14, "steel")
     box(ck, 30, 34, 10, 22, 11, 14, "glass")
     box(ck, 19, 30, 10, 22, 14, 15, "steel_dark")
+    m.points["turret_mount"] = (24.0, 16.0, 15.0)   # cockpit roof (unused: Outrider guns are fixed)
     gn = m.g("guns")
     for y0 in (2, 26):
         box(gn, 44, 67, y0, y0 + 4, 7, 10, "steel")
