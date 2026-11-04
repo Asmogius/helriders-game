@@ -18,6 +18,7 @@ signal crew_ability_used(kind: String, ability: Dictionary)   # Mark, Flare, Mag
 signal status_started(kind: int)   # a status bar filled (StatusBars index)
 signal revived                     # a Patcher brought this wreck back
 
+const TracerStyles := preload("res://scripts/tracer_styles.gd")   # V4.3 tracer looks (visual only)
 const T := preload("res://scripts/tuning.gd")
 const Hostile := preload("res://scripts/hostile.gd")
 const BulletPool := preload("res://scripts/bullet_pool.gd")
@@ -1539,10 +1540,12 @@ func _shoot(w: Dictionary, muzzle: Vector2, direction: Vector2) -> void:
 	if chain and has_mod("overload_coil") and _gun_overloaded(gun_stats.find(w)):
 		jumps = T.OVERLOAD_COIL_JUMPS
 		_perk_fired("overload_coil")
+	bullets.next_style = TracerStyles.index_for(str(w.get("id", "")), team != BulletPool.TEAM_PLAYER)   # V4.3 look only
 	for p in pellets:
 		var dir := direction.rotated(randf_range(-cone, cone))
 		bullets.fire(muzzle, dir * speed * randf_range(0.95, 1.05) if pellets > 1 else dir * speed, damage, team, pierce, dtype, 0.0, chain, rider, self,
 				_last_of_burst and has_sp("sp_shrapnel"), jumps)   # Shrapnel: the burst's last round splashes
+	bullets.next_style = -1
 
 
 # --- Utilities ---------------------------------------------------------------------
@@ -2266,7 +2269,14 @@ class CableLine extends Node2D:
 			draw_line(_a, _b, Color(0.8, 0.78, 0.6), 2.5)
 			draw_circle(_b, 4.0, Color(0.6, 0.6, 0.62))
 		elif _flash > 0.0:
-			draw_line(_a, _b, Color(0.9, 0.9, 0.85, _flash * 4.0), 3.0)
+			# V4.3 look: the Harpoon style (tracer_styles.gd): cable plus a bright spear head.
+			var st: Dictionary = TracerStyles.style_for("harpoon")
+			var a := clampf(_flash * 4.0, 0.0, 1.0)
+			var cable: Color = st.glow
+			draw_line(_a, _b, Color(cable, a), 1.5 * float(st.width))
+			var head_dir := (_b - _a).normalized()
+			var spear: Color = st.core
+			draw_line(_b - head_dir * 14.0, _b, Color(spear, a), 3.0 * float(st.width))
 
 
 # --- Flag mods and specialty perks (proposal 01, implement-03) ----------------------
