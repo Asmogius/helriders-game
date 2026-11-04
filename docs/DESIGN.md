@@ -238,6 +238,10 @@ A PlayStation-style pad (any pad Godot maps) works alongside touch. The first pa
 - Menus: every screen (garage, stations, Comms, part cards, Inn, Saloon, pause menu) is driven by D-pad or left stick to move, Cross to press and Circle to back out (closes the part sheet or panel, or returns to the garage from a station). L1 / R1 switch stations. Options opens MENU. A cyan ring marks the focused button. While a panel is open, focus stays inside it.
 - Button mapping (Settings > CONTROLLER BUTTONS): every fight action (fire, utilities 1-3, LOCK, crew wheel, pause) can go on any pad button, L2 or R2. A button already in use swaps over. The sticks can swap (left aims, right drives). RESET TO DEFAULT restores the layout above. Menus keep the D-pad, Cross, Circle and L1 / R1, and Cross always picks in the crew wheel. HUD badges, hints and tutorial tips follow the mapping.
 
+## Windows
+
+The game also builds for Windows: every build on main attaches helriders-windows.zip (one helriders.exe) next to the APK. With a controller it plays exactly as on the phone. Settings has DISPLAY: WINDOWED / FULLSCREEN (F11 or Alt+Enter also flip it, saved), and Esc is the back button. Mouse and keyboard controls are the next step.
+
 ## Mods and Perks
 
 - Part mods: pre-attached per schematic, visible while locked, unlocked by part level. Tier sets the unlock level: Minor 3, Major 7, Signature 11, Unique 18 (Legendary only). Rarity's max level decides which tiers a part can reach: Common Minor; Uncommon + Major; Rare + Signature; Epic + a second Major at 14; Legendary + Unique. The +4% per level stays. Mods belong to the schematic, like levels.

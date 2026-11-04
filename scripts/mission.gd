@@ -1158,13 +1158,24 @@ func restart_job() -> void:
 func _notification(what: int) -> void:
 	match what:
 		NOTIFICATION_WM_GO_BACK_REQUEST:
-			if menu != null:
-				menu.back()
-			else:
-				open_menu()
+			go_back()
 		NOTIFICATION_APPLICATION_PAUSED, NOTIFICATION_APPLICATION_FOCUS_OUT:
 			if not DisplayServer.get_name() == "headless":
 				open_menu()
+
+
+## The phone's back button, or Esc on a PC: up a menu page, or pause.
+func go_back() -> void:
+	if menu != null:
+		menu.back()
+	else:
+		open_menu()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if menu == null and event is InputEventKey and (event as InputEventKey).pressed and not (event as InputEventKey).echo and (event as InputEventKey).keycode == KEY_ESCAPE:
+		go_back()
+		get_viewport().set_input_as_handled()
 
 
 func _exit_tree() -> void:

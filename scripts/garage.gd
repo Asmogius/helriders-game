@@ -1558,6 +1558,13 @@ func _notification(what: int) -> void:
 		go_back()
 
 
+## Esc on a PC is the back button.
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and (event as InputEventKey).pressed and not (event as InputEventKey).echo and (event as InputEventKey).keycode == KEY_ESCAPE:
+		go_back()
+		get_viewport().set_input_as_handled()
+
+
 func go_back() -> void:
 	if menu != null:
 		menu.back()
