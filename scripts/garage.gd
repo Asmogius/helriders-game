@@ -66,6 +66,8 @@ var preview: Vehicle
 
 var _rig_holder: Node2D
 const WorkshopRoom := preload("res://scripts/workshop_room.gd")   # V2 sample (P6)
+const GarageLayout := preload("res://scripts/garage_layout.gd")   # V2.3 sample: reading order
+const GarageFocus := preload("res://scripts/garage_focus.gd")     # V2.3 sample: open slot lights its part
 var _workshop: Control
 var _rig_touch: Control
 var _stat_sheet: StatSheet
@@ -122,6 +124,9 @@ func _ready() -> void:
 	_workshop = WorkshopRoom.new()
 	add_child(_workshop)
 	_workshop.set_open(true, true)
+	var focus := GarageFocus.new()
+	focus.garage = self
+	add_child(focus)
 
 	_build_rig_area()
 	_build_top_bar()
@@ -208,6 +213,7 @@ func _show_stat_sheet(on: bool) -> void:
 	_callouts.visible = not on
 	_rings.visible = not on
 	_rig_touch.mouse_filter = Control.MOUSE_FILTER_IGNORE if on else Control.MOUSE_FILTER_STOP
+	GarageLayout.apply(self)   # V2.3 sample
 
 
 ## First tap on a card previews it; a second tap on the same card fits it.
@@ -516,6 +522,7 @@ func _layout_tags() -> void:
 			tag.offset_top = y
 			tag.offset_bottom = y + h
 			y += h + gap
+	GarageLayout.apply(self)   # V2.3 sample: the slot grid
 
 
 func _build_sheet() -> void:
@@ -587,6 +594,7 @@ func _button(text: String, min_width: float) -> Button:
 func _layout() -> void:
 	# The rig sits in the middle, nudged up so the sheet doesn't cover it.
 	_rig_holder.position = Vector2(size.x * 0.5, 290.0)
+	GarageLayout.apply(self)   # V2.3 sample
 
 
 # --- Refresh ---------------------------------------------------------------------
@@ -1140,6 +1148,7 @@ func _on_tab(tab_name: String) -> void:
 	_saloon.visible = tab_name == "SALOON"
 	_research.visible = tab_name == "RESEARCH"
 	_rig_holder.visible = tab_name == "GARAGE" and not _stat_sheet.visible   # V0.1
+	GarageLayout.apply(self)   # V2.3 sample
 	if tab_name == "GARAGE":
 		_close_overlay()
 		return
@@ -1338,6 +1347,7 @@ class StatSheet extends Control:
 	const Loadout := preload("res://scripts/loadout.gd")
 	const BulletPool := preload("res://scripts/bullet_pool.gd")
 	const ROW_H := 26.0
+	var single_column := false   # V2.3 sample: one tall column (garage_layout.gd)
 	# [label, key, higher is better, decimals, suffix]
 	const LEFT := [
 		["TOP SPEED", "speed", true, 0, ""],
@@ -1431,8 +1441,13 @@ class StatSheet extends Control:
 		draw_rect(Rect2(Vector2.ZERO, size), UI.PANEL_EDGE, false, 2.0)
 		draw_string(font, Vector2(16, 28), title, HORIZONTAL_ALIGNMENT_LEFT, size.x - 32.0, 17, T.COL_ORANGE)
 		var col_w := (size.x - 56.0) / 2.0
-		_column(font, LEFT, Vector2(16, 42), col_w)
-		_column(font, RIGHT, Vector2(40 + col_w, 42), col_w)
+		if single_column:   # V2.3 sample: the stats panel on the right
+			col_w = size.x - 32.0
+			_column(font, LEFT, Vector2(16, 34), col_w)
+			_column(font, RIGHT, Vector2(16, 34 + LEFT.size() * ROW_H + 6.0), col_w)
+		else:
+			_column(font, LEFT, Vector2(16, 42), col_w)
+			_column(font, RIGHT, Vector2(40 + col_w, 42), col_w)
 		var count := maxi(int(now.weapon_count), int(after.weapon_count))
 		if count > 1:
 			draw_string(font, Vector2(40 + col_w, 47), "gun rows show WEAPON %d" % (int(now.weapon) + 1), HORIZONTAL_ALIGNMENT_RIGHT, col_w, 12, UI.TEXT_DIM)
