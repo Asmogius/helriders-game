@@ -426,7 +426,8 @@ func art_layer_modulate(_id: String) -> Color:
 ## frame for its own aim, placed on the hull's projected mount point.
 ## Gameplay (bodies, turret pivots, muzzles) is untouched.
 func _update_art() -> void:
-	# Top-level art doesn't inherit the rig's scale: copy it (the garage preview
+	# ==== P6 garage preview scale (art/garage-preview-scale) ====
+	# Art-only: `sc` and every `* sc` below in this function. Top-level art doesn't inherit the rig's scale: copy it (the garage preview
 	# shows the rig at RIG_SCALE 3.4), and scale every point offset by it.
 	var sc := absf(global_scale.x)
 	if _hull_art != null:
@@ -470,6 +471,7 @@ func _update_art() -> void:
 		if _hull_art != null and _hull_art.meta.has("points") and _hull_art.meta.points.has("nose_mount"):
 			at = global_position + _hull_art.point_offset("nose_mount") * sc
 		fa.global_position = at - fa.point_offset("pivot") * sc
+	# ==== end P6 garage preview scale ====
 
 
 ## Which hull point turret `index` of `total` sits on.
