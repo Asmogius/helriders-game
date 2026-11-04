@@ -19,7 +19,23 @@ from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from voxel_render import render_frame, canvas_for, write_import  # noqa: E402
+import inspect  # noqa: E402
+import voxel_render  # noqa: E402
+from voxel_render import canvas_for, write_import  # noqa: E402
+
+# Tilt prototype (art/zombie-tilt-proto): the shared voxel_render.render_frame
+# culls side faces with view = (0, -sin t, cos t), so it draws the up-screen
+# (north) sides and drops the south sides, which the projection and depth order
+# say face the camera. On a zombie that hides the front/side/height and the
+# figure reads flat next to the rigs. Same fix as the garage sample
+# (art/sample-garage, garage_scenes.py): a local copy with the sign fixed. The
+# shared renderer is untouched (fixing it re-renders every rig sheet).
+_src = inspect.getsource(voxel_render.render_frame).replace(
+    "view = np.array([0.0, -st, ct])", "view = np.array([0.0, st, ct])")
+assert "[0.0, st, ct]" in _src
+_ns = dict(vars(voxel_render))
+exec(_src, _ns)
+render_frame = _ns["render_frame"]
 
 OUT = os.path.join(HERE, "..", "..", "art", "zombies")
 HEADINGS = 16
