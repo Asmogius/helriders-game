@@ -113,6 +113,43 @@ static func has_patcher(mission: Dictionary) -> bool:
 	return rng.randf() < chance
 
 
+static func _seeded_chance(mission: Dictionary, table: Dictionary, salt: String) -> bool:
+	var chances: Array = table.get(str(mission.get("type", "")), [])
+	if chances.is_empty():
+		return false
+	var chance := float(chances[skulls(mission) - 1])
+	if chance <= 0.0:
+		return false
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("helriders-%s-%d" % [salt, int(mission.get("seed", 0))])
+	return rng.randf() < chance
+
+
+## Does this job bring a Torcher (proposal 01)? Seeded per job, on Comms.
+static func has_torcher(mission: Dictionary) -> bool:
+	return _seeded_chance(mission, T.TORCHER_CHANCE, "torcher")
+
+
+## Does this job bring a Sludger (proposal 01)? Seeded per job, on Comms.
+static func has_sludger(mission: Dictionary) -> bool:
+	return _seeded_chance(mission, T.SLUDGER_CHANCE, "sludger")
+
+
+## Extract or Push (§14, proposal 01): can this job offer a push once its
+## objective is done? Seeded (T.PUSH_CHANCE), hidden until then. Never on
+## Courier, the tutorial or the day after a wreck (the caller checks those
+## two). Retrieve and Escort follow the draft rule, pending the owner.
+static func has_push(mission: Dictionary) -> bool:
+	var type := str(mission.get("type", ""))
+	if T.PUSH_NO_TYPES.has(type):
+		return false
+	if (type == "retrieve" or type == "escort") and not T.PUSH_RETRIEVE_ESCORT_DRAFT:
+		return false
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("helriders-push-%d" % int(mission.get("seed", 0)))
+	return rng.randf() < T.PUSH_CHANCE
+
+
 ## The mission tests and a fresh mission scene fall back to.
 static func default_mission() -> Dictionary:
 	return make("clear", 3, 1)
@@ -190,6 +227,10 @@ static func threats_text(mission: Dictionary) -> String:
 		bits.append("%d %s%s" % [scrappers, what, "" if scrappers == 1 else "s"])
 	if has_patcher(mission):
 		bits.append("1 Patcher")
+	if has_torcher(mission):
+		bits.append("1 Torcher")
+	if has_sludger(mission):
+		bits.append("1 Sludger")
 	var kinds := zombie_kinds_text(mission)
 	if kinds != "":
 		bits.append(kinds)

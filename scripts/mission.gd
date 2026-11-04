@@ -26,6 +26,8 @@ const ScrapperRig := preload("res://scripts/scrapper_rig.gd")
 const ScrapperGunnerRig := preload("res://scripts/scrapper_gunner_rig.gd")
 const ConvoyRig := preload("res://scripts/convoy_rig.gd")
 const PatcherRig := preload("res://scripts/patcher_rig.gd")
+const TorcherRig := preload("res://scripts/torcher_rig.gd")
+const SludgerRig := preload("res://scripts/sludger_rig.gd")
 const FriendlyTruck := preload("res://scripts/friendly_truck.gd")
 const StatusBars := preload("res://scripts/status_bars.gd")
 const Barrel := preload("res://scripts/barrel.gd")
@@ -53,6 +55,8 @@ enum State { RUNNING, WRECKED, CLEARED, FAILED }
 var auto_spawn_specials := true
 ## Tests: make every Outrider drop a schematic instead of rolling for it.
 var always_drop_schematic := false
+## Tests: Extract or Push. -1 = seeded as on the board, 0 = never, 1 = always.
+var push_override := -1
 ## Tests: run this mission instead of the profile's.
 var mission_override := {}
 ## Tests: ride with these crew (crew.gd dictionaries) instead of the seated ones.
@@ -89,6 +93,24 @@ var convoy: ConvoyRig            # the first Convoy Lead (tests use it)
 var patchers: Array[EnemyRig] = []    # support rigs, built up front too
 var patcher: PatcherRig          # the first Patcher (tests use it)
 var use_patcher := false         # this job brings a Patcher (seeded, on Comms)
+var torchers: Array[EnemyRig] = []    # proposal 01: fire skirmishers, built up front
+var torcher: TorcherRig
+var sludgers: Array[EnemyRig] = []    # proposal 01: acid / goop artillery, built up front
+var sludger: SludgerRig
+# Extract or Push (§14, proposal 01). The push beacon and its own extraction
+# marker appear when the objective is done (Retrieve: once every non-deep
+# cache is taken; pending the owner's confirmation).
+enum Push { NONE, CHOOSING, ACTIVE, EXTRACT, DONE }
+var push_allowed := false        # this job may offer a push (seeded, hidden until the objective)
+var push_state := Push.NONE
+var push_at := Vector2.INF       # the orange push beacon
+var push_extract := Vector2.INF  # the cyan extraction marker
+var push_left := 0.0             # push timer, then the extraction window
+var pushed := false              # the player pushed and made it out (pays x1.5)
+var _push_rigs_due := 0
+var _push_pending := {}          # the objective's result, held while you choose
+var _push_finishing := false
+var _push_blocked_warned := false
 var _rig_crate := {}             # rig -> the crate its wreck dropped
 var _held_crate := {}            # rig -> its uncollected crate, taken back when revived
 var _revived := {}               # rigs a Patcher has brought back (they pay once)
@@ -247,6 +269,7 @@ func _ready() -> void:
 	bullets.fx = fx
 	mines.fx = fx
 	shells.fx = fx
+	shells.hazards = hazards
 	for b in barrels:
 		b.fx = fx
 	enemy_mines.fx = fx
@@ -299,6 +322,12 @@ func _ready() -> void:
 		rig.wrecked.connect(_on_patcher_wrecked.bind(rig))
 	for rig in _all_enemy_rigs():
 		rig.revived.connect(_on_rig_revived.bind(rig))
+	for rig in torchers:
+		rig.wrecked.connect(_on_torcher_wrecked.bind(rig))
+	for rig in sludgers:
+		rig.wrecked.connect(_on_sludger_wrecked.bind(rig))
+	for rig in _all_enemy_rigs():
+		rig.status_started.connect(_on_enemy_status.bind(rig))
 	for rig in convoys:
 		rig.wrecked.connect(_on_convoy_wrecked.bind(rig))
 		(rig as ConvoyRig).trailer.wrecked.connect(_on_trailer_lost.bind(rig))
@@ -463,6 +492,40 @@ func _configure_mission() -> void:
 			truck = FriendlyTruck.new()
 			truck.nav = nav
 			_plan_sites(int(Missions.stat(spec, "sites")))
+	# Torcher and Sludger (proposal 01): seeded per job, shown on Comms.
+	# The Torcher takes the Scrapper's slot at 3 skulls and an Outrider's from 4.
+	var torcher_count := 0
+	if not tutorial and Missions.has_torcher(spec):
+		torcher_count = 1
+		if mission_type == "clear":
+			var swap_scrapper := skulls <= 3 and scrapper_count > 0
+			if swap_scrapper:
+				scrapper_count -= 1
+				_drop_event("scrapper")
+			elif outrider_count > 0:
+				outrider_count -= 1
+				_drop_event("outrider")
+			else:
+				target_kills += 1
+			_events.append([T.SCRAPPER_SPAWN_TIME + 10.0, "torcher", T.SCRAPPER_SPAWN_KILLS, false])
+		else:
+			if not _swap_event("scrapper" if skulls <= 3 else "outrider", "torcher"):
+				_events.append([75.0, "torcher", -1, false])
+	if not tutorial and Missions.has_sludger(spec):
+		_events.append([90.0, "sludger", -1, false])
+	for i in 1:
+		torchers.append(TorcherRig.new())
+		sludgers.append(SludgerRig.new())
+	torcher = torchers[0] as TorcherRig
+	sludger = sludgers[0] as SludgerRig
+	# Extract or Push: hidden until the objective's done.
+	push_allowed = not tutorial and Missions.has_push(spec) and not profile.push_blocked_today()
+	if push_override >= 0:
+		push_allowed = push_override == 1 and not tutorial and not T.PUSH_NO_TYPES.has(mission_type)
+	if push_allowed:
+		_push_rigs_due = 0
+		outrider_count += 1   # one spare of each for the push's extra rigs
+		gunner_count += 1
 	# Always keep one Outrider ready (tests spawn one by hand); never more
 	# rigs than the design's cap of three.
 	var room := T.MAX_ENEMY_RIGS - (1 if elite != null else 0)
@@ -524,13 +587,15 @@ func _physics_process(delta: float) -> void:
 	_apply_slime(delta)
 	match mission_type:
 		"survive":
-			if elapsed >= float(Missions.stat(spec, "seconds")):
+			if elapsed >= float(Missions.stat(spec, "seconds")) and push_state == Push.NONE:
 				_succeed("HELD THE BLOCK", "", 1.0)
 		"courier":
 			if checkpoint_index < checkpoints.size() and vehicle.global_position.distance_to(checkpoints[checkpoint_index]) < T.COURIER_RADIUS:
 				reach_checkpoint()
 		"retrieve":
 			_update_retrieve()
+	_physics_extract_arm()
+	_update_push(delta)
 
 
 func _process(_delta: float) -> void:
@@ -770,6 +835,10 @@ func _rig_key(rig: EnemyRig) -> String:
 		return "scrapper"
 	if rig is PatcherRig:
 		return "patcher"
+	if rig is TorcherRig:
+		return "torcher"
+	if rig is SludgerRig:
+		return "sludger"
 	if rig is GunnerRig:
 		return "gunner"
 	return "outrider"
@@ -850,6 +919,8 @@ func _all_enemy_rigs() -> Array[EnemyRig]:
 	all.append_array(scrapper_gunners)
 	all.append_array(convoys)
 	all.append_array(patchers)
+	all.append_array(torchers)
+	all.append_array(sludgers)
 	if elite != null:
 		all.append(elite)
 	return all
@@ -886,6 +957,10 @@ func _run_events() -> void:
 				e[3] = spawn_scrapper(zombies.pick_spawn_point()) != null
 			"convoy":
 				e[3] = spawn_convoy(zombies.pick_spawn_point()) != null
+			"torcher":
+				e[3] = spawn_torcher(zombies.pick_spawn_point()) != null
+			"sludger":
+				e[3] = spawn_sludger(zombies.pick_spawn_point()) != null
 			"patcher":
 				# Only alongside another rig, unless none are left to come.
 				if _ally_in_fight() or not _rig_events_pending():
@@ -994,6 +1069,53 @@ func spawn_convoy(at: Vector2) -> EnemyRig:
 			hud.banner("CONVOY LEAD INBOUND  -  GET BESIDE IT", T.COL_ENEMY)
 			return rig
 	return null
+
+
+## Sends in the Torcher (proposal 01), if there's room under the rig cap.
+func spawn_torcher(at: Vector2) -> EnemyRig:
+	if active_rig_count() >= T.MAX_ENEMY_RIGS:
+		return null
+	for rig in torchers:
+		if not rig.is_inside_tree():
+			(rig as TorcherRig).hazards = hazards
+			rig.position = at
+			rig.rotation = (vehicle.global_position - at).angle()
+			rigs.add_child(rig)
+			hud.banner("TORCHER INBOUND  -  HIT ITS FUEL TANK", T.COL_ENEMY)
+			return rig
+	return null
+
+
+## Sends in the Sludger (proposal 01), if there's room under the rig cap.
+func spawn_sludger(at: Vector2) -> EnemyRig:
+	if active_rig_count() >= T.MAX_ENEMY_RIGS:
+		return null
+	for rig in sludgers:
+		if not rig.is_inside_tree():
+			rig.shells = shells
+			rig.position = at
+			rig.rotation = (vehicle.global_position - at).angle()
+			rigs.add_child(rig)
+			hud.banner("SLUDGER INBOUND  -  WATCH THE SKY", T.COL_ENEMY)
+			return rig
+	return null
+
+
+## Drop the first pending event of `kind` (a seeded rig took its slot).
+func _drop_event(kind: String) -> void:
+	for i in _events.size():
+		if str(_events[i][1]) == kind and not _events[i][3]:
+			_events.remove_at(i)
+			return
+
+
+## Turn the first pending event of `kind` into `into`. False if none.
+func _swap_event(kind: String, into: String) -> bool:
+	for e: Array in _events:
+		if str(e[1]) == kind and not e[3]:
+			e[1] = into
+			return true
+	return false
 
 
 ## Sends in the Patcher, if there's room under the rig cap.
@@ -1442,7 +1564,7 @@ func _add_kill(points: int, rig := false) -> void:
 	if rig:
 		mult *= float(vehicle.crew_mod("rig_scrap"))
 	scrap += points * mult
-	if state == State.RUNNING and mission_type == "clear" and kills >= target_kills:
+	if state == State.RUNNING and mission_type == "clear" and kills >= target_kills and push_state == Push.NONE:
 		_succeed("BLOCK CLEARED", "", 1.0)
 
 
@@ -1487,13 +1609,17 @@ func _ground_on(rig: Vehicle, delta: float) -> void:
 	if rig == vehicle and _seen_timer >= 0.99:   # once a second, the tick the timer resets
 		var at := rig.global_position
 		for pair: Array in [["oil", hazards.oil_at(at, rig.team)], ["spikes", hazards.spike_at(at, rig.team)],
-				["fire", hazards.fire_at(at, rig.team)], ["slime", hazards.slime_at(at)], ["bile", hazards.is_marked(rig)]]:
+				["fire", hazards.fire_at(at, rig.team)], ["slime", hazards.slime_at(at)], ["bile", hazards.is_marked(rig)], ["acid", hazards.acid_at(at, rig.team)]]:
 			if bool(pair[1]):
 				profile.discover("hazards", str(pair[0]))
 	rig.set_on_slime(hazards.slick_at(rig.global_position, rig.team), delta)
 	rig.set_on_spikes(hazards.spike_at(rig.global_position, rig.team), delta)
-	if hazards.fire_at(rig.global_position, rig.team):
+	# A Scrapper has no immunity to its own oil once it's lit (approved 2026-11-03).
+	var burn_victim := GroundHazards.NEUTRAL if rig is ScrapperRig else rig.team
+	if hazards.fire_at(rig.global_position, burn_victim):
 		rig.add_buildup(StatusBars.FIRE, T.STATUS_POOL_BUILDUP * delta)
+	if hazards.acid_at(rig.global_position, rig.team):
+		rig.add_buildup(StatusBars.ACID, T.STATUS_POOL_BUILDUP * delta)
 
 
 ## A status started on your rig. GOOPED marks it for the horde.
@@ -1616,6 +1742,34 @@ func _on_convoy_wrecked(rig: EnemyRig) -> void:
 	_salvage_plating()
 
 
+func _on_torcher_wrecked(rig: EnemyRig) -> void:
+	camera.shake(0.7)
+	if _wrecked_again(rig):
+		return
+	_drop(rig.global_position, "torcher", false, T.TORCHER_SCRAP_CACHE, rig)
+	hud.banner("TORCHER DOWN  -  GRAB THE SALVAGE", T.COL_CYAN)
+	_add_kill(T.TORCHER_SCRAP, true)
+	_salvage_plating()
+
+
+func _on_sludger_wrecked(rig: EnemyRig) -> void:
+	camera.shake(0.7)
+	if _wrecked_again(rig):
+		return
+	_drop(rig.global_position, "sludger", false, T.SLUDGER_SCRAP_CACHE, rig)
+	hud.banner("SLUDGER DOWN  -  GRAB THE SALVAGE", T.COL_CYAN)
+	_add_kill(T.SLUDGER_SCRAP, true)
+	_salvage_plating()
+
+
+## An enemy rig went GOOPED (your Goop Launcher, a Boomer): the horde nearby
+## goes for it instead of you.
+func _on_enemy_status(k: int, rig: EnemyRig) -> void:
+	if k == StatusBars.GOOP:
+		zombies.bait = rig
+		zombies.bait_left = float(T.STATUS_TIME_RIG[StatusBars.GOOP])
+
+
 func _on_patcher_wrecked(rig: EnemyRig) -> void:
 	camera.shake(0.5)
 	_drop(rig.global_position, "patcher", false, T.PATCHER_SCRAP_CACHE, rig)
@@ -1714,6 +1868,25 @@ func _on_damaged(amount: float) -> void:
 ## Success: bank the run's scrap plus the job's pay (x `pay_mult`) and any
 ## schematics, end the day, show the results card.
 func _succeed(title: String, detail: String, pay_mult: float) -> void:
+	if state != State.RUNNING:
+		return
+	if not _push_finishing:
+		if mission_type == "retrieve" and push_state == Push.ACTIVE:
+			if not _push_blocked_warned:
+				_push_blocked_warned = true
+				hud.banner("HOLD OUT  -  THE PUSH ISN'T OVER", T.COL_ORANGE, 1.6)
+			return
+		if mission_type == "retrieve" and push_state == Push.EXTRACT:
+			pushed = true
+			push_state = Push.DONE
+		elif mission_type != "retrieve" and push_state == Push.NONE and _push_offerable():
+			_offer_push(title, detail, pay_mult)
+			return
+		elif push_state != Push.NONE and push_state != Push.DONE and mission_type != "retrieve":
+			return
+	if pushed:
+		pay_mult *= T.PUSH_PAY
+		detail = ("PUSHED  -  " + detail) if detail != "" else "PUSHED"
 	hud.close_crew_wheel(false)
 	Engine.time_scale = 1.0
 	state = State.CLEARED
@@ -1725,10 +1898,14 @@ func _succeed(title: String, detail: String, pay_mult: float) -> void:
 	var ids := _pending_ids()
 	if reward_part != "":
 		ids.append(reward_part)
+	if pushed:
+		var extra := _push_schematic(ids)
+		if extra != "":
+			ids.append(extra)
 	bank_report = profile.bank_run(int(scrap) + pay, ids)
 	profile.finish_day()
 	# After the day ends, so tonight doesn't count toward anyone's rest.
-	var crew_lines := profile.bank_crew(skulls, injured_crew_ids(), bool(vehicle.crew_mod("triage")))
+	var crew_lines := profile.bank_crew(roundi(skulls * T.PUSH_XP) if pushed else skulls, injured_crew_ids(), bool(vehicle.crew_mod("triage")))
 	var lines := "Job pay +%d    Kill scrap +%d    Time %s" % [pay, int(scrap), _clock(elapsed)]
 	if detail != "":
 		lines = detail + "\n" + lines
@@ -1758,6 +1935,125 @@ func _mission_reward_schematic(pay_mult: float) -> String:
 	var unknown := profile.unknown_schematics(pool, _pending_ids())
 	var sure := mission_type == "escort" and optional_taken   # the risky site pays a schematic
 	if unknown.is_empty() or (not sure and randf() >= Missions.schematic_chance(spec)):
+		return ""
+	return unknown.pick_random()
+
+
+# --- Extract or Push (§14, proposal 01) ------------------------------------------
+
+## Can this job offer the push now? Escort only if the risky site was
+## skipped (pending the owner's confirmation, T.PUSH_RETRIEVE_ESCORT_DRAFT).
+func _push_offerable() -> bool:
+	if not push_allowed:
+		return false
+	if mission_type == "escort" and optional_taken:
+		return false
+	return true
+
+
+## The objective's done: show both markers and hold the result.
+func _offer_push(title: String, detail: String, pay_mult: float) -> void:
+	_push_pending = {"title": title, "detail": detail, "pay": pay_mult}
+	push_state = Push.CHOOSING
+	push_extract = vehicle.global_position
+	push_at = _open_spot(T.PUSH_MARKER_GAP)
+	hud.banner("EXTRACT (CYAN) OR PUSH (ORANGE)?", T.COL_ORANGE, 3.0)
+
+
+## Retrieve (pending confirmation): the beacon shows once every non-deep cache is out.
+func _check_retrieve_push() -> void:
+	if push_state != Push.NONE or not push_allowed:
+		return
+	for i in caches.size():
+		if i != deep_cache and not cache_taken[i]:
+			return
+	push_state = Push.CHOOSING
+	push_extract = extract_at
+	push_at = _open_spot(T.PUSH_MARKER_GAP)
+	hud.banner("PUSH BEACON UP  -  ORANGE TO PUSH, EXTRACT AS USUAL", T.COL_ORANGE, 3.0)
+
+
+## The push's skull row: the job's skulls +1 (cap 6).
+func push_skulls() -> int:
+	return mini(skulls + 1, T.MAX_SKULLS)
+
+
+## Extra rigs the push brings: one, or two at 6 skulls (instead of +1 skull).
+func push_extra_rigs() -> int:
+	return 2 if skulls >= T.MAX_SKULLS else 1
+
+
+func start_push() -> void:
+	push_state = Push.ACTIVE
+	push_left = float(T.PUSH_SECONDS[skulls - 1])
+	var up := spec.duplicate()
+	up.skulls = push_skulls()
+	zombies.set_mix(push_skulls(), false)
+	zombies.cap = maxi(zombies.cap, int(Missions.stat(up, "cap")))
+	zombies.spawn_budget = 1000000
+	_push_rigs_due = push_extra_rigs()
+	hud.banner("PUSHING  -  HOLD OUT %d s" % int(push_left), T.COL_ORANGE, 2.5)
+
+
+func _update_push(delta: float) -> void:
+	if mission_type == "retrieve":
+		_check_retrieve_push()
+	match push_state:
+		Push.CHOOSING:
+			var at := vehicle.global_position
+			if at.distance_to(push_at) < T.PUSH_RADIUS:
+				start_push()
+			elif mission_type != "retrieve" and at.distance_to(push_extract) < T.PUSH_RADIUS and _left_extract_once():
+				_finish_push(false)
+		Push.ACTIVE:
+			push_left -= delta
+			while _push_rigs_due > 0 and active_rig_count() < T.MAX_ENEMY_RIGS:
+				var rig: EnemyRig = spawn_outrider(zombies.pick_spawn_point()) if _push_rigs_due % 2 == 1 else spawn_gunner(zombies.pick_spawn_point())
+				if rig == null:
+					break
+				_push_rigs_due -= 1
+			if push_left <= 0.0:
+				push_state = Push.EXTRACT
+				push_extract = push_at
+				push_left = T.PUSH_EXTRACT_WINDOW
+				if mission_type == "retrieve":
+					hud.banner("PUSH DONE  -  GET TO THE EXTRACTION POINT", T.COL_CYAN, 2.5)
+				else:
+					hud.banner("PUSH DONE  -  EXTRACT AT THE BEACON", T.COL_CYAN, 2.5)
+		Push.EXTRACT:
+			if mission_type == "retrieve":
+				return   # extracting at the usual point ends it
+			push_left -= delta
+			if vehicle.global_position.distance_to(push_extract) < T.PUSH_RADIUS or push_left <= 0.0 or active_rig_count() == 0:
+				_finish_push(true)
+
+
+var _extract_left := false
+## The extraction marker spawns under you: it counts once you've left it.
+func _left_extract_once() -> bool:
+	return _extract_left
+
+
+func _physics_extract_arm() -> void:
+	if push_state == Push.CHOOSING and not _extract_left and vehicle.global_position.distance_to(push_extract) > T.PUSH_RADIUS * 1.5:
+		_extract_left = true
+
+
+func _finish_push(did_push: bool) -> void:
+	pushed = did_push
+	push_state = Push.DONE
+	_push_finishing = true
+	_succeed(str(_push_pending.get("title", "DONE")), str(_push_pending.get("detail", "")), float(_push_pending.get("pay", 1.0)))
+	_push_finishing = false
+
+
+## The push's extra schematic roll, at the push's skull odds.
+func _push_schematic(taken: Array[String]) -> String:
+	var pool: Array = Parts.DROP_POOLS.get(mission_type, [])
+	var unknown := profile.unknown_schematics(pool, taken)
+	var up := spec.duplicate()
+	up.skulls = push_skulls()
+	if unknown.is_empty() or randf() >= Missions.schematic_chance(up):
 		return ""
 	return unknown.pick_random()
 
@@ -1813,12 +2109,13 @@ class CourierMarkers extends Node2D:
 
 	func _process(delta: float) -> void:
 		_t += delta
-		if mission != null and str(mission.get("mission_type")) in ["courier", "retrieve", "escort"]:
+		if mission != null and (str(mission.get("mission_type")) in ["courier", "retrieve", "escort"] or int(mission.get("push_state")) != 0):
 			queue_redraw()
 
 	func _draw() -> void:
 		if mission == null:
 			return
+		_draw_push()
 		match str(mission.get("mission_type")):
 			"retrieve":
 				_draw_retrieve()
@@ -1845,6 +2142,21 @@ class CourierMarkers extends Node2D:
 			else:
 				draw_arc(p, r * 0.7, 0.0, TAU, 40, Color(green, 0.35), 2.0)
 			draw_string(font, p + Vector2(-30, 10), str(i + 1), HORIZONTAL_ALIGNMENT_CENTER, 60, 30, Color(green, 0.95 if i == index else 0.4))
+
+	## Extract or Push: the cyan extraction marker and the orange push beacon.
+	func _draw_push() -> void:
+		var state: int = mission.get("push_state")
+		if state == 0 or state == 4:
+			return
+		var pulse := 0.5 + 0.5 * sin(_t * 5.0)
+		var ex: Vector2 = mission.get("push_extract")
+		var beacon: Vector2 = mission.get("push_at")
+		if state == 1 and beacon != Vector2.INF:
+			draw_circle(beacon, T.PUSH_RADIUS, Color(T.COL_ORANGE, 0.10 + 0.08 * pulse))
+			draw_arc(beacon, T.PUSH_RADIUS, 0.0, TAU, 48, Color(T.COL_ORANGE, 0.9), 4.0)
+		if (state == 1 or state == 3) and ex != Vector2.INF and str(mission.get("mission_type")) != "retrieve":
+			draw_circle(ex, T.PUSH_RADIUS, Color(T.COL_CYAN, 0.10 + 0.08 * pulse))
+			draw_arc(ex, T.PUSH_RADIUS, 0.0, TAU, 48, Color(T.COL_CYAN, 0.9), 4.0)
 
 	func _draw_retrieve() -> void:
 		var pulse := 0.5 + 0.5 * sin(_t * 4.0)

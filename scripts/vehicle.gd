@@ -161,6 +161,9 @@ var hazards: Node2D                # GroundHazards, for the Oil Slick
 var shells: Node2D                 # ShellPool, for the Mortar
 var tether: Tether                 # the Harpoon's cable, while it holds a rig
 var harpoon_hits := 0              # spears that struck something (tests)
+var lobs := 0                      # lobber shells thrown (Sludger alternates acid / goop)
+var jammed_left := 0.0             # Jammer's Static Burst: shield can't recharge
+var chain_target: Node2D           # Wrangler's Chain Drag: the rig on the chain
 
 var _turret: Node2D                # the first turret, if any
 var _turrets: Array[Node2D] = []   # one per weapon; null for fixed guns
@@ -238,7 +241,12 @@ func apply_stats(s: Dictionary) -> void:
 			"spread_deg": float(s.spread_deg), "turret_turn_rate": float(s.turret_turn_rate),
 			"lock_range": float(s.lock_range), "pellets": int(s.get("pellets", 1)),
 			"burst": int(s.get("burst", 1)), "burst_rate": float(s.get("burst_rate", 0.0)),
+			"kind": str(s.get("kind", "")), "mag": int(s.get("mag", 0)), "reload": float(s.get("reload", 0.0)),
 		})
+		# Enemy ammo and special weapons (proposal 01): heat, lobbers, damage types.
+		for key: String in ["heat_time", "lockout", "cool", "dtype", "pierce", "blast", "min_range", "max_range", "flight"]:
+			if s.has(key):
+				gun_stats[0][key] = s[key]
 	_cooldowns.clear()
 	_burst_left.clear()
 	_burst_gap.clear()
@@ -404,6 +412,14 @@ func use_crew_ability(index: int) -> bool:
 				u.ready_in = float(u.ready_in) * (1.0 - minf(float(a.cut), 0.95))
 		"shockwave":
 			_shockwave(float(a.damage), float(a.radius))
+		"static_burst":
+			static_burst(float(a.radius), float(a.shock_buildup), float(a.time))
+		"chain_drag":
+			if not chain_drag(float(a.latch_range)):
+				return false
+			var timed := a.duplicate()
+			timed.left = float(a.time)
+			_active[kind] = timed
 		"mark", "flare", "magnet":
 			crew_ability_used.emit(kind, a)
 			if a.time > 0.0:
@@ -623,7 +639,7 @@ func _physics_process(delta: float) -> void:
 		wall_impact = 0.0
 		_burn(delta)
 		return
-	if not crew.is_empty():
+	if not crew.is_empty() or not _active.is_empty():
 		_tick_crew(delta)
 	if vuln_left > 0.0:
 		vuln_left -= delta
@@ -841,7 +857,7 @@ func _weapons(delta: float) -> void:
 			_reload_left[i] -= delta
 			if _reload_left[i] <= 0.0:
 				_ammo[i] = int(w.get("mag", 0))
-		if str(w.get("kind", "")) == "mortar":
+		if str(w.get("kind", "")) == "mortar" or str(w.get("kind", "")) == "lobber":
 			_mortar(i, w, delta, manual, locked, can_aim)
 			continue
 		var wants_fire := false
@@ -1014,9 +1030,31 @@ func _mortar(i: int, w: Dictionary, delta: float, manual: bool, locked: bool, ca
 	_show_aim(landing, i, w)
 	var on_target := absf(angle_difference(turret.global_rotation, want_angle)) < T.MORTAR_AIM_CONE or not can_aim
 	if on_target and has_round(i) and _cooldowns[i] <= 0.0 and shells != null:
-		if shells.call("launch", turret.global_position, landing, flight, float(w.bullet_damage) * crew_damage, float(w.get("blast", 90.0)), team):
+		if _lob(w, turret.global_position, landing, flight):
 			_cooldowns[i] = 1.0 / (float(w.fire_rate) * crew_fire)
 			_use_round(i)
+
+
+## One shell out of a Mortar or a lobber. The Acid Lobber's globs leave an
+## acid puddle; the Sludger alternates acid shells and goop shells.
+func _lob(w: Dictionary, from: Vector2, landing: Vector2, flight: float) -> bool:
+	var damage := float(w.bullet_damage) * crew_damage
+	var radius := float(w.get("blast", 90.0))
+	var dtype := str(w.get("dtype", ""))
+	var extra := {}
+	if str(w.get("id", "")) == "sludger":
+		lobs += 1
+		if lobs % 2 == 0:
+			damage = T.SLUDGER_GOOP_DAMAGE
+			radius = T.SLUDGER_GOOP_RADIUS
+			dtype = ""
+			extra = {"buildup_kind": StatusBars.GOOP, "buildup": T.SLUDGER_GOOP_BUILDUP}
+		else:
+			extra = {"puddle_r": T.SLUDGER_PUDDLE_RADIUS, "puddle_t": T.SLUDGER_PUDDLE_TIME}
+	elif dtype == "acid":
+		lobs += 1
+		extra = {"puddle_r": T.ACID_PUDDLE_RADIUS, "puddle_t": T.ACID_PUDDLE_TIME}
+	return bool(shells.call("launch", from, landing, flight, damage, radius, team, dtype, extra))
 
 
 func _show_aim(at: Vector2, i: int, w: Dictionary) -> void:
@@ -1119,10 +1157,14 @@ func _shoot(w: Dictionary, muzzle: Vector2, direction: Vector2) -> void:
 			return
 	var cone := deg_to_rad(float(w.spread_deg) * crew_spread)
 	var speed := float(w.bullet_speed) * float(crew_mods.bullet_speed)
-	var pierce := int(crew_mods.pierce)
+	var pierce := maxi(int(crew_mods.pierce), int(w.get("pierce", 0)))
+	var dtype := str(w.get("dtype", ""))
+	if dtype == "" and _active.has("cook_off"):
+		dtype = "fire"   # Demolisher's Cook Off: kinetic shots burn
+	var chain := bool(w.get("chain", false))
 	for p in pellets:
 		var dir := direction.rotated(randf_range(-cone, cone))
-		bullets.fire(muzzle, dir * speed * randf_range(0.95, 1.05) if pellets > 1 else dir * speed, damage, team, pierce)
+		bullets.fire(muzzle, dir * speed * randf_range(0.95, 1.05) if pellets > 1 else dir * speed, damage, team, pierce, dtype, 0.0, chain)
 
 
 # --- Utilities ---------------------------------------------------------------------
@@ -1150,6 +1192,11 @@ func use_ability(index: int) -> bool:
 				lay_spikes(float(a.spike_length), float(a.spike_time))
 		"pulse":
 			shock_pulse(float(a.pulse_radius), float(a.pulse_damage), float(a.pulse_buildup))
+		"goop":
+			goop_shot(float(a.goop_range), float(a.goop_radius))
+		"nitro":
+			_active["nitro"] = {"speed": float(a.nitro_speed), "accel": float(a.nitro_accel), "ram": T.NITRO_RAM, "left": float(a.nitro_time)}
+			_refresh_crew_mods()
 		"mines":
 			if mines != null:
 				var back := -Vector2.RIGHT.rotated(rotation)
@@ -1184,6 +1231,65 @@ func shock_pulse(radius: float, damage: float, buildup: float) -> int:
 	if fx != null:
 		fx.call("blast", global_position, radius)
 	return n
+
+
+## Enemy rigs (the other side's) within `radius`, nearest first.
+func _rigs_near(radius: float) -> Array[Node2D]:
+	var q := PhysicsShapeQueryParameters2D.new()
+	var circle := CircleShape2D.new()
+	circle.radius = radius
+	q.shape = circle
+	q.transform = Transform2D(0.0, global_position)
+	q.collision_mask = T.LAYER_ENEMY if team == BulletPool.TEAM_PLAYER else T.LAYER_VEHICLE
+	q.exclude = [get_rid()]
+	var out: Array[Node2D] = []
+	for hit: Dictionary in get_world_2d().direct_space_state.intersect_shape(q, 16):
+		var body := hit.collider as Node2D
+		if body != null and body.has_method("add_buildup") and not bool(body.get("is_wrecked")):
+			out.append(body)
+	out.sort_custom(func(a: Node2D, b: Node2D) -> bool: return a.global_position.distance_squared_to(global_position) < b.global_position.distance_squared_to(global_position))
+	return out
+
+
+## Goop Launcher: the nearest enemy rig in range (and any within `radius` of
+## it) has its GOOPED bar filled, so the horde goes for it. Returns how many.
+func goop_shot(reach: float, radius: float) -> int:
+	var near := _rigs_near(reach)
+	if near.is_empty():
+		return 0
+	var at := near[0].global_position
+	var n := 0
+	for rig in near:
+		if rig.global_position.distance_to(at) <= radius + 1.0:
+			rig.call("fill_status", StatusBars.GOOP)
+			n += 1
+	if fx != null:
+		fx.call("blast", at, radius)
+	return n
+
+
+## Jammer's Static Burst: shock buildup on every enemy rig in range, and their
+## shields stop recharging for `seconds`.
+func static_burst(radius: float, buildup: float, seconds: float) -> int:
+	var near := _rigs_near(radius)
+	for rig in near:
+		rig.call("add_buildup", StatusBars.SHOCK, buildup)
+		rig.set("jammed_left", seconds)
+	if fx != null:
+		fx.call("blast", global_position, radius)
+	return near.size()
+
+
+## Wrangler's Chain Drag: hooks the nearest enemy rig in reach on a cable
+## (the Harpoon's tether rules); the next RAM within the ability is stronger.
+func chain_drag(reach: float) -> bool:
+	var near := _rigs_near(reach)
+	if near.is_empty():
+		return false
+	chain_target = near[0]
+	release_tether()
+	tether = Tether.new(self, near[0] as CharacterBody2D, T.WRANGLER_TETHER)
+	return true
 
 
 ## 0 when ready, up to 1 right after use.
@@ -1439,6 +1545,9 @@ func arm_for_skulls(skulls: int) -> void:
 
 
 func _recharge_shield(delta: float) -> void:
+	if jammed_left > 0.0:
+		jammed_left -= delta   # Jammer's Static Burst
+		return
 	if shield >= shield_max or shield_max <= 0.0:
 		return
 	if _shield_wait > 0.0:

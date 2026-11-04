@@ -4,6 +4,7 @@ extends Node2D
 ## Bullets carry a team so player fire and enemy fire hit different things.
 
 const T := preload("res://scripts/tuning.gd")
+const StatusBars := preload("res://scripts/status_bars.gd")
 
 const MAX_BULLETS := 96
 const LIFETIME := 0.38  # range = bullet speed x this (~570 px for the starter turret)
@@ -31,6 +32,11 @@ var _dmg := PackedFloat32Array()
 var _life := PackedFloat32Array()
 var _team := PackedByteArray()
 var _pierce := PackedByteArray()   # shamblers it can still pass through
+var _dtype := PackedByteArray()    # damage type: 0 kinetic, else StatusBars kind + 1
+var _chain := PackedByteArray()    # Arc Projector: 1 = jumps to one more target on a hit
+var chained := 0                   # chain jumps (tests)
+var typed_hits := 0                # typed (non-kinetic) hits landed (tests)
+var _chain_query := PhysicsShapeQueryParameters2D.new()
 var _count := 0
 var _query := PhysicsRayQueryParameters2D.new()
 
@@ -44,9 +50,16 @@ func _ready() -> void:
 	_life.resize(MAX_BULLETS)
 	_team.resize(MAX_BULLETS)
 	_pierce.resize(MAX_BULLETS)
+	_dtype.resize(MAX_BULLETS)
+	_chain.resize(MAX_BULLETS)
+	var circle := CircleShape2D.new()
+	circle.radius = T.ARC_CHAIN_RANGE
+	_chain_query.shape = circle
 
 
-func fire(origin: Vector2, velocity: Vector2, damage: float, team := TEAM_PLAYER, pierce := 0) -> void:
+## `dtype` is a damage type ("" kinetic, "fire", "acid", "shock"...); `life` > 0
+## overrides the range (seconds of flight); `chain` makes a hit jump once.
+func fire(origin: Vector2, velocity: Vector2, damage: float, team := TEAM_PLAYER, pierce := 0, dtype := "", life := 0.0, chain := false) -> void:
 	if team == TEAM_PLAYER:
 		shots_fired += 1
 	else:
@@ -56,9 +69,11 @@ func fire(origin: Vector2, velocity: Vector2, damage: float, team := TEAM_PLAYER
 	_pos[_count] = origin
 	_vel[_count] = velocity
 	_dmg[_count] = damage
-	_life[_count] = LIFETIME
+	_life[_count] = life if life > 0.0 else LIFETIME
 	_team[_count] = team
 	_pierce[_count] = clampi(pierce, 0, 255)
+	_dtype[_count] = StatusBars.kind_of(dtype) + 1
+	_chain[_count] = 1 if chain else 0
 	_count += 1
 
 
@@ -92,7 +107,12 @@ func _physics_process(delta: float) -> void:
 				var priority := int(collider.get("lock_priority")) if collider.get("lock_priority") != null else 0
 				if _team[i] == TEAM_PLAYER and priority >= 2:
 					dmg *= big_game  # Hunters and rigs
-				collider.call("take_hit", dmg, _vel[i].normalized() * 140.0)
+				var dtype := type_name(_dtype[i])
+				collider.call("take_hit", dmg, _vel[i].normalized() * 140.0, "shot", dtype)
+				if dtype != "":
+					typed_hits += 1
+				if _chain[i] == 1:
+					_chain_hit(collider as Node2D, hit.position, dmg * T.ARC_CHAIN_SHARE, _team[i], dtype)
 				if _team[i] == TEAM_PLAYER:
 					hits += 1
 				# Piercing Rounds: carry on through a shambler.
@@ -128,8 +148,37 @@ func _remove(i: int) -> void:
 	_life[i] = _life[_count]
 	_team[i] = _team[_count]
 	_pierce[i] = _pierce[_count]
+	_dtype[i] = _dtype[_count]
+	_chain[i] = _chain[_count]
 	if _count == 0:
 		queue_redraw()
+
+
+static func type_name(code: int) -> String:
+	return "" if code <= 0 else str(T.STATUS_TYPES[code - 1])
+
+
+## Arc Projector: a hit jumps to the nearest other target of the same side.
+func _chain_hit(first: Node2D, at: Vector2, damage: float, team: int, dtype: String) -> void:
+	if first == null:
+		return
+	_chain_query.transform = Transform2D(0.0, at)
+	_chain_query.collision_mask = MASKS[team] & ~T.LAYER_WORLD
+	var best: Node2D = null
+	var best_d := INF
+	for hit: Dictionary in get_world_2d().direct_space_state.intersect_shape(_chain_query, 16):
+		var body := hit.collider as Node2D
+		if body == null or body == first or not body.has_method("take_hit") or body.has_method("explode"):
+			continue
+		var d := body.global_position.distance_to(at)
+		if d < best_d:
+			best_d = d
+			best = body
+	if best != null:
+		best.call("take_hit", damage, (best.global_position - at).normalized() * 100.0, "shot", dtype)
+		chained += 1
+		if fx != null:
+			fx.sparks(best.global_position, (at - best.global_position).normalized())
 
 
 func _draw() -> void:

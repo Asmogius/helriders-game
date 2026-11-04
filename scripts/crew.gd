@@ -83,13 +83,13 @@ const PASSIVES := {
 # --- Specialties and their triggered abilities --------------------------------------
 const SPECIALTIES := {
 	"driver": ["wheelman", "speedster", "bootlegger"],
-	"gunner": ["gunslinger", "marksman", "breacher"],
+	"gunner": ["gunslinger", "marksman", "breacher", "demolisher"],
 	"mechanic": ["patcher", "welder"],
-	"spotter": ["marker", "scout"],
+	"spotter": ["marker", "scout", "jammer"],
 	"engineer": ["overclocker", "tinkerer"],
 	"medic": ["field_medic", "combat_medic"],
 	"scavenger": ["magpie", "salvager"],
-	"bruiser": ["bracer", "breaker"],
+	"bruiser": ["bracer", "breaker", "wrangler"],
 }
 # Common numbers. Each rarity above Common adds 10% to `effect` and to the
 # duration and takes 1 s off the cooldown. `fixed` numbers don't scale.
@@ -127,6 +127,19 @@ const ABILITIES := {
 		"effect": {"dr": 0.6, "ram": 0.5}},
 	"breaker": {"name": "Breaker", "ability": "Shockwave", "kind": "shockwave", "time": 0.0, "cooldown": 18.0,
 		"effect": {"damage": 40.0}, "fixed": {"radius": 150.0}},
+	# Content proposal 01 (approved by the owner 2026-11-03).
+	"demolisher": {"name": "Demolisher", "ability": "Cook Off", "kind": "cook_off", "time": 5.0, "cooldown": 24.0,
+		"effect": {"fire_rider": 0.5}, "fixed": {"barrel_mult": 1.5}},
+	"jammer": {"name": "Jammer", "ability": "Static Burst", "kind": "static_burst", "time": 4.0, "cooldown": 26.0,
+		"effect": {"shock_buildup": 60.0}, "fixed": {"radius": 450.0, "shield_off": 1.0}},
+	"wrangler": {"name": "Wrangler", "ability": "Chain Drag", "kind": "chain_drag", "time": 3.0, "cooldown": 22.0,
+		"effect": {"ram": 0.4}, "fixed": {"latch_range": 260.0}},
+}
+# Specialty injury penalties (proposal 01), on top of the class's own.
+const SPECIALTY_INJURY := {
+	"demolisher": {"spread": 1.3},     # fixed weapons spread +30%
+	"jammer": {"util_cd": 1.15},       # utility cooldowns +15%
+	"wrangler": {"ram": 0.8},          # ram dealt -20%
 }
 const MAX_DAMAGE_REDUCTION := 0.9
 
@@ -453,7 +466,7 @@ static func base_mods() -> Dictionary:
 
 ## A runtime entry for compute_mods(): the member's class, passive and perks.
 static func entry(member: Dictionary) -> Dictionary:
-	return {"role": str(member.role), "passive": passive(member),
+	return {"role": str(member.role), "specialty": specialty(member), "passive": passive(member),
 		"perks": (member.get("perks", []) as Array).duplicate(), "injured": false}
 
 
@@ -481,6 +494,9 @@ static func compute_mods(entries: Array, active: Dictionary = {}) -> Dictionary:
 		_apply_passive(m, role, e.passive, scale)
 		if bool(e.injured):
 			_apply_injury(m, role)
+			var hurt: Dictionary = SPECIALTY_INJURY.get(str(e.get("specialty", "")), {})
+			for key: String in hurt:
+				m[key] = float(m[key]) * float(hurt[key])
 		else:
 			for perk: String in e.perks:
 				_apply_perk(m, perk)
@@ -631,6 +647,12 @@ static func _apply_active(m: Dictionary, active: Dictionary) -> void:
 				m.scrap *= 1.0 + float(a.bonus)
 			"brace":
 				m.taken *= 1.0 - minf(float(a.dr), MAX_DAMAGE_REDUCTION)
+				m.ram *= 1.0 + float(a.ram)
+			"chain_drag":
+				m.ram *= 1.0 + float(a.ram)
+			"nitro":   # the Nitro Bottle utility rides the same timer
+				m.speed *= 1.0 + float(a.speed)
+				m.accel *= 1.0 + float(a.accel)
 				m.ram *= 1.0 + float(a.ram)
 
 

@@ -20,6 +20,8 @@ var hazards: GroundHazards
 var mix := {}                            # kind -> share of each pack (set_mix)
 var tanks_left := 0                      # Tanks still to come this job
 var alt_target: Node2D                   # Escort: the truck; each zombie goes for the nearer one
+var bait: Node2D                         # a GOOPED enemy rig (proposal 01): zombies near it go for it
+var bait_left := 0.0
 var speed_bonus := 1.0                   # Retrieve: the horde speeds up as the danger climbs
 var spawn_points: Array[Vector2] = []
 var spawn_budget := T.CLEAR_SHAMBLERS   # shamblers left to spawn this mission
@@ -126,10 +128,15 @@ func _steer(delta: float) -> void:
 	var marked := hazards != null and hazards.is_marked(target)
 	var mark_range2 := T.BILE_MARK_RANGE * T.BILE_MARK_RANGE
 	var count := _active.size()
+	if bait_left > 0.0:
+		bait_left -= delta
+	var baited := bait != null and bait_left > 0.0 and is_instance_valid(bait) and bait.is_inside_tree() and not bool(bait.get("is_wrecked"))
 	for a in count:
 		var zombie := _active[a]
 		var chase: Node2D = target
-		if alt and zombie.position.distance_squared_to(alt_target.position) < zombie.position.distance_squared_to(player_goal):
+		if baited and zombie.position.distance_squared_to(bait.position) < mark_range2:
+			chase = bait
+		elif alt and zombie.position.distance_squared_to(alt_target.position) < zombie.position.distance_squared_to(player_goal):
 			chase = alt_target
 		var goal := chase.position
 		# Re-plan a few times a second (staggered): straight at the target when
@@ -161,7 +168,9 @@ func _steer(delta: float) -> void:
 				_active[b].add_buildup(StatusBars.FIRE, T.BURNING_SPREAD * delta)   # BURNING spreads on touch
 		desired += push * zombie.speed * 0.9
 		if hazards != null:
-			zombie.frenzy = (marked and zombie.position.distance_squared_to(player_goal) < mark_range2) or hazards.bile_at(zombie.position)
+			zombie.frenzy = (marked and zombie.position.distance_squared_to(player_goal) < mark_range2) or hazards.bile_at(zombie.position) or (baited and chase == bait)
+			if hazards.acid_at(zombie.position):
+				zombie.add_buildup(StatusBars.ACID, T.STATUS_POOL_BUILDUP * delta)
 			zombie.oiled = hazards.oil_at(zombie.position)
 			if hazards.fire_at(zombie.position):
 				zombie.add_buildup(StatusBars.FIRE, T.STATUS_POOL_BUILDUP * delta)

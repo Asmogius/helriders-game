@@ -63,6 +63,19 @@ const CATALOG := {
 		"hp": 270.0, "max_speed": 500.0, "reverse_speed": 210.0, "coast": 300.0, "turn_rate": 3.0,
 		"body": [76.0, 42.0], "seats": ["driver", "gunner", "open", "open"],
 	},
+	# Content proposal 01 (approved by the owner 2026-11-03).
+	"raider_frame": {
+		"name": "Raider Frame", "category": "Chassis", "rarity": "Uncommon", "cost": 120, "power": 14.0,
+		"hardpoints": 2, "utility_slots": 1, "internal_slots": 1, "weight_capacity": 90.0,
+		"hp": 125.0, "max_speed": 590.0, "reverse_speed": 240.0, "coast": 270.0, "turn_rate": 3.6,
+		"body": [66.0, 34.0], "seats": ["driver", "gunner", "open"],
+	},
+	"hauler_frame": {
+		"name": "Hauler Frame", "category": "Chassis", "rarity": "Epic", "cost": 320, "power": 22.0,
+		"hardpoints": 2, "utility_slots": 2, "internal_slots": 3, "weight_capacity": 200.0,
+		"hp": 320.0, "max_speed": 470.0, "reverse_speed": 200.0, "coast": 310.0, "turn_rate": 2.7,
+		"body": [82.0, 44.0], "seats": ["driver", "gunner", "open", "open", "open"],
+	},
 	# --- Engines: acceleration and the power budget -------------------------------
 	"junk_v6": {
 		"name": "Junk V6", "category": "Engine", "rarity": "Common", "cost": 40, "power": 0.0, "weight": 20.0,
@@ -135,6 +148,11 @@ const CATALOG := {
 		"power_sides": 7.0, "weight_sides": 30.0, "armor": 142.0, "ram_damage": 75.0,
 		"resist": ["medium", "high", "high", "medium", "low", "low"],
 	},
+	"slag_plating": {
+		"name": "Slag Plating", "category": "Armor", "rarity": "Rare", "cost": 170, "power": 0.0, "weight": 16.0,
+		"weight_sides": 28.0, "armor": 125.0, "ram_damage": 80.0,
+		"resist": ["low", "high", "high", "medium", "medium", "medium"],
+	},
 	# --- Weapons (hardpoints). lock_range 0 = this weapon can't be locked ---------
 	"pintle_turret": {
 		"name": "Pintle Turret", "category": "Weapon", "rarity": "Common", "cost": 40, "power": 50.0, "weight": 15.0,
@@ -176,6 +194,32 @@ const CATALOG := {
 		"name": "Hood Guns", "category": "Weapon", "rarity": "Rare", "cost": 170, "power": 40.0, "weight": 20.0,
 		"mount": 1, "fire_rate": 8.0, "bullet_damage": 7.0, "bullet_speed": 1300.0,
 		"spread_deg": 3.0, "turret_turn_rate": 0.0, "lock_range": 0.0, "pellets": 1,
+	},
+	# Content proposal 01 (approved 2026-11-03). `dtype` is the damage type the
+	# shots carry (builds that status); `chain` jumps each hit to one more target.
+	"rivet_gun": {
+		"name": "Rivet Gun", "category": "Weapon", "rarity": "Common", "cost": 45, "power": 40.0, "weight": 15.0,
+		"mount": 1, "fire_rate": 4.0, "bullet_damage": 16.0, "bullet_speed": 1600.0, "pierce": 1,
+		"spread_deg": 2.0, "turret_turn_rate": 0.0, "lock_range": 0.0, "pellets": 1,
+		"mag": 12, "reload": 2.2,
+	},
+	"flame_sprayer": {
+		"name": "Flame Sprayer", "category": "Weapon", "rarity": "Uncommon", "cost": 100, "power": 35.0, "weight": 12.0,
+		"mount": 1, "fire_rate": 10.0, "bullet_damage": 4.0, "bullet_speed": 580.0, "pierce": 99, "dtype": "fire",
+		"spread_deg": 15.0, "turret_turn_rate": 0.0, "lock_range": 0.0, "pellets": 1,   # 220 px, 30 deg cone
+		"heat_time": 4.0, "lockout": 2.5, "cool": 0.25,
+	},
+	"acid_lobber": {
+		"name": "Acid Lobber", "category": "Weapon", "rarity": "Uncommon", "cost": 110, "power": 40.0, "weight": 15.0,
+		"mount": 0, "kind": "lobber", "dtype": "acid", "fire_rate": 2.0, "bullet_damage": 22.0, "blast": 70.0,
+		"min_range": 250.0, "max_range": 750.0, "flight": 0.9, "mag": 5, "reload": 2.5,
+		"bullet_speed": 1000.0, "spread_deg": 0.0, "turret_turn_rate": 6.0, "lock_range": 750.0, "pellets": 1,
+	},
+	"arc_projector": {
+		"name": "Arc Projector", "category": "Weapon", "rarity": "Rare", "cost": 180, "power": 55.0, "weight": 20.0,
+		"mount": 0, "fire_rate": 6.0, "bullet_damage": 6.0, "bullet_speed": 1000.0, "dtype": "shock", "chain": true,
+		"spread_deg": 2.0, "turret_turn_rate": 7.0, "lock_range": 380.0, "pellets": 1,   # 380 px reach
+		"heat_time": 5.0, "lockout": 3.0, "cool": 0.25,
 	},
 	# Burst weapons: `fire_rate` is bursts per second; each burst is `burst`
 	# rounds, `burst_rate` rounds per second. Approved with the Gunner Rig.
@@ -234,6 +278,10 @@ const CATALOG := {
 		"name": "Roll Cage", "category": "Internal", "rarity": "Uncommon", "cost": 60, "power": 0.0, "weight": 15.0,
 		"injury_mult": 0.5,
 	},
+	"ceramic_heat_sink": {
+		"name": "Ceramic Heat Sink", "category": "Internal", "rarity": "Uncommon", "cost": 90, "power": 15.0, "weight": 5.0,
+		"heat_time_mult": 1.2, "resist_bonus": [0.0, 5.0, 0.0, 0.0, 0.0, 0.0],
+	},
 	# --- Utility (active: a HUD button each) --------------------------------------
 	"emergency_patch": {
 		"name": "Emergency Patch", "category": "Utility", "rarity": "Rare", "cost": 150, "power": 12.0, "weight": 10.0,
@@ -256,6 +304,14 @@ const CATALOG := {
 		"name": "Mine Dropper", "category": "Utility", "rarity": "Rare", "cost": 160, "power": 15.0, "weight": 15.0,
 		"ability": "mines", "cooldown": 15.0, "mines": 3, "mine_damage": 60.0, "mine_radius": 90.0,
 		"mine_arm": 0.5, "mine_life": 20.0,
+	},
+	"goop_launcher": {
+		"name": "Goop Launcher", "category": "Utility", "rarity": "Uncommon", "cost": 100, "power": 15.0, "weight": 10.0,
+		"ability": "goop", "cooldown": 16.0, "goop_range": 500.0, "goop_radius": 90.0,
+	},
+	"nitro_bottle": {
+		"name": "Nitro Bottle", "category": "Utility", "rarity": "Uncommon", "cost": 90, "power": 10.0, "weight": 8.0,
+		"ability": "nitro", "cooldown": 14.0, "nitro_time": 1.5, "nitro_speed": 0.4, "nitro_accel": 1.0,
 	},
 }
 
@@ -281,22 +337,24 @@ const STARTER_LOADOUT := {
 const STARTER_SCHEMATICS := ["scrap_frame", "junk_v6", "street_wheels", "scrap_plating", "pintle_turret", "targeting_computer", "junk_emitter"]
 
 # What an Outrider can drop when you wreck it.
-const OUTRIDER_DROPS := ["outrider_twin_guns", "outrider_light_plating", "outrider_sport_wheels", "coolant_loop", "shock_pulse"]
+const OUTRIDER_DROPS := ["outrider_twin_guns", "outrider_light_plating", "outrider_sport_wheels", "coolant_loop", "shock_pulse", "nitro_bottle"]
 
 # Schematic pools by source (approved in the parts draft).
 const DROP_POOLS := {
 	"outrider": OUTRIDER_DROPS,
-	"elite": ["bulwark_frame", "diesel_block", "half_track", "composite_plating", "heavy_mg_turret", "advanced_targeting", "mine_dropper", "reflex_emitter"],
-	"clear": ["riot_plating", "spiked_ram_plate", "scattergun_turret", "roll_cage"],
+	"elite": ["bulwark_frame", "diesel_block", "half_track", "composite_plating", "heavy_mg_turret", "advanced_targeting", "mine_dropper", "reflex_emitter", "arc_projector"],
+	"clear": ["riot_plating", "spiked_ram_plate", "scattergun_turret", "roll_cage", "rivet_gun"],
 	"survive": ["structural_bracing", "belt_feed", "patched_v8", "emergency_patch"],
 	"courier": ["courier_frame", "turbo_four", "off_road_tires"],
-	"bulwark": ["riot_plating", "spiked_ram_plate", "structural_bracing", "roll_cage", "harpoon"],
+	"bulwark": ["riot_plating", "spiked_ram_plate", "structural_bracing", "roll_cage", "harpoon", "slag_plating"],
 	"gunner": ["burst_turret", "belt_feed", "coolant_loop", "mortar", "emp_computer"],
 	"scrapper": ["oil_slick", "spike_strip", "mine_dropper", "off_road_tires"],   # the Scrapper Gunner shares it
-	"retrieve": ["turbo_four", "off_road_tires", "oil_slick", "mine_dropper"],
+	"retrieve": ["turbo_four", "off_road_tires", "oil_slick", "mine_dropper", "raider_frame"],
 	"escort": ["structural_bracing", "riot_plating", "emergency_patch", "burst_turret"],
 	"patcher": ["capacitor_bank", "flux_coil", "emergency_patch", "structural_bracing"],
-	"convoy": ["heavy_mg_turret", "composite_plating", "diesel_block", "half_track", "cowcatcher_ram", "hood_guns"],
+	"convoy": ["heavy_mg_turret", "composite_plating", "diesel_block", "half_track", "cowcatcher_ram", "hood_guns", "hauler_frame"],
+	"torcher": ["flame_sprayer", "ceramic_heat_sink", "patched_v8", "composite_plating"],
+	"sludger": ["acid_lobber", "goop_launcher", "slag_plating", "emp_computer"],
 }
 
 

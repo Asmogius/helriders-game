@@ -259,4 +259,4 @@ On garage cards: the glyph sits in a 20 px chip in the keyword color on the mod 
 5. Extract or Push with Retrieve (beacon after the non-deep caches) and Escort (only if the optional site was skipped): **PENDING CONFIRMATION**; the draft recommendation is used.
 6. Torcher and Sludger added. **APPROVED.**
 7. Outrider and Bulwark designs, four weapons, four parts, Raider and Hauler frames, three crew, tiered perk numbers, keyword symbols/animations/colors, Harpoon/Mortar/Shock Pulse mods. **APPROVED as drafted.**
-8. Scrapper own-oil rule: not explicitly decided; treated as part of the approved rig refinements.
+8. Scrapper own-oil rule: **APPROVED** by Cameron (lit Scrapper oil burns the Scrapper too; no immunity).
