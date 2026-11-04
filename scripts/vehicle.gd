@@ -1017,6 +1017,7 @@ func _drive(delta: float) -> void:
 
 	side_speed *= exp(-(grip + crew_grip) * traction * delta)
 	velocity = forward * fwd_speed + side * side_speed
+	_track_drift(delta, side_speed, fwd_speed)
 
 	var pre_velocity := velocity
 	move_and_slide()
@@ -1503,6 +1504,8 @@ func _lead_point(target: Node2D, speed := 1500.0) -> Vector2:
 func _shoot(w: Dictionary, muzzle: Vector2, direction: Vector2) -> void:
 	var pellets := int(w.get("pellets", 1))
 	var damage := float(w.bullet_damage) * crew_damage
+	if hit_run_left > 0.0:
+		damage *= 1.0 + T.HIT_AND_RUN_DAMAGE   # Hit and Run
 	if int(w.mount) == Mount.FIXED and _active.has("about_face"):
 		damage *= 1.25   # About Face: fixed guns +25% for 2 s after a Bootleg Turn
 	# A Hunter clinging to the hull is too close for a bullet to travel:
@@ -1524,10 +1527,15 @@ func _shoot(w: Dictionary, muzzle: Vector2, direction: Vector2) -> void:
 	if _active.has("overcharge"):
 		rider += float((_active.overcharge as Dictionary).get("red_hot", 0.0))   # Red Hot perk
 	var chain := bool(w.get("chain", false))
+	# Overload Coil: an OVERLOADed Arc Projector's chain hits 2 extra targets.
+	var jumps := 1
+	if chain and has_mod("overload_coil") and _gun_overloaded(gun_stats.find(w)):
+		jumps = T.OVERLOAD_COIL_JUMPS
+		_perk_fired("overload_coil")
 	for p in pellets:
 		var dir := direction.rotated(randf_range(-cone, cone))
 		bullets.fire(muzzle, dir * speed * randf_range(0.95, 1.05) if pellets > 1 else dir * speed, damage, team, pierce, dtype, 0.0, chain, rider, self,
-				_last_of_burst and has_sp("sp_shrapnel"))   # Shrapnel: the burst's last round splashes
+				_last_of_burst and has_sp("sp_shrapnel"), jumps)   # Shrapnel: the burst's last round splashes
 
 
 # --- Utilities ---------------------------------------------------------------------
@@ -1646,6 +1654,9 @@ func static_burst(radius: float, buildup: float, seconds: float) -> int:
 	for rig in near:
 		rig.call("add_buildup", StatusBars.SHOCK, buildup)
 		rig.set("jammed_left", seconds)
+		# Feedback Loop: OVERLOADed enemy weapons overheat on the spot.
+		if has_sp("sp_feedback_loop") and int(rig.call("force_overheat")) > 0:
+			_perk_fired("sp_feedback_loop")
 	if fx != null:
 		fx.call("blast", global_position, radius)
 	return near.size()
@@ -1746,8 +1757,12 @@ func _tick_status(delta: float) -> void:
 			hp = maxf(hp - T.TOXIC_DPS * delta, floor_hp)
 	if team != BulletPool.TEAM_PLAYER:
 		# Enemy rigs: a small bar under the hull, only while something builds or is on.
-		var now := status.any_active() or status.building()
-		if _status_bar != null and (now or was):
+		# The Outrider's heat bar shows here too while its guns are warm.
+		var warm := _heat.size() > 0 and heat_of(0) > 0.02 and float(gun_stats[0].get("heat_time", 0.0)) > 0.0
+		var now := status.any_active() or status.building() or warm
+		if _status_bar != null and (now or was or _status_bar.heat > 0.0):
+			_status_bar.heat = heat_of(0) if warm else 0.0
+			_status_bar.hot = warm and is_overheated(0)
 			_status_bar.visible = now
 			if now:
 				_status_bar.global_position = global_position + Vector2(0, body_wid * 0.5 + 26.0)
@@ -1836,6 +1851,7 @@ func take_damage(amount: float, from := Vector2.ZERO, splash := false, dtype := 
 		hp = 1.0
 		_invuln_left = 1.0
 		_perk_fired("sp_last_breath")
+	_check_workshop()
 	if hp <= 0.0 and cannot_wreck:
 		hp = hp_max * 0.5
 		for i in 4:
@@ -2178,6 +2194,8 @@ class EnemyStatusBar extends Node2D:
 	## full bar while one is on. Not rotated with the hull.
 	const T := preload("res://scripts/tuning.gd")
 	var bars: RefCounted   # the rig's StatusBars
+	var heat := 0.0        # its heat gun's bar (0 = cold, hidden)
+	var hot := false       # locked hot
 
 	func _draw() -> void:
 		if bars == null:
@@ -2185,6 +2203,14 @@ class EnemyStatusBar extends Node2D:
 		var build: PackedFloat32Array = bars.get("build")
 		var left: PackedFloat32Array = bars.get("left")
 		var y := 0.0
+		if heat > 0.0:
+			# Heat: orange to red, solid red while it's locked hot.
+			var col := Color(1.0, 0.55, 0.15).lerp(Color(1.0, 0.15, 0.1), heat)
+			draw_rect(Rect2(-24, y, 48, 5), Color(0, 0, 0, 0.6))
+			draw_rect(Rect2(-23, y + 1, 46.0 * heat, 3), Color(1.0, 0.15, 0.1) if hot else col)
+			if heat >= T.OVERLOAD_HEAT and not hot:
+				draw_rect(Rect2(-24, y - 1, 48, 7), Color(1.0, 0.3, 0.15, 0.6), false, 1.0)   # OVERLOAD
+			y += 7.0
 		for k in 6:
 			var on := left[k] > 0.0
 			if not on and build[k] <= 0.0:
@@ -2339,6 +2365,80 @@ func player_post_hit(target: Object, dmg: float, dtype: String, went_through: bo
 			if str(gun_stats[i].get("id", "")) == "arc_projector" and i < _heat.size() and not _overheated[i]:
 				_heat[i] *= 1.0 - Mods.THUNDERHEAD_VENT
 		_perk_fired("thunderhead")
+
+
+# --- DRIFT and OVERLOAD keywords ---------------------------------------------------
+
+## DRIFT: sliding sideways at speed. A slide that lasted long enough counts
+## as a DRIFT when it dies down.
+func _track_drift(delta: float, side_speed: float, fwd_speed: float) -> void:
+	hit_run_left = maxf(hit_run_left - delta, 0.0)
+	var now := absf(side_speed) > T.DRIFT_SIDE_SPEED and absf(fwd_speed) > T.DRIFT_MIN_FWD
+	if now:
+		_drift_time += delta
+	elif drifting:
+		if _drift_time >= T.DRIFT_MIN_TIME:
+			end_drift()
+		_drift_time = 0.0
+	drifting = now
+
+
+func is_drifting() -> bool:
+	return drifting and _drift_time >= T.DRIFT_MIN_TIME
+
+
+## A DRIFT just ended: what's keyed to it fires (tests call this directly).
+func end_drift() -> void:
+	drifts += 1
+	drift_ended.emit()
+	if has_mod("hit_and_run"):
+		hit_run_left = T.HIT_AND_RUN_TIME
+		_perk_fired("hit_and_run")
+	if has_mod("drift_fuel"):
+		for a in abilities:
+			if str(a.get("ability", "")) == "nitro" and float(a.ready_in) > 0.0:
+				a.ready_in = maxf(float(a.ready_in) - T.DRIFT_FUEL_REFUND, 0.0)
+				_perk_fired("drift_fuel")
+	if _active.has("hard_line") and has_sp("sp_clean_exit"):
+		for c in crew:
+			if str((c.ability as Dictionary).get("kind", "")) == "hard_line":
+				c.ready_in = maxf(float(c.ready_in) - T.CLEAN_EXIT_REFUND, 0.0)
+		_perk_fired("sp_clean_exit")
+
+
+## OVERLOAD: heat gun `i` running at T.OVERLOAD_HEAT or more, not yet locked.
+func _gun_overloaded(i: int) -> bool:
+	return i >= 0 and i < _heat.size() and float(gun_stats[i].get("heat_time", 0.0)) > 0.0 \
+		and _heat[i] >= T.OVERLOAD_HEAT and not _overheated[i]
+
+
+func is_overloaded_gun() -> bool:
+	for i in _heat.size():
+		if _gun_overloaded(i):
+			return true
+	return false
+
+
+## Feedback Loop: every OVERLOADed heat gun locks hot now. Returns how many.
+func force_overheat() -> int:
+	var n := 0
+	for i in _heat.size():
+		if _gun_overloaded(i):
+			_heat[i] = 1.0
+			_overheated[i] = true
+			n += 1
+	return n
+
+
+## Mobile Workshop (Hauler): the first time HP falls under 30%, 15% comes back.
+func _check_workshop() -> void:
+	if workshop_used or not has_mod("mobile_workshop") or hp <= 0.0 or hp >= hp_max * T.MOBILE_WORKSHOP_AT:
+		return
+	workshop_used = true
+	hp = minf(hp + hp_max * T.MOBILE_WORKSHOP_HEAL, hp_max)
+	if fx != null:
+		fx.call("repair", global_position)
+	_perk_fired("mobile_workshop")
 
 
 ## Straight to HP (Bleed-Through, Weak Point): armor doesn't stop it.
@@ -2695,6 +2795,12 @@ func _area_hit(at: Vector2, radius: float, damage: float, dtype: String) -> int:
 # Numbers: proposal 01 §3.1 and DESIGN §14 crew perk table (approved). Numbers
 # neither gives are T.* constants in tuning.gd (agreed with the owner).
 
+var drifting := false              # DRIFT keyword: sliding sideways at speed
+var drifts := 0                    # DRIFTs ended (tests, keyword feedback)
+var hit_run_left := 0.0            # Hit and Run: +15% damage while > 0
+var workshop_used := false         # Mobile Workshop: once per mission
+var _drift_time := 0.0
+signal drift_ended
 var neuro_left := 0.0              # Neurotoxin: -25% speed, half turret turn while > 0
 var slung_left := 0.0              # Slingshot: flung off a chain; a wall crash is a RAM
 var slung_damage := 0.0

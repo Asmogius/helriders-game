@@ -593,6 +593,23 @@ const WRECK_SLOWMO_TIME := 0.8   # ...for this long (real seconds)
 const WRECK_SWARM := 6           # zombies that close on the wreck
 const WRECK_SWARM_RANGE := 280.0
 
+# Keywords DRIFT and OVERLOAD (§14; the owner approved gap-filler definitions,
+# 2026-11-04). DRIFT: sliding sideways faster than DRIFT_SIDE_SPEED while
+# rolling; it "ends" when the slide dies, if it lasted DRIFT_MIN_TIME.
+# OVERLOAD: a heat gun running at OVERLOAD_HEAT or more of its bar (before it
+# locks hot). Enemy heat guns can be OVERLOADed too.
+const DRIFT_SIDE_SPEED := 160.0
+const DRIFT_MIN_FWD := 150.0
+const DRIFT_MIN_TIME := 0.4
+const OVERLOAD_HEAT := 0.75
+const HIT_AND_RUN_TIME := 2.0      # Raider frame mod: after a DRIFT...
+const HIT_AND_RUN_DAMAGE := 0.15   # ...+15% damage
+const DRIFT_FUEL_REFUND := 3.0     # Nitro Bottle mod: seconds off its cooldown per DRIFT
+const CLEAN_EXIT_REFUND := 1.0     # Wheelman perk: seconds off Hard Line per DRIFT during it
+const OVERLOAD_COIL_JUMPS := 3     # Arc Projector mod: the chain hits 2 extra targets
+const MOBILE_WORKSHOP_AT := 0.30   # Hauler mod: when HP first falls under 30%...
+const MOBILE_WORKSHOP_HEAL := 0.15 # ...restore 15% of max HP, once per mission
+
 const CREW_PRICES := {"Common": 0, "Uncommon": 80, "Rare": 200, "Epic": 450, "Legendary": 900, "Mythic": 1600}
 # Lost crew (§14; agreed with the owner): a crew member lost in a wreck turns
 # up again after 3 days (Uncommon), a day more per rarity step, and joins the

@@ -84,6 +84,7 @@ godot --headless --fixed-fps 60 --path . -s res://tests/layouts_test.gd    # mus
 godot --headless --fixed-fps 60 --path . -s res://tests/art_sheet_test.gd   # must end "art_sheet_test: PASS"
 godot --headless --fixed-fps 60 --path . -s res://tests/art_content_test.gd # must end "art_content_test: PASS"
 godot --headless --fixed-fps 60 --path . -s res://tests/audio_test.gd      # must end "AUDIO TEST PASSED"
+godot --headless --fixed-fps 60 --path . -s res://tests/keywords_test.gd   # must end "KEYWORDS TEST PASSED"
 ```
 
 - Tests must call `Profile.new_game()` with `persist = false` first, so they never touch a real save.

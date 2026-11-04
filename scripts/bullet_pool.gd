@@ -76,7 +76,7 @@ func _ready() -> void:
 
 ## `dtype` is a damage type ("" kinetic, "fire", "acid", "shock"...); `life` > 0
 ## overrides the range (seconds of flight); `chain` makes a hit jump once.
-func fire(origin: Vector2, velocity: Vector2, damage: float, team := TEAM_PLAYER, pierce := 0, dtype := "", life := 0.0, chain := false, rider := 0.0, src: Node2D = null, shrapnel := false) -> void:
+func fire(origin: Vector2, velocity: Vector2, damage: float, team := TEAM_PLAYER, pierce := 0, dtype := "", life := 0.0, chain := false, rider := 0.0, src: Node2D = null, shrapnel := false, jumps := 1) -> void:
 	if team == TEAM_PLAYER:
 		shots_fired += 1
 	else:
@@ -90,7 +90,7 @@ func fire(origin: Vector2, velocity: Vector2, damage: float, team := TEAM_PLAYER
 	_team[_count] = team
 	_pierce[_count] = clampi(pierce, 0, 255)
 	_dtype[_count] = StatusBars.kind_of(dtype) + 1
-	_chain[_count] = 1 if chain else 0
+	_chain[_count] = clampi(jumps, 1, 9) if chain else 0
 	_rider[_count] = rider
 	_passed[_count] = 0
 	_src[_count] = src
@@ -154,8 +154,8 @@ func _physics_process(delta: float) -> void:
 				if _rider[i] > 0.0 and is_instance_valid(collider):
 					collider.call("take_hit", dmg * _rider[i], Vector2.ZERO, "shot", "fire")
 					rider_hits += 1
-				if _chain[i] == 1:
-					_chain_hit(collider as Node2D, hit.position, dmg * T.ARC_CHAIN_SHARE, _team[i], dtype)
+				if _chain[i] >= 1:
+					_chain_hit(collider as Node2D, hit.position, dmg * T.ARC_CHAIN_SHARE, _team[i], dtype, int(_chain[i]))
 				if _team[i] == TEAM_PLAYER:
 					hits += 1
 				# Piercing Rounds: carry on through a shambler (Rail Line: one rig).
@@ -221,26 +221,34 @@ static func type_name(code: int) -> String:
 
 
 ## Arc Projector: a hit jumps to the nearest other target of the same side.
-func _chain_hit(first: Node2D, at: Vector2, damage: float, team: int, dtype: String) -> void:
+## The Arc Projector's jump: to the nearest other target within range, then
+## on from there, `jumps` times (Overload Coil: 3).
+func _chain_hit(first: Node2D, at: Vector2, damage: float, team: int, dtype: String, jumps := 1) -> void:
 	if first == null:
 		return
-	_chain_query.transform = Transform2D(0.0, at)
-	_chain_query.collision_mask = MASKS[team] & ~T.LAYER_WORLD
-	var best: Node2D = null
-	var best_d := INF
-	for hit: Dictionary in get_world_2d().direct_space_state.intersect_shape(_chain_query, 16):
-		var body := hit.collider as Node2D
-		if body == null or body == first or not body.has_method("take_hit") or body.has_method("explode"):
-			continue
-		var d := body.global_position.distance_to(at)
-		if d < best_d:
-			best_d = d
-			best = body
-	if best != null:
-		best.call("take_hit", damage, (best.global_position - at).normalized() * 100.0, "shot", dtype)
+	var done: Array[Node2D] = [first]
+	var from := at
+	for j in jumps:
+		_chain_query.transform = Transform2D(0.0, from)
+		_chain_query.collision_mask = MASKS[team] & ~T.LAYER_WORLD
+		var best: Node2D = null
+		var best_d := INF
+		for hit: Dictionary in get_world_2d().direct_space_state.intersect_shape(_chain_query, 16):
+			var body := hit.collider as Node2D
+			if body == null or done.has(body) or not body.has_method("take_hit") or body.has_method("explode"):
+				continue
+			var d := body.global_position.distance_to(from)
+			if d < best_d:
+				best_d = d
+				best = body
+		if best == null:
+			return
+		best.call("take_hit", damage, (best.global_position - from).normalized() * 100.0, "shot", dtype)
 		chained += 1
 		if fx != null:
-			fx.sparks(best.global_position, (at - best.global_position).normalized())
+			fx.sparks(best.global_position, (from - best.global_position).normalized())
+		done.append(best)
+		from = best.global_position
 
 
 func _draw() -> void:
