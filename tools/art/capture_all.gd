@@ -2,6 +2,7 @@ extends SceneTree
 ## Every-screen capture set for art review (VISUAL_PLAN P0). Needs a display:
 ##   xvfb-run -s "-screen 0 1280x720x24" godot --rendering-driver opengl3 --path . -s res://tools/art/capture_all.gd -- out_dir
 ## Writes `<shot>.png` into out_dir (default user://captures) for every step.
+## Optional second arg: only shots whose name starts with it, e.g. "map_".
 ## Uses a throwaway profile (persist = false), so no save is touched.
 ##
 ## Shots live one per file in tools/art/captures/<NNN>_<shot>.gd (extending
@@ -37,6 +38,8 @@ func _initialize() -> void:
 		if not profile.schematics.has(id):
 			profile.schematics.append(id)
 	_steps = load_steps()
+	if args.size() > 1:
+		_steps = _steps.filter(func(s: Step) -> bool: return s.shot.begins_with(args[1]))
 
 
 ## Every step file in STEP_DIR, sorted by file name, with its shot name set.

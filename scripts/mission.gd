@@ -66,6 +66,9 @@ var mission_override := {}
 ## Tests: ride with these crew (crew.gd dictionaries) instead of the seated ones.
 var crew_override: Array = []
 
+var loading_map := false        # start held (tree paused) while the styled map bakes
+var _load_layer: CanvasLayer
+var _restarting := false         # RESTART keeps the baked map cached; leaving drops it
 var spec := {}                   # the mission being run
 var mission_type := "clear"
 var skulls := 3                  # difficulty, 1 to 6
@@ -375,8 +378,50 @@ func _ready() -> void:
 	hud.crew_picked.connect(use_crew_ability)
 	hud.crew_wheel_toggled.connect(_on_crew_wheel)
 	_sync_hud_to_rig()
-	hud.banner("%s  -  %s" % [Missions.label(spec), str(spec.name).to_upper()], _type_color(), 3.0)
+	if arena.is_baking():
+		_hold_for_bake()
+	else:
+		_start_banner()
 	_refresh_hud()
+
+
+func _start_banner() -> void:
+	hud.banner("%s  -  %s" % [Missions.label(spec), str(spec.name).to_upper()], _type_color(), 3.0)
+
+
+## Outer Blocks style only: the map bakes on a worker; the job waits behind a
+## loading screen (tree paused, input ignored) so the code-drawn map never
+## shows and swaps. The flag-off path never gets here.
+func _hold_for_bake() -> void:
+	loading_map = true
+	get_tree().paused = true
+	_load_layer = CanvasLayer.new()
+	_load_layer.layer = 120
+	_load_layer.process_mode = Node.PROCESS_MODE_ALWAYS
+	var bg := ColorRect.new()
+	bg.color = Color(0.05, 0.05, 0.06)
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.mouse_filter = Control.MOUSE_FILTER_STOP   # swallows taps while loading
+	_load_layer.add_child(bg)
+	var label := Label.new()
+	label.text = "LOADING MAP"
+	label.add_theme_color_override("font_color", T.COL_CYAN)
+	label.add_theme_font_size_override("font_size", 40)
+	label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	bg.add_child(label)
+	add_child(_load_layer)
+	arena.bake_finished.connect(_on_map_ready, CONNECT_ONE_SHOT)
+
+
+func _on_map_ready() -> void:
+	loading_map = false
+	if _load_layer != null:
+		_load_layer.queue_free()
+		_load_layer = null
+	get_tree().paused = false
+	_start_banner()
 
 
 ## Crowd size, specials and objective for this mission's type and skulls.
@@ -961,6 +1006,9 @@ func _wreck_sequence(aboard: Array[String]) -> void:
 
 ## A tap (or any pad button) during the wreck skips to the card.
 func _input(event: InputEvent) -> void:
+	if loading_map:
+		get_viewport().set_input_as_handled()
+		return
 	if not _in_wreck:
 		_kbm_event(event)
 		return
@@ -1190,6 +1238,8 @@ func pad_wants_focus() -> bool:
 ## A pad button in the fight (bound in Settings > CONTROLLER; pad.gd).
 ## Returns true when it was used.
 func pad_button(button: int) -> bool:
+	if loading_map:
+		return true   # swallowed behind the loading screen
 	var pad := _pad()
 	var action := str(pad.call("action_for", button)) if pad != null else ""
 	if menu != null:
@@ -1250,6 +1300,7 @@ func _on_menu_closed() -> void:
 
 ## The fight starts over: same job, same rig and crew, nothing lost.
 func restart_job() -> void:
+	_restarting = true
 	menu = null
 	get_tree().paused = false
 	Engine.time_scale = 1.0
@@ -1283,6 +1334,8 @@ func go_back() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if loading_map:
+		return
 	if menu == null and event is InputEventKey and (event as InputEventKey).pressed and not (event as InputEventKey).echo and (event as InputEventKey).keycode == KEY_ESCAPE:
 		go_back()
 		get_viewport().set_input_as_handled()
@@ -1290,6 +1343,8 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _exit_tree() -> void:
 	Engine.time_scale = 1.0
+	if not _restarting:
+		Arena.clear_cache()   # left the job: free the baked map
 	if is_inside_tree():
 		get_tree().paused = false
 	# Rigs are built up front; free any that never made it into the fight.
