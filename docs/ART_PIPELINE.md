@@ -60,10 +60,10 @@ godot --headless --path . -s res://tests/art_sheet_test.gd
 - **Wreck:** every chunk except the chassis is flung outward from its offset for this heading. Each piece spins and fades over 1.4 s. The hull switches to the darkened chassis sheet, and fire, dust and the crew-haul flow are unchanged. A revive restores the full sheet.
 - **Part layers (voxel):** chassis models have a core (chassis, cab, rear plates, skirts) plus part layers, each built for that chassis's size:
   - `drive:` street wheels, off-road tires, sport wheels, half-track
-  - `armor:` scrap, riot, spiked ram, composite, Outrider light plating
+  - `armor:` scrap, riot, spiked ram, composite, Outrider light plating, cowcatcher ram
   - extras: `nose_guns`, `nose_guns_hot`, `patch_kit`, `mine_rack`, `sensor_dish`, `roll_cage` (the cage is fitted to that chassis's cab)
   - A layer is rendered together with the core, using per-pixel owner ids, and keeps only the pixels the layer actually shows. So it stacks on the core sheet with the core's occlusion baked in, with the same frame and the same ground anchor.
-  - `art_layers()` in `vehicle.gd` picks the layers from the equipped parts. A part without its own sheet (for example the Cowcatcher Ram) uses the stock sheet for its slot.
+  - `art_layers()` in `vehicle.gd` picks the layers from the equipped parts. A part without its own sheet uses the stock sheet for its slot.
 - **Wreck pieces:** layers split into pieces, one per wheel or track, each with its own per-heading offsets. A wreck flings the core chunks (all but the chassis) plus every piece of the fitted layers. The hull switches to `<model>__chassis_burnt.png`, a soot palette where the lights go darker than the hull.
 - **Sheets per chassis:** `<model>__core.png` (the hull sprite), `<model>.png` (composite with the stock parts, for previews), `__<chunk>.png`, `__L_<layer>.png` and `__L_<layer>__<piece>.png`.
 - **Old part marks (replaced by the voxel layers above):** `art_marks()` reads the equipped parts and draws small overlays on the deck for:

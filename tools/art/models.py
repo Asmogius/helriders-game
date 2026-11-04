@@ -109,6 +109,14 @@ def chassis_layers(m, L, W, wheels_x, wheel_len, deck_z, cab, nose_x):
     g = plate("armor:outrider_light_plating")
     box(g, nose_x + 2, L, 5, W - 5, 3, deck_z + 1, "rust")
     box(g, nose_x + 2, L, W // 2 - 1, W // 2 + 1, deck_z + 1, deck_z + 2, "enemy_red")
+    g = plate("armor:cowcatcher_ram")   # angled bar grille sweeping out to a point
+    for x in range(nose_x - 2, L):
+        inset = (x - (nose_x - 2)) * 2
+        y0, y1 = 3 + inset // 2, W - 3 - inset // 2
+        box(g, x, x + 1, y0, y0 + 2, 3, deck_z + 1, "steel"); box(g, x, x + 1, y1 - 2, y1, 3, deck_z + 1, "steel")
+        if x % 2 == 0:
+            box(g, x, x + 1, y0, y1, 4, 6, "steel_dark")
+    box(g, nose_x - 2, nose_x, 3, W - 3, 3, deck_z + 2, "rust")
     m.defaults += ["drive:street_wheels", "armor:scrap_plating"]
     # --- extras ---
     for lid, tip in (("nose_guns", "steel_dark"), ("nose_guns_hot", "white_hot")):

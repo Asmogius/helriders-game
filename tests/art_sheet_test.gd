@@ -221,8 +221,10 @@ func _check_layers() -> void:
 	check(v.art_layers().has("nose_guns_hot") and not v.art_layers().has("nose_guns"), "hot nose guns on Overcharge")
 	v._active.erase("overcharge")
 	v.gun_stats.clear()
-	v.look = {"chassis": "scrap_frame", "drive": "street_wheels", "armor": "cowcatcher_ram"}
+	v.look = {"chassis": "scrap_frame", "drive": "street_wheels", "armor": "no_such_plate"}
 	check(v.art_layers().has("armor:scrap_plating"), "armor without a sheet falls back to stock")
+	v.look = {"chassis": "scrap_frame", "drive": "street_wheels", "armor": "cowcatcher_ram"}
+	check(v.art_layers().has("armor:cowcatcher_ram"), "Cowcatcher Ram has its own sheet")
 	v.queue_free()
 
 
