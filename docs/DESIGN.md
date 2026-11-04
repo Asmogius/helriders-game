@@ -256,6 +256,7 @@ Agreed with the owner on 2026-11-03. **Do not implement until the numbers are dr
 - Layouts are shared across districts; districts change art and enemy mix. Each job type draws suitable layouts.
 - Per-mission variation: blocked roads, shifted props, different spawn sides.
 - Target: at least 4 layouts per job type (~12 total), to expand later.
+- **Built (2026-11-04).** Agreed with the owner: six layouts for the beta, every district looking the same for now. Crossroads (all jobs), Main Drag (Clear, Courier, Retrieve, Escort), Parking Lots (Clear, Survive, Hunt, Escort), Back Alleys (Clear, Hunt, Courier, Retrieve), Rail Yard (Clear, Survive, Courier, Escort) and Plaza (Clear, Survive, Hunt, Retrieve): at least four per job type. Gap-fillers: every layout is the same size as the old block; board jobs get a layout and a variation from their seed (the Comms card names the map); a variation mirrors left-right and/or top-bottom (each half the time), nudges props up to 50 px, barricades one or two roads from each layout's list of safe spots, and has zombies come from two or three of the four sides; maps go in the Database's Places tab once played; jobs from before layouts, and the tutorial, use the Crossroads as drawn. Every layout and 25 variations each are checked headless: every stop, barrel spot, spawn point and the Escort truck's spot is open and reachable from the start.
 
 ## New Weapons
 

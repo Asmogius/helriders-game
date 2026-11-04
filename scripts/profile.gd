@@ -57,6 +57,7 @@ const Parts := preload("res://scripts/parts.gd")
 const Loadout := preload("res://scripts/loadout.gd")
 const Missions := preload("res://scripts/missions.gd")
 const Crew := preload("res://scripts/crew.gd")
+const Layouts := preload("res://scripts/layouts.gd")
 const LOST_DAYS := T.LOST_RETURN_DAYS
 
 const SAVE_VERSION := 1
@@ -1463,7 +1464,7 @@ static func _clean_mission(raw: Variant) -> Dictionary:
 	var skulls := int(d.get("skulls", 0))
 	if skulls <= 0:
 		skulls = [1, 3, 6][clampi(int(d.get("threat", 1)), 1, 3) - 1]
-	return {
+	var out := {
 		"id": str(d.get("id", "")),
 		"type": type,
 		"skulls": clampi(skulls, 1, T.MAX_SKULLS),
@@ -1471,6 +1472,9 @@ static func _clean_mission(raw: Variant) -> Dictionary:
 		"seed": int(d.get("seed", 1)),
 		"reward": int(d.get("reward", 0)),
 	}
+	if Layouts.LAYOUTS.has(str(d.get("layout", ""))):
+		out["layout"] = str(d.layout)
+	return out
 
 
 ## JSON gives back untyped data; rebuild a loadout with only known part ids.

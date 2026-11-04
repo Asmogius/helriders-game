@@ -14,6 +14,7 @@ const Parts := preload("res://scripts/parts.gd")
 const Loadout := preload("res://scripts/loadout.gd")
 const Missions := preload("res://scripts/missions.gd")
 const Arena := preload("res://scripts/arena.gd")
+const Layouts := preload("res://scripts/layouts.gd")
 const Splats := preload("res://scripts/splats.gd")
 const GroundHazards := preload("res://scripts/ground_hazards.gd")
 const ZombieDirector := preload("res://scripts/zombie_director.gd")
@@ -161,6 +162,11 @@ func _ready() -> void:
 	skulls = Missions.skulls(spec)
 
 	arena = Arena.new()
+	# Board jobs carry a layout and vary it by their seed; test and tutorial
+	# runs (no layout) use the Crossroads as drawn.
+	if spec.has("layout"):
+		arena.setup(Layouts.build(str(spec.layout), int(spec.get("seed", 0)) | 1))
+	profile.discover("places", "map_" + str(arena.layout.id))
 	splats = Splats.new()
 	hazards = GroundHazards.new()
 	barrel_layer = Node2D.new()
@@ -189,7 +195,7 @@ func _ready() -> void:
 	reticle = LockReticle.new()
 	camera = ChaseCamera.new()
 	hud = Hud.new()
-	nav = NavGrid.new()
+	nav = NavGrid.new(arena)
 	markers = CourierMarkers.new()
 	markers.z_index = 1
 
@@ -210,7 +216,7 @@ func _ready() -> void:
 	_configure_mission()
 
 	# Wire references before adding to the tree so every _ready() sees them.
-	vehicle.position = Arena.PLAYER_START
+	vehicle.position = arena.player_start
 	vehicle.rotation = -PI / 2.0
 	vehicle.bullets = bullets
 	vehicle.mines = mines
@@ -226,7 +232,7 @@ func _ready() -> void:
 	if truck != null:
 		# Escort: the truck rolls out behind you, and the zombies and enemy
 		# rigs go for it.
-		truck.position = Arena.PLAYER_START + Vector2(0, 110)
+		truck.position = arena.player_start + Vector2(0, 110)
 		truck.rotation = -PI / 2.0
 		truck.bullets = bullets
 		truck.fx = fx
@@ -419,7 +425,7 @@ func _configure_mission() -> void:
 			zombies.pool_size = T.ZOMBIE_CAP
 			zombies.start_count = mini(8, cap)
 			_base_cap = cap
-			extract_at = Arena.PLAYER_START
+			extract_at = arena.player_start
 			_plan_caches(int(Missions.stat(spec, "caches")))
 			for i in int(Missions.stat(spec, "hunters")):
 				_events.append([50.0 + 45.0 * i, "hunter", -1, false])
@@ -1062,8 +1068,8 @@ func lock_candidates() -> Array[Node2D]:
 func _plan_route(count: int) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = int(spec.seed)
-	var pool: Array = Arena.CHECKPOINTS.duplicate()
-	var at := Arena.PLAYER_START
+	var pool: Array = arena.checkpoints.duplicate()
+	var at := arena.player_start
 	var length := 0.0
 	for i in count:
 		var options: Array = pool.filter(func(p: Vector2) -> bool:
@@ -1114,7 +1120,7 @@ func courier_tier() -> String:
 func _plan_caches(count: int) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = int(spec.seed)
-	var pool: Array = Arena.CHECKPOINTS.filter(func(p: Vector2) -> bool: return p.distance_to(extract_at) >= 500.0)
+	var pool: Array = arena.checkpoints.filter(func(p: Vector2) -> bool: return p.distance_to(extract_at) >= 500.0)
 	_shuffle(pool, rng)
 	caches = PackedVector2Array()
 	for p: Vector2 in pool:
@@ -1227,8 +1233,8 @@ func retrieve_pay_mult() -> float:
 func _plan_sites(count: int) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = int(spec.seed)
-	var pool: Array = Arena.CHECKPOINTS.duplicate()
-	var at := Arena.PLAYER_START
+	var pool: Array = arena.checkpoints.duplicate()
+	var at := arena.player_start
 	for i in count:
 		var options: Array = pool.filter(func(p: Vector2) -> bool:
 			var d := at.distance_to(p)
@@ -1458,7 +1464,7 @@ func _on_zombie_killed(at: Vector2, kind: String) -> void:
 func _place_barrels() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash("helriders-barrels-%d" % int(spec.seed))
-	var spots: Array = Arena.BARREL_SPOTS.duplicate()
+	var spots: Array = arena.barrel_spots.duplicate()
 	_shuffle(spots, rng)
 	for i in barrels.size():
 		var kind: String = T.BARREL_TYPES[rng.randi_range(0, T.BARREL_TYPES.size() - 1)]

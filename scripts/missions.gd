@@ -11,6 +11,7 @@ extends RefCounted
 ##   reward   scrap paid on success, before Courier time tiers
 
 const T := preload("res://scripts/tuning.gd")
+const Layouts := preload("res://scripts/layouts.gd")
 
 const TYPES := ["clear", "survive", "hunt", "courier", "retrieve", "escort"]
 
@@ -27,7 +28,9 @@ static func make_board(day: int, count: int, quality: int, district := "outer_bl
 	var board: Array = []
 	for i in count:
 		var type: String = types[i % types.size()]
-		board.append(make(type, _roll_skulls(band, rng), rng.randi(), quality, day, i))
+		var job := make(type, _roll_skulls(band, rng), rng.randi(), quality, day, i)
+		job["layout"] = Layouts.pick(type, int(job.seed))
+		board.append(job)
 	return board
 
 
@@ -162,6 +165,8 @@ static func threats_text(mission: Dictionary) -> String:
 				bits.append("up to %d rig%s called in as it heats up" % [calls, "" if calls == 1 else "s"])
 		"escort":
 			bits.append("%d salvage sites, maybe a risky extra" % int(stat(mission, "sites")))
+	if Layouts.LAYOUTS.has(str(mission.get("layout", ""))):
+		bits.push_front(str(Layouts.LAYOUTS[str(mission.layout)].name))
 	var hunters := _count(mission, "hunters")
 	var rigs := _count(mission, "outriders") + _count(mission, "escorts")
 	var convoy := has_convoy(mission)

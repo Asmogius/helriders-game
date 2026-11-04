@@ -7,6 +7,7 @@ extends RefCounted
 const Parts := preload("res://scripts/parts.gd")
 const Crew := preload("res://scripts/crew.gd")
 const T := preload("res://scripts/tuning.gd")
+const Layouts := preload("res://scripts/layouts.gd")
 
 const CATEGORIES := ["parts", "crew", "enemies", "hazards", "places", "jobs"]
 const CATEGORY_NAMES := {"parts": "PARTS", "crew": "CREW", "enemies": "ENEMIES", "hazards": "HAZARDS",
@@ -76,6 +77,9 @@ static func entries(category: String) -> Array:
 		"places":
 			for d: Dictionary in T.DISTRICTS:
 				out.append([str(d.id), str(d.name), "%s Jobs at %d-%d skulls." % [str(PLACE_TEXT.get(str(d.id), "")), int(d.skulls[0]), int(d.skulls[1])]])
+			for id: String in Layouts.LAYOUTS:
+				var l: Dictionary = Layouts.LAYOUTS[id]
+				out.append(["map_" + id, "Map: %s" % str(l.name), "A layout for %s jobs." % ", ".join((l.jobs as Array).map(func(j: String) -> String: return str(T.MISSIONS[j].label).capitalize()))])
 		"jobs":
 			for type: String in T.MISSIONS:
 				out.append([type, str(T.MISSIONS[type].label), str(T.MISSIONS[type].get("brief", ""))])

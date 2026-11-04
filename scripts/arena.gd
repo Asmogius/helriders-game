@@ -1,66 +1,39 @@
 extends Node2D
-## Outer Blocks test arena: one ruined city block. Builds its own collision and
+## The arena: one ruined city block, laid out from layouts.gd. Builds its own collision and
 ## draws everything static in a single pass (redrawn only once).
 
 const T := preload("res://scripts/tuning.gd")
 
 const WALL := 40.0
-const PLAYER_START := Vector2(1600, 1200)
+const Layouts := preload("res://scripts/layouts.gd")
 
-# Building footprints (x, y, w, h).
-const BUILDINGS := [
-	Rect2(180, 180, 420, 300),
-	Rect2(900, 160, 520, 340),
-	Rect2(1700, 220, 380, 280),
-	Rect2(2400, 160, 560, 360),
-	Rect2(160, 900, 300, 560),
-	Rect2(2780, 860, 260, 600),
-	Rect2(180, 1880, 420, 340),
-	Rect2(1000, 1900, 440, 320),
-	Rect2(1720, 1880, 360, 360),
-	Rect2(2480, 1900, 520, 320),
-]
+# The map this job runs on (layouts.gd). Set with setup() before the arena
+# enters the tree; defaults to the Crossroads as drawn.
+var layout: Dictionary = Layouts.build(Layouts.DEFAULT)
+var player_start: Vector2
+var buildings: Array = []      # Rect2
+var props: Array = []          # [center, size, rotation, kind]
+var roads: Array = []          # Rect2, drawn only
+var checkpoints: Array = []    # Courier stops, Retrieve caches, Escort sites
+var barrel_spots: Array = []
+var spawn_points: Array[Vector2] = []
 
-# Props: [center, size, rotation, kind]  kind 0 = car wreck, 1 = barrier, 2 = crates
-const PROPS := [
-	[Vector2(1240, 980), Vector2(110, 54), 0.35, 0],
-	[Vector2(1980, 1420), Vector2(110, 54), -0.4, 0],
-	[Vector2(1080, 1360), Vector2(150, 36), 0.0, 1],
-	[Vector2(2160, 960), Vector2(150, 36), 1.2, 1],
-	[Vector2(1600, 860), Vector2(64, 64), 0.2, 2],
-	[Vector2(1420, 1480), Vector2(64, 64), -0.1, 2],
-	[Vector2(2500, 1250), Vector2(110, 54), 1.4, 0],
-	[Vector2(760, 1150), Vector2(110, 54), -1.2, 0],
-	[Vector2(1900, 700), Vector2(150, 36), 0.0, 1],
-	[Vector2(1000, 1720), Vector2(110, 54), 0.1, 0],
-]
 
-# Roads as [start, end] bands along y (horizontal) or x (vertical).
-const ROADS_H := [Vector2(620, 820), Vector2(1600, 1800)]
-const ROADS_V := [Vector2(640, 860), Vector2(2120, 2360)]
+func _init() -> void:
+	setup(layout)
 
-# Courier checkpoints: open road and lots, clear of buildings and props.
-const CHECKPOINTS := [
-	Vector2(150, 720), Vector2(750, 720), Vector2(1450, 720), Vector2(2240, 720), Vector2(3050, 720),
-	Vector2(150, 1700), Vector2(750, 1700), Vector2(1550, 1700), Vector2(2240, 1700), Vector2(3050, 1700),
-	Vector2(750, 170), Vector2(750, 1400), Vector2(750, 2260),
-	Vector2(2240, 170), Vector2(2240, 1250), Vector2(2240, 2260),
-	Vector2(1350, 1250), Vector2(1950, 1150),
-]
 
-# Barrel spots (§14: fixed spots per layout, type rolled per job), along the
-# roads so they sit in the way.
-const BARREL_SPOTS := [
-	Vector2(270, 720), Vector2(1050, 720), Vector2(1700, 720), Vector2(2600, 720),
-	Vector2(400, 1700), Vector2(1150, 1700), Vector2(1850, 1700), Vector2(2700, 1700),
-	Vector2(750, 500), Vector2(750, 1150), Vector2(2240, 500), Vector2(2240, 950),
-]
-
-var spawn_points: Array[Vector2] = [
-	Vector2(60, 720), Vector2(60, 1700), Vector2(3140, 720), Vector2(3140, 1700),
-	Vector2(750, 60), Vector2(820, 2340), Vector2(2240, 60), Vector2(2240, 2340),
-	Vector2(1560, 80), Vector2(1580, 2330), Vector2(100, 1200), Vector2(3110, 1200),
-]
+func setup(l: Dictionary) -> void:
+	layout = l
+	player_start = l.start
+	buildings = l.buildings
+	props = l.props
+	roads = l.roads
+	checkpoints = l.checkpoints
+	barrel_spots = l.barrel_spots
+	spawn_points.clear()
+	for p: Vector2 in l.spawn_points:
+		spawn_points.append(p)
 
 
 func _ready() -> void:
@@ -75,9 +48,9 @@ func _ready() -> void:
 	_add_box(solid, Vector2(w.x * 0.5, w.y - WALL * 0.5), Vector2(w.x, WALL), 0.0)
 	_add_box(solid, Vector2(WALL * 0.5, w.y * 0.5), Vector2(WALL, w.y), 0.0)
 	_add_box(solid, Vector2(w.x - WALL * 0.5, w.y * 0.5), Vector2(WALL, w.y), 0.0)
-	for b: Rect2 in BUILDINGS:
+	for b: Rect2 in buildings:
 		_add_box(solid, b.get_center(), b.size, 0.0)
-	for p: Array in PROPS:
+	for p: Array in props:
 		_add_box(solid, p[0], p[1], p[2])
 
 
@@ -102,27 +75,28 @@ func _draw() -> void:
 		var tone := Color(1, 1, 1, 0.018) if i % 2 == 0 else Color(0, 0, 0, 0.05)
 		draw_rect(Rect2(rng.randf_range(0, w.x), rng.randf_range(0, w.y), rng.randf_range(80, 320), rng.randf_range(60, 240)), tone)
 
-	# Roads with curbs and broken centre dashes.
-	for r: Vector2 in ROADS_H:
-		draw_rect(Rect2(0, r.x, w.x, r.y - r.x), T.COL_ROAD)
-		draw_rect(Rect2(0, r.x - 6, w.x, 6), Color(0.24, 0.235, 0.225))
-		draw_rect(Rect2(0, r.y, w.x, 6), Color(0.24, 0.235, 0.225))
-		var mid := (r.x + r.y) * 0.5
-		var x := 20.0
-		while x < w.x:
-			if rng.randf() > 0.2:
-				draw_rect(Rect2(x, mid - 3, 46, 6), T.COL_ROAD_LINE)
-			x += 92.0
-	for r: Vector2 in ROADS_V:
-		draw_rect(Rect2(r.x, 0, r.y - r.x, w.y), T.COL_ROAD)
-		draw_rect(Rect2(r.x - 6, 0, 6, w.y), Color(0.24, 0.235, 0.225))
-		draw_rect(Rect2(r.y, 0, 6, w.y), Color(0.24, 0.235, 0.225))
-		var mid := (r.x + r.y) * 0.5
-		var y := 20.0
-		while y < w.y:
-			if rng.randf() > 0.2:
-				draw_rect(Rect2(mid - 3, y, 6, 46), T.COL_ROAD_LINE)
-			y += 92.0
+	# Roads with curbs and broken centre dashes, along their long side.
+	var curb := Color(0.24, 0.235, 0.225)
+	for r: Rect2 in roads:
+		draw_rect(r, T.COL_ROAD)
+		if r.size.x >= r.size.y:
+			draw_rect(Rect2(r.position.x, r.position.y - 6, r.size.x, 6), curb)
+			draw_rect(Rect2(r.position.x, r.end.y, r.size.x, 6), curb)
+			var mid := r.get_center().y
+			var x := r.position.x + 20.0
+			while x < r.end.x:
+				if rng.randf() > 0.2:
+					draw_rect(Rect2(x, mid - 3, 46, 6), T.COL_ROAD_LINE)
+				x += 92.0
+		else:
+			draw_rect(Rect2(r.position.x - 6, r.position.y, 6, r.size.y), curb)
+			draw_rect(Rect2(r.end.x, r.position.y, 6, r.size.y), curb)
+			var mid := r.get_center().x
+			var y := r.position.y + 20.0
+			while y < r.end.y:
+				if rng.randf() > 0.2:
+					draw_rect(Rect2(mid - 3, y, 6, 46), T.COL_ROAD_LINE)
+				y += 92.0
 
 	# Cracks and rubble.
 	for i in 160:
@@ -135,12 +109,12 @@ func _draw() -> void:
 		draw_rect(Rect2(rng.randf_range(0, w.x), rng.randf_range(0, w.y), s, s), c)
 
 	# Buildings: drop shadow for fake height, then walls and roof.
-	for b: Rect2 in BUILDINGS:
+	for b: Rect2 in buildings:
 		draw_rect(Rect2(b.position + Vector2(16, 16), b.size), Color(0, 0, 0, 0.38))
-	for b: Rect2 in BUILDINGS:
+	for b: Rect2 in buildings:
 		_draw_building(b, rng)
 
-	for p: Array in PROPS:
+	for p: Array in props:
 		_draw_prop(p[0], p[1], p[2], p[3])
 
 	# Perimeter wall.
