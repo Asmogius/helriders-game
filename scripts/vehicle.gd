@@ -174,6 +174,13 @@ var _overheated: Array[bool] = []   # locked until the bar drains to empty
 var _cable: CableLine               # draws the Harpoon spear and cable
 var _fire_cooldown := 0.0
 var _flash := 0.0
+const DirectionalSprite := preload("res://scripts/directional_sprite.gd")
+## Voxel art per chassis id (look.chassis). A chassis without art keeps the
+## code-drawn hull below.
+const ART_CHASSIS := {"scrap_frame": "res://art/sprites/scrap_frame.json"}
+const ART_TURRETS := {"": "res://art/sprites/pintle_turret.json", "pintle_turret": "res://art/sprites/pintle_turret.json"}
+var _hull_art: Sprite2D = null   # DirectionalSprite, or null when drawing by code
+var _art_overlay: Node2D = null  # rotates with the rig, above the hull art
 var _reversing := false
 var _burn_timer := 0.0
 var _burn_left := 0.0
@@ -297,10 +304,88 @@ func _sync_parts() -> void:
 		sprite.enemy = team != BulletPool.TEAM_PLAYER
 		sprite.position = turret_position(i, count)
 		add_child(sprite)
+		var tpath := str(ART_TURRETS.get(sprite.kind, ""))
+		if tpath != "" and ResourceLoader.exists(tpath.get_basename() + ".png"):
+			var ta: Sprite2D = DirectionalSprite.new()
+			if ta.load_meta(tpath):
+				ta.top_level = true   # never rotates; picks its frame from the aim
+				ta.z_index = 1
+				sprite.art = ta
+				sprite.add_child(ta)
+			else:
+				ta.free()
 		_turrets.append(sprite)
 		if _turret == null:
 			_turret = sprite
+	_sync_art()
 	queue_redraw()
+
+
+## Which voxel sheet this rig wears ("" = drawn by code).
+func _art_meta_path() -> String:
+	return str(ART_CHASSIS.get(str(look.get("chassis", "")), ""))
+
+
+func _sync_art() -> void:
+	var path := _art_meta_path()
+	if _hull_art != null and (path == "" or _hull_art.meta_path != path):
+		_hull_art.queue_free()
+		_hull_art = null
+		if _art_overlay != null:
+			_art_overlay.queue_free()
+			_art_overlay = null
+	if path != "" and _hull_art == null and ResourceLoader.exists(path.get_basename() + ".png"):
+		_hull_art = DirectionalSprite.new()
+		if _hull_art.load_meta(path):
+			_hull_art.meta_path = path
+			_hull_art.top_level = true
+			add_child(_hull_art)
+			move_child(_hull_art, 0)
+			_art_overlay = Node2D.new()
+			_art_overlay.draw.connect(_draw_art_overlay)
+			add_child(_art_overlay)
+			move_child(_art_overlay, 1)
+		else:
+			_hull_art.free()
+			_hull_art = null
+	_update_art()
+
+
+## Art follows the rig: the hull sheet picks the frame for the rig's heading,
+## each turret sheet the frame for its own aim, placed on the hull's projected
+## mount point. Gameplay (bodies, turret pivots, muzzles) is untouched.
+func _update_art() -> void:
+	if _hull_art != null:
+		_hull_art.visible = not is_wrecked and visible
+		_hull_art.global_position = global_position
+		_hull_art.heading = global_rotation
+		_hull_art.modulate = Color.WHITE.lerp(Color(1.6, 1.4, 1.2), _flash * 0.6)
+	var single := 0
+	for t in _turrets:
+		if t != null:
+			single += 1
+	for t in _turrets:
+		if t == null or t.art == null:
+			continue
+		var a: Sprite2D = t.art
+		a.heading = t.global_rotation
+		var base := t.global_position
+		if _hull_art != null and single == 1:
+			base = global_position + _hull_art.point_offset("turret_mount")
+		a.global_position = base - a.point_offset("pivot")
+
+
+func _process(_delta: float) -> void:
+	if _hull_art != null or _turret != null:
+		_update_art()
+	if _art_overlay != null:
+		_art_overlay.visible = not is_wrecked
+		_art_overlay.queue_redraw()
+
+
+## Readability marks drawn over the voxel hull (rig-local, rotates with it).
+func _draw_art_overlay() -> void:
+	pass
 
 
 func can_lock() -> bool:
@@ -1496,6 +1581,8 @@ func _burn(delta: float) -> void:
 # --- Look ----------------------------------------------------------------------
 
 func _draw() -> void:
+	if _hull_art != null and not is_wrecked:
+		return   # the voxel sheet draws the rig
 	var half_l := body_len * 0.5
 	var half_w := body_wid * 0.5
 	var hull := T.COL_STEEL
@@ -1605,8 +1692,11 @@ class TurretSprite extends Node2D:
 	var kind := ""   # weapon part id: changes the barrel
 	var hot := false # Overcharge: white-hot muzzle
 	var enemy := false  # enemy turrets wear red
+	var art: Sprite2D = null  # DirectionalSprite when this weapon has voxel art
 
 	func _draw() -> void:
+		if art != null:
+			return
 		match kind:
 			"scattergun_turret":
 				# Short, wide, flared.

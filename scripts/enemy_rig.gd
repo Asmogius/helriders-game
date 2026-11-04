@@ -130,9 +130,25 @@ func _avoid_walls(goal: Vector2, forward: Vector2) -> Vector2:
 	return forward.rotated(steer * 1.1)
 
 
+## Only the plain Outrider has voxel art so far; subclasses draw by code.
+func _art_meta_path() -> String:
+	return "res://art/sprites/outrider.json" if get_script() == preload("res://scripts/enemy_rig.gd") else ""
+
+
+func _draw_art_overlay() -> void:
+	var o := _art_overlay
+	if vuln_left > 0.0:
+		o.draw_arc(Vector2.ZERO, body_len * 0.5 + 8.0, 0.0, TAU, 28, Color(0.95, 0.3, 0.25, 0.85), 2.5)
+	if is_elite():
+		o.draw_rect(Rect2(-body_len * 0.5 + 2.0, -2.0, body_len - 14.0, 4.0), T.COL_ELITE)
+
+
 func _draw() -> void:
 	var half_l := body_len * 0.5
 	var half_w := body_wid * 0.5
+	if _hull_art != null and not is_wrecked:
+		return   # the voxel sheet draws the rig; marks go in _draw_art_overlay
+
 	var hull := Color(0.3, 0.2, 0.16)
 	if is_wrecked:
 		hull = Color(0.1, 0.09, 0.085)
