@@ -15,6 +15,7 @@ const T := preload("res://scripts/tuning.gd")
 const UI := preload("res://scripts/ui_theme.gd")
 const Codex := preload("res://scripts/codex.gd")
 const ProfileScript := preload("res://scripts/profile.gd")
+const PadScript := preload("res://scripts/pad.gd")
 
 var profile: ProfileScript
 var in_job := false
@@ -134,7 +135,7 @@ func _main_page() -> void:
 	_title("PAUSED" if in_job else "MENU")
 	if in_job:
 		_button("RESUME", resume, T.COL_CYAN)
-		_button("TAP AGAIN TO RESTART THE JOB" if restart_armed else "RESTART JOB", restart, T.COL_ORANGE if restart_armed else Color.TRANSPARENT)
+		_button(PadScript.hint("TAP AGAIN TO RESTART THE JOB", "PRESS AGAIN TO RESTART THE JOB") if restart_armed else "RESTART JOB", restart, T.COL_ORANGE if restart_armed else Color.TRANSPARENT)
 	if in_tutorial:
 		_button("LEAVE TUTORIAL", func() -> void: leave_requested.emit())
 	_button("SETTINGS", show_page.bind("settings"))

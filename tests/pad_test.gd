@@ -69,6 +69,7 @@ func _process(_delta: float) -> bool:
 		6:
 			var f := _focus()
 			_check(f is BaseButton and f.is_visible_in_tree(), "a visible button takes focus")
+			_check(garage._hint.text.contains("Cross") and str(garage._tags[9].detail).contains("Cross"), "hints name the pad buttons in controller mode")
 			mark.first = f
 			_action("ui_down")
 		8:
@@ -116,6 +117,7 @@ func _process(_delta: float) -> bool:
 				if (b as Control).focus_mode != Control.FOCUS_NONE:
 					focusable += 1
 			_check(focusable == 0, "touch mode: no button keeps focus")
+			_check(garage._hint.text.begins_with("Tap"), "and the hints go back to touch wording")
 			# The fight.
 			garage.queue_free()
 			main = (load("res://scenes/mission.tscn") as PackedScene).instantiate() as Mission
@@ -138,6 +140,9 @@ func _process(_delta: float) -> bool:
 		22:
 			var v := main.vehicle
 			_check(v.drive_input.distance_to(Vector2(0, -1)) < 0.01, "the left stick drives")
+			var hud: Variant = _hud()
+			_check(hud._ability_buttons.size() >= 1 and hud._ability_buttons[0].pad_badge == "square" and hud._lock_button.pad_badge == "R1" and hud._crew_button.pad_badge == "L1", "HUD buttons show their pad buttons (Square, R1, L1)")
+			_check(str(hud._hint.text).contains("R2"), "the control line names the sticks and R2")
 			_check(absf(v.aim_input.length() - 0.45) < 0.01 and v.aim_input.x > 0.0 and not v.fire_trigger, "the right stick turns the turret without firing")
 			pad.set("override", {"right": Vector2(1, 0), "r2": true})
 		24:

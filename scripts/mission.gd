@@ -46,6 +46,7 @@ const Hud := preload("res://scripts/hud.gd")
 const GameMenu := preload("res://scripts/game_menu.gd")
 const NavGrid := preload("res://scripts/nav_grid.gd")
 const ProfileScript := preload("res://scripts/profile.gd")
+const PadScript := preload("res://scripts/pad.gd")
 const GARAGE_SCENE := "res://scenes/garage.tscn"
 const MISSION_SCENE := "res://scenes/mission.tscn"
 const STATUS_IDS := ["shock", "fire", "acid", "toxic", "slime", "goop"]
@@ -173,6 +174,9 @@ var _events: Array = []          # [seconds, kind, kills that also trigger it (-
 
 func _ready() -> void:
 	profile = get_node("/root/Profile")
+	var pad := get_node_or_null("/root/Pad")
+	if pad != null:
+		pad.connect("mode_changed", _on_pad_mode)
 	_music_start.call_deferred()
 	tutorial = profile.tutorial_active or bool(mission_override.get("tutorial", false))
 	if tutorial:
@@ -787,6 +791,21 @@ const TUT_TIPS := [
 	"ENEMY RIG: an Outrider is coming. Keep moving, it shoots back. Wreck it.",
 	"SALVAGE: drive over the crate to pick up its schematic.",
 ]
+## The same tips for a controller (only the ones that differ).
+const TUT_PAD_TIPS := {
+	1: "SHOOT: aim the turret with the RIGHT stick at a zombie and hold R2 to fire.",
+	2: "LOCK: press R1. While it's on, your turret picks targets and fires by itself.",
+}
+
+
+## Touch <-> controller mid-tutorial: swap the tip's wording.
+func _on_pad_mode(_on: bool) -> void:
+	if tutorial and tut_step < TUT_TIPS.size() and not bool(_tut_mark.get("spawned", false)):
+		hud.set_tip(_tut_tip(tut_step))
+
+
+func _tut_tip(i: int) -> String:
+	return PadScript.hint(TUT_TIPS[i], str(TUT_PAD_TIPS.get(i, TUT_TIPS[i])))
 
 
 func _tutorial_tick() -> void:
@@ -821,7 +840,7 @@ func _tutorial_tick() -> void:
 func _tut_begin() -> void:
 	_tut_mark = {"step": tut_step, "kills": kills, "from": vehicle.global_position}
 	if tut_step < TUT_TIPS.size():
-		hud.set_tip(TUT_TIPS[tut_step])
+		hud.set_tip(_tut_tip(tut_step))
 	match tut_step:
 		1:
 			_tut_spawn_pack(4)

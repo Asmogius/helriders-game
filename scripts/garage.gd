@@ -23,6 +23,7 @@ const Missions := preload("res://scripts/missions.gd")
 const MISSION_SCENE := "res://scenes/mission.tscn"
 const GameMenu := preload("res://scripts/game_menu.gd")
 const GarageTour := preload("res://scripts/garage_tour.gd")
+const PadScript := preload("res://scripts/pad.gd")
 
 var auto_resume := true    # closed mid-job last time: go straight back in (tests switch it off)
 var menu: GameMenu
@@ -95,6 +96,9 @@ var _crew_line: Button
 
 func _ready() -> void:
 	profile = get_node("/root/Profile")
+	var pad := get_node_or_null("/root/Pad")
+	if pad != null:
+		pad.connect("mode_changed", _on_pad_mode)
 	var music := get_node_or_null("/root/MusicManager")
 	if music != null:
 		music.play_garage()
@@ -400,7 +404,7 @@ func _build_rig_area() -> void:
 	_job.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(_job)
 
-	_hint = UI.label("Tap a slot to change parts.  Drag the rig to turn it.", 18, UI.TEXT_DIM)
+	_hint = UI.label(_hint_text(), 18, UI.TEXT_DIM)
 	_hint.anchor_right = 1.0
 	_hint.anchor_top = 1.0
 	_hint.anchor_bottom = 1.0
@@ -669,7 +673,7 @@ func _refresh_tags() -> void:
 		tag.required = REQUIRED.has(slot.key)
 		if id == "":
 			tag.part_name = "Empty"
-			tag.detail = "REQUIRED" if tag.required else "Tap to fit a part"
+			tag.detail = "REQUIRED" if tag.required else PadScript.hint("Tap to fit a part", "Cross to fit a part")
 		else:
 			var part := profile.part(id)
 			tag.part_name = part.name
@@ -709,7 +713,7 @@ func _fill_sheet() -> void:
 		c.queue_free()
 	var slot: Dictionary = SLOTS[selected]
 	var current := _slot_part(slot)
-	_sheet_title.text = "%s   -   tap a part to compare, tap again to fit it    (scrap %d)" % [slot.label, profile.scrap]
+	_sheet_title.text = _sheet_title_text(slot)
 
 	var ids: Array[String] = []
 	for id in profile.schematics:
@@ -784,7 +788,7 @@ func _make_card(slot: Dictionary, id: String, current: String, now: Dictionary) 
 
 ## Status line on a card: what a tap (or a second tap) would do.
 func _style_card(card: PartCard) -> void:
-	var again := "TAP AGAIN:  " if card.selected else ""
+	var again := PadScript.hint("TAP AGAIN:  ", "PRESS AGAIN:  ") if card.selected else ""
 	if card.installed:
 		card.status = "INSTALLED"
 		card.status_color = T.COL_CYAN
@@ -1527,6 +1531,26 @@ func start_tour() -> GarageTour:
 # D-pad / left stick move between buttons, Cross presses, Circle backs out
 # (closes the part sheet, or returns to the garage from a station), L1 / R1
 # switch stations, Options opens MENU.
+
+func _hint_text() -> String:
+	return PadScript.hint("Tap a slot to change parts.  Drag the rig to turn it.",
+		"D-pad: pick a slot.   Cross: change parts.   L1 / R1: stations.   Options: menu.")
+
+
+func _sheet_title_text(slot: Dictionary) -> String:
+	return "%s   -   %s    (scrap %d)" % [slot.label, PadScript.hint("tap a part to compare, tap again to fit it", "Cross on a part to compare, again to fit it"), profile.scrap]
+
+
+## Touch <-> controller: swap the wording on screen.
+func _on_pad_mode(_on: bool) -> void:
+	_hint.text = _hint_text()
+	_refresh_tags()
+	if selected >= 0:
+		_sheet_title.text = _sheet_title_text(SLOTS[selected])
+		for c in _cards.get_children():
+			if c is PartCard:
+				_style_card(c as PartCard)
+
 
 func pad_button(button: int) -> bool:
 	match button:

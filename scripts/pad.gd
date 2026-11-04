@@ -63,6 +63,14 @@ func set_active(on: bool) -> void:
 	mode_changed.emit(on)
 
 
+## The touch wording, or the pad's while a controller is in use (hints and
+## tips; screens listen to mode_changed to swap them).
+static func hint(touch: String, pad: String) -> String:
+	var tree := Engine.get_main_loop() as SceneTree
+	var p: Node = tree.root.get_node_or_null("Pad") if tree != null else null
+	return pad if p != null and bool(p.get("active")) else touch
+
+
 # --- Fights: the sticks and triggers ---------------------------------------------
 
 ## A stick with the deadzone taken out (screen directions, like the thumb sticks).

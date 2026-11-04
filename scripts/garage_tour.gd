@@ -11,9 +11,10 @@ signal finished
 const T := preload("res://scripts/tuning.gd")
 const UI := preload("res://scripts/ui_theme.gd")
 const Parts := preload("res://scripts/parts.gd")
+const PadScript := preload("res://scripts/pad.gd")
 
 const STEPS := [
-	{"tab": "GARAGE", "text": "SALVAGE INTO PARTS: the %s you hauled home is in storage. Tap ARMOR FRONT, then tap the plating twice to fit it.", "wait": true},
+	{"tab": "GARAGE", "text": "SALVAGE INTO PARTS: the %s you hauled home is in storage. Tap ARMOR FRONT, then tap the plating twice to fit it.", "pad_text": "SALVAGE INTO PARTS: the %s you hauled home is in storage. Pick ARMOR FRONT with Cross, then press Cross twice on the plating to fit it.", "wait": true},
 	{"tab": "COMMS", "text": "COMMS: each day, pick one job from the board. More skulls mean a harder job, better pay and better parts."},
 	{"tab": "INN", "text": "INN: your crew live here. Seat them on the rig, let the injured rest, and send spares out on expeditions."},
 	{"tab": "SALOON", "text": "SALOON: hire new crew. Free Common Drivers and Gunners are always at the bar, so you're never stuck."},
@@ -61,6 +62,11 @@ func _ready() -> void:
 	_next.pressed.connect(next)
 	row.add_child(_next)
 	profile.changed.connect(_check_fit)
+	var pad := get_node_or_null("/root/Pad")
+	if pad != null:
+		pad.connect("mode_changed", func(_on: bool) -> void:
+			if STEPS[step].has("pad_text") and not _fitted():
+				_show())
 	_show()
 
 
@@ -68,6 +74,8 @@ func _show() -> void:
 	var s: Dictionary = STEPS[step]
 	garage.call("show_tab", str(s.tab))
 	var text := str(s.text)
+	if s.has("pad_text"):
+		text = PadScript.hint(text, str(s.pad_text))
 	if text.contains("%s"):
 		text = text % str(Parts.get_part(T.TUTORIAL_PART).name)
 	_text.text = text

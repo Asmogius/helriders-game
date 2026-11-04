@@ -173,6 +173,10 @@ func _ready() -> void:
 	_root.add_child(_wheel)
 
 	_build_overlay()
+	var pad := get_node_or_null("/root/Pad")
+	if pad != null:
+		pad.connect("mode_changed", _pad_badges)
+	_pad_badges()
 
 
 ## One round button per utility part ("patch", "mines"), in a row left of
@@ -196,6 +200,7 @@ func set_abilities(kinds: Array[String]) -> void:
 		_ability_buttons.append(b)
 		right_stick.blockers.append(b)
 	_layout_buttons()
+	_pad_badges()
 
 
 ## Right to left: LOCK (if any), CREW (if any crew), then utilities.
@@ -356,7 +361,17 @@ func set_power(used: float, output: float, weight := 0.0, capacity := 0.0) -> vo
 func set_lock_available(available: bool) -> void:
 	_lock_button.visible = available
 	_layout_buttons()
-	_hint.text = "LEFT THUMB  DRIVE      RIGHT THUMB  AIM + FIRE" + ("      LOCK  AUTO-AIM" if available else "")
+	_controls_hint()
+
+
+## The control line at the bottom, in touch or controller wording.
+func _controls_hint() -> void:
+	var lock := _lock_button.visible
+	var pad := get_node_or_null("/root/Pad")
+	if pad != null and bool(pad.get("active")):
+		_hint.text = "LEFT STICK  DRIVE      RIGHT STICK  AIM      R2  FIRE" + ("      R1  LOCK" if lock else "")
+	else:
+		_hint.text = "LEFT THUMB  DRIVE      RIGHT THUMB  AIM + FIRE" + ("      LOCK  AUTO-AIM" if lock else "")
 
 
 func set_status(kills: int, target: int, scrap: int) -> void:
@@ -589,7 +604,13 @@ class LockButton extends Control:
 	## Round toggle. Handles its own touches; the right stick ignores this area.
 	signal toggled(on: bool)
 	const T := preload("res://scripts/tuning.gd")
+	const PadGlyph := preload("res://scripts/pad_glyph.gd")
 	var on := false
+	var pad_badge := "":
+		set(value):
+			if value != pad_badge:
+				pad_badge = value
+				queue_redraw()
 	var has_target := false
 
 	func _ready() -> void:
@@ -630,6 +651,8 @@ class LockButton extends Control:
 			draw_circle(c, 5.0, accent)
 		var font := ThemeDB.fallback_font
 		draw_string(font, Vector2(0.0, size.y + 18.0), "LOCK", HORIZONTAL_ALIGNMENT_CENTER, size.x, 18, Color(accent, 0.9))
+		if pad_badge != "":
+			PadGlyph.draw(self, Vector2(size.x - 8.0, 8.0), pad_badge)
 
 
 class ThreatArrows extends Control:
@@ -668,7 +691,13 @@ class AbilityButton extends Control:
 	signal pressed
 	const T := preload("res://scripts/tuning.gd")
 	const LABELS := {"patch": "PATCH", "mines": "MINES", "oil": "OIL", "spikes": "SPIKES", "pulse": "PULSE", "hard_line": "HARD LINE", "overcharge": "OVERCHARGE"}
+	const PadGlyph := preload("res://scripts/pad_glyph.gd")
 	var kind := ""      # "hard_line", "overcharge", "patch", "mines" or "oil"
+	var pad_badge := "": # controller mode: the face button that fires it
+		set(value):
+			if value != pad_badge:
+				pad_badge = value
+				queue_redraw()
 	var charge := 0.0   # 0 ready, 1 just used
 	var disabled := false
 
@@ -761,6 +790,8 @@ class AbilityButton extends Control:
 		if disabled:
 			label = "INJURED"
 		draw_string(font, Vector2(-20.0, size.y + 18.0), label, HORIZONTAL_ALIGNMENT_CENTER, size.x + 40.0, 15, Color(tint, 0.9))
+		if pad_badge != "":
+			PadGlyph.draw(self, Vector2(size.x - 8.0, 8.0), pad_badge)
 
 
 class CrewButton extends Control:
@@ -768,7 +799,13 @@ class CrewButton extends Control:
 	## while the wheel itself cools down.
 	signal pressed
 	const T := preload("res://scripts/tuning.gd")
+	const PadGlyph := preload("res://scripts/pad_glyph.gd")
 	var has_ready := false
+	var pad_badge := "":
+		set(value):
+			if value != pad_badge:
+				pad_badge = value
+				queue_redraw()
 	var cooldown := 0.0   # 0..1
 
 	func _ready() -> void:
@@ -813,6 +850,8 @@ class CrewButton extends Control:
 			draw_circle(c + Vector2(r * 0.65, -r * 0.65), 8.0, T.COL_ORANGE)
 		var font := ThemeDB.fallback_font
 		draw_string(font, Vector2(-20.0, size.y + 18.0), "CREW", HORIZONTAL_ALIGNMENT_CENTER, size.x + 40.0, 15, Color(tint, 0.9))
+		if pad_badge != "":
+			PadGlyph.draw(self, Vector2(size.x - 8.0, 8.0), pad_badge)
 
 
 class CrewWheel extends Control:
@@ -1053,6 +1092,20 @@ func hide_controls() -> void:
 
 
 # --- Controller (pad.gd) ---------------------------------------------------------
+
+const PadGlyph := preload("res://scripts/pad_glyph.gd")
+
+
+## Controller mode: each button shows the pad button that works it.
+func _pad_badges(_on := false) -> void:
+	var pad := get_node_or_null("/root/Pad")
+	var on := pad != null and bool(pad.get("active"))
+	for i in _ability_buttons.size():
+		_ability_buttons[i].pad_badge = str(PadGlyph.ABILITY[i]) if on and i < PadGlyph.ABILITY.size() else ""
+	_lock_button.pad_badge = "R1" if on else ""
+	_crew_button.pad_badge = "L1" if on else ""
+	_controls_hint()
+
 
 ## R1: the LOCK button, if it's showing.
 func pad_lock() -> void:

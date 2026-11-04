@@ -19,6 +19,11 @@ concurrency:
 env:
   GODOT_VERSION: "4.7.2"
   GODOT_STATUS: "stable"
+  # A signed release APK is built too once these repository secrets exist:
+  # ANDROID_RELEASE_KEYSTORE_BASE64 (the .keystore file, base64), and
+  # ANDROID_RELEASE_KEY_ALIAS / ANDROID_RELEASE_KEY_PASSWORD. Without them
+  # only the debug APK is built, as before.
+  HAS_RELEASE_KEY: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 != '' }}
 
 defaults:
   run:
@@ -150,17 +155,33 @@ jobs:
           fi
           ls -lh build/helriders.apk
 
+      - name: Export signed release APK
+        if: env.HAS_RELEASE_KEY == 'true'
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
+          GODOT_ANDROID_KEYSTORE_RELEASE_PATH: ${{ runner.temp }}/release.keystore
+          GODOT_ANDROID_KEYSTORE_RELEASE_USER: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+          GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+        run: |
+          echo "$KEYSTORE_B64" | base64 -d > "$GODOT_ANDROID_KEYSTORE_RELEASE_PATH"
+          godot --headless --path . --export-release "Android" build/helriders-release.apk 2>&1 | tee export-release.log
+          rm -f "$GODOT_ANDROID_KEYSTORE_RELEASE_PATH"
+          if [ ! -s build/helriders-release.apk ]; then
+            echo "::error::Release APK was not produced"; exit 1
+          fi
+          ls -lh build/helriders-release.apk
+
       - uses: actions/upload-artifact@v7
         with:
           name: helriders-${{ env.APP_VERSION }}
-          path: build/helriders.apk
+          path: build/helriders*.apk
 
       - name: Publish to the "latest-build" release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete latest-build --yes --cleanup-tag || true
-          gh release create latest-build build/helriders.apk \
+          gh release create latest-build build/helriders*.apk \
             --prerelease \
             --target "$GITHUB_SHA" \
             --title "Latest build ${APP_VERSION}" \

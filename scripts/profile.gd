@@ -1231,11 +1231,19 @@ func save_game() -> void:
 	if not persist:
 		return
 	var data := save_data()
-	var file := FileAccess.open(save_path, FileAccess.WRITE)
+	# Write a temp file, then swap it in, keeping the last good save as .bak:
+	# the app dying mid-write can't leave a half-written save behind.
+	var tmp := save_path + ".tmp"
+	var file := FileAccess.open(tmp, FileAccess.WRITE)
 	if file == null:
 		push_warning("Profile: can't write save (%s)" % FileAccess.get_open_error())
 		return
 	file.store_string(JSON.stringify(data, "\t"))
+	file.close()
+	if FileAccess.file_exists(save_path):
+		_move(save_path, save_path + ".bak")
+	if _move(tmp, save_path) != OK:
+		push_warning("Profile: can't swap in the new save")
 
 
 ## Everything the save file holds.
@@ -1276,13 +1284,67 @@ func save_data() -> Dictionary:
 
 
 func load_game() -> bool:
-	if not persist or not FileAccess.file_exists(save_path):
+	if not persist:
 		return false
-	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(save_path))
-	if not parsed is Dictionary:
-		push_warning("Profile: save file unreadable, starting fresh")
+	if not FileAccess.file_exists(save_path) and FileAccess.file_exists(save_path + ".tmp"):
+		_move(save_path + ".tmp", save_path)   # died between write and swap
+	if not FileAccess.file_exists(save_path) and not FileAccess.file_exists(save_path + ".bak"):
 		return false
-	return apply_data(parsed)
+	var data := read_save(save_path)
+	if data.is_empty():
+		# Unreadable: fall back to the previous save, and keep the broken file
+		# aside (never overwrite it) so nothing is lost for good.
+		var backup := read_save(save_path + ".bak")
+		if FileAccess.file_exists(save_path):
+			_move(save_path, save_path + ".broken")
+		if backup.is_empty():
+			push_warning("Profile: save file unreadable, starting fresh")
+			notice = "Your save couldn't be read, so this is a fresh start. The old file is kept as helriders_save.json.broken."
+			return false
+		var ok := apply_data(backup)
+		notice = "Your last save couldn't be read; loaded the one before it."
+		return ok
+	return apply_data(data)
+
+
+static func _move(from: String, to: String) -> Error:
+	return DirAccess.rename_absolute(ProjectSettings.globalize_path(from), ProjectSettings.globalize_path(to))
+
+
+## A save file as a clean dictionary, or {} if it's missing or unreadable.
+## Fields of the wrong type are dropped (they load as a new game's).
+static func read_save(path: String) -> Dictionary:
+	if not FileAccess.file_exists(path):
+		return {}
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+	if not parsed is Dictionary or (parsed as Dictionary).is_empty():
+		return {}
+	return sanitize_save(parsed)
+
+
+const _SAVE_TYPES := {
+	"version": TYPE_FLOAT, "scrap": TYPE_FLOAT, "schematics": TYPE_ARRAY, "storage": TYPE_DICTIONARY,
+	"rig": TYPE_DICTIONARY, "plan": TYPE_DICTIONARY, "presets": TYPE_ARRAY, "upgrades": TYPE_DICTIONARY,
+	"levels": TYPE_DICTIONARY, "research_today": TYPE_FLOAT, "record": TYPE_DICTIONARY, "notice": TYPE_STRING,
+	"day": TYPE_FLOAT, "wreck_day": TYPE_FLOAT, "board": TYPE_ARRAY, "active_mission": TYPE_DICTIONARY,
+	"run_active": TYPE_BOOL, "crew": TYPE_ARRAY, "next_crew_id": TYPE_FLOAT, "saloon": TYPE_ARRAY,
+	"saloon_day": TYPE_FLOAT, "exp_board": TYPE_ARRAY, "exp_board_day": TYPE_FLOAT, "expeditions": TYPE_ARRAY,
+	"expedition_reports": TYPE_ARRAY, "discovered": TYPE_DICTIONARY, "lost": TYPE_ARRAY,
+	"rehire_pool": TYPE_ARRAY, "rehire_day": TYPE_FLOAT, "rehire_pick": TYPE_FLOAT, "rehire_taken": TYPE_BOOL,
+}
+
+
+## Drop top-level fields whose type is wrong (a hand-edited or damaged save),
+## so apply_data never meets, say, a number where it expects a list.
+static func sanitize_save(data: Dictionary) -> Dictionary:
+	var out := {}
+	for key: Variant in data:
+		var want: int = _SAVE_TYPES.get(str(key), -1)
+		var v: Variant = data[key]
+		var got := typeof(v)
+		if want == -1 or got == want or (want == TYPE_FLOAT and got == TYPE_INT) or (want == TYPE_BOOL and got == TYPE_FLOAT):
+			out[str(key)] = v
+	return out
 
 
 ## Load the game from a save_data() dictionary (the file, or a snapshot).
