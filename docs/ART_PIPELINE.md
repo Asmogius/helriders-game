@@ -85,3 +85,32 @@ for the wreck.
 - Chunks render on their own, so a chunk sheet shows faces that the composite hides
   (correct for flying debris).
 - Hull and turret pivots: the turret mount point per heading isn't in the metadata yet.
+
+## Art lookup by id (content models)
+Art is found **by id**: something with id `X` wears `res://art/sprites/X.json` (plus its sheets) if that file exists, otherwise it keeps the code-drawn look. Nothing else needs registering.
+
+| Kind | Where the id comes from | Placement |
+|---|---|---|
+| Chassis | `look.chassis` (parts id) | hull sheet + part layers (drive, armor, extras) |
+| Turret weapon | the weapon's part id (`gun_stats[i].id`; "" = `pintle_turret`) | ring `pivot` on the hull's `turret_mount` / `mount_a` / `mount_b`, frame from its aim |
+| Fixed weapon | the weapon's part id | rear `pivot` on the hull's `nose_mount`, frame from the hull heading; replaces the stock `nose_guns` layer |
+| Utility | `shock_pulse` in `look.utility` | `shock_emitter` hull layer |
+| Enemy rig | `art_id()` in `enemy_rig.gd` ("outrider"); a subclass overrides it | hull sheet; a Hunt elite (`make_elite`) adds the `elite_trim` layer |
+
+Sheets that already ship for ids from the unmerged content branch (Proposal 01):
+- **Rigs:**
+  - `torcher`: rear `fuel_tank` chunk, `weak_spot` and `muzzle` points
+  - `sludger`: `tank` chunk, `turret_mount` for its lobber
+- **Weapons:**
+  - fixed: `rivet_gun`, `flame_sprayer`
+  - turrets: `acid_lobber`, `arc_projector`
+
+These pick up art automatically:
+- A weapon picks up its art as soon as its part id exists in `parts.gd`.
+- A rig picks up its art once its script returns its id from `art_id()`, e.g. `func art_id() -> String: return "torcher"`.
+
+Every enemy hull has an `elite_trim` layer (gold spine stripe and nose chevron).
+
+**Enemy colours:** enemy red `#F23D29`, acid `#99F240`, goop `#E0A458` and elite gold `#FFC740`. `tests/art_content_test.gd` fails if an enemy sheet contains cyan `#40D1E0`, push orange `#ED7A2B`, shield `#8CBFFF` or truck `#73D980`.
+
+**Export:** `export_presets.cfg` includes `art/sprites/*.json`, so the APK ships the metadata.
