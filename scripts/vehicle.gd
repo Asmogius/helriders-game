@@ -25,6 +25,7 @@ const Parts := preload("res://scripts/parts.gd")
 const Loadout := preload("res://scripts/loadout.gd")
 const Crew := preload("res://scripts/crew.gd")
 const StatusBars := preload("res://scripts/status_bars.gd")
+const Tether := preload("res://scripts/tether.gd")
 
 enum Mount { TURRET, FIXED }
 
@@ -156,12 +157,18 @@ var bullets: Node2D                # BulletPool
 var fx: Node2D                     # Fx
 var mines: Node2D                  # MinePool, for the Mine Dropper
 var hazards: Node2D                # GroundHazards, for the Oil Slick
+var shells: Node2D                 # ShellPool, for the Mortar
+var tether: Tether                 # the Harpoon's cable, while it holds a rig
+var harpoon_hits := 0              # spears that struck something (tests)
 
 var _turret: Node2D                # the first turret, if any
 var _turrets: Array[Node2D] = []   # one per weapon; null for fixed guns
 var _cooldowns: Array[float] = []
 var _burst_left: Array[int] = []     # rounds still to go in each gun's burst
 var _burst_gap: Array[float] = []
+var _ammo: Array[int] = []          # rounds left in each magazine weapon
+var _reload_left: Array[float] = [] # its reload, while it's reloading
+var _cable: CableLine               # draws the Harpoon spear and cable
 var _fire_cooldown := 0.0
 var _flash := 0.0
 var _reversing := false
@@ -232,10 +239,15 @@ func apply_stats(s: Dictionary) -> void:
 	_cooldowns.clear()
 	_burst_left.clear()
 	_burst_gap.clear()
+	_ammo.clear()
+	_reload_left.clear()
 	for w in gun_stats:
 		_cooldowns.append(0.0)
 		_burst_left.append(0)
 		_burst_gap.append(0.0)
+		_ammo.append(int(w.get("mag", 0)))
+		_reload_left.append(0.0)
+	release_tether()
 	abilities.clear()
 	for a: Dictionary in s.get("abilities", []):
 		var copy := a.duplicate()
@@ -616,6 +628,7 @@ func _physics_process(delta: float) -> void:
 	if stunned:
 		drive_input = Vector2.ZERO   # STUNNED: no driving, firing or turret turning
 	_drive(delta)
+	_tick_tether(delta)
 	_update_lock(delta)
 	if not stunned:
 		_weapons(delta)
@@ -817,6 +830,13 @@ func _weapons(delta: float) -> void:
 	for i in gun_stats.size():
 		var w := gun_stats[i]
 		_cooldowns[i] = maxf(_cooldowns[i] - delta, 0.0)
+		if _reload_left[i] > 0.0:
+			_reload_left[i] -= delta
+			if _reload_left[i] <= 0.0:
+				_ammo[i] = int(w.get("mag", 0))
+		if str(w.get("kind", "")) == "mortar":
+			_mortar(i, w, delta, manual, locked, can_aim)
+			continue
 		var wants_fire := false
 		var direction := forward
 		var muzzle := global_position + forward * (body_len * 0.25)
@@ -854,6 +874,8 @@ func _weapons(delta: float) -> void:
 				wants_fire = absf(forward.angle_to(lock_target.global_position - global_position)) < 0.2
 			# Twin fixed guns alternate barrels.
 			muzzle += forward.orthogonal() * 9.0 * _barrel_side
+		if not has_round(i):
+			wants_fire = false
 		var burst := int(w.get("burst", 1))
 		if burst > 1:
 			# Burst guns: one pull fires `burst` rounds a beat apart; the burst
@@ -873,7 +895,144 @@ func _weapons(delta: float) -> void:
 			_cooldowns[i] = 1.0 / (float(w.fire_rate) * crew_fire)
 			if turret == null:
 				_barrel_side = -_barrel_side
-			_shoot(w, muzzle, direction)
+			_use_round(i)
+			if str(w.get("kind", "")) == "harpoon":
+				_fire_harpoon(w, global_position, forward)   # from the hull: zombies on the nose get it too
+			else:
+				_shoot(w, muzzle, direction)
+
+
+## A magazine weapon has a round ready (anything without a magazine always does).
+func has_round(i: int) -> bool:
+	return i < _ammo.size() and (int(gun_stats[i].get("mag", 0)) <= 0 or _ammo[i] > 0)
+
+
+## Rounds left in weapon `i`'s magazine (-1 if it has none).
+func ammo_left(i: int) -> int:
+	return _ammo[i] if int(gun_stats[i].get("mag", 0)) > 0 else -1
+
+
+func _use_round(i: int) -> void:
+	if int(gun_stats[i].get("mag", 0)) <= 0:
+		return
+	_ammo[i] -= 1
+	if _ammo[i] <= 0:
+		_reload_left[i] = float(gun_stats[i].get("reload", 1.0))
+
+
+## Mortar: the stick's direction aims the turret and its push sets the
+## distance (min to max range); it lobs a shell whenever one's ready while the
+## stick is held. With LOCK it aims at where the target will be when the shell
+## lands. Shells fly over walls.
+func _mortar(i: int, w: Dictionary, delta: float, manual: bool, locked: bool, can_aim: bool) -> void:
+	var turret := _turrets[i] if i < _turrets.size() else null
+	if turret == null:
+		return
+	var min_r := float(w.get("min_range", 300.0))
+	var max_r := float(w.get("max_range", 1200.0))
+	var flight := float(w.get("flight", 1.2))
+	var dist := -1.0
+	var want_angle := 0.0
+	if manual:
+		var push := clampf(inverse_lerp(AIM_DEADZONE, 1.0, aim_input.length()), 0.0, 1.0)
+		dist = lerpf(min_r, max_r, push)
+		want_angle = aim_input.angle() if can_aim else rotation
+	elif locked and can_aim:
+		var vel: Vector2 = lock_target.get("velocity") if lock_target.get("velocity") != null else Vector2.ZERO
+		var aim_point := lock_target.global_position + vel * flight
+		dist = clampf(turret.global_position.distance_to(aim_point), min_r, max_r)
+		want_angle = (aim_point - turret.global_position).angle()
+	if dist < 0.0:
+		turret.rotation = lerp_angle(turret.rotation, 0.0, 1.0 - exp(-4.0 * delta))
+		_show_aim(Vector2.INF, i, w)
+		return
+	if can_aim:
+		turret.rotation = rotate_toward(turret.rotation, wrapf(want_angle - rotation, -PI, PI), float(w.turret_turn_rate) * crew_aim * delta)
+	else:
+		turret.rotation = lerp_angle(turret.rotation, 0.0, 1.0 - exp(-6.0 * delta))   # no Gunner: straight ahead
+	var landing := turret.global_position + Vector2.RIGHT.rotated(turret.global_rotation) * dist
+	_show_aim(landing, i, w)
+	var on_target := absf(angle_difference(turret.global_rotation, want_angle)) < T.MORTAR_AIM_CONE or not can_aim
+	if on_target and has_round(i) and _cooldowns[i] <= 0.0 and shells != null:
+		if shells.call("launch", turret.global_position, landing, flight, float(w.bullet_damage) * crew_damage, float(w.get("blast", 90.0)), team):
+			_cooldowns[i] = 1.0 / (float(w.fire_rate) * crew_fire)
+			_use_round(i)
+
+
+func _show_aim(at: Vector2, i: int, w: Dictionary) -> void:
+	if shells == null or team != BulletPool.TEAM_PLAYER:
+		return
+	shells.set("aim_at", at)
+	shells.set("aim_radius", float(w.get("blast", 90.0)))
+	shells.set("aim_ammo", maxi(_ammo[i], 0))
+	shells.set("aim_reloading", _reload_left[i] > 0.0)
+
+
+## Harpoon: a spear straight ahead, out to its range. It goes through
+## zombies (up to `pierce`), sets off barrels, stops at walls, and sticks in
+## the first rig it meets, tethering it. Firing again lets go first.
+func _fire_harpoon(w: Dictionary, from: Vector2, direction: Vector2) -> void:
+	release_tether()
+	var reach := float(w.get("range", 600.0))
+	var to := from + direction * reach
+	var space := get_world_2d().direct_space_state
+	var ray := PhysicsRayQueryParameters2D.create(from, to, T.LAYER_WORLD | T.LAYER_ZOMBIE | (T.LAYER_ENEMY if team == BulletPool.TEAM_PLAYER else T.LAYER_VEHICLE))
+	ray.hit_from_inside = true
+	var skip: Array[RID] = [get_rid()]
+	var pierced := 0
+	var end := to
+	for guard in 12:
+		ray.exclude = skip
+		var hit := space.intersect_ray(ray)
+		if hit.is_empty():
+			break
+		var body := hit.collider as Node2D
+		if body == null or not body.has_method("take_hit"):
+			end = hit.position   # a wall
+			break
+		harpoon_hits += 1
+		if body.get("is_wrecked") != null:
+			# A rig: the spear sticks and the cable holds it.
+			end = hit.position
+			body.call("take_hit", float(w.bullet_damage) * crew_damage, direction * 200.0, "shot", "")
+			if not bool(body.get("is_wrecked")):
+				tether = Tether.new(self, body as CharacterBody2D, float(w.get("cable", 500.0)))
+			break
+		body.call("take_hit", float(w.get("zombie_damage", w.bullet_damage)) * crew_damage, direction * 250.0, "shot", "")
+		if fx != null:
+			fx.call("gore", body.global_position, direction)
+		pierced += 1
+		skip.append(hit.rid)
+		if pierced >= int(w.get("pierce", 1)):
+			end = hit.position
+			break
+	_cable_line().flash(from, end)
+
+
+func release_tether() -> void:
+	if tether != null:
+		tether.release()
+		tether = null
+
+
+func _tick_tether(delta: float) -> void:
+	if tether == null:
+		return
+	if not tether.step(delta):
+		release_tether()
+		if _cable != null:
+			_cable.hide_cable()
+		return
+	_cable_line().hold(global_position, tether.b.global_position)
+
+
+func _cable_line() -> CableLine:
+	if _cable == null:
+		_cable = CableLine.new()
+		_cable.top_level = true
+		_cable.z_index = 3
+		add_child(_cable)
+	return _cable
 
 
 func _lead_point(target: Node2D, speed := 1500.0) -> Vector2:
@@ -929,6 +1088,8 @@ func use_ability(index: int) -> bool:
 		"spikes":
 			if hazards != null:
 				lay_spikes(float(a.spike_length), float(a.spike_time))
+		"pulse":
+			shock_pulse(float(a.pulse_radius), float(a.pulse_damage), float(a.pulse_buildup))
 		"mines":
 			if mines != null:
 				var back := -Vector2.RIGHT.rotated(rotation)
@@ -938,6 +1099,31 @@ func use_ability(index: int) -> bool:
 					var at := global_position + back * (body_len * 0.5 + 18.0) + back.orthogonal() * side
 					mines.call("drop", at, float(a.mine_damage) * float(crew_mods.mine), float(a.mine_radius), float(a.mine_arm), float(a.mine_life))
 	return true
+
+
+## Shock Pulse: a burst around the rig that hits the other side (zombies,
+## Hunters, rigs) for `damage` and a fixed `buildup` of shock.
+func shock_pulse(radius: float, damage: float, buildup: float) -> int:
+	var q := PhysicsShapeQueryParameters2D.new()
+	var circle := CircleShape2D.new()
+	circle.radius = radius
+	q.shape = circle
+	q.transform = Transform2D(0.0, global_position)
+	q.collision_mask = T.LAYER_ZOMBIE | (T.LAYER_ENEMY if team == BulletPool.TEAM_PLAYER else T.LAYER_VEHICLE)
+	q.exclude = [get_rid()]
+	var n := 0
+	for hit: Dictionary in get_world_2d().direct_space_state.intersect_shape(q, 48):
+		var body := hit.collider as Node2D
+		if body == null or not body.has_method("take_hit") or body.has_method("explode"):
+			continue   # barrels shrug it off
+		var away := (body.global_position - global_position).normalized()
+		body.call("take_hit", damage, away * 250.0, "pulse", "")
+		if body.has_method("add_buildup"):
+			body.call("add_buildup", StatusBars.SHOCK, buildup)
+		n += 1
+	if fx != null:
+		fx.call("blast", global_position, radius)
+	return n
 
 
 ## 0 when ready, up to 1 right after use.
@@ -1200,6 +1386,9 @@ func _recharge_shield(delta: float) -> void:
 func _wreck() -> void:
 	is_wrecked = true
 	lock_target = null
+	release_tether()
+	if _cable != null:
+		_cable.hide_cable()
 	_burn_left = 6.0
 	for t in _turrets:
 		if t != null:
@@ -1407,3 +1596,41 @@ class EnemyStatusBar extends Node2D:
 			draw_rect(Rect2(-24, y, 48, 5), Color(0, 0, 0, 0.6))
 			draw_rect(Rect2(-23, y + 1, 46.0 * (1.0 if on else clampf(build[k] / T.STATUS_BAR, 0.0, 1.0)), 3), c)
 			y += 7.0
+
+
+class CableLine extends Node2D:
+	## The Harpoon's spear flash and its cable, in world space.
+	var _a := Vector2.ZERO
+	var _b := Vector2.ZERO
+	var _flash := 0.0
+	var _held := false
+
+	func flash(from: Vector2, to: Vector2) -> void:
+		_a = from
+		_b = to
+		_flash = 0.25
+		visible = true
+		queue_redraw()
+
+	func hold(from: Vector2, to: Vector2) -> void:
+		_a = from
+		_b = to
+		_held = true
+		visible = true
+		queue_redraw()
+
+	func hide_cable() -> void:
+		_held = false
+		queue_redraw()
+
+	func _process(delta: float) -> void:
+		if _flash > 0.0:
+			_flash -= delta
+			queue_redraw()
+
+	func _draw() -> void:
+		if _held:
+			draw_line(_a, _b, Color(0.8, 0.78, 0.6), 2.5)
+			draw_circle(_b, 4.0, Color(0.6, 0.6, 0.62))
+		elif _flash > 0.0:
+			draw_line(_a, _b, Color(0.9, 0.9, 0.85, _flash * 4.0), 3.0)

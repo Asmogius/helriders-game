@@ -32,6 +32,7 @@ const Crew := preload("res://scripts/crew.gd")
 const Hunter := preload("res://scripts/hunter.gd")
 const BulletPool := preload("res://scripts/bullet_pool.gd")
 const MinePool := preload("res://scripts/mine_pool.gd")
+const ShellPool := preload("res://scripts/shell_pool.gd")
 const Fx := preload("res://scripts/fx.gd")
 const Pickup := preload("res://scripts/pickup.gd")
 const LockReticle := preload("res://scripts/lock_reticle.gd")
@@ -91,6 +92,7 @@ var enemy_mines: MinePool        # the Scrappers' mines (hurt you and zombies)
 var marked: Node2D               # the last target a Spotter marked (tests)
 var bullets: BulletPool
 var mines: MinePool
+var shells: ShellPool             # Mortar shells in flight
 var fx: Fx
 var pickups: Node2D
 var reticle: LockReticle
@@ -165,6 +167,7 @@ func _ready() -> void:
 	bullets = BulletPool.new()
 	bullets.z_index = 4
 	mines = MinePool.new()
+	shells = ShellPool.new()
 	enemy_mines = MinePool.new()
 	enemy_mines.enemy = true
 	fx = Fx.new()
@@ -190,6 +193,7 @@ func _ready() -> void:
 	vehicle.rotation = -PI / 2.0
 	vehicle.bullets = bullets
 	vehicle.mines = mines
+	vehicle.shells = shells
 	vehicle.hazards = hazards
 	vehicle.fx = fx
 	vehicle.lock_candidates = lock_candidates
@@ -215,6 +219,7 @@ func _ready() -> void:
 	zombies.hazards = hazards
 	bullets.fx = fx
 	mines.fx = fx
+	shells.fx = fx
 	for b in barrels:
 		b.fx = fx
 	enemy_mines.fx = fx
@@ -233,7 +238,7 @@ func _ready() -> void:
 		add_child(truck)
 	for h in hunters:
 		add_child(h)
-	for node: Node in [bullets, fx, reticle, camera, hud]:
+	for node: Node in [bullets, shells, fx, reticle, camera, hud]:
 		add_child(node)
 
 	camera.set_bounds(Rect2(Vector2.ZERO, T.WORLD_SIZE))
