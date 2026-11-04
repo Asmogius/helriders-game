@@ -1696,11 +1696,13 @@ func _take_salvage(pickup: Pickup) -> void:
 	else:
 		salvage.append(pickup.part)
 		hud.banner("SCHEMATIC: " + Parts.describe(pickup.part).to_upper(), Parts.color_of(pickup.part), 3.0)
+	# A Hunt ends when the Elite's drop is in the rig. (Not "when the ground is
+	# empty": a Tank's or escort's cache lying elsewhere mustn't block it.)
+	var elite_drop: bool = elite != null and _rig_crate.get(elite) == pickup
 	# Out of the tree now, so a second physics tick this frame can't collect it twice.
 	pickups.remove_child(pickup)
 	pickup.queue_free()
-	# A Hunt ends when the Elite's drop is in the rig.
-	if state == State.RUNNING and mission_type == "hunt" and elite != null and elite.is_wrecked and pickups.get_child_count() == 0:
+	if state == State.RUNNING and mission_type == "hunt" and elite != null and elite.is_wrecked and elite_drop:
 		_succeed("TARGET DOWN", "", 1.0)
 
 
