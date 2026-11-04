@@ -519,6 +519,18 @@ def _red_lights(c, L, W, z):
     c[1, 3:6, z:z + 2] = C["enemy_red"]; c[1, W - 6:W - 3, z:z + 2] = C["enemy_red"]
 
 
+def windup_glow(m, src, edge_x):
+    """Pre-ram wind-up layer (slot "state"): a recoloured copy of the ram/plow
+    `src` (layers override the core voxels they cover). Plates and spikes go
+    enemy red; only a 1-voxel seam on top of the leading edge is white-hot
+    (a solid pale face read as bone next to the spikes), so it can't read as bone. Driven by windup_progress()."""
+    glow = m.layer("windup_glow", "state")
+    for x, y, z in zip(*np.nonzero(src)):
+        top = z == np.nonzero(src[x, y])[0].max()            # top seam only
+        hot = x >= edge_x and top and src[x, y, z] != C["bone"]
+        glow[x, y, z] = C["white_hot"] if hot else C["enemy_red"]
+
+
 def bulwark_enemy():
     """Enemy Bulwark (bulwark_rig.gd, 84x46): slab hull, armor bands, six heavy
     wheels, a wide spiked plow (the armored front, its own wreck chunk), a light
@@ -547,13 +559,7 @@ def bulwark_enemy():
             box(plow, 81 + j, 82 + j, y - 1 + j // 2, y + 2 - j // 2, 6, 8, "bone")
     gun = m.g("gun")
     box(gun, 58, 84, 21, 25, 13, 16, "steel_dark")
-    # Pre-ram wind-up: the whole plow heats. A recoloured copy of the plow
-    # (layers override the core voxels they cover): plates go enemy red, the
-    # leading edge and spike roots white-hot. Driven by windup_progress().
-    glow = m.layer("windup_glow", "state")
-    pz = np.nonzero(plow)
-    for x, y, z in zip(*pz):
-        glow[x, y, z] = C["white_hot"] if x >= 80 or (plow[x, y, z] == C["bone"] and x <= 82) else C["enemy_red"]
+    windup_glow(m, plow, edge_x=82)
     m.points["nose_mount"] = (66.0, W / 2.0, 13.0)
     elite_trim(m)
     return m
@@ -637,6 +643,7 @@ def convoy_lead():
         box(guns, 78, 96, y0, y0 + 4, 14, 17, "steel_dark")
         guns[95, y0 + 1:y0 + 3, 15] = C["enemy_red"]
     m.points["hitch"] = (4.0, W / 2.0, 9.0)
+    windup_glow(m, ram, edge_x=L - 2)
     elite_trim(m)
     return m
 

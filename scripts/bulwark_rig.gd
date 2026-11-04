@@ -66,7 +66,8 @@ func _on_windup_started() -> void:
 
 func _ready() -> void:
 	super()
-	if has_signal("windup_started"):
+	# Once per rig, also for subclasses (the Convoy) that call super().
+	if has_signal("windup_started") and not is_connected("windup_started", _on_windup_started):
 		connect("windup_started", _on_windup_started)
 
 

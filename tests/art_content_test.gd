@@ -221,18 +221,25 @@ func _check_weapon_scale() -> void:
 
 ## Pre-ram wind-up glow, through a stub that has the interface Content will add.
 func _check_windup() -> void:
-	var b: Node2D = (load("res://tests/stubs/bulwark_windup_stub.gd") as GDScript).new()
+	_check_windup_for("bulwark")
+	_check_windup_for("convoy")
+
+
+func _check_windup_for(id: String) -> void:
+	var b: Node2D = (load("res://tests/stubs/%s_windup_stub.gd" % id) as GDScript).new()
 	root.add_child(b)
+	check(String(b._hull_art.meta_path).ends_with("/%s.json" % id), id + " windup: own sheet")
+	check(b.get_signal_connection_list("windup_started").size() == 1, id + " windup: signal connected once (got %d)" % b.get_signal_connection_list("windup_started").size())
 	b._update_art()
-	check(not b._layer_sprites.has("windup_glow"), "windup: idle, no glow")
+	check(not b._layer_sprites.has("windup_glow"), id + " windup: idle, no glow")
 	b.stub_winding = true
 	var alphas: Array[float] = []
 	for p in [0.0, 0.5, 1.0]:
 		b.stub_progress = p
 		b._update_art()
-		check(b._layer_sprites.has("windup_glow") and b._layer_sprites.windup_glow.visible, "windup: glow at %.1f" % p)
+		check(b._layer_sprites.has("windup_glow") and b._layer_sprites.windup_glow.visible, id + " windup: glow at %.1f" % p)
 		alphas.append(b._layer_sprites.windup_glow.modulate.a)
-	check(alphas[0] >= 0.2 and alphas[2] >= 0.69, "windup: faint at 0, strong at 1 (a=%.2f / %.2f)" % [alphas[0], alphas[2]])
+	check(alphas[0] >= 0.2 and alphas[2] >= 0.69, id + " windup: faint at 0, strong at 1 (a=%.2f / %.2f)" % [alphas[0], alphas[2]])
 	b.stub_progress = 0.0
 	var lo := 1.0
 	var hi := 0.0
@@ -241,12 +248,12 @@ func _check_windup() -> void:
 		var a: float = b.art_layer_modulate("windup_glow").a
 		lo = minf(lo, a)
 		hi = maxf(hi, a)
-	check(hi - lo > 0.15, "windup: glow pulses")
+	check(hi - lo > 0.15, id + " windup: glow pulses")
 	b.stub_progress = 2.0
-	check(is_equal_approx(b.art_windup_progress(), 1.0), "windup: progress clamped to 0..1")
+	check(is_equal_approx(b.art_windup_progress(), 1.0), id + " windup: progress clamped to 0..1")
 	b.emit_signal("windup_started")
-	check(absf(b._windup_t0 - Time.get_ticks_msec() * 0.001) < 0.1, "windup: windup_started restarts the pulse")
+	check(absf(b._windup_t0 - Time.get_ticks_msec() * 0.001) < 0.1, id + " windup: windup_started restarts the pulse")
 	b.stub_winding = false
 	b._update_art()
-	check(not b._layer_sprites.has("windup_glow"), "windup: glow gone after the ram")
+	check(not b._layer_sprites.has("windup_glow"), id + " windup: glow gone after the ram")
 	b.free()

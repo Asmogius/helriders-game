@@ -125,7 +125,7 @@ Every enemy hull has an `elite_trim` layer (gold spine stripe and nose chevron).
 | gunner_rig.gd | gunner | 74x40 | turret `gunner_rig` on turret_mount |
 | scrapper_rig.gd | scrapper | 62x32 | dropper tray chunk |
 | scrapper_gunner_rig.gd | scrapper_gunner | 64x34 | turret gun id `scrapper` -> sheet `scrapper_turret` (ART_WEAPON_ALIASES) |
-| convoy_rig.gd | convoy | 96x46 | ram + nose guns baked into the hull; hitch point |
+| convoy_rig.gd | convoy | 96x46 | ram + nose guns baked into the hull; hitch point; `windup_glow` on the ram (inherits the Bulwark contract) |
 | convoy_trailer.gd | convoy_trailer | 70x40 | `_art_meta_path()` override; turret `convoy_turret` |
 | patcher_rig.gd | patcher | 66x34 | `winch` point; cable/hook/revive drawn over the sheet |
 
@@ -156,3 +156,12 @@ The old always-on attack-mode `charge_glow` was removed: the Bulwark is in
 ATTACK almost all the time, so it would glow constantly and drown out the
 warning. Stub: `tests/stubs/bulwark_windup_stub.gd`. Shot:
 `tools/art/capture_windup.gd` -> `art/previews/capture_bulwark_windup.png`.
+
+**Convoy:** convoy_rig.gd extends bulwark_rig.gd, so it inherits the same hook
+and contract; its sheet has its own `windup_glow` (the ram). The signal is
+connected in bulwark_rig.gd `_ready()` behind an `is_connected` guard, so
+subclasses that call `super()` connect it exactly once. Content will not add a
+`_ready()` to bulwark_rig.gd. The glow's white-hot is a 1-voxel top seam on
+the leading edge only; spikes heat to enemy red. Stub:
+`tests/stubs/convoy_windup_stub.gd`. Shot: `capture_windup.gd -- out.png convoy`
+-> `art/previews/capture_convoy_windup.png`.
