@@ -12,6 +12,7 @@ const T := preload("res://scripts/tuning.gd")
 const SLIME_CAP := 192
 const BILE_CAP := 8
 const OIL_CAP := 16
+const FIRE_CAP := 12
 const REDRAW_EVERY := 0.2   # fading is slow; a few redraws a second is plenty
 
 var marked: Node2D           # the rig wearing bile, if any (mission sets it)
@@ -27,6 +28,10 @@ var _oil_pos := PackedVector2Array()
 var _oil_r := PackedFloat32Array()
 var _oil_life := PackedFloat32Array()
 var _oil_next := 0
+var _fire_pos := PackedVector2Array()
+var _fire_r := PackedFloat32Array()
+var _fire_life := PackedFloat32Array()
+var _fire_next := 0
 var _redraw := 0.0
 
 
@@ -39,6 +44,9 @@ func _ready() -> void:
 	_oil_pos.resize(OIL_CAP)
 	_oil_r.resize(OIL_CAP)
 	_oil_life.resize(OIL_CAP)
+	_fire_pos.resize(FIRE_CAP)
+	_fire_r.resize(FIRE_CAP)
+	_fire_life.resize(FIRE_CAP)
 	clear()
 
 
@@ -46,6 +54,7 @@ func clear() -> void:
 	_slime_life.fill(0.0)
 	_bile_life.fill(0.0)
 	_oil_life.fill(0.0)
+	_fire_life.fill(0.0)
 	marked = null
 	marked_left = 0.0
 	queue_redraw()
@@ -93,6 +102,50 @@ func oil_count() -> int:
 		if _oil_life[i] > 0.0:
 			n += 1
 	return n
+
+
+## Burning ground (§14): a Fire barrel's blast, or oil set alight. Anything
+## standing in it builds BURNING (the mission and director add it).
+func add_fire(at: Vector2, radius: float, seconds: float) -> void:
+	_fire_pos[_fire_next] = at
+	_fire_r[_fire_next] = radius
+	_fire_life[_fire_next] = seconds
+	_fire_next = (_fire_next + 1) % FIRE_CAP
+	ignite_oil(at, radius)
+	queue_redraw()
+
+
+func fire_at(p: Vector2) -> bool:
+	for i in FIRE_CAP:
+		if _fire_life[i] > 0.0 and p.distance_squared_to(_fire_pos[i]) < _fire_r[i] * _fire_r[i]:
+			return true
+	return false
+
+
+func fire_count() -> int:
+	var n := 0
+	for i in FIRE_CAP:
+		if _fire_life[i] > 0.0:
+			n += 1
+	return n
+
+
+## Explosions and fire light oil: every slick touching the circle turns to
+## burning ground for the rest of its life. Returns how many caught.
+func ignite_oil(at: Vector2, radius: float) -> int:
+	var lit := 0
+	for i in OIL_CAP:
+		if _oil_life[i] > 0.0 and at.distance_to(_oil_pos[i]) < radius + _oil_r[i]:
+			var life := _oil_life[i]
+			_oil_life[i] = 0.0
+			lit += 1
+			_fire_pos[_fire_next] = _oil_pos[i]
+			_fire_r[_fire_next] = _oil_r[i]
+			_fire_life[_fire_next] = life
+			_fire_next = (_fire_next + 1) % FIRE_CAP
+	if lit > 0:
+		queue_redraw()
+	return lit
 
 
 ## Slime or oil: a rig here loses grip.
@@ -150,6 +203,9 @@ func _physics_process(delta: float) -> void:
 	for i in OIL_CAP:
 		if _oil_life[i] > 0.0:
 			_oil_life[i] -= delta
+	for i in FIRE_CAP:
+		if _fire_life[i] > 0.0:
+			_fire_life[i] -= delta
 	if marked_left > 0.0:
 		marked_left -= delta
 		queue_redraw()   # the ring follows the rig
@@ -160,6 +216,14 @@ func _physics_process(delta: float) -> void:
 
 
 func _draw() -> void:
+	for i in FIRE_CAP:
+		var life := _fire_life[i]
+		if life > 0.0:
+			var c := T.COL_FIRE_GROUND
+			c.a *= clampf(life / 1.5, 0.0, 1.0)
+			var flick := 0.85 + 0.15 * sin(float(Time.get_ticks_msec()) * 0.02 + i)
+			draw_circle(_fire_pos[i], _fire_r[i] * flick, c)
+			draw_circle(_fire_pos[i], _fire_r[i] * 0.55 * flick, Color(1.0, 0.75, 0.3, c.a))
 	for i in OIL_CAP:
 		var life := _oil_life[i]
 		if life > 0.0:

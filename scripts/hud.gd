@@ -19,6 +19,7 @@ var right_stick: ThumbStick
 var _root: Control
 var _armor_bar: ArmorBar
 var _rig_icon: RigIcon
+var _status_strip: StatusStrip
 var _power_bar: PowerBar
 var _arrows: ThreatArrows
 var _lock_button: LockButton
@@ -52,6 +53,11 @@ func _ready() -> void:
 	_rig_icon.position = Vector2(20, 10)
 	_rig_icon.size = Vector2(64, 76)
 	_root.add_child(_rig_icon)
+
+	_status_strip = StatusStrip.new()
+	_status_strip.position = Vector2(20, 90)
+	_status_strip.size = Vector2(150, 70)
+	_root.add_child(_status_strip)
 
 	_armor_bar = ArmorBar.new()
 	_armor_bar.position = Vector2(94, 18)
@@ -298,6 +304,16 @@ func set_armor(ratio: float) -> void:
 ## 0..1; a facing with no armor fitted is -1 (drawn empty).
 func set_defense(shield_ratio: float, facings: PackedFloat32Array, hp_ratio: float) -> void:
 	_rig_icon.set_values(shield_ratio, facings, hp_ratio)
+
+
+## Status buildup (0..100 per bar) and seconds left on each active status
+## (§14), shown under the rig icon only while something's building or on.
+func set_statuses(build: PackedFloat32Array, left: PackedFloat32Array) -> void:
+	_status_strip.set_values(build, left)
+
+
+func status_strip_visible() -> bool:
+	return _status_strip.showing
 
 
 func defense_icon_values() -> Dictionary:
@@ -871,6 +887,42 @@ class PowerBar extends Control:
 		if over or heavy:
 			text += "  OVERLOAD"
 		draw_string(font, Vector2(size.x + 10.0, size.y + 1.0), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, color)
+
+
+class StatusStrip extends Control:
+	## One thin bar per status that's building, in its colour, with its name;
+	## a status that's on shows full and bright. Hidden when nothing is going.
+	const T := preload("res://scripts/tuning.gd")
+	var build := PackedFloat32Array([0, 0, 0, 0, 0, 0])
+	var left := PackedFloat32Array([0, 0, 0, 0, 0, 0])
+	var showing := false
+
+	func set_values(new_build: PackedFloat32Array, new_left: PackedFloat32Array) -> void:
+		var changed := false
+		for k in 6:
+			changed = changed or absf(new_build[k] - build[k]) > 0.5 or (new_left[k] > 0.0) != (left[k] > 0.0)
+		if not changed:
+			return
+		build = new_build.duplicate()
+		left = new_left.duplicate()
+		showing = false
+		for k in 6:
+			showing = showing or build[k] > 0.0 or left[k] > 0.0
+		queue_redraw()
+
+	func _draw() -> void:
+		var font := get_theme_default_font()
+		var y := 0.0
+		for k in 6:
+			var on := left[k] > 0.0
+			if not on and build[k] <= 0.0:
+				continue
+			var c: Color = T.STATUS_COLORS[k]
+			var fill := 1.0 if on else clampf(build[k] / T.STATUS_BAR, 0.0, 1.0)
+			draw_rect(Rect2(0, y, 70, 7), Color(0, 0, 0, 0.55))
+			draw_rect(Rect2(1, y + 1, 68.0 * fill, 5), c if on else Color(c, 0.75))
+			draw_string(font, Vector2(76, y + 8), str(T.STATUS_NAMES[k]), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, c if on else Color(c, 0.7))
+			y += 11.0
 
 
 class RigIcon extends Control:

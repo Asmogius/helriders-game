@@ -103,11 +103,11 @@ func deflects(at: Vector2) -> bool:
 	return not is_wrecked and is_front(at) and facing_armor[FRONT] > 0.0
 
 
-func take_hit(damage: float, impulse: Vector2, cause := "shot") -> void:
+func take_hit(damage: float, impulse: Vector2, cause := "shot", dtype := "") -> void:
 	# The impulse points the way the hit travels, so it came from behind it.
 	if impulse != Vector2.ZERO and is_front(global_position - impulse.normalized() * 100.0):
 		front_hits += 1
-	super(damage, impulse, cause)
+	super(damage, impulse, cause, dtype)
 
 
 func _draw() -> void:

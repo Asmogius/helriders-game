@@ -157,6 +157,7 @@ static func build(loadout: Dictionary, levels: Dictionary = {}) -> Dictionary:
 		"shield_delay": float(shield.get("shield_delay", T.DEFAULT_SHIELD_DELAY)),
 		"shield_refill": float(shield.get("shield_refill", T.DEFAULT_SHIELD_REFILL)),
 		"ram_damage": float(front.get("ram_damage", 30.0)) + ram_bonus,
+		"resist": resistances(plates, chassis, internal),
 		"mount": int(first.get("mount", 0)),
 		"fire_rate": float(first.get("fire_rate", 0.0)),
 		"bullet_damage": float(first.get("bullet_damage", 0.0)),
@@ -190,6 +191,29 @@ static func build(loadout: Dictionary, levels: Dictionary = {}) -> Dictionary:
 		},
 	}
 	out["armor"] = toughness(out)
+	return out
+
+
+## Status resistances (§14), shock fire acid toxic slime goop. The rig starts
+## at T.STATUS_RESIST_BASE; every fitted plate adds its profile's step, and the
+## chassis and internals add any `resist_bonus` they carry (agreed with the
+## owner: all of it adds up). Capped at T.STATUS_RESIST_CAP.
+static func resistances(plates: Dictionary, chassis: Dictionary, internal: Array[Dictionary]) -> Array:
+	var out: Array = []
+	for k in 6:
+		out.append(T.STATUS_RESIST_BASE)
+	for slot: String in ARMOR_SLOTS:
+		var profile: Array = (plates[slot] as Dictionary).get("resist", [])
+		for k in mini(profile.size(), 6):
+			out[k] = float(out[k]) + float(T.STATUS_RESIST_STEP.get(str(profile[k]), 0.0))
+	var extras: Array[Dictionary] = [chassis]
+	extras.append_array(internal)
+	for part: Dictionary in extras:
+		var bonus: Array = part.get("resist_bonus", [])
+		for k in mini(bonus.size(), 6):
+			out[k] = float(out[k]) + float(bonus[k])
+	for k in 6:
+		out[k] = minf(float(out[k]), T.STATUS_RESIST_CAP)
 	return out
 
 

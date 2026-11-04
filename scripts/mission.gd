@@ -24,6 +24,8 @@ const GunnerRig := preload("res://scripts/gunner_rig.gd")
 const ScrapperRig := preload("res://scripts/scrapper_rig.gd")
 const ConvoyRig := preload("res://scripts/convoy_rig.gd")
 const FriendlyTruck := preload("res://scripts/friendly_truck.gd")
+const StatusBars := preload("res://scripts/status_bars.gd")
+const Barrel := preload("res://scripts/barrel.gd")
 const Crew := preload("res://scripts/crew.gd")
 const Hunter := preload("res://scripts/hunter.gd")
 const BulletPool := preload("res://scripts/bullet_pool.gd")
@@ -56,6 +58,8 @@ var skulls := 3                  # difficulty, 1 to 6
 var arena: Arena
 var splats: Splats
 var hazards: GroundHazards
+var barrels: Array[Barrel] = []
+var barrel_layer: Node2D
 var zombies: ZombieDirector
 var vehicle: Vehicle
 var rigs: Node2D                 # enemy rigs live here
@@ -133,6 +137,13 @@ func _ready() -> void:
 	arena = Arena.new()
 	splats = Splats.new()
 	hazards = GroundHazards.new()
+	barrel_layer = Node2D.new()
+	for i in T.BARRELS_PER_JOB:
+		var b := Barrel.new()
+		b.hazards = hazards
+		barrels.append(b)
+		barrel_layer.add_child(b)
+	_place_barrels()
 	splats.z_index = -5
 	zombies = ZombieDirector.new()
 	vehicle = Vehicle.new()
@@ -193,6 +204,8 @@ func _ready() -> void:
 	zombies.hazards = hazards
 	bullets.fx = fx
 	mines.fx = fx
+	for b in barrels:
+		b.fx = fx
 	enemy_mines.fx = fx
 	zombies.target = vehicle
 	zombies.spawn_points = arena.spawn_points
@@ -203,7 +216,7 @@ func _ready() -> void:
 	# Tree order is also physics order:
 	# inputs (here) -> zombies -> player rig -> enemy rigs -> hunters -> bullets.
 	# Hunters run after the rig so they see this tick's wall contact.
-	for node: Node in [arena, splats, hazards, markers, mines, enemy_mines, pickups, zombies, vehicle, rigs]:
+	for node: Node in [arena, splats, hazards, markers, mines, enemy_mines, barrel_layer, pickups, zombies, vehicle, rigs]:
 		add_child(node)
 	if truck != null:
 		add_child(truck)
@@ -218,6 +231,7 @@ func _ready() -> void:
 
 	zombies.zombie_killed.connect(_on_zombie_killed)
 	vehicle.wrecked.connect(_on_wrecked)
+	vehicle.status_started.connect(_on_status_started)
 	vehicle.crew_injured.connect(_on_crew_injured)
 	vehicle.crew_healed.connect(_on_crew_healed)
 	vehicle.crew_ability_used.connect(_on_crew_ability)
@@ -1025,6 +1039,7 @@ func _refresh_hud() -> void:
 	for i in 4:
 		plates[i] = vehicle.facing_armor[i] / vehicle.facing_max[i] if vehicle.facing_max[i] > 0.0 else -1.0
 	hud.set_defense(vehicle.shield / vehicle.shield_max if vehicle.shield_max > 0.0 else -1.0, plates, vehicle.hp / maxf(vehicle.hp_max, 1.0))
+	hud.set_statuses(vehicle.status.build, vehicle.status.left)
 	hud.set_power(vehicle.power_load(), vehicle.power_capacity(), vehicle.weight_load, vehicle.weight_limit())
 	for i in vehicle.crew.size():
 		_crew_state(i)
@@ -1142,12 +1157,39 @@ func _on_zombie_killed(at: Vector2, kind: String) -> void:
 				hud.banner("BILE!  THE HORDE IS COMING", T.COL_BOOMER, 2.0)
 
 
-## Every rig on slime or oil loses grip (the player's and the enemy rigs alike).
+## Barrels at fixed spots, their types rolled from the job's seed (§14).
+func _place_barrels() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("helriders-barrels-%d" % int(spec.seed))
+	var spots: Array = Arena.BARREL_SPOTS.duplicate()
+	_shuffle(spots, rng)
+	for i in barrels.size():
+		var kind: String = T.BARREL_TYPES[rng.randi_range(0, T.BARREL_TYPES.size() - 1)]
+		barrels[i].place(spots[i], kind)
+
+
+## Ground hazards on every rig (yours, the enemies', an Escort's truck):
+## slime and oil build SLICK, burning ground builds BURNING (§14).
 func _apply_slime(delta: float) -> void:
-	vehicle.set_on_slime(hazards.slick_at(vehicle.global_position), delta)
+	_ground_on(vehicle, delta)
 	for rig in rigs.get_children():
-		if rig.has_method("set_on_slime"):
-			rig.call("set_on_slime", hazards.slick_at((rig as Node2D).global_position), delta)
+		_ground_on(rig as Vehicle, delta)
+	if truck != null:
+		_ground_on(truck, delta)
+
+
+func _ground_on(rig: Vehicle, delta: float) -> void:
+	if rig == null or rig.is_wrecked:
+		return
+	rig.set_on_slime(hazards.slick_at(rig.global_position), delta)
+	if hazards.fire_at(rig.global_position):
+		rig.add_buildup(StatusBars.FIRE, T.STATUS_POOL_BUILDUP * delta)
+
+
+## A status started on your rig. GOOPED marks it for the horde.
+func _on_status_started(k: int) -> void:
+	if k == StatusBars.GOOP:
+		hazards.mark(vehicle)
 
 
 ## A scrap crate at `at` (a Tank's), scaled like other caches.

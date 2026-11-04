@@ -217,7 +217,6 @@ const SLIME_RADIUS := 22.0
 const SLIME_TIME := 10.0
 const SLIME_PUDDLE_RADIUS := 60.0      # left where a Slimer dies
 const SLIME_GRIP := 0.35               # rig grip on slime...
-const SLIME_LINGER := 0.5              # ...and for this long after
 const COL_BRUTE := Color(0.42, 0.4, 0.36)
 const COL_TANK := Color(0.5, 0.33, 0.3)
 const COL_BOOMER := Color(0.66, 0.7, 0.3)
@@ -334,6 +333,7 @@ const TRUCK := {
 	"grip": 8.0,
 	"armor": 400.0,            # total of the layers below
 	"hp": 120.0, "front": 70.0, "side": 70.0, "rear": 70.0,
+	"resist": [45.0, 45.0, 45.0, 45.0, 45.0, 45.0],   # shock fire acid toxic slime goop
 	"ram_damage": 40.0,
 	"mount": 1,
 	"fire_rate": 0.0,          # no guns: that's your job
@@ -464,6 +464,60 @@ const DEFAULT_SHIELD_DELAY := 3.0
 const DEFAULT_SHIELD_REFILL := 5.0
 const COL_SHIELD := Color(0.55, 0.75, 1.0)
 
+# --- Statuses and damage types (§14; agreed with the owner) ----------------------
+# Every status uses buildup: typed hits fill a 100-point bar that drains over
+# time; a full bar triggers the status. Order everywhere: shock, fire, acid,
+# toxic, slime, goop -> STUNNED, BURNING, CORRODED, TOXIC, SLICK, GOOPED.
+const STATUS_NAMES := ["STUNNED", "BURNING", "CORRODED", "TOXIC", "SLICK", "GOOPED"]
+const STATUS_TYPES := ["shock", "fire", "acid", "toxic", "slime", "goop"]
+const STATUS_COLORS := [Color(0.55, 0.8, 1.0), Color(1.0, 0.45, 0.15), Color(0.6, 0.95, 0.25),
+	Color(0.7, 0.4, 0.9), Color(0.45, 0.85, 0.6), Color(0.85, 0.85, 0.3)]
+const STATUS_BAR := 100.0
+# Buildup taken = hit buildup x (100 - resistance) / 50 (0 = x2, 50 = x1, 100 = immune).
+const STATUS_DRAIN := 15.0            # per second, once nothing's added for...
+const STATUS_DRAIN_DELAY := 1.5       # ...this long
+const STATUS_AFTERGLOW := 3.0         # after a trigger, buildup runs at half speed this long
+const STATUS_HIT_BUILDUP := 2.0       # a typed hit adds this x its damage as buildup
+const STATUS_POOL_BUILDUP := 25.0     # per second inside slime, oil, fire ground (and Miasma)
+const STATUS_SHIELD_RESIST := 15.0    # an active shield adds this to every resistance (cap 100)
+const STATUS_RESIST_BASE := 30.0      # the player's rig before parts (agreed with the owner)...
+const STATUS_RESIST_STEP := {"low": 5.0, "medium": 10.0, "high": 15.0}   # ...plus each plate's profile
+const STATUS_RESIST_CAP := 95.0       # parts alone never make you immune
+const ZOMBIE_RESIST := 50.0           # zombies are neutral to everything
+# How long each lasts, on rigs and on zombies (seconds).
+const STATUS_TIME_RIG := [1.2, 5.0, 6.0, 8.0, 3.0, 6.0]
+const STATUS_TIME_ZOMBIE := [2.0, 5.0, 6.0, 8.0, 3.0, 6.0]
+const BURNING_RIG_DPS := 6.0          # across the facings, by the splash rule
+const BURNING_ZOMBIE_DPS := 15.0      # and it spreads to zombies it touches...
+const BURNING_SPREAD := 50.0          # ...as this much fire buildup a second (2 s of contact)
+const BURNING_TOUCH := 50.0           # "touching": centres this close
+const CORRODED_TAKEN := 1.25          # +25% damage taken
+const TOXIC_DPS := 4.0                # straight to HP (rigs: blocked by a raised shield)...
+const TOXIC_FLOOR := 0.1              # ...and never below 10% of max HP
+const SLICK_ZOMBIE_SPEED := 0.5
+# Damage types: Kinetic (bullets, rams) all-round; the rest get a bonus.
+const SHOCK_VS_SHIELD := 1.5
+const ACID_VS_ARMOR := 1.5
+const FIRE_VS_ZOMBIES := 1.5
+
+# Barrels (§14): battlefield hazards, so they hurt everyone, the player
+# included. Shot or rammed; blasts chain. Fixed spots per layout; the type is
+# rolled per job.
+const BARREL_HP := 20.0
+const BARREL_TYPES := ["explosive", "fire", "acid", "slime", "boomer"]
+const BARREL_RADIUS := 140.0          # blast reach (Explosive, Fire, Acid)
+const BARREL_EXPLOSIVE_DAMAGE := 60.0
+const BARREL_EXPLOSIVE_SHOVE := 4000.0
+const BARREL_FIRE_DAMAGE := 25.0
+const BARREL_FIRE_GROUND_TIME := 6.0
+const BARREL_ACID_DAMAGE := 20.0
+const BARREL_ACID_BUILDUP := 80.0
+const BARREL_SLIME_POOL := 80.0       # radius (a 160 px pool)...
+const BARREL_SLIME_TIME := 10.0       # ...for this long
+const BARREL_BOOMER_RADIUS := 160.0   # fills the GOOPED bar of everything this close
+const BARRELS_PER_JOB := 7
+const COL_FIRE_GROUND := Color(1.0, 0.45, 0.1, 0.35)
+
 # Overload (DESIGN §4: overload reduces mobility). Power drawn over the
 # engine's output, or weight over the chassis's capacity, scales acceleration
 # and top speed by (limit / load) ^ exponent. Both together multiply.
@@ -484,6 +538,7 @@ const OUTRIDER := {
 	"grip": 6.5,
 	"armor": 260.0,            # total of the layers below (§14 table)
 	"hp": 100.0, "front": 40.0, "side": 40.0, "rear": 40.0,
+	"resist": [45.0, 50.0, 50.0, 50.0, 35.0, 50.0],   # shock fire acid toxic slime goop
 	"ram_damage": 40.0,
 	"mount": 1,                # twin guns fixed forward
 	"fire_rate": 8.0,
@@ -505,6 +560,7 @@ const GUNNER := {
 	"grip": 7.0,
 	"armor": 345.0,            # total of the layers below (§14 table; was 340)
 	"hp": 120.0, "front": 60.0, "side": 55.0, "rear": 55.0,
+	"resist": [35.0, 55.0, 50.0, 50.0, 55.0, 50.0],   # shock fire acid toxic slime goop
 	"shield": 30.0, "shield_skulls": 4, "shield_delay": 3.0, "shield_refill": 5.0,   # a shield from 4 skulls
 	"ram_damage": 40.0,
 	"mount": 0,                # turret on top
@@ -530,6 +586,7 @@ const SCRAPPER := {
 	"grip": 6.5,
 	"armor": 230.0,            # total of the layers below (§14 table; was 200)
 	"hp": 90.0, "front": 35.0, "side": 35.0, "rear": 35.0,
+	"resist": [50.0, 30.0, 50.0, 50.0, 90.0, 50.0],   # shock fire acid toxic slime goop
 	"ram_damage": 30.0,
 	"mount": 0,                # one weak turret
 	"gun_id": "scrapper",
@@ -552,6 +609,7 @@ const CONVOY := {
 	"grip": 8.0,
 	"armor": 650.0,            # total of the layers below (agreed with the owner)
 	"hp": 200.0, "front": 250.0, "side": 70.0, "rear": 60.0,   # the plow is a very heavy front plate
+	"resist": [60.0, 60.0, 35.0, 55.0, 70.0, 50.0],   # shock fire acid toxic slime goop
 	"shield": 30.0, "shield_skulls": 4, "shield_delay": 3.0, "shield_refill": 5.0,   # cab only, from 4 skulls
 	"ram_damage": 120.0,
 	"mount": 1,                # two small guns fixed on the nose, alternating
@@ -575,6 +633,7 @@ const CONVOY_TRAILER := {
 	"grip": 8.0,
 	"armor": 350.0,            # total of the layers below (agreed with the owner; was 300)
 	"hp": 120.0, "front": 50.0, "side": 65.0, "rear": 50.0,
+	"resist": [60.0, 60.0, 35.0, 55.0, 70.0, 50.0],   # shock fire acid toxic slime goop
 	"ram_damage": 60.0,
 	"mount": 0,                # the heavy turret
 	"gun_id": "convoy_turret",
@@ -597,6 +656,7 @@ const BULWARK := {
 	"grip": 8.0,
 	"armor": 520.0,            # total of the layers below (§14 table)
 	"hp": 180.0, "front": 180.0, "side": 55.0, "rear": 50.0,   # a very heavy front plate
+	"resist": [60.0, 60.0, 35.0, 55.0, 70.0, 50.0],   # shock fire acid toxic slime goop
 	"ram_damage": 80.0,
 	"mount": 1,                # one light gun fixed forward
 	"fire_rate": 3.0,

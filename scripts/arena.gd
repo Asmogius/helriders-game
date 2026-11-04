@@ -48,6 +48,14 @@ const CHECKPOINTS := [
 	Vector2(1350, 1250), Vector2(1950, 1150),
 ]
 
+# Barrel spots (§14: fixed spots per layout, type rolled per job), along the
+# roads so they sit in the way.
+const BARREL_SPOTS := [
+	Vector2(270, 720), Vector2(1050, 720), Vector2(1700, 720), Vector2(2600, 720),
+	Vector2(400, 1700), Vector2(1150, 1700), Vector2(1850, 1700), Vector2(2700, 1700),
+	Vector2(750, 500), Vector2(750, 1150), Vector2(2240, 500), Vector2(2240, 950),
+]
+
 var spawn_points: Array[Vector2] = [
 	Vector2(60, 720), Vector2(60, 1700), Vector2(3140, 720), Vector2(3140, 1700),
 	Vector2(750, 60), Vector2(820, 2340), Vector2(2240, 60), Vector2(2240, 2340),

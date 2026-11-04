@@ -102,30 +102,38 @@ const CATALOG := {
 	# slots, Front, Sides (one part covers both flanks) and Rear; `weight` and
 	# `power` are for a Front or Rear slot, `weight_sides` / `power_sides` for
 	# the Sides slot. `front_only` plates (rams) fit the Front slot only. The
-	# Front slot's plate gives the rig its ram damage.
+	# Front slot's plate gives the rig its ram damage. `resist` is the plate's
+	# status profile (§14), shock fire acid toxic slime goop: each fitted plate
+	# adds T.STATUS_RESIST_STEP for its rating to the rig's resistances.
 	"scrap_plating": {
 		"name": "Scrap Plating", "category": "Armor", "rarity": "Common", "cost": 30, "power": 0.0, "weight": 12.0,
 		"weight_sides": 21.0, "armor": 80.0, "ram_damage": 70.0,
+		"resist": ["low", "low", "low", "low", "low", "low"],
 	},
 	"outrider_light_plating": {
 		"name": "Outrider Light Plating", "category": "Armor", "rarity": "Uncommon", "cost": 60, "power": 0.0, "weight": 7.0,
 		"weight_sides": 12.0, "armor": 62.0, "ram_damage": 45.0,
+		"resist": ["medium", "low", "low", "medium", "medium", "medium"],
 	},
 	"riot_plating": {
 		"name": "Riot Plating", "category": "Armor", "rarity": "Uncommon", "cost": 80, "power": 0.0, "weight": 18.0,
 		"weight_sides": 33.0, "armor": 115.0, "ram_damage": 80.0,
+		"resist": ["high", "medium", "low", "low", "medium", "medium"],
 	},
 	"spiked_ram_plate": {
 		"name": "Zed Sled", "category": "Armor", "rarity": "Uncommon", "cost": 70, "power": 0.0, "weight": 15.0,
 		"armor": 71.0, "ram_damage": 130.0, "front_only": true,
+		"resist": ["low", "medium", "medium", "low", "high", "high"],
 	},
 	"cowcatcher_ram": {
 		"name": "Cowcatcher Ram", "category": "Armor", "rarity": "Rare", "cost": 180, "power": 0.0, "weight": 22.0,
 		"armor": 124.0, "ram_damage": 170.0, "front_only": true,
+		"resist": ["low", "medium", "medium", "low", "high", "high"],
 	},
 	"composite_plating": {
 		"name": "Composite Plating", "category": "Armor", "rarity": "Rare", "cost": 170, "power": 4.0, "weight": 17.0,
 		"power_sides": 7.0, "weight_sides": 30.0, "armor": 142.0, "ram_damage": 75.0,
+		"resist": ["medium", "high", "high", "medium", "low", "low"],
 	},
 	# --- Weapons (hardpoints). lock_range 0 = this weapon can't be locked ---------
 	"pintle_turret": {

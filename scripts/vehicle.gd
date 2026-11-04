@@ -15,6 +15,7 @@ signal damaged(amount: float)
 signal crew_injured(index: int)
 signal crew_healed(index: int)
 signal crew_ability_used(kind: String, ability: Dictionary)   # Mark, Flare, Magnet: the mission acts
+signal status_started(kind: int)   # a status bar filled (StatusBars index)
 
 const T := preload("res://scripts/tuning.gd")
 const Hostile := preload("res://scripts/hostile.gd")
@@ -22,6 +23,7 @@ const BulletPool := preload("res://scripts/bullet_pool.gd")
 const Parts := preload("res://scripts/parts.gd")
 const Loadout := preload("res://scripts/loadout.gd")
 const Crew := preload("res://scripts/crew.gd")
+const StatusBars := preload("res://scripts/status_bars.gd")
 
 enum Mount { TURRET, FIXED }
 
@@ -94,6 +96,11 @@ var shield_delay := T.DEFAULT_SHIELD_DELAY
 var shield_refill := T.DEFAULT_SHIELD_REFILL
 var shield_skulls := 0             # enemy rigs: the shield only comes up from this many skulls
 var last_facing := -1              # the facing the last hit landed on (tests, HUD)
+# Statuses (§14): buildup bars and resistances (shock fire acid toxic slime goop).
+var status := StatusBars.new()
+var resist: Array = [50.0, 50.0, 50.0, 50.0, 50.0, 50.0]
+var _burn_angle := 0.0
+var _status_bar: EnemyStatusBar   # enemy rigs: a small bar under the hull while building
 
 ## Everything left before a wreck: HP plus every facing's armor plus the shield.
 ## Kept for the many readers that think in one number. Setting it refills from
@@ -120,7 +127,6 @@ var armor_max: float:
 		hp_max = maxf(value - _armor_max_total() - shield_max, 1.0)
 		hp = minf(hp, hp_max)
 var traction := 1.0                # grip multiplier: slime lowers it (set_on_slime)
-var slime_left := 0.0               # seconds of slick tyres left after leaving slime
 var is_wrecked := false
 var lock_priority := 3             # when someone else locks onto this rig
 var lock_radius := 40.0
@@ -188,6 +194,8 @@ func apply_stats(s: Dictionary) -> void:
 	turn_rate = s.turn_rate
 	grip = s.grip
 	_set_layers(s)
+	var r: Array = s.get("resist", [])
+	resist = r.duplicate() if r.size() == 6 else [50.0, 50.0, 50.0, 50.0, 50.0, 50.0]
 	ram_damage = s.ram_damage
 	mount = s.mount
 	fire_rate = s.fire_rate
@@ -554,6 +562,13 @@ func mobility() -> float:
 
 func _ready() -> void:
 	motion_mode = CharacterBody2D.MOTION_MODE_FLOATING
+	if team != BulletPool.TEAM_PLAYER and _status_bar == null:
+		_status_bar = EnemyStatusBar.new()
+		_status_bar.top_level = true
+		_status_bar.z_index = 6
+		_status_bar.bars = status
+		_status_bar.visible = false
+		add_child(_status_bar)
 	if team == BulletPool.TEAM_PLAYER:
 		collision_layer = T.LAYER_VEHICLE
 		collision_mask = T.LAYER_WORLD | T.LAYER_ZOMBIE | T.LAYER_ENEMY
@@ -594,9 +609,14 @@ func _physics_process(delta: float) -> void:
 		if vuln_left <= 0.0:
 			queue_redraw()
 	_recharge_shield(delta)
+	_tick_status(delta)
+	var stunned := status.active(StatusBars.SHOCK)
+	if stunned:
+		drive_input = Vector2.ZERO   # STUNNED: no driving, firing or turret turning
 	_drive(delta)
 	_update_lock(delta)
-	_weapons(delta)
+	if not stunned:
+		_weapons(delta)
 	for a in abilities:
 		a.ready_in = maxf(float(a.ready_in) - delta, 0.0)
 	if _flash > 0.0:
@@ -923,20 +943,76 @@ func ability_charge(index: int) -> float:
 
 # --- Damage ----------------------------------------------------------------------
 
-## Slimer trails: on slime (and for a moment after) the tyres lose grip.
+## Slime and oil on the ground build SLICK (§14); while SLICK the tyres keep
+## only T.SLIME_GRIP of their grip (see _tick_status).
 func set_on_slime(on: bool, delta: float) -> void:
-	slime_left = T.SLIME_LINGER if on else maxf(slime_left - delta, 0.0)
-	traction = T.SLIME_GRIP if slime_left > 0.0 else 1.0
+	if on:
+		add_buildup(StatusBars.SLIME, T.STATUS_POOL_BUILDUP * delta)
+
+
+# --- Statuses (§14) ------------------------------------------------------------
+
+## Resistance to status `k`, with an active shield's bonus.
+func resistance(k: int) -> float:
+	var r := float(resist[k])
+	if shield > 0.0:
+		r += T.STATUS_SHIELD_RESIST
+	return minf(r, 100.0)
+
+
+## Add `amount` of buildup (before resistance) to status `k`.
+func add_buildup(k: int, amount: float) -> void:
+	if is_wrecked:
+		return
+	if status.add(k, amount, resistance(k), float(T.STATUS_TIME_RIG[k])):
+		status_started.emit(k)
+		queue_redraw()
+
+
+## Fill status `k` outright (a Boomer's burst fills GOOPED).
+func fill_status(k: int) -> void:
+	if is_wrecked:
+		return
+	status.trigger(k, float(T.STATUS_TIME_RIG[k]))
+	status_started.emit(k)
+	queue_redraw()
+
+
+func is_status(k: int) -> bool:
+	return status.active(k)
+
+
+func _tick_status(delta: float) -> void:
+	var was := status.any_active() or status.building()
+	status.tick(delta)
+	traction = T.SLIME_GRIP if status.active(StatusBars.SLIME) else 1.0
+	if status.active(StatusBars.FIRE):
+		# BURNING: damage across the facings, by the splash rule.
+		_burn_angle += delta * 4.0
+		take_damage(T.BURNING_RIG_DPS * delta, Vector2.RIGHT.rotated(_burn_angle), true)
+	if status.active(StatusBars.TOXIC) and shield <= 0.0:
+		# TOXIC: straight to HP, never below the floor; a raised shield blocks it.
+		var floor_hp := hp_max * T.TOXIC_FLOOR
+		if hp > floor_hp:
+			hp = maxf(hp - T.TOXIC_DPS * delta, floor_hp)
+	if team != BulletPool.TEAM_PLAYER:
+		# Enemy rigs: a small bar under the hull, only while something builds or is on.
+		var now := status.any_active() or status.building()
+		if _status_bar != null and (now or was):
+			_status_bar.visible = now
+			if now:
+				_status_bar.global_position = global_position + Vector2(0, body_wid * 0.5 + 26.0)
+				_status_bar.queue_redraw()
 
 
 ## A hit from a bullet or a blast. `impulse` points the way the hit travels,
 ## so it came from the opposite side; mines and other blasts splash.
-func take_hit(damage: float, impulse: Vector2, cause := "shot") -> void:
+func take_hit(damage: float, impulse: Vector2, cause := "shot", dtype := "") -> void:
 	if not is_wrecked:
 		velocity += impulse * 0.15
 	if vuln_left > 0.0:
 		damage *= vuln
-	take_damage(damage, -impulse, cause == "mine" or cause == "blast")
+	take_damage(damage, -impulse, cause == "mine" or cause == "blast", dtype)
 
 
 ## Rammed by another rig at world point `from` (its position).
@@ -957,28 +1033,37 @@ func apply_status(mult: float, _slow: float, seconds: float) -> void:
 ## HP. A `splash` (explosion) hits the nearest facing in full and each
 ## adjacent one at T.SPLASH_ADJACENT, and only reaches HP once every facing
 ## is stripped.
-func take_damage(amount: float, from := Vector2.ZERO, splash := false) -> void:
+func take_damage(amount: float, from := Vector2.ZERO, splash := false, dtype := "") -> void:
 	if is_wrecked or amount <= 0.0:
 		return
+	# A typed hit builds its status (before CORRODED and crew modifiers).
+	var k := StatusBars.kind_of(dtype)
+	if k >= 0:
+		add_buildup(k, amount * T.STATUS_HIT_BUILDUP)
+	if status.active(StatusBars.ACID):
+		amount *= T.CORRODED_TAKEN
 	amount *= float(crew_mods.taken)
 	var left := amount
 	_shield_wait = shield_delay
 	if shield > 0.0:
-		var soak := minf(shield, left)
+		# Shock hits shields harder.
+		var vs := T.SHOCK_VS_SHIELD if dtype == "shock" else 1.0
+		var soak := minf(shield, left * vs)
 		shield -= soak
-		left -= soak
+		left -= soak / vs
 	if left > 0.0:
 		var f := facing_of(from)
 		last_facing = f
+		var vs_armor := T.ACID_VS_ARMOR if dtype == "acid" else 1.0   # acid eats plates
 		if splash:
 			if _armor_total() <= 0.0:
 				hp -= left
 			else:
-				_strip(f, left)
+				_strip(f, left, vs_armor)
 				for adj: int in _adjacent(f):
-					_strip(adj, left * T.SPLASH_ADJACENT)
+					_strip(adj, left * T.SPLASH_ADJACENT, vs_armor)
 		else:
-			hp -= _strip(f, left)
+			hp -= _strip(f, left, vs_armor)
 	if amount >= 2.0:
 		_flash = 1.0
 		queue_redraw()
@@ -991,11 +1076,12 @@ func take_damage(amount: float, from := Vector2.ZERO, splash := false) -> void:
 		_wreck()
 
 
-## Take `amount` off facing `f`'s armor; returns what got through.
-func _strip(f: int, amount: float) -> float:
-	var soak := minf(facing_armor[f], amount)
+## Take `amount` off facing `f`'s armor (x `vs` for acid); returns what got
+## through, in plain damage.
+func _strip(f: int, amount: float, vs := 1.0) -> float:
+	var soak := minf(facing_armor[f], amount * vs)
 	facing_armor[f] -= soak
-	return amount - soak
+	return amount - soak / vs
 
 
 ## Which facing a hit from direction `from` (world space) lands on.
@@ -1256,3 +1342,25 @@ class TurretSprite extends Node2D:
 		draw_circle(Vector2.ZERO, 11.0, Color(0.22, 0.225, 0.235))
 		draw_arc(Vector2.ZERO, 11.0, 0.0, TAU, 20, T.COL_ENEMY if enemy else T.COL_CYAN, 2.0)
 		draw_rect(Rect2(-4.0, -4.0, 8.0, 8.0), Color(0.14, 0.14, 0.15))
+
+
+class EnemyStatusBar extends Node2D:
+	## Under an enemy rig (§14): one thin bar per status building, a bright
+	## full bar while one is on. Not rotated with the hull.
+	const T := preload("res://scripts/tuning.gd")
+	var bars: RefCounted   # the rig's StatusBars
+
+	func _draw() -> void:
+		if bars == null:
+			return
+		var build: PackedFloat32Array = bars.get("build")
+		var left: PackedFloat32Array = bars.get("left")
+		var y := 0.0
+		for k in 6:
+			var on := left[k] > 0.0
+			if not on and build[k] <= 0.0:
+				continue
+			var c: Color = T.STATUS_COLORS[k]
+			draw_rect(Rect2(-24, y, 48, 5), Color(0, 0, 0, 0.6))
+			draw_rect(Rect2(-23, y + 1, 46.0 * (1.0 if on else clampf(build[k] / T.STATUS_BAR, 0.0, 1.0)), 3), c)
+			y += 7.0
