@@ -47,7 +47,7 @@ const RARITY_BEAM := [0.0, 40.0, 80.0, 140.0, 220.0, 320.0]
 # `const NAME := Color(...)` form used here). Grouped by package / feature.
 
 # P4 Maps: Outer Blocks district style (V5.1/V5.2/V5.5; PR #38).
-const COL_OB_GRASS := Color(0.27, 0.33, 0.2)            # lawn (tiles.py)
+const COL_OB_GRASS := Color(0.46, 0.47, 0.27)           # dry yellowed lawn #757845 (tiles.py), ~1.9:1 vs COL_ZOMBIE_DARK
 const COL_OB_PAVE := Color(0.36, 0.35, 0.33)            # sidewalk slabs (tiles.py)
 const COL_OB_SIDING := Color(0.45, 0.43, 0.38)          # house siding (buildings.py)
 const COL_OB_ROOF := Color(0.3, 0.25, 0.23)             # shingles (buildings.py)
