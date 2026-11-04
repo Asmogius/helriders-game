@@ -113,6 +113,11 @@ static func rarity_frame(control: Control, r: String) -> Control:
 	return f
 
 
+## The rarity a perk tier shows as ("minor", "major", "signature"); Common otherwise.
+static func perk_rarity(tier: String) -> String:
+	return str(T.PERK_TIER_RARITY.get(tier, "Common"))
+
+
 ## BBCode for a RichTextLabel: the name in its rarity colour.
 static func rarity_text(text: String, r: String) -> String:
 	return "[color=#%s]%s[/color]" % [rarity_color(r).to_html(false), text]

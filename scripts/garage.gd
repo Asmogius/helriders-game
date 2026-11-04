@@ -236,7 +236,8 @@ func choose(id: String) -> bool:
 		toast("Not enough scrap")
 		return false
 	_preview = id
-	toast("Fitted: " + (str(Parts.get_part(id).name) if id != "" else "slot emptied"))
+	toast("Fitted: " + (str(Parts.get_part(id).name) if id != "" else "slot emptied"), 2.2,
+		UI.rarity_color(str(Parts.get_part(id).rarity)) if id != "" else T.COL_ORANGE)
 	return true
 
 
@@ -320,8 +321,9 @@ func slot_anchor(i: int) -> Vector2:
 	return slot.anchor
 
 
-func toast(text: String, seconds := 2.2) -> void:
+func toast(text: String, seconds := 2.2, color := T.COL_ORANGE) -> void:
 	_toast.text = text
+	_toast.add_theme_color_override("font_color", color)
 	if _toast_tween != null:
 		_toast_tween.kill()
 	_toast.modulate.a = 1.0
@@ -695,6 +697,7 @@ func _refresh_tags() -> void:
 				tag.detail = "%s    %d / FACING    WT %d" % [part.rarity, int(part.armor), int(part.get("weight_sides" if sides else "weight", part.weight))]
 			else:
 				tag.detail = "%s    PWR %d    WT %d" % [part.rarity, int(part.power), int(part.get("weight", 0))]
+		tag.rarity = "" if id == "" else str(profile.part(id).rarity)   # V1.3
 		tag.queue_redraw()
 
 
@@ -768,6 +771,7 @@ func _make_card(slot: Dictionary, id: String, current: String, now: Dictionary) 
 		card.title = "Remove"
 		card.subtitle = "Back to storage"
 		card.rarity_color = UI.TEXT_DIM
+		card.rarity = ""
 	else:
 		var part := profile.part(id)
 		card.title = part.name
@@ -779,7 +783,8 @@ func _make_card(slot: Dictionary, id: String, current: String, now: Dictionary) 
 		card.subtitle = "%s %s" % [part.rarity, kind]
 		if int(part.level) > 1:
 			card.subtitle += "  LV %d" % int(part.level)
-		card.rarity_color = Parts.color_of(part)
+		card.rarity_color = UI.rarity_color(str(part.rarity))   # V1.3
+		card.rarity = str(part.rarity)
 		card.headline = _headline(part)
 		card.mod_line = mod_line(part)
 		card.mod_chips = mod_chips(part)
@@ -1170,6 +1175,13 @@ class SlotTag extends Button:
 	var empty := false
 	var required := false
 	var active := false
+	var rarity := "":   # fitted part's rarity (V1.3); "" when empty
+		set(v):
+			if v != rarity:
+				rarity = v
+				var f: Control = UI.rarity_frame(self, v) if v != "" else get_node_or_null("RarityFrame")
+				if f != null:
+					f.visible = v != ""
 	var compact := false   # shorter tag when five share a side
 
 	func _ready() -> void:
@@ -1191,6 +1203,8 @@ class SlotTag extends Button:
 			fill = Color(0.17, 0.12, 0.08, 0.95)
 		draw_rect(Rect2(Vector2.ZERO, size), fill)
 		draw_rect(Rect2(Vector2.ZERO, size), Color(a, 0.85 if active else 0.4), false, 2.0)
+		if active and rarity != "":   # the rarity frame covers the edge: ring inside it
+			draw_rect(Rect2(Vector2(4, 4), size - Vector2(8, 8)), Color(a, 0.85), false, 2.0)
 		draw_rect(Rect2(size.x - 4.0 if side == 0 else 0.0, 0.0, 4.0, size.y), a)
 		var ys := PackedFloat32Array([17.0, 36.0, 51.0]) if compact else PackedFloat32Array([20.0, 45.0, 63.0])
 		draw_string(font, Vector2(14, ys[0]), slot_label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13 if compact else 14, UI.TEXT_DIM)
@@ -1212,6 +1226,11 @@ class PartCard extends Button:
 	var status_color := Color.WHITE
 	var warning := ""
 	var rarity_color := Color.WHITE
+	var rarity := "":   # V1.3: a part's cards wear its rarity frame
+		set(v):
+			rarity = v
+			if is_inside_tree():
+				_frame()
 	var installed := false
 	var selected := false          # previewed on the stat sheet
 	var part_id := ""
@@ -1222,6 +1241,15 @@ class PartCard extends Button:
 		focus_mode = Control.FOCUS_NONE
 		custom_minimum_size = Vector2(262, 176)
 		action_mode = BaseButton.ACTION_MODE_BUTTON_RELEASE
+		_frame()
+
+	func _frame() -> void:
+		var f: Control = get_node_or_null("RarityFrame")
+		if rarity == "":
+			if f != null:
+				f.visible = false
+			return
+		UI.rarity_frame(self, rarity).visible = true
 
 	func _draw() -> void:
 		var font := get_theme_default_font()
@@ -1231,11 +1259,11 @@ class PartCard extends Button:
 		elif get_draw_mode() == DRAW_PRESSED:
 			fill = Color(0.2, 0.13, 0.08)
 		draw_rect(Rect2(Vector2.ZERO, size), fill)
-		draw_rect(Rect2(0, 0, size.x, 5), rarity_color)
-		if selected:
-			draw_rect(Rect2(Vector2.ZERO, size), T.COL_ORANGE, false, 3.0)
-		else:
+		if rarity == "":
+			draw_rect(Rect2(0, 0, size.x, 5), rarity_color)
 			draw_rect(Rect2(Vector2.ZERO, size), Color(rarity_color, 0.35), false, 2.0)
+		if selected:   # inside the rarity frame, so both show
+			draw_rect(Rect2(Vector2(4, 4), size - Vector2(8, 8)), T.COL_ORANGE, false, 3.0)
 		var dim := 0.45 if disabled else 1.0
 		draw_string(font, Vector2(12, 30), title, HORIZONTAL_ALIGNMENT_LEFT, size.x - 24.0, 19, Color(UI.TEXT, dim))
 		draw_string(font, Vector2(12, 50), subtitle, HORIZONTAL_ALIGNMENT_LEFT, size.x - 24.0, 14, Color(rarity_color, 0.9 * dim))

@@ -34,14 +34,21 @@ func _initialize() -> void:
 	var profile: Node = root.get_node("Profile")
 	profile.persist = false
 	profile.new_game()
+	# P1: own a schematic of each rarity there is, so frames show on cards.
+	for id: String in ["courier_frame", "bulwark_frame", "hauler_frame"]:
+		if not profile.schematics.has(id):
+			profile.schematics.append(id)
 	for t: String in TABS:
 		_add("garage_" + t.to_lower(), _show_tab.bind(t))
+	_add("garage_part_cards", _show_part_cards)
 	_add("rarity_tiers", _show_rarity)
 	# --- P4 map corner (VISUAL_PLAN V5.5 style sample) ---
 	_add("map_outer_blocks_before", _show_map_corner.bind(false))
 	_add("map_outer_blocks_after", _show_map_corner.bind(true))
 	_add("art_swatches", _show_swatches)
 	_add("fight", _show_fight)
+	_add("fight_crates", _show_crates)
+	_add("results_finds", _show_finds)
 	if args.size() > 1:
 		var keep_names: Array[String] = []
 		var keep_steps: Array[Callable] = []
@@ -65,6 +72,11 @@ func _show_tab(t: String) -> void:
 	_garage.show_tab(t)
 
 
+func _show_part_cards() -> void:
+	_garage.show_tab("GARAGE")
+	_garage.open_slot(0)   # chassis: Common, Uncommon, Rare and Epic cards
+
+
 func _show_rarity() -> void:
 	_garage.queue_free()
 	_garage = null
@@ -85,7 +97,7 @@ func _show_rarity() -> void:
 		var l := UI.label(r, 24, UI.rarity_color(r))
 		l.position = Vector2(14, 40)
 		card.add_child(l)
-		UI.rarity_frame(card, r)
+		UI.rarity_frame(card, r).set("t", 1.0)   # shimmer mid-sweep for the shot
 
 
 var _map: Node2D
@@ -159,6 +171,25 @@ func _show_fight() -> void:
 	change_scene_to_file("res://scenes/mission.tscn")
 
 
+## One schematic crate per rarity in a row ahead of the rig (beams by tier).
+func _show_crates() -> void:
+	var m: Node = current_scene
+	var Pickup: GDScript = load("res://scripts/pickup.gd")
+	var at: Vector2 = m.vehicle.global_position + Vector2(-250, 150)
+	for i in T.RARITY_ORDER.size():
+		var p: Node2D = Pickup.new()
+		p.part = {"name": T.RARITY_ORDER[i], "rarity": T.RARITY_ORDER[i], "category": "Weapon"}
+		p.position = at + Vector2(i * 100, 0)
+		m.pickups.add_child(p)
+	m.hud.banner("SCHEMATIC: HAULER FRAME", UI.rarity_color("Epic"), 3.0)
+
+
+func _show_finds() -> void:
+	var hud: Node = current_scene.hud
+	hud.show_result("JOB DONE", "Job pay +120    Kill scrap +45    Time 3:12", "RETURN TO GARAGE", T.COL_ORANGE)
+	hud.show_finds([["New schematic: Courier Frame", "Uncommon"], ["New schematic: Bulwark Frame", "Rare"], ["New schematic: Hauler Frame", "Epic"]])
+
+
 func _process(_delta: float) -> bool:
 	if _wait > 0:
 		_wait -= 1
@@ -172,5 +203,5 @@ func _process(_delta: float) -> bool:
 		quit()
 		return true
 	_steps[_step].call()
-	_wait = 150 if _names[_step] == "fight" else SETTLE
+	_wait = 150 if _names[_step] == "fight" else (70 if _names[_step] == "results_finds" else SETTLE)
 	return false

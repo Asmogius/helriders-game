@@ -102,7 +102,7 @@ One rule: **anything that has a rarity shows it in its colour, the same way ever
 - [x] **V1.1 One source of truth.** Move the rarity colours into `tuning.gd` as `RARITY_COLORS` with all six: Common, Uncommon, Rare, Epic, Legendary, Mythic. `Parts.RARITY_COLORS` and `Crew.color_of` read it.
   - Add `UI.rarity_color(r)`, `UI.rarity_frame(control, r)` (border plus top strip) and `UI.rarity_text(name, r)`: a BBCode colour tag for RichTextLabels.
   - Done when no other file defines a rarity colour.
-- [ ] **V1.2 Rarity tiers look different, not just tinted.**
+- [x] **V1.2 Rarity tiers look different, not just tinted.**
   - Common: plain grey frame.
   - Uncommon: green frame.
   - Rare: blue frame plus a soft inner glow.
