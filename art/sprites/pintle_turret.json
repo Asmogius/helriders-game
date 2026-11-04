@@ -1,5 +1,4 @@
 {
- "sheet": "pintle_turret.png",
  "frame_w": 50,
  "frame_h": 50,
  "columns": 8,
@@ -669,5 +668,9 @@
     ]
    ]
   }
- }
+ },
+ "layers": {},
+ "defaults": [],
+ "sheet": "pintle_turret.png",
+ "composite": "pintle_turret.png"
 }

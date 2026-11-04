@@ -5,14 +5,14 @@ and orange (accent) edge lights, red for enemies."""
 OUTLINE = (12, 11, 13, 255)
 
 # name -> RGB. Index order is the model colour index (0 = empty).
-NAMES = ["_", "steel", "steel_dark", "rust", "tyre", "glass", "cyan", "orange", "enemy_red", "bone", "elite_gold"]
+NAMES = ["_", "steel", "steel_dark", "rust", "tyre", "glass", "cyan", "orange", "enemy_red", "bone", "elite_gold", "white_hot", "patch_green"]
 PALETTE = {
     "steel": (79, 82, 85), "steel_dark": (48, 49, 52), "rust": (117, 64, 33),
     "tyre": (24, 24, 26), "glass": (40, 62, 70), "cyan": (64, 209, 224),
     "orange": (237, 122, 43), "enemy_red": (242, 61, 41), "bone": (176, 166, 140),
-    "elite_gold": (255, 199, 64),
+    "elite_gold": (255, 199, 64), "white_hot": (255, 242, 204), "patch_green": (115, 217, 128),
 }
-EMISSIVE = {"cyan", "orange", "enemy_red", "elite_gold"}  # never darkened
+EMISSIVE = {"cyan", "orange", "enemy_red", "elite_gold", "white_hot", "patch_green"}  # never darkened
 SHADE_MUL = (0.62, 0.82, 1.0)
 
 
@@ -26,3 +26,22 @@ def shade(c, level):
     name = next((k for k, v in PALETTE.items() if v == tuple(c[:3])), None)
     m = 1.0 if name in EMISSIVE else SHADE_MUL[level]
     return tuple(int(min(255, ch * m)) for ch in c[:3]) + (255,)
+
+
+# Burnt-out wreck: every colour, lights included, goes to soot (lights get no glow).
+BURNT_MUL = 0.33
+
+
+BURNT_LIGHT_MUL = 0.12   # dead lights: darker than the soot around them
+
+
+def burnt_colors(colors):
+    out = []
+    for c in colors:
+        if len(c) == 4 and c[3] == 0:
+            out.append(c)
+            continue
+        name = next((k for k, v in PALETTE.items() if v == tuple(c[:3])), None)
+        mul = BURNT_LIGHT_MUL if name in EMISSIVE else BURNT_MUL
+        out.append(tuple(int(ch * mul) for ch in c[:3]) + (255,))
+    return out
