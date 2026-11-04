@@ -39,9 +39,14 @@ func _run() -> void:
 			if t.visible:
 				check(t.size.y >= UI.MIN_TOUCH and t.position.x < cols[1].position.x, "%s: slot card on the left, touch size" % sz)
 		var stats: Control = g.get("_stat_sheet")
-		check(stats.visible and stats.position.x >= cols[2].position.x - 1.0, "%s: stats panel on the right" % sz)
+		check(stats.visible and stats.position.x >= cols[2].position.x - 1.0 and stats.get("headline"), "%s: one small stats box, top right, headline stats" % sz)
+		check(stats.HEADLINE.size() >= 4 and stats.HEADLINE.size() <= 5, "4-5 headline stats")
 		var holder: Node2D = g.get("_rig_holder")
 		check(absf(holder.position.x - cols[1].get_center().x) < 1.0, "%s: rig centred in the middle column" % sz)
+		check(holder.scale.x >= 1.5, "%s: rig shown big (zoom %.2f)" % [sz, holder.scale.x])
+		var room: Control = g.get("_workshop")
+		if room.has_art():
+			check(room.lift_point().distance_to(holder.position) < 1.0, "%s: floor pad under the rig" % sz)
 		check(not (g.get("_callouts") as CanvasItem).visible and not (g.get("_rings") as CanvasItem).visible, "old all-slot callouts off")
 		var crew: Control = g.get("_crew_line")
 		check(crew.size.y >= UI.MIN_TOUCH, "%s: crew row is touch size (%d)" % [sz, crew.size.y])
@@ -73,6 +78,12 @@ func _run() -> void:
 			lit_any = true
 			seen[s] = true
 			check(s.get_node_or_null("FocusGlow") != null, "slot %d: glow on the part" % i)
+		check(focus.line_alpha < 1.0, "slot %d: callout fades in" % i)
+		for f in 10:
+			await process_frame
+		check(is_equal_approx(focus.line_alpha, 1.0), "slot %d: faded in within ~150 ms" % i)
+		if i != 0:
+			check((g.get("_rig_holder") as CanvasItem).modulate.r < 0.99, "slot %d: rest of the rig dimmed" % i)
 		var pts: PackedVector2Array = focus.callout_points()
 		check(pts.size() >= 3, "slot %d: callout line drawn" % i)
 		if pts.size() >= 3:
@@ -93,12 +104,27 @@ func _run() -> void:
 		for f in 2:
 			await process_frame
 		check(focus.lit() == null and focus.callout_points().is_empty(), "closed: nothing lit, no line")
+		for f in 12:
+			await process_frame
+		check(focus.line_alpha == 0.0 and (g.get("_rig_holder") as CanvasItem).modulate == Color.WHITE, "closed: line faded out, rig undimmed")
 	if rig.get("_hull_art") != null:
 		check(lit_any and seen.size() >= 3, "different slots light different parts (%d)" % seen.size())
-	# Equipped parts are drawn: fitting the Half-Track swaps the rig's drive layer.
+	# Browsing a candidate shows it on the rig at once; the loadout is unchanged.
 	if rig.get("_hull_art") != null:
 		profile.schematics.append("half_track")
 		profile.scrap += 1000
+		g.open_slot(2)
+		g.preview_part("half_track")
+		for f in 3:
+			await process_frame
+		var lay: Dictionary = rig.get("_layer_sprites")
+		check(lay.has("drive:half_track") and profile.rig.drive != "half_track", "browsing Half-Track shows it on the rig, not fitted")
+		g.close_sheet()
+		for f in 3:
+			await process_frame
+		check(not (rig.get("_layer_sprites") as Dictionary).has("drive:half_track"), "closing puts the fitted drive back")
+	# Equipped parts are drawn: fitting the Half-Track swaps the rig's drive layer.
+	if rig.get("_hull_art") != null:
 		check(profile.apply_loadout(profile.with_part(profile.rig, "drive", 0, "half_track")), "fit half track")
 		for f in 3:
 			await process_frame

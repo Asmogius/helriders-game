@@ -21,6 +21,11 @@ var _overlay: Sprite2D = null
 var _outline: Array[Sprite2D] = []   # 8 solid copies, 1 texel out, behind the part
 static var _shader: Shader
 var line: Control   # the callout, drawn above the rig (tests read it)
+const FADE := 0.15   # s, callout fade in / out
+const DIM := 0.6     # the rest of the rig while one part is lit
+var line_alpha := 0.0
+var _last_points := PackedVector2Array()
+var _preview_key := ""   # selected slot + browsed part the rig shows now
 
 
 func _ready() -> void:
@@ -92,19 +97,19 @@ static func part_centre(sp: Sprite2D) -> Vector2:
 
 
 func _draw_line() -> void:
-	var p := callout_points()
-	if p.is_empty():
+	var p := _last_points
+	if p.is_empty() or line_alpha <= 0.0:
 		return
 	var gt := line.get_global_transform().affine_inverse()
 	for k in p.size():
 		p[k] = gt * p[k]
-	var c := T.COL_ORANGE
-	line.draw_polyline(p, Color(0, 0, 0, 0.6), 6.0)   # dark edge: reads on any floor
+	var c := Color(T.COL_ORANGE, line_alpha)
+	line.draw_polyline(p, Color(0, 0, 0, 0.6 * line_alpha), 6.0)   # dark edge: reads on any floor
 	line.draw_polyline(p, c, 3.0)
 	line.draw_circle(p[0], 5.0, c)
 	var end := p[p.size() - 1]
 	var pulse := 10.0 + 2.0 * sin(_t * 5.0)
-	line.draw_arc(end, pulse, 0.0, TAU, 24, Color(0, 0, 0, 0.6), 5.0)
+	line.draw_arc(end, pulse, 0.0, TAU, 24, Color(0, 0, 0, 0.6 * line_alpha), 5.0)
 	line.draw_arc(end, pulse, 0.0, TAU, 24, c, 2.5)
 var _target: Sprite2D = null
 var _t := 0.0
@@ -142,6 +147,11 @@ static func target_for(rig: Node2D, slot: Dictionary, part_id: String) -> Sprite
 
 func _process(delta: float) -> void:
 	_t += delta
+	_live_preview()
+	var pts := callout_points()
+	if not pts.is_empty():
+		_last_points = pts
+	line_alpha = move_toward(line_alpha, 1.0 if not pts.is_empty() else 0.0, delta / FADE)
 	if line != null:
 		line.queue_redraw()
 	var want: Sprite2D = null
@@ -175,6 +185,7 @@ func _process(delta: float) -> void:
 				o.position = d
 				want.add_child(o)
 				_outline.append(o)
+	_dim(want)
 	if _overlay != null and is_instance_valid(_target):
 		_overlay.texture = _target.texture
 		_overlay.hframes = _target.hframes
@@ -194,7 +205,42 @@ func _process(delta: float) -> void:
 		_clear()
 
 
+## While a part is lit, the rest of the rig steps back (the lit part keeps
+## full brightness by undoing the dim on itself).
+func _dim(want: Sprite2D) -> void:
+	var holder: CanvasItem = garage.get("_rig_holder") if garage != null else null
+	if holder == null:
+		return
+	var hull: Sprite2D = garage.get("preview").get("_hull_art") if garage.get("preview") != null else null
+	var on := want != null and want != hull
+	holder.modulate = Color(DIM, DIM, DIM) if on else Color.WHITE
+	if want != null and is_instance_valid(want):
+		want.self_modulate = Color(1.0 / DIM, 1.0 / DIM, 1.0 / DIM) if on else Color.WHITE
+
+
+## Browsing a candidate puts it on the rig at once (display only: the preview
+## rig gets the candidate's build; the real loadout changes only on EQUIP).
+func _live_preview() -> void:
+	if garage == null or garage.get("preview") == null:
+		return
+	var sel := int(garage.get("selected"))
+	var key := ""
+	if sel >= 0:
+		key = "%d:%s:%s" % [sel, garage.get("_preview"), str(garage.profile.rig)]
+	if key == _preview_key:
+		return
+	_preview_key = key
+	var prof: Node = garage.profile
+	if sel < 0 or not prof.has_rig():
+		return   # close_sheet() refreshes the rig back to the fitted build
+	var slot: Dictionary = garage.SLOTS[sel]
+	var cand: Dictionary = prof.with_part(prof.rig, slot.key, slot.index, str(garage.get("_preview")))
+	garage.get("preview").apply_stats(garage.call("_built", cand))
+
+
 func _clear() -> void:
+	if _target != null and is_instance_valid(_target):
+		_target.self_modulate = Color.WHITE
 	if _overlay != null and is_instance_valid(_overlay):
 		_overlay.queue_free()
 	for o in _outline:

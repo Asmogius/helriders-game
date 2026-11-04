@@ -1349,7 +1349,8 @@ class StatSheet extends Control:
 	const ROW_H := 26.0
 	var single_column := false   # V2.3 sample: one tall column (garage_layout.gd)
 	var _row_h := ROW_H
-	var only_changed := false    # V2.3 sample: list just the rows the previewed part changes
+	var headline := false        # V2.3 sample: only the HEADLINE rows (garage_layout.gd)
+	const HEADLINE := ["speed", "accel", "hp", "front", "dps"]
 	# [label, key, higher is better, decimals, suffix]
 	const LEFT := [
 		["TOP SPEED", "speed", true, 0, ""],
@@ -1443,14 +1444,14 @@ class StatSheet extends Control:
 		draw_rect(Rect2(Vector2.ZERO, size), UI.PANEL_EDGE, false, 2.0)
 		draw_string(font, Vector2(16, 28), title, HORIZONTAL_ALIGNMENT_LEFT, size.x - 32.0, 17, T.COL_ORANGE)
 		var col_w := (size.x - 56.0) / 2.0
-		if single_column and only_changed:   # V2.3 sample: short panel over the part sheet
+		if single_column and headline:   # V2.3 sample: one small box, 5 headline stats
 			col_w = size.x - 32.0
-			var rows: Array = (LEFT + RIGHT).filter(_changed)
-			if rows.is_empty():
-				draw_string(font, Vector2(16, 60), "No change", HORIZONTAL_ALIGNMENT_LEFT, col_w, 15, UI.TEXT_DIM)
-			_row_h = minf(ROW_H, (size.y - 44.0) / float(maxi(rows.size(), 1)))
-			_column(font, rows, Vector2(16, 34), col_w)
-			_row_h = ROW_H
+			var rows: Array = (LEFT + RIGHT).filter(func(r: Array) -> bool: return HEADLINE.has(r[1]))
+			_column(font, rows, Vector2(16, 30), col_w)
+			var more: Array = (LEFT + RIGHT).filter(func(r: Array) -> bool: return not HEADLINE.has(r[1]) and _changed(r))
+			if not more.is_empty():
+				var names: Array = more.map(func(r: Array) -> String: return str(r[0]))
+				draw_string(font, Vector2(16, 30 + (rows.size() + 1) * ROW_H - 4.0), "ALSO: " + ", ".join(names), HORIZONTAL_ALIGNMENT_LEFT, col_w, 12, UI.TEXT_DIM)
 		elif single_column:   # V2.3 sample: the stats panel on the right
 			col_w = size.x - 32.0
 			_row_h = minf(ROW_H, (size.y - 64.0) / float(LEFT.size() + RIGHT.size()))

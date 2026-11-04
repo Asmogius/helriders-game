@@ -23,9 +23,11 @@ const BAR_H := UI.BAR_H              # action bar, buttons MIN_TOUCH tall
 const TOP_H := 6.0 * UI.GRID         # top bar row (scrap / day, MENU): 48
 const CARD_W := 23.0 * UI.GRID       # slot card cell: 184 x 64
 const CARD_H := UI.MIN_TOUCH
-const STATS_W := 42.0 * UI.GRID      # 336
-const RIG_Y := 0.42      # rig centre, fraction of the content height
-const OPEN_SCALE := 0.85 # rig scale while the part sheet is open
+const STATS_W := 36.0 * UI.GRID      # 288: one small stats box, 5 headline stats
+const STATS_H := 25.0 * UI.GRID      # 200
+const RIG_ZOOM := 1.6                # rig (and its floor pad) zoom with nothing open
+const STACK_H := 44.0 + 4.0 + 64.0 + 48.0   # meters, crew row, job + hint under the rig
+const OPEN_SCALE := 1.0  # zoom while the part sheet is open # rig scale while the part sheet is open
 
 
 static func left_w() -> float:
@@ -40,9 +42,9 @@ static func columns(size: Vector2, footer_h: float, safe := Rect2()) -> Array[Re
 	var bottom := size.y - footer_h - BAR_H - GAP
 	var h := bottom - top
 	var left := Rect2(safe.position.x, top, left_w(), h)
-	var right := Rect2(safe.end.x - STATS_W, top, STATS_W, h)
+	var right := Rect2(safe.end.x - STATS_W, top, STATS_W, STATS_H)
 	var cx := left.end.x + GAP * 2.0
-	var centre := Rect2(cx, top, right.position.x - GAP * 2.0 - cx, h)
+	var centre := Rect2(cx, top, right.position.x - GAP - cx, h)
 	return [left, centre, right]
 
 
@@ -90,44 +92,45 @@ static func apply(g: Control) -> void:
 	var stats_label: Control = g.get("_stats_label")
 	stats_label.visible = false   # the stats panel says it all
 
-	# --- right: the stats panel, always on the GARAGE tab --------------------
+	# --- right: one small stats box (5 headline stats), top right -----------
 	var sheet_stats: Control = g.get("_stat_sheet")
 	sheet_stats.set("single_column", true)
+	sheet_stats.set("headline", true)
 	var sheet_h: float = g.SHEET_H
-	if open:   # the part sheet runs under the stats panel too: 3 cards at 1280
-		_place(sheet_stats, Rect2(right.position, Vector2(right.size.x, right.size.y - sheet_h - GAP)))
-	else:
-		_place(sheet_stats, right)
-	sheet_stats.set("only_changed", open)
+	_place(sheet_stats, right)
 	sheet_stats.visible = on_garage and g.profile.has_rig()
 	if not open and sheet_stats.visible:
 		var now: Dictionary = g.call("_built", g.profile.rig)
 		sheet_stats.call("set_data", "RIG STATS", now, now, 0)
 
-	# --- centre: rig, meters, crew / job / hint, or the part sheet -----------
+	# --- centre: the rig, big; the meters stack, or the part sheet -----------
 	var holder: Node2D = g.get("_rig_holder")
 	var sheet: Control = g.get("_sheet")
-	var rig_area := centre
-	if open:
+	var rig_area := Rect2(centre.position, Vector2(centre.size.x, centre.size.y - STACK_H - GAP))
+	if open:   # bottom sheet: from the slot grid to the right edge (3 cards at 1280)
 		rig_area = Rect2(centre.position, Vector2(centre.size.x, centre.size.y - sheet_h - GAP))
 		_place(sheet, Rect2(centre.position.x, centre.end.y - sheet_h, right.end.x - centre.position.x, sheet_h))
 		var title: Label = g.get("_sheet_title")
 		title.clip_text = true
 		title.size = Vector2(right.end.x - centre.position.x - 4.0 * UI.GRID, 4.0 * UI.GRID)
 		title.add_theme_font_size_override("font_size", 15)
-	holder.position = Vector2(rig_area.get_center().x, rig_area.position.y + rig_area.size.y * (0.5 if open else RIG_Y))
-	holder.scale = Vector2.ONE * (OPEN_SCALE if open else 1.0)
+	var zoom := OPEN_SCALE if open else RIG_ZOOM
+	holder.position = rig_area.get_center()
+	holder.scale = Vector2.ONE * zoom
 	holder.visible = on_garage and g.profile.has_rig()
+	var room: Control = g.get("_workshop")
+	if room != null and room.has_method("frame_rig"):
+		room.call("frame_rig", holder.position, zoom)
 	var touch: Control = g.get("_rig_touch")
 	_place(touch, rig_area)
 	touch.mouse_filter = Control.MOUSE_FILTER_IGNORE if open else Control.MOUSE_FILTER_STOP
 	var meter: Control = g.get("_power_meter")
 	# meters 44, crew row MIN_TOUCH (it opens the INN), job and hint 24 each
 	var heights := {"_crew_line": UI.MIN_TOUCH, "_job": 3.0 * UI.GRID, "_hint": 3.0 * UI.GRID}
-	var y := centre.end.y - 44.0 - UI.GRID * 0.5 - UI.MIN_TOUCH - 6.0 * UI.GRID
+	var y := centre.end.y - STACK_H
 	_place(meter, Rect2(centre.position.x, y, centre.size.x, 44.0))
 	meter.visible = not open and g.profile.has_rig()
-	y += 44.0 + UI.GRID * 0.5
+	y += 48.0
 	for name: String in ["_crew_line", "_job", "_hint"]:
 		var c: Control = g.get(name)
 		var h: float = heights[name]

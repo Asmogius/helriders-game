@@ -9,6 +9,8 @@ const Ambient := preload("res://scripts/garage_ambient.gd")
 const ART := "res://art/garage/"
 
 var meta := {}
+var zoom := 1.0                  # garage_layout.gd: the rig's extra zoom (pad stays under it)
+var lift_at := Vector2.INF       # garage_layout.gd: where the rig sits (INF = default spot)
 var _back: TextureRect
 var _lights: TextureRect
 var ambient: Control
@@ -51,13 +53,24 @@ func has_art() -> bool:
 
 ## Pixels per room voxel on screen (the garage's 720-high layout uses 3.4).
 func px() -> float:
-	return size.y / 212.0 if size.y > 0.0 else float(meta.get("scale", 3.4))
+	return (size.y / 212.0 if size.y > 0.0 else float(meta.get("scale", 3.4))) * zoom
 
 
 ## Lift centre in this Control's coordinates; garage.gd puts the rig at
 ## (size.x * 0.5, 290) on a 720-high screen.
 func lift_point() -> Vector2:
+	if lift_at != Vector2.INF:
+		return lift_at
 	return Vector2(size.x * 0.5, 290.0 * size.y / 720.0)
+
+
+## Move/zoom the room so the floor pad sits under the rig.
+func frame_rig(at: Vector2, new_zoom: float) -> void:
+	if at == lift_at and is_equal_approx(new_zoom, zoom):
+		return
+	lift_at = at
+	zoom = new_zoom
+	_layout()
 
 
 func _layout() -> void:
