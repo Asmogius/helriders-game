@@ -188,7 +188,8 @@ func _make_row(id: String) -> Button:
 	text.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	text.add_theme_constant_override("separation", 0)
 	line.add_child(text)
-	var name_label := UI.label(str(part.name), 21, Parts.color_of(part))
+	UI.rarity_frame(row, str(part.rarity))   # V1.3
+	var name_label := UI.label(str(part.name), 21, UI.rarity_color(str(part.rarity)))
 	name_label.clip_text = true
 	text.add_child(name_label)
 	text.add_child(UI.label("%s %s" % [part.rarity, part.category], 15, UI.TEXT_DIM))
@@ -235,7 +236,7 @@ func _fill_detail() -> void:
 	var top := Parts.max_level(base)
 	var now := Parts.at_level(base, level)
 	_name.text = str(base.name)
-	_name.add_theme_color_override("font_color", Parts.color_of(base))
+	_name.add_theme_color_override("font_color", UI.rarity_color(str(base.rarity)))
 	_kind.text = "%s %s    PWR %d    WT %d    (power and weight never change)" % [
 		base.rarity, base.category, int(base.get("power", 0)), int(base.get("weight", 0))]
 	var can := Parts.can_level(base)

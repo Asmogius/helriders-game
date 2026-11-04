@@ -8,12 +8,26 @@ extends RefCounted
 var texture: Texture2D
 var regions := {}
 
-## Loads the atlas at `base` (path without extension), e.g. "res://art/fx/fx".
-## Drawers keep the one they use in a member var; the texture itself is shared
-## through ResourceLoader's cache. (No static cache: nothing outlives the tree.)
+# One atlas per path, kept on the SceneTree root (meta CACHE_META) rather than in
+# a static var: a static var holding objects keeps this script alive past the
+# tree, which Godot reports at exit as "resources still in use" / leaked
+# instances. The root is freed when the tree goes, and the cache goes with it.
+const CACHE_META := &"art_atlas_cache"
+
+
+## Shared per path (without extension), e.g. load_atlas("res://art/fx/fx").
 static func load_atlas(base: String) -> RefCounted:
+	var tree := Engine.get_main_loop() as SceneTree
+	var cache: Dictionary = {}
+	if tree != null and tree.root != null:
+		if not tree.root.has_meta(CACHE_META):
+			tree.root.set_meta(CACHE_META, {})
+		cache = tree.root.get_meta(CACHE_META)
+		if cache.has(base):
+			return cache[base]
 	var a := new()
 	a._load(base)
+	cache[base] = a
 	return a
 
 

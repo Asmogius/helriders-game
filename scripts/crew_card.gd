@@ -7,7 +7,18 @@ const UI := preload("res://scripts/ui_theme.gd")
 const Crew := preload("res://scripts/crew.gd")
 const SIZE := Vector2(286, 300)
 
-var member := {}
+var member := {}:   # clear with {}
+	set(v):
+		member = v
+		var f: Control = get_node_or_null("RarityFrame")
+		if v.is_empty():   # cleared: no member, no frame
+			if f != null:
+				f.hide()
+			queue_redraw()
+			return
+		# V1.3: crew cards wear the shared rarity frame
+		UI.rarity_frame(self, str(v.get("rarity", "Common"))).show()
+		queue_redraw()
 var status := ""
 var status_color := UI.TEXT_DIM
 var selected := false
@@ -26,16 +37,13 @@ func _draw() -> void:
 	if member.is_empty():
 		return
 	var font := get_theme_default_font()
-	var rarity := Crew.color_of(member)
+	var rarity := UI.rarity_color(str(member.get("rarity", "Common")))
 	var fill := Color(0.12, 0.12, 0.13)
 	if get_draw_mode() == DRAW_PRESSED:
 		fill = Color(0.2, 0.13, 0.08)
 	draw_rect(Rect2(Vector2.ZERO, size), fill)
-	draw_rect(Rect2(0, 0, size.x, 6), rarity)
-	if selected:
-		draw_rect(Rect2(Vector2.ZERO, size), T.COL_ORANGE, false, 3.0)
-	else:
-		draw_rect(Rect2(Vector2.ZERO, size), Color(rarity, 0.35), false, 2.0)
+	if selected:   # inside the rarity frame, so both show
+		draw_rect(Rect2(Vector2(4, 4), size - Vector2(8, 8)), T.COL_ORANGE, false, 3.0)
 	var a := 0.5 if dim else 1.0
 	var w := size.x - 32.0
 	var role_color := Crew.role_color(member)
