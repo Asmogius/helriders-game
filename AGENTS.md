@@ -22,6 +22,8 @@ The owner works from a phone and has no computer, so nobody opens the Godot edit
 
 - Controller: `pad.gd` (autoload `Pad`). A pad press sets `Pad.active` (a touch clears it). Buttons go to the topmost visible node in group `pad_modal` (Circle calls its `pad_close` meta Callable), then to the current scene's (or newest root child's) `pad_button(button) -> bool`. Pad turns `focus_mode` on only for visible, enabled buttons (inside the open modal, if any) and draws the focus ring. A scene can turn menu focus off with `pad_wants_focus()` (the mission does while you drive). The mission reads `Pad.stick(left)` and `Pad.r2()` in `_pad_input()`; tests set `Pad.override`. Wording that says "tap" goes through `PadScript.hint(touch, pad)` (preload `pad.gd`) and screens listen to `Pad.mode_changed` to swap it; HUD buttons show a pad badge (`pad_glyph.gd`). Fight buttons are rebindable (Settings > CONTROLLER BUTTONS in `game_menu.gd`): code asks `Pad.binding(action)`, `action_for(code)`, `button_name(action)`, `badge(action)` and `fire_held()` instead of naming buttons; the map lives in `Profile.settings` (`pad_map`, `pad_swap`, saved in the settings file); L2/R2 are codes `Pad.TRIGGER_BASE + axis`. Menus keep D-pad, Cross, Circle and L1/R1. The phone's back button in the garage goes through `garage.go_back()` (menu, top `pad_modal`, part sheet, station, then MENU), the same order Circle uses. The right stick scrolls a panel's text lists and turns the garage rig; sliders take pad focus too. A new overlay panel joins `pad_modal`; its clickable things must be `BaseButton`s so the pad can reach them.
 
+- PC: `Profile.is_desktop()` (not mobile/web). Settings has DISPLAY (windowed/fullscreen, `settings.fullscreen`, applied in `apply_settings()`); F11 or Alt+Enter flips it (`pad.gd`). Esc is the back button: `garage.go_back()`, `mission.go_back()`, and `game_menu` handles Esc itself while the fight is paused.
+
 - `scripts/profile.gd` (autoload `Profile`) is the save game: scrap, schematics, storage, the rig, presets (with `preset_names`, `rename_preset()`), upgrades. Every change saves to `user://` (written to a .tmp and swapped in, the previous save kept as .bak; an unreadable save loads the .bak or starts fresh with a notice and is kept as .broken; `sanitize_save()` drops fields of the wrong type, so add a new saved field to `_SAVE_TYPES`). Economy rules agreed with the owner are listed at the top of that file; don't change them without asking.
 
 ## Engine rules
@@ -89,6 +91,7 @@ godot --headless --fixed-fps 60 --path . -s res://tests/audio_test.gd      # mus
 godot --headless --fixed-fps 60 --path . -s res://tests/keywords_test.gd   # must end "KEYWORDS TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/pad_test.gd        # must end "PAD TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/save_test.gd       # must end "SAVE TEST PASSED"
+godot --headless --fixed-fps 60 --path . -s res://tests/pc_test.gd         # must end "PC TEST PASSED"
 ```
 
 - Tests must call `Profile.new_game()` with `persist = false` first, so they never touch a real save.
@@ -102,6 +105,6 @@ godot --headless --fixed-fps 60 --path . -s res://tests/save_test.gd       # mus
 Pushing to `main` runs `.github/workflows/android.yml`. It imports the project, runs the smoke test, exports a debug APK, and replaces the `latest-build` release. The owner installs from:
 https://github.com/Asmogius/helriders-game/releases/download/latest-build/helriders.apk
 
-Each build is stamped version 0.1.<run number>. A signed release APK (`helriders-release.apk`) is also built once the repository secrets `ANDROID_RELEASE_KEYSTORE_BASE64`, `ANDROID_RELEASE_KEY_ALIAS` and `ANDROID_RELEASE_KEY_PASSWORD` exist; never commit a release key.
+The same run also exports a Windows build (preset "Windows" in `export_presets.cfg`, one self-contained .exe) and attaches `helriders-windows.zip` to the release; that step is `continue-on-error`, so a Windows failure never blocks the APK. Each build is stamped version 0.1.<run number>. A signed release APK (`helriders-release.apk`) is also built once the repository secrets `ANDROID_RELEASE_KEYSTORE_BASE64`, `ANDROID_RELEASE_KEY_ALIAS` and `ANDROID_RELEASE_KEY_PASSWORD` exist; never commit a release key.
 
 If the workflow fails, the owner gets no build. Check the run and fix it before moving on.

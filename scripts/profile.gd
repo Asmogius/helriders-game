@@ -1655,7 +1655,7 @@ func is_discovered(category: String, id: String) -> bool:
 # --- Settings (own file, kept across new games) ------------------------------------
 
 func load_settings() -> void:
-	settings = {"quality": auto_quality(), "shake": true, "music": 0.8, "effects": 0.8}
+	settings = {"quality": auto_quality(), "shake": true, "music": 0.8, "effects": 0.8, "fullscreen": false}
 	if persist:
 		var cfg := ConfigFile.new()
 		if cfg.load(settings_path) == OK:
@@ -1665,6 +1665,8 @@ func load_settings() -> void:
 			settings.shake = bool(cfg.get_value("video", "shake", true))
 			settings.music = clampf(float(cfg.get_value("audio", "music", 0.8)), 0.0, 1.0)
 			settings.effects = clampf(float(cfg.get_value("audio", "effects", 0.8)), 0.0, 1.0)
+			var fs: Variant = cfg.get_value("video", "fullscreen", false)
+			settings.fullscreen = fs is bool and bool(fs)
 			# Controller mapping (pad.gd): action -> button code, and the stick swap.
 			var saved_map: Variant = cfg.get_value("pad", "map", {})
 			if saved_map is Dictionary:
@@ -1687,6 +1689,7 @@ func save_settings() -> void:
 	var cfg := ConfigFile.new()
 	cfg.set_value("video", "quality", settings.quality)
 	cfg.set_value("video", "shake", settings.shake)
+	cfg.set_value("video", "fullscreen", bool(settings.get("fullscreen", false)))
 	cfg.set_value("audio", "music", settings.music)
 	cfg.set_value("audio", "effects", settings.effects)
 	if settings.has("pad_map"):
@@ -1701,6 +1704,11 @@ func set_setting(key: String, value: Variant) -> void:
 	settings[key] = value
 	save_settings()
 	changed.emit()
+
+
+## Running on a PC (Windows, Linux, macOS) rather than a phone.
+static func is_desktop() -> bool:
+	return not OS.has_feature("mobile") and not OS.has_feature("web")
 
 
 ## A first guess for this phone: fewer cores, lower preset. Headless runs
@@ -1724,6 +1732,11 @@ func quality() -> Dictionary:
 ## Volumes go to the Music and Effects buses (made here if missing).
 func apply_settings() -> void:
 	Engine.max_fps = int(quality().fps)
+	# PC: windowed or fullscreen (a phone is always full screen).
+	if is_desktop() and DisplayServer.get_name() != "headless":
+		var want := DisplayServer.WINDOW_MODE_FULLSCREEN if bool(settings.get("fullscreen", false)) else DisplayServer.WINDOW_MODE_WINDOWED
+		if DisplayServer.window_get_mode() != want:
+			DisplayServer.window_set_mode(want)
 	for bus: String in ["Music", "Effects"]:
 		var i := AudioServer.get_bus_index(bus)
 		if i < 0:

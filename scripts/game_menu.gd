@@ -64,6 +64,13 @@ func _ready() -> void:
 	show_page("main")
 
 
+## Esc on a PC works like the phone's back button (the menu runs while paused).
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and (event as InputEventKey).pressed and not (event as InputEventKey).echo and (event as InputEventKey).keycode == KEY_ESCAPE:
+		get_viewport().set_input_as_handled()
+		back()
+
+
 ## The phone's back button: up a page, or close.
 func back() -> void:
 	if page == "controller":
@@ -184,7 +191,18 @@ func _settings_page() -> void:
 			UI.accent(b, T.COL_ORANGE)
 		b.pressed.connect(set_quality.bind(q))
 		row.add_child(b)
-	_button("SCREEN SHAKE: %s" % ("ON" if bool(profile.settings.get("shake", true)) else "OFF"), toggle_shake)
+	var shake := _button("SCREEN SHAKE: %s" % ("ON" if bool(profile.settings.get("shake", true)) else "OFF"), toggle_shake)
+	if ProfileScript.is_desktop():
+		# On a PC: windowed or fullscreen, side by side with the shake toggle.
+		var pair := HBoxContainer.new()
+		pair.add_theme_constant_override("separation", 8)
+		_body.add_child(pair)
+		_body.move_child(pair, shake.get_index())
+		shake.reparent(pair)
+		shake.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var display := _button("DISPLAY: %s" % ("FULLSCREEN" if bool(profile.settings.get("fullscreen", false)) else "WINDOWED"), toggle_fullscreen)
+		display.reparent(pair)
+		display.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	for key: String in ["music", "effects"]:
 		var line := HBoxContainer.new()
 		line.add_theme_constant_override("separation", 14)
@@ -210,6 +228,11 @@ func _settings_page() -> void:
 
 func set_quality(q: String) -> void:
 	profile.set_setting("quality", q)
+	show_page("settings")
+
+
+func toggle_fullscreen() -> void:
+	profile.set_setting("fullscreen", not bool(profile.settings.get("fullscreen", false)))
 	show_page("settings")
 
 

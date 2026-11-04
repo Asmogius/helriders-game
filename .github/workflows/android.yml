@@ -1,8 +1,8 @@
 name: Android build
 
-# Every push to main: import, run the headless smoke test, export a debug APK,
-# and publish it to the rolling "latest-build" release so it can be installed
-# straight from a phone.
+# Every push to main: import, run the headless smoke test, export a debug APK
+# (and a Windows build), and publish them to the rolling "latest-build" release
+# so they can be installed straight from a phone or a PC.
 
 on:
   push:
@@ -171,18 +171,34 @@ jobs:
           fi
           ls -lh build/helriders-release.apk
 
+      # The Windows build rides along; if it ever fails, the APK still ships.
+      - name: Export Windows build
+        continue-on-error: true
+        run: |
+          mkdir -p build/windows
+          godot --headless --path . --export-release "Windows" build/windows/helriders.exe 2>&1 | tee export-windows.log
+          if [ ! -s build/windows/helriders.exe ]; then
+            echo "::warning::Windows build was not produced"; exit 1
+          fi
+          (cd build/windows && zip -q ../helriders-windows.zip helriders.exe)
+          ls -lh build/helriders-windows.zip
+
       - uses: actions/upload-artifact@v7
         with:
           name: helriders-${{ env.APP_VERSION }}
-          path: build/helriders*.apk
+          path: |
+            build/helriders*.apk
+            build/helriders-windows.zip
+          if-no-files-found: warn
 
       - name: Publish to the "latest-build" release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete latest-build --yes --cleanup-tag || true
-          gh release create latest-build build/helriders*.apk \
+          FILES=$(ls build/helriders*.apk build/helriders-windows.zip 2>/dev/null)
+          gh release create latest-build $FILES \
             --prerelease \
             --target "$GITHUB_SHA" \
             --title "Latest build ${APP_VERSION}" \
-            --notes "Debug build ${APP_VERSION} from commit ${GITHUB_SHA::7}. On your Android phone: download helriders.apk below and open it to install."
+            --notes "Build ${APP_VERSION} from commit ${GITHUB_SHA::7}. Android: download helriders.apk below and open it to install. Windows: download helriders-windows.zip, unzip it and run helriders.exe (Windows may warn about an unknown publisher: More info, then Run anyway)."

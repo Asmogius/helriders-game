@@ -65,10 +65,23 @@ func _input(event: InputEvent) -> void:
 					_route(code)
 			if down or m.axis_value < 0.3:
 				_trig_down[k] = down
+	elif event is InputEventKey and (event as InputEventKey).pressed and not (event as InputEventKey).echo:
+		var k := event as InputEventKey
+		if k.keycode == KEY_F11 or ((k.keycode == KEY_ENTER or k.keycode == KEY_KP_ENTER) and k.alt_pressed):
+			_toggle_fullscreen()
+			get_viewport().set_input_as_handled()
 	elif (event is InputEventScreenTouch and (event as InputEventScreenTouch).pressed) \
 			or (event is InputEventMouseButton and (event as InputEventMouseButton).pressed):
 		capturing = ""
 		set_active(false)
+
+
+## F11 or Alt+Enter on a PC: windowed <-> fullscreen (saved like the Settings toggle).
+func _toggle_fullscreen() -> void:
+	var profile := get_node_or_null("/root/Profile")
+	if profile == null or not bool(profile.call("is_desktop")):
+		return
+	profile.call("set_setting", "fullscreen", not bool(_settings().get("fullscreen", false)))
 
 
 func set_active(on: bool) -> void:
