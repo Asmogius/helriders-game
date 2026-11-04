@@ -299,9 +299,10 @@ func _on_hit(_damage: float, impulse: Vector2) -> void:
 # Drawing only: reads kind, rotation, charge state and _flash; never changes
 # stats or AI. Missing atlas or another kind -> the code-drawn body below.
 # The atlas is loaded once and shared (static); no per-zombie art nodes.
-const ZOMBIE_ATLAS := "res://art/zombies/zombies.json"   # P0 atlas loader stand-in
-static var _art_meta: Dictionary = {}
-static var _art_tex: Texture2D
+const ArtAtlas := preload("res://scripts/art_atlas.gd")   # P0 atlas loader
+const ZOMBIE_ATLAS := "res://art/zombies/zombies"         # .png + .json
+static var _art_meta: Dictionary = {}    # kinds / poses / variants (the JSON's extra keys)
+static var _atlas: RefCounted            # regions "<kind>/<row>/<heading>"
 static var _art_tried := false
 var art_pose_override := ""      # captures and tests: force a pose row (e.g. "lunge_1")
 var _art_t := 0.0                # walk cycle phase, advanced by distance walked
@@ -312,12 +313,13 @@ var _art_key := -1
 static func art_atlas() -> Dictionary:
 	if not _art_tried:
 		_art_tried = true
-		if FileAccess.file_exists(ZOMBIE_ATLAS):
-			var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(ZOMBIE_ATLAS))
-			var tex_path := ZOMBIE_ATLAS.get_base_dir().path_join("zombies.png")
-			if data is Dictionary and ResourceLoader.exists(tex_path):
+		var a: RefCounted = ArtAtlas.load_atlas(ZOMBIE_ATLAS)
+		if a.ok():
+			_atlas = a
+			var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(ZOMBIE_ATLAS + ".json"))
+			if data is Dictionary:
 				_art_meta = data
-				_art_tex = load(tex_path)
+				_art_meta.erase("regions")   # held by the atlas
 	return _art_meta
 
 
@@ -366,12 +368,10 @@ func _process(_delta: float) -> void:
 
 func _draw_art() -> void:
 	var info: Dictionary = _art_meta.kinds[kind]
-	var row: Array = (info.rows as Dictionary).get(art_row(), info.rows.values()[0])
 	var fw: float = info.frame_w
 	var fh: float = info.frame_h
-	var src := Rect2(float(row[0]) + art_heading() * fw, float(row[1]), fw, fh)
 	draw_set_transform(Vector2.ZERO, -rotation, Vector2.ONE)   # sheets carry the heading; never rotate them
-	draw_texture_rect_region(_art_tex, Rect2(Vector2(-fw, -fh) * 0.5, Vector2(fw, fh)), src)
+	_atlas.draw(self, "%s/%s/%d" % [kind, art_row(), art_heading()], Rect2(Vector2(-fw, -fh) * 0.5, Vector2(fw, fh)))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 

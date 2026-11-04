@@ -35,6 +35,7 @@ func _initialize() -> void:
 		_add("garage_" + t.to_lower(), _show_tab.bind(t))
 	_add("rarity_tiers", _show_rarity)
 	_add("fight", _show_fight)
+	_add("zombies_sample", _show_zombies_sample)   # P3 V3 style sample
 
 
 func _add(shot: String, setup: Callable) -> void:
@@ -75,6 +76,15 @@ func _show_rarity() -> void:
 func _show_fight() -> void:
 	_strip.queue_free()
 	change_scene_to_file("res://scenes/mission.tscn")
+
+
+## P3 V3 sample: Shamblers and a Tank around the rig in the running fight.
+func _show_zombies_sample() -> void:
+	var m := current_scene
+	var p: Vector2 = m.vehicle.global_position
+	for i in 8:
+		m.zombies.spawn_at(p + Vector2(140, 0).rotated(i * TAU / 8.0), "shambler")
+	m.zombies.spawn_at(p + Vector2(0, -190), "tank")
 
 
 func _process(_delta: float) -> bool:

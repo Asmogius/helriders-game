@@ -217,6 +217,9 @@ def build():
             for h, img in enumerate(row):
                 atlas.paste(Image.fromarray(img), (x0 + h * cv, y0))
         meta["kinds"][kind] = {"frame_w": cv, "frame_h": cv, "rows": rows, "variants": variants}
+        for n, (x0, y0) in rows.items():   # P0 art_atlas.gd regions: "<kind>/<row>/<heading>"
+            for h in range(HEADINGS):
+                meta.setdefault("regions", {})["%s/%s/%d" % (kind, n, h)] = [x0 + h * cv, y0, cv, cv]
     os.makedirs(OUT, exist_ok=True)
     p = os.path.join(OUT, "zombies.png")
     atlas.save(p)

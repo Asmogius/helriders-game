@@ -55,6 +55,5 @@ func _run() -> void:
 	var f := _z("shambler")
 	check(not f.has_art(), "fallback without the atlas")
 	f.queue_redraw()
-	Zombie._art_tex = null
 	print("ZOMBIE SAMPLE TEST ", "PASSED" if fails == 0 else "FAILED (%d)" % fails)
 	quit(1 if fails else 0)
