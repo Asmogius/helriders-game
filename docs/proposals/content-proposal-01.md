@@ -1,6 +1,6 @@
-# Content Proposal 01 — DRAFT, NOT APPROVED
+# Content Proposal 01 — APPROVED (2026-11-03)
 
-> **Status: DRAFT.** Nothing here is approved or built. No gameplay code is in this PR. Every number is a first pass for Cameron to accept, change or reject (see **Decisions for Cameron** at the end). Where this doc and `docs/DESIGN.md` disagree, DESIGN.md wins until something here is approved.
+> **Status: APPROVED by Cameron (2026-11-03)**, with the changes recorded in **Decisions for Cameron** below. One item is **pending confirmation**: how Extract or Push works with Retrieve and Escort (§3.3). Not built in this PR.
 
 ## 0. Baseline read (what exists today)
 
@@ -64,7 +64,7 @@ Keeps current built stats; adds behavior, shield step and spawn rules.
 |---|---|---|
 | Gunner Rig | Shield 30 from 4 skulls — OK. Enemy guns unlimited. | Give it a 6-burst magazine + 2.5 s reload → sustained ~17 DPS; reload is a visible "turret droops" tell. |
 | Scrapper | Fire resist 30 but lays oil it can be caught in. | Keep (intended: lighting its own oil is the counter). Add **ignite rule**: Scrapper oil lit within 200 px of the Scrapper also BURNs it (no special-case immunity). |
-| Patcher | Survives forever if player ignores it. | Add a soft cap: max **2 revives per job at 1-3 skulls, 3 at 4-6**; was "unlimited" in §14 → needs Cameron's call. |
+| Patcher | Survives forever if player ignores it. | **APPROVED: max 3 revives per job** (was unlimited in §14). |
 | Convoy Lead | Shield on cab only. | OK. Trailer gets no shield. Add BURST-friendly trailer weak point: trailer rear 50 → keep. No change. |
 | Bulwark / Outrider | No status-rider variants. | See new rigs. |
 | All enemy guns | No ammo model. | Adopt per-rig magazine/heat as above (Outrider heat, Gunner magazine, Bulwark/Convoy nose unlimited). |
@@ -220,9 +220,9 @@ Pick schedule (approved concept): Minor at picks 3 and 6, Major at 9 and 12, Sig
 | STUNNED | Lightning zig-zag | Jitter + 2 sparks | `#F2F5FF` white-ice (was `#8CCCFF`) |
 | OVERLOAD | Gauge needle past red | Needle flick, gauge flashes | `#3D7BFF` electric blue |
 | SLICK | Droplet with skid line | Droplet slides sideways | `#2EC4A6` teal (was `#73D999`) |
-| BURNING | Flame | Flicker 3 frames loop | `#FF4A8A`? **or** keep orange family `#FF5A1F` — decision (was `#FF7326`) |
+| BURNING | Flame | Flicker 3 frames loop | `#FF5A1F` orange (was `#FF7326`) |
 | CORRODED | Cracked plate | Crack spreads | `#99F240` (keep) |
-| GOOPED | Blob with eyes | Wobble squash | `#C77DFF`? conflicts TOXIC → propose `#E0A458` mustard-brown (was `#D9D94D`) |
+| GOOPED | Blob with eyes | Wobble squash | `#E0A458` mustard (was `#D9D94D`) |
 | TOXIC | Skull-in-cloud | Cloud puff rises | `#B366E6` (keep) |
 
 On garage cards: the glyph sits in a 20 px chip in the keyword color on the mod line; locked mods show the chip at 40% alpha.
@@ -231,7 +231,7 @@ On garage cards: the glyph sits in a 20 px chip in the keyword color on the mod 
 
 | Item | Draft |
 |---|---|
-| Eligibility | 75% of board jobs, seeded per job, hidden until objective done. Never: tutorial, onboarding Clear, the day after a wreck, Courier (timed route; revisit later). Retrieve: push beacon appears once ≥ all non-deep caches taken; extraction point is already the cyan marker. Escort: offered only if the optional site was *not* taken (no double-dipping). |
+| Eligibility | **33%** of board jobs, seeded per job, hidden until objective done. Never: tutorial, onboarding Clear, the day after a wreck, Courier (timed route; revisit later). **Pending confirmation:** Retrieve: push beacon appears once ≥ all non-deep caches taken; extraction point is already the cyan marker. Escort: offered only if the optional site was *not* taken (no double-dipping). |
 | Decision | Cyan extract marker and orange push beacon spawn ≥ 600 px apart, both 110 px radius. No timeout; the horde keeps ramping while you choose. |
 | Push timer | 60 / 65 / 70 / 75 / 85 / 90 s at skulls 1-6. |
 | Skull math | Push plays at min(skulls + 1, 6): zombie cap/ramp/mix of that row. Plus **one extra rig** from the job's rig pool. At 6 skulls: instead of +1 skull, a **second extra rig** (both respect the 3-rig cap; extras queue). |
@@ -250,24 +250,13 @@ On garage cards: the glyph sits in a 20 px chip in the keyword color on the mod 
 
 ---
 
-## Decisions for Cameron
+## Decisions for Cameron — APPROVED (2026-11-03)
 
-All items DRAFT until approved.
-
-1. Outrider: add a 25 shield from 5 skulls and the flank / strafe / break behavior?
-2. Give enemy guns ammo: Outrider heat (6 s / 3 s), Gunner Rig magazine (6 bursts / 2.5 s); Bulwark and Convoy nose stay unlimited?
-3. Bulwark: charge telegraph (0.5 s), 1.0 s overshoot window, ally-screening; still no shield?
-4. Patcher: cap revives at 2 (1-3 skulls) / 3 (4-6) instead of unlimited?
-5. Scrapper: no immunity to its own lit oil?
-6. New rig Torcher (fire skirmisher, rear tank rupture): stats, 30-45% spawn from 3 skulls, drops?
-7. New rig Sludger (acid/goop lobber): stats, 30-50% spawn from 4 skulls, drops?
-8. Weapons: Rivet Gun (37 sustained), Flame Sprayer (25), Acid Lobber (22), Arc Projector (23 + chain): ammo, costs, rarity, mods?
-9. Parts: Slag Plating, Ceramic Heat Sink, Goop Launcher, Nitro Bottle: stats and mods?
-10. Frames: Raider (Uncommon, 125 HP, 2 hardpoints) and Hauler (Epic, 320 HP, 3 seats) — and does Hauler's 3 open seats fit the seat model?
-11. Crew: Demolisher (Gunner), Jammer (Spotter), Wrangler (Bruiser) — abilities, perks and injury debuffs?
-12. Numbers for the vague first-draft perks (table 3.1) and the rarity → perk-tier reach?
-13. Keyword symbols and animations, and the throttle rule (1 per rig / 0.5 s, 6 on screen)?
-14. Re-colour four built status colors (STUNNED, SLICK, GOOPED, BURNING) that clash with shield/accent/truck/threat colors — and pick BURNING: pink `#FF4A8A` vs orange `#FF5A1F`?
-15. Extract or Push: 75% eligibility, exclusions (tutorial, day after wreck, Courier; Escort only without optional site), timers 60-90 s, +1 skull / +1 rig (6 skulls: +2 rigs), x1.5 pay + schematic roll + 50% XP, no choice timeout?
-16. How Push reconciles with Retrieve (beacon after non-deep caches) and Escort (only if optional site skipped)?
-17. Harpoon / Mortar / Shock Pulse mod numbers, especially Cluster Shell (3 x 40%, 45 px)?
+1. Enemy ammo: Outrider heat (6 s / 3 s), Gunner Rig magazine (6 bursts / 2.5 s); Bulwark and Convoy nose unlimited. **APPROVED.**
+2. Patcher revives capped at **3 per job** (all skulls). **APPROVED (changed).**
+3. BURNING `#FF5A1F` orange; GOOPED `#E0A458` mustard; STUNNED `#F2F5FF`, SLICK `#2EC4A6`. **APPROVED.**
+4. Extract or Push on **33%** of jobs (not 75%); everything else as drafted. **APPROVED (changed).**
+5. Extract or Push with Retrieve (beacon after the non-deep caches) and Escort (only if the optional site was skipped): **PENDING CONFIRMATION**; the draft recommendation is used.
+6. Torcher and Sludger added. **APPROVED.**
+7. Outrider and Bulwark designs, four weapons, four parts, Raider and Hauler frames, three crew, tiered perk numbers, keyword symbols/animations/colors, Harpoon/Mortar/Shock Pulse mods. **APPROVED as drafted.**
+8. Scrapper own-oil rule: not explicitly decided; treated as part of the approved rig refinements.
