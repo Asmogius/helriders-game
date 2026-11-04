@@ -24,10 +24,14 @@ var _ring: FocusRing
 var _scan := 0.0
 var _modal: Control          # the modal at the last scan (a new one rescans at once)
 var override := {}           # tests: "left" / "right" Vector2 and "r2" bool stand in for the pad
+var kbm := false             # PC: mouse and keyboard in use (pad.gd tracks all three schemes)
 
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	if _desktop():
+		# On a PC the mouse aims and clicks; it mustn't grab the touch sticks.
+		Input.emulate_touch_from_mouse = false
 	var layer := CanvasLayer.new()
 	layer.layer = 120
 	add_child(layer)
@@ -67,13 +71,22 @@ func _input(event: InputEvent) -> void:
 				_trig_down[k] = down
 	elif event is InputEventKey and (event as InputEventKey).pressed and not (event as InputEventKey).echo:
 		var k := event as InputEventKey
+		if _desktop():
+			set_kbm(true)
 		if k.keycode == KEY_F11 or ((k.keycode == KEY_ENTER or k.keycode == KEY_KP_ENTER) and k.alt_pressed):
 			_toggle_fullscreen()
 			get_viewport().set_input_as_handled()
-	elif (event is InputEventScreenTouch and (event as InputEventScreenTouch).pressed) \
-			or (event is InputEventMouseButton and (event as InputEventMouseButton).pressed):
+	elif event is InputEventScreenTouch and (event as InputEventScreenTouch).pressed:
 		capturing = ""
 		set_active(false)
+		set_kbm(false)
+	elif event is InputEventMouseButton and (event as InputEventMouseButton).pressed:
+		capturing = ""
+		set_active(false)
+		if _desktop():
+			set_kbm(true)
+	elif event is InputEventMouseMotion and _desktop() and (event as InputEventMouseMotion).relative.length() > 3.0:
+		set_kbm(true)
 
 
 ## F11 or Alt+Enter on a PC: windowed <-> fullscreen (saved like the Settings toggle).
@@ -84,9 +97,26 @@ func _toggle_fullscreen() -> void:
 	profile.call("set_setting", "fullscreen", not bool(_settings().get("fullscreen", false)))
 
 
+## Mouse and keyboard on a PC (a pad press or a touch switches back).
+func set_kbm(on: bool) -> void:
+	if on == kbm:
+		return
+	kbm = on
+	if on and active:
+		set_active(false)
+		return   # set_active emitted the change
+	mode_changed.emit(active)
+
+
+static func _desktop() -> bool:
+	return not OS.has_feature("mobile") and not OS.has_feature("web")
+
+
 func set_active(on: bool) -> void:
 	if on == active:
 		return
+	if on:
+		kbm = false
 	active = on
 	_scan = 0.0
 	if not on:
@@ -99,10 +129,15 @@ func set_active(on: bool) -> void:
 
 ## The touch wording, or the pad's while a controller is in use (hints and
 ## tips; screens listen to mode_changed to swap them).
-static func hint(touch: String, pad: String) -> String:
+static func hint(touch: String, pad: String, mouse := "") -> String:
 	var tree := Engine.get_main_loop() as SceneTree
 	var p: Node = tree.root.get_node_or_null("Pad") if tree != null else null
-	return pad if p != null and bool(p.get("active")) else touch
+	if p != null and bool(p.get("active")):
+		return pad
+	if p != null and bool(p.get("kbm")):
+		# Mouse and keyboard: its own wording, or the touch text with clicks for taps.
+		return mouse if mouse != "" else touch.replace("Tap", "Click").replace("tap", "click").replace("TAP", "CLICK")
+	return touch
 
 
 # --- Fights: the sticks and triggers ---------------------------------------------
@@ -156,6 +191,30 @@ const BUTTON_NAMES := {JOY_BUTTON_A: "CROSS", JOY_BUTTON_B: "CIRCLE", JOY_BUTTON
 	JOY_BUTTON_DPAD_UP: "D-PAD UP", JOY_BUTTON_DPAD_DOWN: "D-PAD DOWN", JOY_BUTTON_DPAD_LEFT: "D-PAD LEFT",
 	JOY_BUTTON_DPAD_RIGHT: "D-PAD RIGHT", JOY_BUTTON_MISC1: "MUTE", JOY_BUTTON_TOUCHPAD: "TOUCHPAD",
 	TRIGGER_BASE + JOY_AXIS_TRIGGER_LEFT: "L2", TRIGGER_BASE + JOY_AXIS_TRIGGER_RIGHT: "R2"}
+
+## Mouse and keyboard (fixed layout): WASD / arrows drive, the mouse aims,
+## left click fires, right click toggles LOCK, Q / E / F fire utilities 1-3,
+## Tab opens the crew wheel (point and click, or 1-4), Esc pauses.
+const KBM_KEYS := {"ability_1": KEY_Q, "ability_2": KEY_E, "ability_3": KEY_F, "crew": KEY_TAB}
+const KBM_NAMES := {"fire": "LEFT CLICK", "lock": "RIGHT CLICK", "ability_1": "Q", "ability_2": "E", "ability_3": "F", "crew": "TAB", "pause": "ESC"}
+const KBM_BADGES := {"fire": "LMB", "lock": "RMB", "ability_1": "Q", "ability_2": "E", "ability_3": "F", "crew": "TAB", "pause": "ESC"}
+
+
+## The fight action a key is bound to (physical key, so it works on any layout), or "".
+static func kbm_action(physical: int) -> String:
+	for a: String in KBM_KEYS:
+		if int(KBM_KEYS[a]) == physical:
+			return a
+	return ""
+
+
+## The WASD / arrow keys as a stick (screen directions).
+static func kbm_drive() -> Vector2:
+	var v := Vector2(
+		float(Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT)) - float(Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT)),
+		float(Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN)) - float(Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_UP)))
+	return v.normalized()
+
 
 signal map_changed
 var capturing := ""          # an action waiting for its new button (Settings), or ""

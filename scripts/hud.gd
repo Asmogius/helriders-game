@@ -369,7 +369,9 @@ func set_lock_available(available: bool) -> void:
 func _controls_hint() -> void:
 	var lock := _lock_button.visible
 	var pad := get_node_or_null("/root/Pad")
-	if pad != null and bool(pad.get("active")):
+	if pad != null and bool(pad.get("kbm")):
+		_hint.text = "WASD  DRIVE      MOUSE  AIM      LEFT CLICK  FIRE" + ("      RIGHT CLICK  LOCK" if lock else "")
+	elif pad != null and bool(pad.get("active")):
 		var sw := bool(pad.call("sticks_swapped"))
 		_hint.text = "%s STICK  DRIVE      %s STICK  AIM      %s  FIRE" % ["RIGHT" if sw else "LEFT", "LEFT" if sw else "RIGHT", str(pad.call("button_name", "fire"))] \
 			+ ("      %s  LOCK" % str(pad.call("button_name", "lock")) if lock else "")
@@ -510,6 +512,11 @@ func show_choice(speaker: String, text: String, yes_text: String, no_text: Strin
 
 func is_choice_open() -> bool:
 	return _choice != null
+
+
+## Where the crew wheel sits on screen (mouse pointing picks a slice).
+func wheel_center() -> Vector2:
+	return _wheel.get_global_rect().position + _wheel.center()
 
 
 ## Answer the open choice (its buttons call this; tests can too).
@@ -1097,16 +1104,19 @@ func hide_controls() -> void:
 # --- Controller (pad.gd) ---------------------------------------------------------
 
 const PadGlyph := preload("res://scripts/pad_glyph.gd")
+const PadScript := preload("res://scripts/pad.gd")
 
 
 ## Controller mode: each button shows the pad button that works it.
 func _pad_badges(_on := false) -> void:
 	var pad := get_node_or_null("/root/Pad")
 	var on := pad != null and bool(pad.get("active"))
+	var keys := pad != null and bool(pad.get("kbm"))
 	for i in _ability_buttons.size():
-		_ability_buttons[i].pad_badge = str(pad.call("badge", "ability_%d" % (i + 1))) if on and i < 3 else ""
-	_lock_button.pad_badge = str(pad.call("badge", "lock")) if on else ""
-	_crew_button.pad_badge = str(pad.call("badge", "crew")) if on else ""
+		var action := "ability_%d" % (i + 1)
+		_ability_buttons[i].pad_badge = str(pad.call("badge", action)) if on and i < 3 else (str(PadScript.KBM_BADGES[action]) if keys and i < 3 else "")
+	_lock_button.pad_badge = str(pad.call("badge", "lock")) if on else ("RMB" if keys else "")
+	_crew_button.pad_badge = str(pad.call("badge", "crew")) if on else ("TAB" if keys else "")
 	_controls_hint()
 
 
