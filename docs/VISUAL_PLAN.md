@@ -253,7 +253,7 @@ Make the home base a place with distinct areas you move between: lit, animated a
 
 - [ ] **V6.1 Fonts.** Pick one display font (condensed, stencil-like) for titles and one clean font for numbers. Both must have open licences; log them like `AUDIO_CREDITS.md`. Swap them in `ui_theme.gd`.
 - [ ] **V6.2 Panels and buttons:** riveted steel panels with worn edges (generated 9-slice textures), buttons with pressed and focus states, cyan and orange accent lines. The controller focus ring and the rarity frames sit on top.
-- [ ] **V6.3 Icons:** a small generated icon set for stats (HP, armor, shield, speed, power, weight, DPS), statuses, part categories and crew classes. Use it in the stat sheet, cards and HUD instead of words where space is tight.
+- [x] **V6.3 Icons:** a small generated icon set for stats (HP, armor, shield, speed, power, weight, DPS), statuses, part categories and crew classes. Use it in the stat sheet, cards and HUD instead of words where space is tight.
 - [ ] **V6.4 HUD:**
   - armor and shield bars styled like gauges;
   - status icons;

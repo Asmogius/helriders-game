@@ -809,6 +809,7 @@ func _make_card(slot: Dictionary, id: String, current: String, now: Dictionary) 
 		if int(part.level) > 1:
 			card.subtitle += "  LV %d" % int(part.level)
 		card.rarity_color = Parts.color_of(part)
+		card.category = "cat_armor" if str(part.category) == "Armor" else str(part.category).to_lower()   # V6.3 icon id
 		card.headline = _headline(part)
 		card.mod_line = mod_line(part)
 		card.mod_chips = mod_chips(part)
@@ -1241,6 +1242,8 @@ class PartCard extends Button:
 	var status_color := Color.WHITE
 	var warning := ""
 	var rarity_color := Color.WHITE
+	var category := ""   # V6.3: the category icon left of the title
+	var _icons: RefCounted = UI.icons()
 	var installed := false
 	var selected := false          # previewed on the stat sheet
 	var part_id := ""
@@ -1266,7 +1269,10 @@ class PartCard extends Button:
 		else:
 			draw_rect(Rect2(Vector2.ZERO, size), Color(rarity_color, 0.35), false, 2.0)
 		var dim := 0.45 if disabled else 1.0
-		draw_string(font, Vector2(12, 30), title, HORIZONTAL_ALIGNMENT_LEFT, size.x - 24.0, 19, Color(UI.TEXT, dim))
+		var tx := 12.0
+		if category != "" and _icons.draw(self, category, Rect2(12, 14, 20, 20), Color(rarity_color, dim)):
+			tx = 38.0
+		draw_string(font, Vector2(tx, 30), title, HORIZONTAL_ALIGNMENT_LEFT, size.x - tx - 12.0, 19, Color(UI.TEXT, dim))
 		draw_string(font, Vector2(12, 50), subtitle, HORIZONTAL_ALIGNMENT_LEFT, size.x - 24.0, 14, Color(rarity_color, 0.9 * dim))
 		draw_string(font, Vector2(12, 72), headline, HORIZONTAL_ALIGNMENT_LEFT, size.x - 24.0, 14, Color(UI.TEXT_DIM, dim))
 		var y := 94.0
@@ -1358,6 +1364,12 @@ class StatSheet extends Control:
 	]
 	# Rows shown as "used / limit": compared by headroom, not the raw load.
 	const LIMITS := {"load": "output", "weight": "capacity"}
+	# V6.3: an icon per row (rows without one keep the same indent).
+	const ROW_ICONS := {"speed": "speed", "accel": "accel", "turn": "drive", "grip": "drive", "ram": "cat_armor",
+		"hp": "hp", "front": "armor", "side": "armor", "rear": "armor", "shield": "shield",
+		"dps": "dps", "damage": "weapon", "rate": "weapon", "range": "lock", "spread": "dps", "aim": "gunner",
+		"lock": "lock", "brake": "drive", "load": "power", "weight": "weight"}
+	var _icons: RefCounted = UI.icons()
 	var title := ""
 	var now := {}
 	var after := {}
@@ -1460,7 +1472,11 @@ class StatSheet extends Control:
 				a = float(now[limit]) - a
 				b = float(after[limit]) - b
 				better = b > a
-			draw_string(font, Vector2(origin.x, y), r[0], HORIZONTAL_ALIGNMENT_LEFT, -1, 14, UI.TEXT_DIM)
+			var lx := origin.x
+			if _icons.ok():
+				_icons.draw(self, str(ROW_ICONS.get(key, "")), Rect2(origin.x, y - 13.0, 16, 16), Color(UI.TEXT_DIM, 0.9))
+				lx += 22.0
+			draw_string(font, Vector2(lx, y), r[0], HORIZONTAL_ALIGNMENT_LEFT, -1, 14, UI.TEXT_DIM)
 			if absf(b - a) < 0.05:
 				var over := LIMITS.has(key) and a < 0.0
 				draw_string(font, Vector2(origin.x, y), text_now, HORIZONTAL_ALIGNMENT_RIGHT, width, 17, UI.BAD if over else UI.TEXT)

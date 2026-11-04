@@ -33,6 +33,7 @@ func _initialize() -> void:
 	profile.new_game()
 	for t: String in TABS:
 		_add("garage_" + t.to_lower(), _show_tab.bind(t))
+	_add("garage_part_cards", _show_part_cards)   # V6.3: part card + stat sheet icons
 	_add("rarity_tiers", _show_rarity)
 	_add("fight", _show_fight)
 	_add("fight_status", _show_status)   # V6.3: status icons on the HUD strip
@@ -48,6 +49,11 @@ func _show_tab(t: String) -> void:
 		_garage = (load("res://scenes/garage.tscn") as PackedScene).instantiate()
 		root.add_child(_garage)
 	_garage.show_tab(t)
+
+
+func _show_part_cards() -> void:
+	_garage.show_tab("GARAGE")
+	_garage.open_slot(7)   # a weapon slot: weapon cards and the gun rows of the stat sheet
 
 
 func _show_rarity() -> void:
