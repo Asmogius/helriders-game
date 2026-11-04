@@ -25,10 +25,13 @@ static func font() -> Font:
 	return ThemeDB.fallback_font
 
 
-## Called once at startup (Profile._ready): every Control and every custom
-## _draw that asks ThemeDB.fallback_font gets the interface font.
+## Makes every Control and every custom _draw that asks ThemeDB.fallback_font
+## use the interface font. Runs once, from the first make() (garage, menus) or
+## the fight HUD's _ready, whichever comes first; later calls do nothing.
 static func apply_fonts() -> void:
 	var f := font()
+	if ThemeDB.fallback_font == f:
+		return   # already applied
 	ThemeDB.fallback_font = f
 	var project := ThemeDB.get_project_theme()
 	if project != null:
@@ -51,6 +54,7 @@ static func draw_fit(canvas: CanvasItem, f: Font, at: Vector2, text: String, ali
 
 
 static func make() -> Theme:
+	apply_fonts()
 	var th := Theme.new()
 	th.default_font = font()
 	th.default_font_size = 22
