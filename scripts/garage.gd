@@ -198,7 +198,7 @@ func _show_stat_sheet(on: bool) -> void:
 	_job.visible = not on
 	_power_meter.visible = not on and profile.has_rig()
 	_no_rig.visible = not on and not profile.has_rig()
-	_rig_holder.visible = not on
+	_rig_holder.visible = not on and tab == "GARAGE"   # V0.1: never over a station
 	_callouts.visible = not on
 	_rings.visible = not on
 	_rig_touch.mouse_filter = Control.MOUSE_FILTER_IGNORE if on else Control.MOUSE_FILTER_STOP
@@ -1126,6 +1126,7 @@ func _on_tab(tab_name: String) -> void:
 	_inn.visible = tab_name == "INN"
 	_saloon.visible = tab_name == "SALOON"
 	_research.visible = tab_name == "RESEARCH"
+	_rig_holder.visible = tab_name == "GARAGE" and not _stat_sheet.visible   # V0.1
 	if tab_name == "GARAGE":
 		_close_overlay()
 		return

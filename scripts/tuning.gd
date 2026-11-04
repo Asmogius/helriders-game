@@ -25,6 +25,18 @@ const COL_HUNTER := Color(0.74, 0.36, 0.28)
 const COL_ELITE := Color(1.0, 0.78, 0.25)       # named Hunt targets
 const COL_BLOOD := Color(0.3, 0.09, 0.07, 0.85)
 
+# --- Rarity colours (VISUAL_PLAN V1.1) -----------------------------------------
+# The one source of truth: Parts, Crew and UI.rarity_* all read this.
+const RARITY_ORDER := ["Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic"]
+const RARITY_COLORS := {
+	"Common": Color(0.75, 0.75, 0.72),
+	"Uncommon": Color(0.4, 0.85, 0.45),
+	"Rare": Color(0.35, 0.6, 1.0),
+	"Epic": Color(0.75, 0.45, 1.0),
+	"Legendary": Color(1.0, 0.72, 0.25),
+	"Mythic": Color(1.0, 0.36, 0.42),
+}
+
 # --- Arena ---------------------------------------------------------------------
 const WORLD_SIZE := Vector2(3200, 2400)
 const SPAWN_MIN_DISTANCE := 850.0  # keep spawns off-screen
