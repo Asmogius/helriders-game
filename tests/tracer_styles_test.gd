@@ -27,6 +27,7 @@ func _key(s: Dictionary) -> String:
 
 
 func _run() -> void:
+	check(TS._ids_match(), "_IDS matches STYLES order")
 	# Each listed weapon resolves its own style; looks are distinct where they should be.
 	var seen := {}
 	for id: String in LISTED:

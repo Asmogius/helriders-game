@@ -28,8 +28,7 @@ func _process(_delta: float) -> bool:
 		_m = current_scene
 		_m.set("auto_spawn_specials", false)
 		if _before:
-			Zombie._art_tried = true
-			Zombie._art_meta = {}
+			Zombie.disable_art()
 		var cam := root.get_camera_2d()
 		if cam != null:
 			cam.zoom = Vector2(2.6, 2.6)

@@ -50,8 +50,7 @@ func _run() -> void:
 		check(int(kinds.tank.frame_w) > int(kinds.shambler.frame_w) * 1.6, "tank about 2x the shambler")
 		check(s.radius == 13.0 and t.radius == 25.0, "hit circles unchanged")
 	# Fallback: no atlas -> code-drawn, no error.
-	Zombie._art_meta = {}
-	Zombie._art_tried = true
+	Zombie.disable_art()
 	var f := _z("shambler")
 	check(not f.has_art(), "fallback without the atlas")
 	f.queue_redraw()

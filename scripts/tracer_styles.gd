@@ -44,15 +44,20 @@ const STYLES := {
 	"scrapper": {"glow": T.COL_ENEMY, "core": T.COL_FX_TRACER_ENEMY_CORE, "length": 0.6, "width": 0.9, "dash": 0},
 }
 
-static var _ids: Array[String] = []
+# STYLES' ids in STYLES order (the byte index in bullet_pool). A const, not the
+# old lazily filled static var, which kept this script and tuning.gd alive past
+# exit ("resources still in use"). Keep it in step with STYLES; _ids_match()
+# checks it.
+const _IDS: Array[String] = ["pintle_turret", "burst_turret", "heavy_mg_turret", "scattergun_turret", "hood_guns", "outrider_twin_guns", "rivet_gun", "flame_sprayer", "arc_projector", "harpoon", "gunner_rig", "convoy_nose", "convoy_turret", "scrapper"]
+
+
+static func _ids_match() -> bool:
+	return _IDS == Array(STYLES.keys(), TYPE_STRING, &"", null)
 
 
 ## Byte index stored per bullet: 0 = DEFAULT, 1 = DEFAULT_ENEMY, 2.. = STYLES.
 static func index_for(id: String, enemy: bool) -> int:
-	if _ids.is_empty():
-		for k: String in STYLES:
-			_ids.append(k)
-	var i := _ids.find(id)
+	var i := _IDS.find(id)
 	if i >= 0:
 		return i + 2
 	return 1 if enemy else 0
@@ -62,9 +67,8 @@ static func style_at(index: int) -> Dictionary:
 	if index == 1:
 		return DEFAULT_ENEMY
 	if index >= 2:
-		index_for("", false)
-		if index - 2 < _ids.size():
-			return STYLES[_ids[index - 2]]
+		if index - 2 < _IDS.size():
+			return STYLES[_IDS[index - 2]]
 	return DEFAULT
 
 

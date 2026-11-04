@@ -53,6 +53,18 @@ static func draw_fit(canvas: CanvasItem, f: Font, at: Vector2, text: String, ali
 	canvas.draw_string(f, at, text, align, width, fit_size(f, text, width, size), color)
 
 
+# --- Icons (P7 / V6.3) ------------------------------------------------------------
+# 16 px white glyphs from tools/art/icons.py, tinted when drawn.
+const ArtAtlas := preload("res://scripts/art_atlas.gd")
+const STATUS_ICONS := ["shock", "fire", "acid", "toxic", "slime", "goop"]   # T.STATUS_NAMES order
+
+
+## The icon atlas (art_atlas.gd). Drawers load it once and keep it in a
+## member var; `ok()` is false when the art is missing (draw the old way).
+static func icons() -> RefCounted:
+	return ArtAtlas.load_atlas("res://art/ui/icons")
+
+
 static func make() -> Theme:
 	apply_fonts()
 	var th := Theme.new()
