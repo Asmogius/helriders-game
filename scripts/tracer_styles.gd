@@ -17,8 +17,8 @@ extends RefCounted
 const T := preload("res://scripts/tuning.gd")
 
 # Sample-local colours (proposed for tuning.gd; UI/P0 owns colours):
-const FX_HOT := Color8(255, 217, 102)          # also in fx_sheet.py
-const FX_WHITE_HOT := Color8(255, 242, 204)    # also in fx_sheet.py
+const FX_HOT := T.COL_FX_HOT                  # (255,217,102), also in fx_sheet.py
+const FX_WHITE_HOT := T.COL_FX_WHITE_HOT      # (255,242,204), also in fx_sheet.py
 const TRACER_RIVET := Color8(255, 150, 70)     # hot rivet slug (orange, a step hotter)
 const NO_CORE := Color(0, 0, 0, 0)
 

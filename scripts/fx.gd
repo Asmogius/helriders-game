@@ -110,7 +110,7 @@ func explosion(at: Vector2, carry: Vector2) -> void:
 	# Fireball.
 	for i in 40:
 		var dir := Vector2.RIGHT.rotated(randf() * TAU)
-		var color := T.COL_ORANGE if i % 2 == 0 else Color(1.0, 0.85, 0.4)
+		var color := T.COL_ORANGE if i % 2 == 0 else T.COL_FX_HOT
 		emit(at, dir * randf_range(40.0, 260.0), randf_range(0.3, 0.8), randf_range(8.0, 16.0), color, 3.0)
 	# Concrete dust.
 	for i in 24:
@@ -129,7 +129,7 @@ func repair(at: Vector2) -> void:
 func blast(at: Vector2, radius: float) -> void:
 	for i in 22:
 		var dir := Vector2.RIGHT.rotated(randf() * TAU)
-		var color := T.COL_ORANGE if i % 2 == 0 else Color(1.0, 0.85, 0.4)
+		var color := T.COL_ORANGE if i % 2 == 0 else T.COL_FX_HOT
 		emit(at, dir * randf_range(radius * 1.2, radius * 3.0), randf_range(0.25, 0.5), randf_range(7.0, 13.0), color, 4.0)
 	for i in 10:
 		var dir := Vector2.RIGHT.rotated(randf() * TAU)
