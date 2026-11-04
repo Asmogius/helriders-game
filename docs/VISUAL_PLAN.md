@@ -102,7 +102,7 @@ One rule: **anything that has a rarity shows it in its colour, the same way ever
 - [x] **V1.1 One source of truth.** Move the rarity colours into `tuning.gd` as `RARITY_COLORS` with all six: Common, Uncommon, Rare, Epic, Legendary, Mythic. `Parts.RARITY_COLORS` and `Crew.color_of` read it.
   - Add `UI.rarity_color(r)`, `UI.rarity_frame(control, r)` (border plus top strip) and `UI.rarity_text(name, r)`: a BBCode colour tag for RichTextLabels.
   - Done when no other file defines a rarity colour.
-- [ ] **V1.2 Rarity tiers look different, not just tinted.**
+- [x] **V1.2 Rarity tiers look different, not just tinted.**
   - Common: plain grey frame.
   - Uncommon: green frame.
   - Rare: blue frame plus a soft inner glow.
@@ -122,7 +122,7 @@ One rule: **anything that has a rarity shows it in its colour, the same way ever
     - the "SCHEMATIC" pickup banner takes the rarity colour.
   - **Database:** entry names in rarity colour (parts and crew).
   - **Toasts and banners** that name a part or crew member colour the name.
-- [ ] **V1.4 Test.** Add `tests/rarity_test.gd`, checking:
+- [x] **V1.4 Test.** Add `tests/rarity_test.gd`, checking:
   - every rarity has a colour;
   - every card type (part, crew, perk, offer, crate) asks `UI.rarity_*` for its colour, not a hard-coded one;
   - a capture shows all six tiers side by side for the owner.
@@ -236,7 +236,7 @@ Make the home base a place with distinct areas you move between: lit, animated a
 - [ ] **V5.6 Map edges:** a real boundary (barricade walls of cars and containers, a burning wreck line) instead of a flat grey border.
 
 **Layout:**
-- [ ] **V5.7 More and better layouts.**
+- [x] **V5.7 More and better layouts.**
   - Go from 6 to 12 layouts: 3 per district, each with at least 1 landmark.
   - Landmarks: a gas station, a collapsed overpass, a mall car park, a rail bridge, a stadium gate, a factory yard and so on.
   - Each layout should have:
@@ -251,8 +251,8 @@ Make the home base a place with distinct areas you move between: lit, animated a
 
 ## V6. Interface polish (supports all of the above)
 
-- [x] **V6.1 Fonts.** Pick one display font (condensed, stencil-like) for titles and one clean font for numbers. Both must have open licences; log them like `AUDIO_CREDITS.md`. Swap them in `ui_theme.gd`.
-- [ ] **V6.2 Panels and buttons:** riveted steel panels with worn edges (generated 9-slice textures), buttons with pressed and focus states, cyan and orange accent lines. The controller focus ring and the rarity frames sit on top.
+- [x] **V6.1 Fonts.** Pick one display font (condensed, stencil-like) for titles and one clean font for numbers. Both must have open licences; log them like `AUDIO_CREDITS.md`. Swap them in `ui_theme.gd`. *(One interface font for now; a separate numbers font is pending the owner's decision.)*
+- [x] **V6.2 Panels and buttons:** riveted steel panels with worn edges (generated 9-slice textures), buttons with pressed and focus states, cyan and orange accent lines. The controller focus ring and the rarity frames sit on top.
 - [ ] **V6.3 Icons:** a small generated icon set for stats (HP, armor, shield, speed, power, weight, DPS), statuses, part categories and crew classes. Use it in the stat sheet, cards and HUD instead of words where space is tight.
 - [ ] **V6.4 HUD:**
   - armor and shield bars styled like gauges;
