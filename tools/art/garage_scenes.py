@@ -51,7 +51,7 @@ C = {
     "tyre": PALETTE["tyre"], "glass": PALETTE["glass"],
     "cyan": PALETTE["cyan"], "orange": PALETTE["orange"], "white_hot": PALETTE["white_hot"],
 }
-# Sample-local (proposed for tuning.gd via UI/P0):
+# Now in tuning.gd as COL_GARAGE_* (PR #42); keep both in step:
 SAMPLE_COLOURS = {
     "GARAGE_FLOOR": (58, 57, 55),       # workshop slab, a step lighter than the street
     "GARAGE_FLOOR_LINE": (120, 104, 60),# worn bay paint (desaturated road-line yellow)
@@ -100,82 +100,59 @@ def tyre_stack(g, cx, cy, n):
 
 
 def build(X, Y=240, Z=78):
-    """Room: x right, y toward the viewer, z up. Back wall at small y."""
+    """V2 calm pass (Cameron: the first bay was cluttered and hard to read).
+    Room: x right, y toward the viewer, z up. Almost empty on purpose: a dark
+    slab, a plain dark back wall, one floor pad under the rig and a pool of
+    light on it. No tool wall, door, tyres or welding bench, so the part cards
+    and stats sit on quiet, dark negative space and the rig is the focus."""
     rng = np.random.default_rng(3)
     g = np.zeros((X, Y, Z), np.int16)
     mid = X // 2
-    # floor slab with bay lines and oil stains
-    box(g, 0, X, 0, Y, 0, 1, "garage_floor")
-    for x0 in (mid - 70, mid + 66):
-        box(g, x0, x0 + 4, 40, Y - 10, 0, 1, "garage_floor_line")
-    for _ in range(18):
-        cx, cy, r = rng.integers(10, X - 10), rng.integers(50, Y - 10), rng.integers(3, 9)
+    ly = 62
+    # dark slab, with a few faint oil stains well away from the cards
+    box(g, 0, X, 0, Y, 0, 1, "road")
+    # spotlight pool: the slab lifts to the bay floor colour around the pad,
+    # dithered at the edge so the light falls off in pixel steps
+    for x in range(mid - 120, mid + 121):
+        for y in range(ly - 70, ly + 71):
+            if not (0 <= x < X and 0 <= y < Y):
+                continue
+            d = math.hypot((x - mid) / 120.0, (y - ly) / 70.0)
+            if d < 0.75 or (d < 1.0 and rng.random() < (1.0 - d) / 0.25):
+                g[x, y, 0] = IDX["garage_floor"]
+    for _ in range(3):
+        cx, cy, r = mid + rng.integers(-60, 60), ly + rng.integers(30, 60), rng.integers(3, 6)
         for x in range(cx - r, cx + r):
             for y in range(cy - r // 2, cy + r // 2 + 1):
-                if 0 <= x < X and 0 <= y < Y and rng.random() < 0.75:
+                if rng.random() < 0.7:
                     g[x, y, 0] = IDX["garage_oil"]
-    # back wall (corrugated: alternating depth) with a door opening on the right
-    door0, door1 = X - 150, X - 60
-    for x in range(X):
-        d = 8 + (1 if (x // 3) % 2 else 0)
-        if door0 <= x < door1:
-            continue
-        box(g, x, x + 1, 0, d, 0, Z, "garage_wall")
-    # roll-up door: frame, half-raised shutter, street outside
-    box(g, door0 - 4, door0, 0, 12, 0, Z, "steel_dark")
-    box(g, door1, door1 + 4, 0, 12, 0, Z, "steel_dark")
-    for z in range(46, Z):
-        box(g, door0, door1, 2, 6, z, z + 1, "steel" if z % 3 else "steel_dark")
-    box(g, door0, door1, 0, 2, 0, 46, "garage_street_night")
-    for x in range(door0 + 6, door1 - 6, 18):           # far street: a wreck silhouette and a lamp
-        box(g, x, x + 10, 0, 1, 4, 10 + (x % 5), "road")
-    box(g, door1 - 20, door1 - 18, 0, 1, 10, 40, "steel_dark")
-    box(g, door1 - 24, door1 - 14, 0, 1, 38, 40, "orange")   # street lamp head
-    box(g, door0, door1, 2, 10, 44, 46, "orange")        # warning strip on the shutter edge
-    # tool wall (pegboard) left of centre, with tools as steel shapes
-    box(g, mid - 150, mid - 40, 8, 10, 22, 62, "garage_pegboard")
-    for k in range(12):
-        tx = mid - 144 + k * 9
-        h = 8 + (k * 7) % 10
-        box(g, tx, tx + 2, 10, 11, 56 - h, 56, "steel")
-        if k % 3 == 0:
-            box(g, tx - 2, tx + 4, 10, 11, 56 - h - 3, 56 - h, "steel_dark")
-    box(g, mid - 150, mid - 40, 10, 22, 18, 21, "steel_dark")   # workbench top
-    for lx in (mid - 148, mid - 44):
-        box(g, lx, lx + 3, 12, 20, 0, 18, "steel_dark")
-    box(g, mid - 120, mid - 96, 12, 20, 21, 27, "gas_dummy" if False else "rust")  # toolbox
-    # fluorescent tubes (cyan) on the back wall and an orange work lamp
-    for x0 in (mid - 140, mid - 20, mid + 90):
-        box(g, x0, x0 + 40, 9, 11, 68, 70, "cyan")
-        box(g, x0 - 2, x0 + 42, 8, 9, 67, 71, "steel_dark")
-    # welding station, right of centre
-    wx = mid + 110
-    box(g, wx, wx + 30, 20, 40, 0, 16, "steel_dark")
-    box(g, wx + 2, wx + 28, 22, 38, 16, 18, "steel")
-    cyl(g, wx + 40, 22, 4, 0, 30, "garage_gas_red")
-    cyl(g, wx + 50, 22, 4, 0, 30, "steel")
-    box(g, wx + 6, wx + 10, 24, 28, 18, 24, "orange")    # hot weld glow on the bench
-    # tyre stacks, left
-    tyre_stack(g, 30, 40, 4)
-    tyre_stack(g, 52, 32, 3)
-    tyre_stack(g, 36, 66, 2)
-    # hydraulic lift in the middle: round platform on a post, hazard ring
-    ly = 62
+    # plain back wall, no corrugation detail
+    box(g, 0, X, 0, 8, 0, Z, "garage_wall")
+    # floor pad (the old lift, quieter): dark disc, thin steel rim, a few cyan
+    # marker dots instead of the busy hazard ring
     cyl(g, mid, ly, 44, 1, 3, "steel_dark")
-    cyl(g, mid, ly, 42, 3, 5, "steel")
-    for a in range(0, 360, 6):
-        if (a // 12) % 2 == 0:
-            x = mid + 41 * math.cos(math.radians(a)); y = ly + 41 * math.sin(math.radians(a))
-            box(g, int(x), int(x) + 2, int(y), int(y) + 2, 5, 6, "orange")
-    cyl(g, mid, ly, 6, 0, 1, "steel_dark")
-    # orange work lamp on a stand, near the lift
-    box(g, mid + 64, mid + 66, 70, 72, 0, 40, "steel_dark")
-    box(g, mid + 60, mid + 70, 66, 74, 40, 44, "orange")
-    # crates / barrels front-left (low, so they don't hide controls)
-    box(g, 70, 96, Y - 40, Y - 16, 0, 14, "rust")
-    box(g, 72, 94, Y - 38, Y - 18, 14, 15, "steel_dark")
-    cyl(g, 108, Y - 30, 7, 0, 18, "steel")
+    cyl(g, mid, ly, 42, 3, 4, "steel_dark")
+    for a in range(0, 360, 2):
+        x = mid + 42 * math.cos(math.radians(a)); y = ly + 42 * math.sin(math.radians(a))
+        box(g, int(x), int(x) + 1, int(y), int(y) + 1, 4, 5, "steel")
+    for a in (0, 90, 180, 270):
+        x = mid + 39 * math.cos(math.radians(a)); y = ly + 39 * math.sin(math.radians(a))
+        box(g, int(x), int(x) + 2, int(y), int(y) + 2, 4, 5, "cyan")
+    # one overhead tube on the back wall, centred over the rig (the light source)
+    box(g, mid - 30, mid + 30, 9, 11, 70, 72, "cyan")
+    box(g, mid - 32, mid + 32, 8, 9, 69, 73, "steel_dark")
     return g, (mid, ly, 5)
+
+
+def vignette(img, lx, ly, rx, ry, floor=0.45):
+    """Darken towards the edges in 4 hard steps (pixel look, no smooth blur)."""
+    h, w = img.shape[:2]
+    yy, xx = np.mgrid[0:h, 0:w]
+    d = np.sqrt(((xx - lx) / rx) ** 2 + ((yy - ly) / ry) ** 2)
+    k = np.clip(1.0 - np.floor(np.clip(d - 0.6, 0, None) * 4.0) / 4.0 * (1.0 - floor) * 1.6, floor, 1.0)
+    out = img.copy()
+    out[..., :3] = (img[..., :3] * k[..., None]).astype(np.uint8)
+    return out
 
 
 def render(g, cols, view_w, lift):
@@ -203,6 +180,7 @@ def main():
     base, _ = render(floor, colors(), WIDE[0], lift)
     a = full[..., 3:4] > 0
     full = np.where(a, full, base)
+    full = vignette(full, lx, ly, 150.0, 95.0)
     lights, _ = render(g, colors(True), WIDE[0], lift)
     # The rig sits at garage.gd (size.x * 0.5, 290) on a 720-high screen -> 290/3.4 px down.
     top = int(round(ly - 290 / SCALE))

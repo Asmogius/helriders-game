@@ -1,10 +1,13 @@
 extends Control
 ## V2.4 style sample (P6): ambient life for the Workshop bay, one drawer.
 ## Flickering fluorescent tubes (the light overlay's alpha), dust motes in the
-## light, and an occasional spark shower at the welding bench. Cheap: a fixed
+## light, and (off in the calm pass) weld sparks. Cheap: a fixed
 ## array of motes, one _draw(). Low quality (Profile settings) turns it off.
 
-const MOTES := 26
+const T := preload("res://scripts/tuning.gd")
+
+const MOTES := 10          # calm pass: a few motes in the spotlight
+const SPARKS := false      # calm pass: no welding bench, so no spark showers
 
 var room: Control
 var enabled := true
@@ -40,7 +43,7 @@ func _process(delta: float) -> void:
 		var stutter := fmod(_t, 4.7) < 0.18 and int(_t * 30.0) % 2 == 0
 		lights.modulate.a = 0.35 if stutter else 0.8 + 0.06 * sin(_t * 9.0)
 	_next_spark -= delta
-	if _next_spark <= 0.0:
+	if SPARKS and _next_spark <= 0.0:
 		_next_spark = _rng.randf_range(1.5, 3.5)
 		for i in 10:
 			_sparks.append(Vector4(0.0, 0.0, _rng.randf_range(-30.0, 30.0), _rng.randf_range(-45.0, -15.0)))
@@ -70,10 +73,10 @@ func _draw() -> void:
 	for m in _motes:
 		var p := Vector2(m.x + 6.0 * sin(_t * 0.3 + m.z), m.y - fmod(_t * 3.0 + m.z * 10.0, 40.0))
 		var a := 0.10 + 0.08 * sin(_t + m.z)
-		draw_rect(Rect2(origin + p * s, Vector2(s, s)), Color(0.9, 0.88, 0.8, a))
+		draw_rect(Rect2(origin + p * s, Vector2(s, s)), Color(T.COL_GARAGE_DUST, a))
 	# Weld sparks: from the welding bench (right of the lift), orange-white.
 	var weld := lift + Vector2(118.0, -64.0) * s
 	for k in _sparks.size():
 		var sp := _sparks[k]
-		var c := Color(1.0, 0.85, 0.5, clampf(_spark_life[k] * 2.0, 0.0, 1.0))
+		var c := Color(T.COL_GARAGE_SPARK, clampf(_spark_life[k] * 2.0, 0.0, 1.0))
 		draw_rect(Rect2(weld + Vector2(sp.x, sp.y) * s, Vector2(s, s)), c)
