@@ -6,7 +6,8 @@ extends SceneTree
 ##   rarity_tiers.png  (all six rarity frames side by side)
 ##   art_swatches.png (every art-only colour in tuning.gd, named)
 ##   fight.png         (the mission scene after a few seconds)
-##   map_outer_blocks_before.png / _after.png (P4 style sample corner)
+##   map_outer_blocks_before.png / _after.png (P4 style sample corner), _full_* (whole
+##   corner), _readability (rig + every zombie kind on the decorated corner)
 ## Optional second arg: only shots whose name starts with it, e.g. "map_".
 ## Uses a throwaway profile (persist = false), so no save is touched.
 ## Packages add their shots as new steps in `_steps()`.
@@ -45,6 +46,9 @@ func _initialize() -> void:
 	# --- P4 map corner (VISUAL_PLAN V5.5 style sample) ---
 	_add("map_outer_blocks_before", _show_map_corner.bind(false))
 	_add("map_outer_blocks_after", _show_map_corner.bind(true))
+	_add("map_outer_blocks_full_before", _show_map_corner.bind(false, 0.68, Vector2(750, 440)))
+	_add("map_outer_blocks_full_after", _show_map_corner.bind(true, 0.68, Vector2(750, 440)))
+	_add("map_outer_blocks_readability", _show_map_corner.bind(true, 1.2, Vector2(680, 640), true))
 	_add("art_swatches", _show_swatches)
 	_add("fight", _show_fight)
 	_add("fight_crates", _show_crates)
@@ -103,7 +107,7 @@ func _show_rarity() -> void:
 var _map: Node2D
 
 
-func _show_map_corner(sample: bool) -> void:
+func _show_map_corner(sample: bool, zoom := 0.84, at := Vector2(750, 440), crowd := false) -> void:
 	for n: Node in [_garage, _strip, _map]:
 		if n != null and is_instance_valid(n):
 			n.queue_free()
@@ -116,10 +120,33 @@ func _show_map_corner(sample: bool) -> void:
 	var arena: Node2D = Arena.new()
 	_map.add_child(arena)
 	var cam := Camera2D.new()
-	cam.position = Vector2(750, 440)
-	cam.zoom = Vector2(0.84, 0.84)
+	cam.position = at
+	cam.zoom = Vector2(zoom, zoom)
 	_map.add_child(cam)
 	cam.make_current()
+	if crowd:
+		_crowd(at)
+
+
+## Readability check: the player's rig and a pack of every zombie kind,
+## frozen, standing on the decorated corner (road, kerb, lawn, near decor).
+func _crowd(at: Vector2) -> void:
+	var rig: Node2D = load("res://scripts/vehicle.gd").new()
+	_map.add_child(rig)
+	var profile: Node = root.get_node("Profile")
+	rig.apply_stats(profile.build_stats(profile.rig if profile.has_rig() else load("res://scripts/parts.gd").STARTER_LOADOUT))
+	rig.position = at + Vector2(40, 60)
+	var dir: Node2D = load("res://scripts/zombie_director.gd").new()
+	dir.start_count = 0
+	_map.add_child(dir)
+	var kinds := ["shambler", "shambler", "brute", "shambler", "slimer", "boomer", "shambler", "tank", "shambler", "shambler", "brute", "shambler"]
+	var spots := [Vector2(-300, -70), Vector2(-250, -40), Vector2(-180, -130), Vector2(-120, -150), Vector2(-60, -200),
+		Vector2(120, -170), Vector2(230, -110), Vector2(300, 40), Vector2(-330, 90), Vector2(-200, 150), Vector2(180, 170), Vector2(60, -60)]
+	for i in kinds.size():
+		var z: Node2D = dir.spawn_at(at + spots[i], kinds[i])
+		if z != null:
+			z.rotation = float(i) * 0.7
+	dir.process_mode = Node.PROCESS_MODE_DISABLED
 
 
 const SWATCHES := [

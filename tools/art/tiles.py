@@ -12,7 +12,8 @@ from palette import tuning_color, PALETTE
 
 T = 64
 OUT = os.path.join(os.path.dirname(__file__), "..", "..", "art", "map")
-GRASS = np.array(tuning_color("COL_OB_GRASS"), float)
+# Lawn kept a step darker than COL_OB_GRASS so zombies (COL_ZOMBIE_DARK) stay readable on it.
+GRASS = np.array(tuning_color("COL_OB_GRASS"), float) * 0.84
 PAVE = np.array(tuning_color("COL_OB_PAVE"), float)
 ROAD = np.array(tuning_color("COL_ROAD"), float)
 LINE = np.array(tuning_color("COL_ROAD_LINE"), float)
@@ -108,6 +109,18 @@ def lane_dash():
     return t
 
 
+def worn_bar(rng, h, w):
+    """Crosswalk stripe / stop line: faded paint with worn-off patches."""
+    t = np.zeros((h, w, 4), np.uint8)
+    t[..., :3] = clamp(PAVE * 1.45)
+    a = np.full((h, w), 150.0) + noise(rng, h, w, 25)
+    for _ in range(w // 6):
+        x, y = rng.randrange(w), rng.randrange(h)
+        a[max(0, y - 1):y + 2, max(0, x - 2):x + 3] *= 0.35
+    t[..., 3] = clamp(a)
+    return t
+
+
 def main():
     rng = random.Random(4207)
     tiles = {}
@@ -121,6 +134,8 @@ def main():
     for i in range(2):
         tiles["tree_%d" % i] = blob(rng, 88, GRASS * np.array([0.85, 0.95, 0.8]), 7, 0.45)
     tiles["lane_dash"] = lane_dash()
+    tiles["zebra"] = worn_bar(rng, 10, 44)
+    tiles["stop_bar"] = worn_bar(rng, 8, 100)
     # Shelf-pack into one atlas, 1 px gutter.
     W = 512
     x = y = row = 0

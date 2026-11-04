@@ -74,6 +74,52 @@ def chimney(rng):
     return rgba(t)
 
 
+WH2 = 46   # two-storey south wall (flat-roof block)
+
+
+def gravel(rng):
+    """Flat tar-and-gravel roof tile for the bigger blocks (seen from above)."""
+    base = np.tile(np.array(PALETTE["steel_dark"], float) * 1.05, (RT, RT, 1))
+    base += (np.random.RandomState(rng.randrange(1 << 30)).rand(RT, RT, 1) - 0.5) * 14
+    for _ in range(40):
+        x, y = rng.randrange(RT), rng.randrange(RT)
+        base[y, x] *= rng.choice((0.7, 1.25))
+    if rng.random() < 0.5:  # tar seam
+        base[rng.randrange(RT), :] *= 0.7
+    return rgba(base)
+
+
+def parapet(length):
+    t = np.tile(np.array(PALETTE["steel"], float) * 0.95, (5, length, 1))
+    t[0, :] *= 1.2; t[-1, :] *= 0.55
+    return rgba(t)
+
+
+def wall2(rng, col, kind):
+    """Two storeys: upper windows plus a ground floor piece (shop front)."""
+    t = np.tile(col * 0.74, (WH2, WW, 1))
+    t[::4, :] *= 0.9                     # block courses
+    t[:3, :] = col * 0.42
+    t[-3:, :] = col * 0.38
+    t[22, :] = col * 0.5                 # floor band
+    g = GLASS
+    t[6:17, 9:23] = np.array(OUTLINE[:3]); t[7:16, 10:22] = ORANGE * 0.8 if kind == "lit" else g
+    if kind == "boarded":
+        t[7:16, 10:22] = np.array(PALETTE["rust"]) * 0.7
+        t[9, 9:23] = t[13, 9:23] = np.array(PALETTE["rust"]) * 0.45
+    if kind == "broken":
+        t[7:12, 12:19] = np.array(OUTLINE[:3])
+    if kind == "shutter":
+        t[26:43, 3:29] = np.array(PALETTE["steel"], float) * 0.85
+        t[26:43:2, 3:29] *= 0.75
+        t[38:43, 6:16] = np.array(OUTLINE[:3])     # pried open at the bottom
+    elif kind == "door":
+        t[25:43, 11:21] = np.array(OUTLINE[:3]); t[26:43, 12:20] = np.array(PALETTE["steel_dark"])
+    else:
+        t[26:38, 6:26] = np.array(OUTLINE[:3]); t[27:37, 7:25] = g * 0.9
+    return rgba(t)
+
+
 def main():
     rng = random.Random(9172)
     pieces = {}
@@ -85,6 +131,11 @@ def main():
         for k in ("plain", "window", "lit", "door"):
             pieces["wall%d_%s" % (i, k)] = wall(rng, c, k)
     pieces["chimney"] = chimney(rng)
+    for v in range(3):
+        pieces["gravel_%d" % v] = gravel(rng)
+    pieces["parapet"] = parapet(64)
+    for k in ("window", "lit", "boarded", "broken", "shutter", "door"):
+        pieces["wall2_%s" % k] = wall2(rng, SIDINGS[1] * 0.9, k)
     W = 256
     x = y = row = 0
     regions = {}
@@ -99,7 +150,7 @@ def main():
     sheet = sheet[:y + row + 1]
     os.makedirs(OUT, exist_ok=True)
     Image.fromarray(sheet, "RGBA").save(os.path.join(OUT, "outer_house.png"))
-    json.dump({"regions": regions, "roofs": len(ROOFS), "sidings": len(SIDINGS), "wall_h": WH},
+    json.dump({"regions": regions, "roofs": len(ROOFS), "sidings": len(SIDINGS), "wall_h": WH, "wall2_h": WH2},
               open(os.path.join(OUT, "outer_house.json"), "w"), indent=1)
     print("outer_house:", sheet.shape, len(regions), "regions")
 
