@@ -72,12 +72,13 @@ func _process(_delta: float) -> bool:
 				# Back off first, or a drop landing beside you is picked up at once.
 				var away := mission.vehicle.global_position - e.global_position
 				mission.vehicle.global_position = e.global_position + (away.normalized() if away.length() > 1.0 else Vector2.RIGHT) * 500.0
+				mark = {"crates": mission.pickups.get_child_count()}   # a Tank may have left a crate already
 				e.take_damage(99999.0)
 			if frame == 305:
-				_check(mission.pickups.get_child_count() == 1, "the Elite always drops something")
+				_check(mission.pickups.get_child_count() == int(mark.crates) + 1, "the Elite always drops something")
 				_check(mission.state == Mission.State.RUNNING, "Hunt isn't over until you grab the drop")
 				mark = {"known": profile.schematics.size()}
-				mission.vehicle.global_position = (mission.pickups.get_child(0) as Node2D).global_position
+				mission.vehicle.global_position = (mission.pickups.get_child(mission.pickups.get_child_count() - 1) as Node2D).global_position
 			if frame == 315:
 				_check(mission.state == Mission.State.CLEARED and mission.hud.result_text().contains("TARGET DOWN"), "grabbing the Elite's drop completes the Hunt")
 				_check(profile.schematics.size() == int(mark.known) + 1, "the Elite's schematic is banked")
