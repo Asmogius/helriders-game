@@ -114,7 +114,7 @@ In a mission, crew abilities fire from a crew wheel. The fight slows to 25% whil
 
 Injury: a small chance on a big hit during a fight. An injured crew member loses their passive, perks and ability for the run, and the rig takes a class-specific penalty. Must rest in Inn for a set number of days (Inn upgrades can shorten). Cannot be assigned or sent on expeditions while resting.
 
-Permanent loss: only on vehicle destruction. Free Common basics (Driver, Gunner) always available at Saloon to prevent soft-lock. Expeditions level reserve crew passively.
+Permanent loss: only on vehicle destruction. Free Common basics (Driver, Gunner) always available at Saloon to prevent soft-lock, even with a full roster: agreed with the owner (audit, 2026-11-04), the free hire fits one over the roster cap; while over, nothing else joins until someone leaves. Expeditions level reserve crew passively.
 
 # 7. Missions, Districts, and Progression
 
@@ -128,7 +128,7 @@ Comms offers clearly labeled missions each day. Most are short single-zone fight
 
   Retrieve (agreed; built. To be reconciled with §14 Extract or Push, since Retrieve already ends at its own extraction point): 3/3/4/4/5/5 caches around the block by skulls; leave through the extraction point (at the start, counts once you've left it) whenever you like with at least one. Danger climbs a step per cache grabbed and every 40 s: +2 zombies alive, +5% zombie speed, and at danger 2/4/6 a rig is called in (up to 0/1/1/2/2/3 by skulls). The farthest cache is the deep cache, guarded by a Gunner Rig: it counts double toward pay and carries a sure schematic. Pay = reward x (30% + 70% x caches brought out); every cache is ~1.3x a Clear. Pool: Turbo Four, Off-Road Tires, Oil Slick, Mine Dropper.
 
-  Escort (agreed; built. To be reconciled with §14 Extract or Push): a friendly salvage truck (400 armor, speed 260, no guns) drives to 2/2/3/3/3/3 sites by skulls and works each for 20 s while you defend it; zombies and enemy rigs go for it. After the first site the driver radios (the game pauses) offering an extra, risky site: 30 s of work, a big wave and a rig, +60% pay and a sure schematic. The truck wrecked = job failed: the day passes, no job pay, kill scrap and salvage kept, no wreck penalty. Pays like Survive. Pool: Structural Bracing, Riot Plating, Emergency Patch, Burst Turret.
+  Escort (agreed; built. To be reconciled with §14 Extract or Push): a friendly salvage truck (400 armor at 3 skulls, scaled by skull with the enemy-damage multiplier: 340 at 1, 780 at 5-6, agreed in the 2026-11-04 audit; speed 260, no guns) drives to 2/2/3/3/3/3 sites by skulls and works each for 20 s while you defend it; zombies and enemy rigs go for it. After the first site the driver radios (the game pauses) offering an extra, risky site: 30 s of work, a big wave and a rig, +60% pay and a sure schematic. The truck wrecked = job failed: the day passes, no job pay, kill scrap and the salvage you picked up kept (not a clear), no wreck penalty. Pays like Survive. Pool: Structural Bracing, Riot Plating, Emergency Patch, Burst Turret.
 
 ## District Unlock
 

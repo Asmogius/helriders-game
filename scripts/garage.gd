@@ -158,9 +158,15 @@ func _ready() -> void:
 		profile.save_game()
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	_callouts.queue_redraw()
 	_rings.queue_redraw()
+	# Controller: the right stick turns the rig, as dragging does.
+	var pad := get_node_or_null("/root/Pad")
+	if pad != null and bool(pad.get("active")) and _rig_holder.visible and menu == null and (_overlay == null or not is_instance_valid(_overlay)):
+		var x: float = (pad.call("stick", false) as Vector2).x
+		if absf(x) > 0.2:
+			rotate_rig(x * 2.5 * delta)
 
 
 # --- Actions (also used by tests) ------------------------------------------------
@@ -1545,12 +1551,27 @@ func open_menu() -> GameMenu:
 	return menu
 
 
+## The phone's back button steps back one level, like Circle: the menu,
+## then an open panel, the part sheet, a station, and last opens MENU.
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
-		if menu != null:
-			menu.back()
-		else:
-			open_menu()
+		go_back()
+
+
+func go_back() -> void:
+	if menu != null:
+		menu.back()
+		return
+	var pad := get_node_or_null("/root/Pad")
+	var modal: Control = pad.call("top_modal") if pad != null else null
+	if modal != null and modal.has_meta("pad_close"):
+		(modal.get_meta("pad_close") as Callable).call()
+	elif selected >= 0:
+		close_sheet()
+	elif tab != "GARAGE":
+		show_tab("GARAGE")
+	else:
+		open_menu()
 
 
 ## The optional tutorial (MENU): the Training Run, then the garage tour.

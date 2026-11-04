@@ -399,6 +399,8 @@ const ESCORT_OPTIONAL_TIME := 30.0
 const ESCORT_OPTIONAL_PAY := 1.6      # with the optional site
 const ESCORT_OPTIONAL_WAVE := 10      # extra zombies the optional site wakes
 const ESCORT_SITE_RADIUS := 90.0
+# Escort truck at 3 skulls; mission.truck_sheet() scales armor and HP by ENEMY_DAMAGE_BY_SKULL
+# (agreed with the owner, audit 2026-11-04).
 const TRUCK := {
 	"name": "Salvage Truck",
 	"max_speed": 260.0,

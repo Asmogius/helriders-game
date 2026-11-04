@@ -105,7 +105,7 @@ func refresh() -> void:
 	_title.text = "SALOON   -   DAY %d" % profile.day
 	_info.text = "SCRAP  %d      ROSTER  %d / %d" % [profile.scrap, profile.crew.size(), profile.roster_cap()]
 	var start := 1 + profile.upgrade_level("seasoned_hands")
-	_note.text = "New hires start at level %d (capped by rarity) with a random specialty. Offers can be any class and change when the day ends. Free Common Drivers and Gunners are always here, so you can never get stuck without a Driver.\nOdds today: %s" % [start, odds_text()]
+	_note.text = "New hires start at level %d (capped by rarity) with a random specialty. Offers can be any class and change when the day ends. Free Common Drivers and Gunners are always here, even with a full roster (one over the cap), so you can never get stuck without a Driver.\nOdds today: %s" % [start, odds_text()]
 	for c in _cards.get_children():
 		_cards.remove_child(c)
 		c.queue_free()
@@ -205,7 +205,10 @@ func _block(i: int) -> String:
 	var m := offer(i)
 	if bool(m.get("hired", false)):
 		return "HIRED"
-	if profile.roster_full():
+	var free := i >= profile.saloon.size() and not is_rehire(i)
+	if free and not profile.can_hire_basic():
+		return "ROSTER FULL"
+	if not free and profile.roster_full():
 		return "ROSTER FULL"
 	if profile.hire_price(m) > profile.scrap:
 		return "NEED %d SCRAP" % profile.hire_price(m)

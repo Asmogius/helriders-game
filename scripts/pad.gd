@@ -283,7 +283,7 @@ func top_modal() -> Control:
 	var best: Control = null
 	for n: Node in get_tree().get_nodes_in_group("pad_modal"):
 		var c := n as Control
-		if c == null or not c.is_visible_in_tree():
+		if c == null or not c.is_visible_in_tree() or c.is_queued_for_deletion():
 			continue
 		if best == null or c.is_greater_than(best):
 			best = c
@@ -296,6 +296,7 @@ func _process(delta: float) -> void:
 	if not active:
 		_ring.target = null
 		return
+	_scroll_lists(delta)
 	_scan -= delta
 	var modal := top_modal()
 	if modal != _modal:
@@ -311,7 +312,11 @@ func _process(delta: float) -> void:
 	_modal = modal
 	if modal != null:
 		want = true
-	_apply_focus(want, modal)
+	# Driving with no menu up: nothing to focus, so skip the tree scan after
+	# the first pass turned focus off (a fight has a lot of nodes).
+	if want or _focus_on:
+		_apply_focus(want, modal)
+		_focus_on = want
 	var owner := get_viewport().gui_get_focus_owner()
 	if want and (owner == null or not owner.is_visible_in_tree() or owner.focus_mode == Control.FOCUS_NONE):
 		var first := _first_button(modal)
@@ -322,16 +327,43 @@ func _process(delta: float) -> void:
 	_ring.target = get_viewport().gui_get_focus_owner() if want else null
 
 
-## Buttons that may take focus now: visible, enabled, and inside the open
-## modal if there is one. Scroll boxes follow the focus.
+var _focus_on := true   # focus was last turned on (so a scan is needed to turn it off)
+
+
+## Buttons (and sliders) that may take focus now: visible, enabled, and
+## inside the open modal if there is one. Scroll boxes follow the focus.
 func _apply_focus(on: bool, modal: Control) -> void:
 	for b: Node in get_tree().root.find_children("*", "BaseButton", true, false):
 		var button := b as BaseButton
 		var ok := on and button.is_visible_in_tree() and not button.disabled and (modal == null or modal.is_ancestor_of(button))
 		button.focus_mode = Control.FOCUS_ALL if ok else Control.FOCUS_NONE
+	for sl: Node in get_tree().root.find_children("*", "Slider", true, false):
+		var slider := sl as Slider
+		var ok := on and slider.is_visible_in_tree() and slider.editable and (modal == null or modal.is_ancestor_of(slider))
+		slider.focus_mode = Control.FOCUS_ALL if ok else Control.FOCUS_NONE
 	if on:
 		for s: Node in get_tree().root.find_children("*", "ScrollContainer", true, false):
 			(s as ScrollContainer).follow_focus = true
+
+
+## The right stick scrolls a list that has no buttons to step through (the
+## Database, long notes): the first visible scroll box in the open panel.
+func _scroll_lists(delta: float) -> void:
+	if not _focus_on:
+		return   # driving: the stick aims
+	var y := stick(false).y
+	if absf(y) < 0.2:
+		return
+	var root: Node = top_modal()
+	if root == null:
+		root = get_tree().current_scene
+	if root == null:
+		return
+	for s: Node in root.find_children("*", "ScrollContainer", true, false):
+		var box := s as ScrollContainer
+		if box.is_visible_in_tree() and box.get_v_scroll_bar().visible:
+			box.scroll_vertical += int(y * 900.0 * delta)
+			return
 
 
 func _first_button(modal: Control) -> BaseButton:

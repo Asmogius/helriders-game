@@ -138,6 +138,21 @@ func _run_checks() -> void:
 	profile.apply_data(snap)
 	_check(profile.preset_name(0) == "Brawler build", "names round-trip through the save")
 	garage._close_overlay()
+	# The phone's back button steps back a level at a time.
+	garage.open_slot(DRIVE)
+	garage.go_back()
+	_check(garage.selected == -1 and garage.menu == null, "back closes the part sheet")
+	garage._open_presets()
+	garage.go_back()
+	_check((garage._overlay == null or not is_instance_valid(garage._overlay) or garage._overlay.is_queued_for_deletion()) and garage.menu == null, "back closes an open panel")
+	garage.show_tab("INN")
+	garage.go_back()
+	_check(garage.tab == "GARAGE" and garage.menu == null, "back leaves a station for the garage")
+	garage.go_back()
+	_check(garage.menu != null, "back on the garage itself opens MENU")
+	garage.go_back()
+	_check(garage.menu == null or garage.menu.is_queued_for_deletion(), "and back again closes it")
+	garage.menu = null
 
 	# --- Weight, frames with more slots, two weapons --------------------------------
 	profile.scrap = 1000
@@ -204,12 +219,15 @@ func _run_checks() -> void:
 	saloon.select(3)
 	while profile.crew.size() < T.ROSTER_SIZE:
 		saloon.hire_selected()
-	_check(profile.crew.size() == T.ROSTER_SIZE and not saloon.hire_selected(), "the roster holds 6; no hiring past that")
+	saloon.select(1)
+	_check(profile.crew.size() == T.ROSTER_SIZE and not saloon.hire_selected(), "the roster holds 6: paid hires stop there")
+	saloon.select(3)
+	_check(saloon.hire_selected() and profile.crew.size() == T.ROSTER_SIZE + 1 and not saloon.hire_selected(), "the free hire can go one over (never stuck without a Driver), no further")
 	var spare: Dictionary = profile.crew[profile.crew.size() - 1]
 	garage.show_tab("INN")
 	inn.select(int(spare.id))
-	_check(not inn.dismiss_selected() and profile.crew.size() == T.ROSTER_SIZE, "DISMISS asks first")
-	_check(inn.dismiss_selected() and profile.crew.size() == T.ROSTER_SIZE - 1, "a second tap dismisses")
+	_check(not inn.dismiss_selected() and profile.crew.size() == T.ROSTER_SIZE + 1, "DISMISS asks first")
+	_check(inn.dismiss_selected() and profile.crew.size() == T.ROSTER_SIZE, "a second tap dismisses")
 	garage.show_tab("GARAGE")
 
 	# --- Upgrades -------------------------------------------------------------------

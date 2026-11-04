@@ -269,6 +269,9 @@ func _ready() -> void:
 		# rigs go for it.
 		truck.position = arena.player_start + Vector2(0, 110)
 		truck.rotation = -PI / 2.0
+		# Agreed with the owner (audit): the truck's armor and HP scale with
+		# the same multiplier as enemy damage, so it holds up alike at every skull.
+		truck.apply_stats(truck_sheet(skulls))
 		truck.bullets = bullets
 		truck.fx = fx
 		zombies.alt_target = truck
@@ -944,11 +947,12 @@ func _wreck_sequence(aboard: Array[String]) -> void:
 	_in_wreck = false
 
 
-## A tap during the wreck skips to the card.
+## A tap (or any pad button) during the wreck skips to the card.
 func _input(event: InputEvent) -> void:
 	if not _in_wreck:
 		return
-	if (event is InputEventScreenTouch and (event as InputEventScreenTouch).pressed) or (event is InputEventMouseButton and (event as InputEventMouseButton).pressed):
+	if (event is InputEventScreenTouch and (event as InputEventScreenTouch).pressed) or (event is InputEventMouseButton and (event as InputEventMouseButton).pressed) \
+			or (event is InputEventJoypadButton and (event as InputEventJoypadButton).pressed):
 		wreck_skipped = true
 
 
@@ -1702,6 +1706,15 @@ func _on_optional_choice(yes: bool) -> void:
 	hud.banner("DETOUR  -  THE TRUCK'S HEADING FOR IT", T.COL_ORANGE, 2.0)
 
 
+## The Escort truck's stat sheet at `skull_level`.
+static func truck_sheet(skull_level: int) -> Dictionary:
+	var mult := float(T.ENEMY_DAMAGE_BY_SKULL[clampi(skull_level, 1, 6) - 1])
+	var sheet: Dictionary = T.TRUCK.duplicate()
+	for key: String in ["armor", "hp", "front", "side", "rear"]:
+		sheet[key] = float(T.TRUCK[key]) * mult
+	return sheet
+
+
 func _on_truck_lost() -> void:
 	if state != State.RUNNING:
 		return
@@ -1718,9 +1731,8 @@ func _fail(title: String, detail: String) -> void:
 	state = State.FAILED
 	if _music != null:
 		_music.end_combat()
-	for p in pickups.get_children():
-		_take_salvage(p as Pickup)
-	bank_report = profile.bank_run(int(scrap), _pending_ids())
+	# Only what you picked up comes home (a cleared job hauls in the rest).
+	bank_report = profile.bank_run(int(scrap), _pending_ids(), false)
 	profile.finish_day()
 	profile.bank_crew(0, _rest_ids(), bool(vehicle.crew_mod("triage")), vehicle.has_sp("sp_clean_bandage"))
 	var lines := detail + "\nKill scrap +%d    Time %s" % [int(scrap), _clock(elapsed)]

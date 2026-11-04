@@ -487,14 +487,15 @@ func is_district_open(index: int) -> bool:
 
 ## Extracted: bank the run's scrap and schematics. Returns a report for the
 ## results card. Drops never repeat a known schematic, so all are new.
-func bank_run(run_scrap: int, salvaged: Array[String]) -> Dictionary:
+func bank_run(run_scrap: int, salvaged: Array[String], cleared := true) -> Dictionary:
 	var unlocked: Array[String] = []
 	for id in salvaged:
 		if not schematics.has(id):
 			schematics.append(id)
 			unlocked.append(id)
 	scrap += run_scrap
-	record.clears = int(record.clears) + 1
+	if cleared:   # a failed job (the truck lost) banks its haul but isn't a clear
+		record.clears = int(record.clears) + 1
 	save_game()
 	changed.emit()
 	return {"scrap": run_scrap, "unlocked": unlocked}
@@ -602,6 +603,11 @@ func roster_cap() -> int:
 
 func roster_full() -> bool:
 	return crew.size() >= roster_cap()
+
+
+## The free Saloon hire fits up to one past the roster cap.
+func can_hire_basic() -> bool:
+	return crew.size() < roster_cap() + 1
 
 
 ## Why crew member `m` can't be seated on this frame, or "".
@@ -814,9 +820,12 @@ func hire_offer(index: int) -> bool:
 	return true
 
 
-## The free Common Driver or Gunner the Saloon always has.
+## The free Common Driver or Gunner the Saloon always has. Agreed with the
+## owner: it can be hired even with a full roster, up to one over the cap
+## (so an injured lone Driver never leaves you stuck: days only pass on jobs).
+## While over the cap, nothing else joins until someone leaves.
 func hire_basic(role: String) -> bool:
-	if roster_full() or not Crew.ROLES.has(role):
+	if not can_hire_basic() or not Crew.ROLES.has(role):
 		return false
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash("helriders-basic-%d-%d" % [day, next_crew_id])

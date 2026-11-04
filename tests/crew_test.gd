@@ -284,6 +284,21 @@ func _check_saloon() -> void:
 	print("  30 days of Saloon offers: %s" % str(roles.keys()))
 	_check(roles.size() >= 7, "Saloon offers can be any class")
 	_check(not profile.hire_basic("mechanic") and profile.hire_basic("gunner"), "the free hires are still a Driver and a Gunner")
+	# Soft-lock guard: a full roster whose only Driver is resting can still take
+	# the free Driver (one over the cap), but nothing else joins until someone leaves.
+	profile.new_game()
+	while not profile.roster_full():
+		profile.hire_basic("gunner")
+	var hurt: Dictionary = profile.seated_in("driver")
+	hurt.rest = 2
+	hurt.seated = false   # injured crew go to the Inn
+	_check(profile.deploy_block() != "", "full roster, the Driver resting: can't deploy")
+	_check(profile.hire_basic("driver") and profile.crew.size() == profile.roster_cap() + 1, "the free Driver joins anyway, one over the cap")
+	_check(not profile.hire_basic("gunner"), "but only one over")
+	profile.scrap = 100000
+	profile.ensure_saloon()
+	_check(profile.saloon.is_empty() or not profile.hire_offer(0), "paid hires wait until someone leaves")
+	_check(profile.seat_member(int(profile.crew[profile.crew.size() - 1].id)) and profile.deploy_block() == "", "seat the new Driver and the rig can go")
 	profile.new_game()
 
 
