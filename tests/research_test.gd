@@ -195,10 +195,41 @@ func _check_tab() -> void:
 	research.open_upgrades()
 	_check(research._upgrades != null, "Research upgrades open")
 	research.close_upgrades()
+	_check_rig_upgrades(research)
 	garage.show_tab("GARAGE")
 	_check(not research.visible, "back to the Garage")
 	_check(float(garage._built(profile.rig).armor) > armor_before, "the Garage stat sheet uses the new level")
 	_check(garage._tags[3].part_name.ends_with("LV 3"), "the armor slot tag shows its level")
+
+
+## Rig upgrades on the Research screen: same data, same buy call, display updates.
+func _check_rig_upgrades(research: Node) -> void:
+	# Numbers are unchanged by the move (a change here is a gameplay change).
+	_check(T.UPGRADES.fabrication == {"name": "Fabrication Discount", "costs": [120, 300, 600], "per_level": 0.10}
+		and T.UPGRADES.loot == {"name": "Loot Quality", "costs": [150, 350, 700], "per_level": 0.15}
+		and T.UPGRADES.salvage == {"name": "Salvage Yield", "costs": [100, 250, 500], "per_level": 0.15},
+		"rig upgrade costs and effects unchanged")
+	profile.scrap = 2000
+	research.show_rig_upgrades(true)
+	_check(research._rig_view.visible and not research._rows.get_parent().visible, "RIG UPGRADES replaces the schematic list")
+	_check(research._rig_rows.get_child_count() == 3, "three rig tracks listed")
+	var buy: Button = research._rig_rows.find_child("Buy_fabrication", true, false)
+	_check(buy != null and buy.text == "BUY  120" and buy.custom_minimum_size.y >= 64.0, "BUY shows the cost, touch-sized")
+	var scrap := profile.scrap
+	var price := profile.fab_mult()
+	buy.pressed.emit()
+	_check(profile.upgrade_level("fabrication") == 1 and profile.scrap == scrap - 120, "buying from Research uses profile.buy_upgrade")
+	_check(is_equal_approx(profile.fab_mult(), price - 0.10), "the bought level has the same effect")
+	buy = research._rig_rows.find_child("Buy_fabrication", true, false)
+	_check(buy.text == "BUY  300" and str(research._rig_rows.get_child(0).get_child(1).text) == "LV 1/3", "the display updates after buying")
+	_check(research._rig_scrap.text == "Scrap  %d" % profile.scrap, "scrap shown updates")
+	research.buy_rig_upgrade("fabrication")
+	research.buy_rig_upgrade("fabrication")
+	buy = research._rig_rows.find_child("Buy_fabrication", true, false)
+	_check(buy.text == "MAXED" and buy.disabled and not research.buy_rig_upgrade("fabrication"), "maxed track can't be bought")
+	_check(garage._upgrade_effect("fabrication") == research.RigUpgrades.effect_text(profile, "fabrication"), "garage and Research show the same effect text")
+	research.show_rig_upgrades(false)
+	_check(not research._rig_view.visible and research._rows.get_parent().visible, "back to schematics")
 
 
 func _check(ok: bool, what: String) -> void:

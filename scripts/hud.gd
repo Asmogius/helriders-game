@@ -339,6 +339,7 @@ func set_armor(ratio: float) -> void:
 ## 0..1; a facing with no armor fitted is -1 (drawn empty).
 func set_defense(shield_ratio: float, facings: PackedFloat32Array, hp_ratio: float) -> void:
 	_rig_icon.set_values(shield_ratio, facings, hp_ratio)
+	_armor_bar.set_shield(shield_ratio)   # V6.4 shield rail on the armor gauge
 
 
 ## Status buildup (0..100 per bar) and seconds left on each active status
@@ -686,6 +687,7 @@ class LockButton extends Control:
 		var r := minf(size.x, size.y) * 0.5 - 4.0
 		var accent := T.COL_ORANGE if on else Color(0.7, 0.68, 0.64)
 		draw_circle(c, r, Color(0.0, 0.0, 0.0, 0.55 if on else 0.35))
+		draw_arc(c, r - 6.0, 0.0, TAU, 40, Color(1, 1, 1, 0.07), 2.0)   # V6.4 inner bevel
 		draw_arc(c, r, 0.0, TAU, 40, Color(accent, 0.9 if on else 0.5), 4.0 if on else 2.5)
 		# Crosshair brackets.
 		var s := r * 0.45
@@ -783,6 +785,7 @@ class AbilityButton extends Control:
 		if disabled:
 			tint = Color(0.42, 0.4, 0.38)
 		draw_circle(c, r, Color(0.0, 0.0, 0.0, 0.5))
+		draw_arc(c, r - 6.0, 0.0, TAU, 40, Color(1, 1, 1, 0.07), 2.0)   # V6.4 inner bevel
 		if not is_ready and not disabled:
 			# Dark wedge for the time left, shrinking clockwise.
 			var shade := Color(0.0, 0.0, 0.0, 0.45)
@@ -879,6 +882,7 @@ class CrewButton extends Control:
 		var r := minf(size.x, size.y) * 0.5 - 4.0
 		var tint := Color(0.95, 0.93, 0.88) if cooldown <= 0.0 else Color(0.55, 0.53, 0.5)
 		draw_circle(c, r, Color(0, 0, 0, 0.5))
+		draw_arc(c, r - 6.0, 0.0, TAU, 40, Color(1, 1, 1, 0.07), 2.0)   # V6.4 inner bevel
 		if cooldown > 0.02:
 			var points := PackedVector2Array([c])
 			var steps := maxi(2, ceili(32.0 * cooldown))
@@ -1106,8 +1110,18 @@ class RigIcon extends Control:
 
 
 class ArmorBar extends Control:
+	## V6.4: a gauge, not a strip: a bevelled steel housing, 10 segments, a
+	## needle tick at the edge of the fill, and the shield as a thin cyan rail
+	## along the top. Redraws only when a value changes.
 	const T := preload("res://scripts/tuning.gd")
+	const SEGMENTS := 10
 	var ratio := 1.0
+	var shield := -1.0   # 0..1, or -1 with no shield fitted
+
+	func set_shield(value: float) -> void:
+		if absf(value - shield) >= 0.01:
+			shield = value
+			queue_redraw()
 
 	func set_ratio(value: float) -> void:
 		value = clampf(value, 0.0, 1.0)
@@ -1116,10 +1130,27 @@ class ArmorBar extends Control:
 			queue_redraw()
 
 	func _draw() -> void:
-		draw_rect(Rect2(Vector2.ZERO, size), Color(0, 0, 0, 0.55))
+		# Housing: dark well, light top edge, dark bottom edge, end caps.
+		draw_rect(Rect2(Vector2(-3, -3), size + Vector2(6, 6)), Color(0.2, 0.205, 0.215, 0.9))
+		draw_rect(Rect2(Vector2(-3, -3), Vector2(size.x + 6, 1)), Color(0.42, 0.43, 0.45, 0.9))
+		draw_rect(Rect2(Vector2(-3, size.y + 2), Vector2(size.x + 6, 1)), Color(0.06, 0.06, 0.07, 0.9))
+		draw_rect(Rect2(Vector2.ZERO, size), Color(0, 0, 0, 0.7))
 		var fill := T.COL_CYAN if ratio > 0.35 else T.COL_ORANGE
-		draw_rect(Rect2(Vector2(2, 2), Vector2((size.x - 4.0) * ratio, size.y - 4.0)), fill)
-		draw_rect(Rect2(Vector2.ZERO, size), Color(0.5, 0.5, 0.5, 0.5), false, 1.0)
+		var inner := Rect2(Vector2(2, 2), size - Vector2(4, 4))
+		var seg_w := inner.size.x / SEGMENTS
+		var lit := inner.size.x * ratio
+		for k in SEGMENTS:
+			var x0 := inner.position.x + k * seg_w
+			var w := clampf(lit - k * seg_w, 0.0, seg_w - 1.0)
+			if w > 0.0:
+				draw_rect(Rect2(x0, inner.position.y, w, inner.size.y), fill)
+				draw_rect(Rect2(x0, inner.position.y, w, 2), Color(1, 1, 1, 0.25))   # glassy top
+			else:
+				draw_rect(Rect2(x0, inner.position.y, seg_w - 1.0, inner.size.y), Color(fill, 0.08))
+		if ratio > 0.0 and ratio < 1.0:   # needle at the edge of the fill
+			draw_rect(Rect2(inner.position.x + lit - 1.0, -2, 2, size.y + 4), Color(1, 1, 1, 0.85))
+		if shield >= 0.0:   # shield rail on the housing's top edge
+			draw_rect(Rect2(Vector2(-3, -3), Vector2((size.x + 6) * shield, 2)), Color(0.55, 0.85, 1.0, 0.95))
 
 
 ## The tutorial's instruction line ("" hides it).
@@ -1161,6 +1192,8 @@ func _pad_badges(_on := false) -> void:
 		_ability_buttons[i].pad_badge = str(pad.call("badge", action)) if on and i < 3 else (str(PadScript.KBM_BADGES[action]) if keys and i < 3 else "")
 	_lock_button.pad_badge = str(pad.call("badge", "lock")) if on else ("RMB" if keys else "")
 	_crew_button.pad_badge = str(pad.call("badge", "crew")) if on else ("TAB" if keys else "")
+	left_stick.queue_redraw()   # V6.4: sticks hide in mouse-and-keyboard mode
+	right_stick.queue_redraw()
 	_controls_hint()
 
 

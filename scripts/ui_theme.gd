@@ -12,19 +12,6 @@ const GOOD := Color(0.45, 0.85, 0.5)
 const BAD := Color(0.95, 0.38, 0.3)
 
 
-# --- Icons (P7 / V6.3) ------------------------------------------------------------
-# 16 px white glyphs from tools/art/icons.py, tinted when drawn.
-const ArtAtlas := preload("res://scripts/art_atlas.gd")
-const STATUS_ICONS := ["shock", "fire", "acid", "toxic", "slime", "goop"]   # T.STATUS_NAMES order
-
-
-## The shared icon atlas (art_atlas.gd caches one instance per tree, so
-## icons.json is read once). Drawers keep it in a
-## member var; `ok()` is false when the art is missing (draw the old way).
-static func icons() -> RefCounted:
-	return ArtAtlas.load_atlas("res://art/ui/icons")
-
-
 # --- Fonts (P7 / V6.1) -----------------------------------------------------------
 # Black Ops One (SIL OFL 1.1, see docs/ART_CREDITS.md), the owner's pick for the
 # whole interface. If the file is missing the engine font stays (fallback rule).
@@ -64,6 +51,19 @@ static func fit_size(f: Font, text: String, width: float, size: int, min_size :=
 ## draw_string that never spills past `width` (shrinks the font instead).
 static func draw_fit(canvas: CanvasItem, f: Font, at: Vector2, text: String, align: HorizontalAlignment, width: float, size: int, color: Color) -> void:
 	canvas.draw_string(f, at, text, align, width, fit_size(f, text, width, size), color)
+
+
+# --- Icons (P7 / V6.3) ------------------------------------------------------------
+# 16 px white glyphs from tools/art/icons.py, tinted when drawn.
+const ArtAtlas := preload("res://scripts/art_atlas.gd")
+const STATUS_ICONS := ["shock", "fire", "acid", "toxic", "slime", "goop"]   # T.STATUS_NAMES order
+
+
+## The shared icon atlas (art_atlas.gd caches one instance per tree, so
+## icons.json is read once). Drawers keep it in a
+## member var; `ok()` is false when the art is missing (draw the old way).
+static func icons() -> RefCounted:
+	return ArtAtlas.load_atlas("res://art/ui/icons")
 
 
 static func make() -> Theme:
