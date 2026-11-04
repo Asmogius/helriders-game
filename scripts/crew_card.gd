@@ -7,11 +7,11 @@ const UI := preload("res://scripts/ui_theme.gd")
 const Crew := preload("res://scripts/crew.gd")
 const SIZE := Vector2(286, 300)
 
-var member = {}:   # untyped so callers can clear it with null
+var member := {}:   # clear with {}
 	set(v):
-		member = v if v != null else {}
+		member = v
 		var f: Control = get_node_or_null("RarityFrame")
-		if v == null or v.is_empty():   # cleared: no member, no frame
+		if v.is_empty():   # cleared: no member, no frame
 			if f != null:
 				f.hide()
 			queue_redraw()
