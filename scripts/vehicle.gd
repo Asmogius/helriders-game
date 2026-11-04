@@ -354,7 +354,7 @@ func _sync_art() -> void:
 			move_child(_hull_art, 0)
 			_art_overlay = Node2D.new()
 			_art_overlay.top_level = true
-			_art_overlay.draw.connect(_draw_art_overlay)
+			_art_overlay.draw.connect(_on_overlay_draw.bind(_art_overlay))
 			add_child(_art_overlay)
 			move_child(_art_overlay, 1)
 		else:
@@ -440,6 +440,11 @@ func _process(_delta: float) -> void:
 	if _art_overlay != null:
 		_art_overlay.visible = not is_wrecked and visible
 		_art_overlay.queue_redraw()
+
+
+func _on_overlay_draw(node: Node2D) -> void:
+	if node == _art_overlay:
+		_draw_art_overlay()
 
 
 ## Part marks layered on a voxel hull, from the equipped parts (the sheet
