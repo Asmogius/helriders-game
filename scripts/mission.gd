@@ -269,6 +269,9 @@ func _ready() -> void:
 		# rigs go for it.
 		truck.position = arena.player_start + Vector2(0, 110)
 		truck.rotation = -PI / 2.0
+		# Agreed with the owner (audit): the truck's armor and HP scale with
+		# the same multiplier as enemy damage, so it holds up alike at every skull.
+		truck.apply_stats(truck_sheet(skulls))
 		truck.bullets = bullets
 		truck.fx = fx
 		zombies.alt_target = truck
@@ -1701,6 +1704,15 @@ func _on_optional_choice(yes: bool) -> void:
 	optional_index = truck.site_index
 	truck.insert_site(optional_site, T.ESCORT_OPTIONAL_TIME)
 	hud.banner("DETOUR  -  THE TRUCK'S HEADING FOR IT", T.COL_ORANGE, 2.0)
+
+
+## The Escort truck's stat sheet at `skull_level`.
+static func truck_sheet(skull_level: int) -> Dictionary:
+	var mult := float(T.ENEMY_DAMAGE_BY_SKULL[clampi(skull_level, 1, 6) - 1])
+	var sheet: Dictionary = T.TRUCK.duplicate()
+	for key: String in ["armor", "hp", "front", "side", "rear"]:
+		sheet[key] = float(T.TRUCK[key]) * mult
+	return sheet
 
 
 func _on_truck_lost() -> void:

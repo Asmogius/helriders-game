@@ -181,6 +181,9 @@ func _process(_delta: float) -> bool:
 
 
 func _check_tables() -> void:
+	var t1 := Mission.truck_sheet(1)
+	var t6 := Mission.truck_sheet(6)
+	_check(is_equal_approx(float(t6.hp), float(T.TRUCK.hp) * float(T.ENEMY_DAMAGE_BY_SKULL[5])) and float(t1.front) < float(T.TRUCK.front), "the truck's armor and HP scale with enemy damage by skull (%.0f at 1, %.0f at 6)" % [float(t1.armor), float(t6.armor)])
 	_check(Missions.TYPES.has("retrieve") and Missions.TYPES.has("escort"), "both jobs are on the Comms board's list")
 	_check(Parts.DROP_POOLS.retrieve == ["turbo_four", "off_road_tires", "oil_slick", "mine_dropper", "raider_frame"], "Retrieve pool: Turbo Four, Off-Road Tires, Oil Slick, Mine Dropper, Raider Frame (proposal 01)")
 	_check(Parts.DROP_POOLS.escort == ["structural_bracing", "riot_plating", "emergency_patch", "burst_turret"], "Escort pool: Bracing, Riot Plating, Emergency Patch, Burst Turret")
