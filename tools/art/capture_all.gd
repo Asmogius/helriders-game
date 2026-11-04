@@ -13,6 +13,7 @@ const UI := preload("res://scripts/ui_theme.gd")
 const T := preload("res://scripts/tuning.gd")
 
 const TABS := ["GARAGE", "RESEARCH", "SALOON", "INN", "COMMS"]
+const ZOMBIE_ATLAS := "res://art/zombies/zombies.png"
 const SETTLE := 12   # frames to wait before each shot
 
 var _dir := "user://captures"
@@ -37,6 +38,12 @@ func _initialize() -> void:
 	_add("rarity_tiers", _show_rarity)
 	_add("art_swatches", _show_swatches)
 	_add("fight", _show_fight)
+	# --- zombies_sample step (P3 V3, stacked on #56) ---
+	if ResourceLoader.exists(ZOMBIE_ATLAS):
+		_add("zombies_sample", _show_zombies_sample)
+	else:
+		print("capture_all: skipping zombies_sample (no atlas at ", ZOMBIE_ATLAS, ")")
+	# --- end zombies_sample ---
 
 
 func _add(shot: String, setup: Callable) -> void:
@@ -118,6 +125,15 @@ func _show_swatches() -> void:
 func _show_fight() -> void:
 	_strip.queue_free()
 	change_scene_to_file("res://scenes/mission.tscn")
+
+
+## P3 V3 sample (stacked on #56): 8 Shamblers in a ring and a Tank around the rig in the running fight.
+func _show_zombies_sample() -> void:
+	var m := current_scene
+	var p: Vector2 = m.vehicle.global_position
+	for i in 8:
+		m.zombies.spawn_at(p + Vector2(140, 0).rotated(i * TAU / 8.0), "shambler")
+	m.zombies.spawn_at(p + Vector2(0, -190), "tank")
 
 
 func _process(_delta: float) -> bool:
