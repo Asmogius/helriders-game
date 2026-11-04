@@ -114,7 +114,7 @@ In a mission, crew abilities fire from a crew wheel. The fight slows to 25% whil
 
 Injury: a small chance on a big hit during a fight. An injured crew member loses their passive, perks and ability for the run, and the rig takes a class-specific penalty. Must rest in Inn for a set number of days (Inn upgrades can shorten). Cannot be assigned or sent on expeditions while resting.
 
-Permanent loss: only on vehicle destruction. Free Common basics (Driver, Gunner) always available at Saloon to prevent soft-lock. Expeditions level reserve crew passively.
+Permanent loss: only on vehicle destruction. Free Common basics (Driver, Gunner) always available at Saloon to prevent soft-lock, even with a full roster: agreed with the owner (audit, 2026-11-04), the free hire fits one over the roster cap; while over, nothing else joins until someone leaves. Expeditions level reserve crew passively.
 
 # 7. Missions, Districts, and Progression
 
