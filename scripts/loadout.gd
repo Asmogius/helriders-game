@@ -212,6 +212,7 @@ static func build(loadout: Dictionary, levels: Dictionary = {}) -> Dictionary:
 		# Which parts are on, so the rig can draw them.
 		"look": {
 			"chassis": chassis.get("id", ""),
+			"engine": engine.get("id", ""),   # display only: the engine block layer
 			"drive": drive.get("id", ""),
 			"armor": front.get("id", ""),
 			"armor_sides": (plates.armor_sides as Dictionary).get("id", ""),
