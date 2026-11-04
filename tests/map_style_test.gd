@@ -103,6 +103,7 @@ func _mission_hold() -> void:
 	m.set("auto_spawn_specials", false)
 	root.add_child(m)
 	_check(bool(m.loading_map) and paused and not m.arena.is_styled(), "style on: start held, tree paused, code-drawn map hidden")
+	_check(bool(m.pad_button(JOY_BUTTON_START)) and m.menu == null, "pad buttons swallowed while loading")
 	var frames := 0
 	var t_end := Time.get_ticks_msec() + 15000
 	while bool(m.loading_map) and Time.get_ticks_msec() < t_end:

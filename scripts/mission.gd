@@ -1237,6 +1237,8 @@ func pad_wants_focus() -> bool:
 ## A pad button in the fight (bound in Settings > CONTROLLER; pad.gd).
 ## Returns true when it was used.
 func pad_button(button: int) -> bool:
+	if loading_map:
+		return true   # swallowed behind the loading screen
 	var pad := _pad()
 	var action := str(pad.call("action_for", button)) if pad != null else ""
 	if menu != null:
