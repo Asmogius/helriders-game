@@ -75,7 +75,7 @@ func _initialize() -> void:
 	root.add_child(_card)
 	var cf: Control = _card.get_node_or_null("RarityFrame")
 	_check(cf != null and str(cf.rarity) == "Legendary", "crew card has a Legendary frame")
-	_card.member = null
+	_card.member = {}
 	_check(cf != null and not cf.visible, "crew card hides its frame when the member is cleared")
 	_card.member = {"id": 2, "name": "Back Again", "role": "mechanic", "rarity": "Rare", "xp": 0}
 	_check(cf != null and cf.visible and str(cf.rarity) == "Rare", "crew card shows the frame again for a new member")
