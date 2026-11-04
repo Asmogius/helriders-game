@@ -896,6 +896,7 @@ const SLUDGER_PUDDLE_TIME := 6.0
 const COL_ACID_GROUND := Color(0.6, 0.95, 0.25, 0.3)
 
 # Arc Projector: each hit chains to one more target this close, for this share.
+const COOK_OFF_FIRE_RIDER := 0.5   # Demolisher Cook Off: +50% of hit damage as fire
 const ARC_CHAIN_RANGE := 150.0
 const ARC_CHAIN_SHARE := 0.5
 

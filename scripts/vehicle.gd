@@ -1159,12 +1159,12 @@ func _shoot(w: Dictionary, muzzle: Vector2, direction: Vector2) -> void:
 	var speed := float(w.bullet_speed) * float(crew_mods.bullet_speed)
 	var pierce := maxi(int(crew_mods.pierce), int(w.get("pierce", 0)))
 	var dtype := str(w.get("dtype", ""))
-	if dtype == "" and _active.has("cook_off"):
-		dtype = "fire"   # Demolisher's Cook Off: kinetic shots burn
+	# Demolisher's Cook Off: hits add 50% of their damage as a fire hit.
+	var rider := float(T.COOK_OFF_FIRE_RIDER) if _active.has("cook_off") else 0.0
 	var chain := bool(w.get("chain", false))
 	for p in pellets:
 		var dir := direction.rotated(randf_range(-cone, cone))
-		bullets.fire(muzzle, dir * speed * randf_range(0.95, 1.05) if pellets > 1 else dir * speed, damage, team, pierce, dtype, 0.0, chain)
+		bullets.fire(muzzle, dir * speed * randf_range(0.95, 1.05) if pellets > 1 else dir * speed, damage, team, pierce, dtype, 0.0, chain, rider)
 
 
 # --- Utilities ---------------------------------------------------------------------

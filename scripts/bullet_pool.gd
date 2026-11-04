@@ -34,6 +34,8 @@ var _team := PackedByteArray()
 var _pierce := PackedByteArray()   # shamblers it can still pass through
 var _dtype := PackedByteArray()    # damage type: 0 kinetic, else StatusBars kind + 1
 var _chain := PackedByteArray()    # Arc Projector: 1 = jumps to one more target on a hit
+var _rider := PackedFloat32Array() # Cook Off: share of damage added as a fire hit
+var rider_hits := 0                # fire rider hits landed (tests)
 var chained := 0                   # chain jumps (tests)
 var typed_hits := 0                # typed (non-kinetic) hits landed (tests)
 var _chain_query := PhysicsShapeQueryParameters2D.new()
@@ -52,6 +54,7 @@ func _ready() -> void:
 	_pierce.resize(MAX_BULLETS)
 	_dtype.resize(MAX_BULLETS)
 	_chain.resize(MAX_BULLETS)
+	_rider.resize(MAX_BULLETS)
 	var circle := CircleShape2D.new()
 	circle.radius = T.ARC_CHAIN_RANGE
 	_chain_query.shape = circle
@@ -59,7 +62,7 @@ func _ready() -> void:
 
 ## `dtype` is a damage type ("" kinetic, "fire", "acid", "shock"...); `life` > 0
 ## overrides the range (seconds of flight); `chain` makes a hit jump once.
-func fire(origin: Vector2, velocity: Vector2, damage: float, team := TEAM_PLAYER, pierce := 0, dtype := "", life := 0.0, chain := false) -> void:
+func fire(origin: Vector2, velocity: Vector2, damage: float, team := TEAM_PLAYER, pierce := 0, dtype := "", life := 0.0, chain := false, rider := 0.0) -> void:
 	if team == TEAM_PLAYER:
 		shots_fired += 1
 	else:
@@ -74,6 +77,7 @@ func fire(origin: Vector2, velocity: Vector2, damage: float, team := TEAM_PLAYER
 	_pierce[_count] = clampi(pierce, 0, 255)
 	_dtype[_count] = StatusBars.kind_of(dtype) + 1
 	_chain[_count] = 1 if chain else 0
+	_rider[_count] = rider
 	_count += 1
 
 
@@ -111,6 +115,9 @@ func _physics_process(delta: float) -> void:
 				collider.call("take_hit", dmg, _vel[i].normalized() * 140.0, "shot", dtype)
 				if dtype != "":
 					typed_hits += 1
+				if _rider[i] > 0.0 and is_instance_valid(collider):
+					collider.call("take_hit", dmg * _rider[i], Vector2.ZERO, "shot", "fire")
+					rider_hits += 1
 				if _chain[i] == 1:
 					_chain_hit(collider as Node2D, hit.position, dmg * T.ARC_CHAIN_SHARE, _team[i], dtype)
 				if _team[i] == TEAM_PLAYER:
@@ -150,6 +157,7 @@ func _remove(i: int) -> void:
 	_pierce[i] = _pierce[_count]
 	_dtype[i] = _dtype[_count]
 	_chain[i] = _chain[_count]
+	_rider[i] = _rider[_count]
 	if _count == 0:
 		queue_redraw()
 

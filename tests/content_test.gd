@@ -83,6 +83,10 @@ func _check_static() -> void:
 	var g := GunnerRig.new()
 	_check(int(g.gun_stats[0].get("mag", 0)) == 6 and float(g.gun_stats[0].get("reload", 0.0)) == 2.5, "Gunner Rig: 6 bursts, 2.5 s reload")
 	g.free()
+	for id in ["torcher", "sludger"]:
+		var r: Node = load("res://scripts/%s_rig.gd" % id).new()
+		_check(r.has_method("art_id") and str(r.call("art_id")) == id, "%s rig exposes art_id() for PR #15" % id)
+		r.free()
 	_check(T.PATCHER_MAX_REVIVES == 3, "Patcher revives capped at 3 per job")
 	# Keyword colors (approved): BURNING orange, GOOPED mustard; none reuse threat colors.
 	_check(_hex(T.STATUS_COLORS[1]) == "FF5A1F" and _hex(T.STATUS_COLORS[5]) == "E0A458", "BURNING #FF5A1F, GOOPED #E0A458")
@@ -155,6 +159,7 @@ func _process(_delta: float) -> bool:
 			if frame == 2:
 				main.zombies.clear_all()
 				main.apply_rig(_build(["arc_projector"], ["targeting_computer"]))
+				rig._active["cook_off"] = {"left": 99.0}   # Demolisher's Cook Off
 				rig.armor_max = 1000000.0
 				rig.armor = rig.armor_max
 				_park(SPOT)
@@ -162,6 +167,8 @@ func _process(_delta: float) -> bool:
 				main.zombies.spawn_at(SPOT + Vector2(60, 230), "brute")
 				main.hud.right_stick.output = Vector2.DOWN
 			if frame == 90:
+				_check(main.bullets.rider_hits > 0, "Cook Off: hits add a 50%% fire hit on top (%d)" % main.bullets.rider_hits)
+				rig._active.erase("cook_off")
 				_check(main.bullets.chained > 0, "Arc Projector hits jump to a second target (%d)" % main.bullets.chained)
 				_next()
 		2:  # Acid Lobber: globs leave acid ground

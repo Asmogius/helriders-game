@@ -67,3 +67,9 @@ func _lob(w: Dictionary, from: Vector2, landing: Vector2, flight: float) -> bool
 	if ok:
 		shells_thrown += 1
 	return ok
+
+
+## Art id (PR #15 looks up res://art/sprites/<id>.json). Until #15 lands the
+## base rig never calls this and the rig keeps its code-drawn look.
+func art_id() -> String:
+	return "sludger"

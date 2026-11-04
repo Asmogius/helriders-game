@@ -97,3 +97,9 @@ func rupture() -> void:
 		if body == null or not body.has_method("take_hit"):
 			continue
 		body.call("take_hit", T.BARREL_FIRE_DAMAGE, (body.global_position - at).normalized() * 300.0, "blast", "fire")
+
+
+## Art id (PR #15 looks up res://art/sprites/<id>.json). Until #15 lands the
+## base rig never calls this and the rig keeps its code-drawn look.
+func art_id() -> String:
+	return "torcher"
