@@ -4,6 +4,7 @@ extends SceneTree
 ## Writes into out_dir (default user://captures):
 ##   garage_<tab>.png for GARAGE, RESEARCH, SALOON, INN, COMMS
 ##   rarity_tiers.png  (all six rarity frames side by side)
+##   art_swatches.png (every art-only colour in tuning.gd, named)
 ##   fight.png         (the mission scene after a few seconds)
 ## Uses a throwaway profile (persist = false), so no save is touched.
 ## Packages add their shots as new steps in `_steps()`.
@@ -31,12 +32,18 @@ func _initialize() -> void:
 	var profile: Node = root.get_node("Profile")
 	profile.persist = false
 	profile.new_game()
+	# P1: own a schematic of each rarity there is, so frames show on cards.
+	for id: String in ["courier_frame", "bulwark_frame", "hauler_frame"]:
+		if not profile.schematics.has(id):
+			profile.schematics.append(id)
 	for t: String in TABS:
 		_add("garage_" + t.to_lower(), _show_tab.bind(t))
+	_add("garage_part_cards", _show_part_cards)
 	_add("rarity_tiers", _show_rarity)
+	_add("art_swatches", _show_swatches)
 	_add("fight", _show_fight)
-	_add("fight_gauges", _show_gauges)       # V6.4: armor gauge + shield rail, button plates, textured sticks
-	_add("fight_gauges_kbm", _show_kbm)      # V6.4: mouse-and-keyboard mode, no touch sticks
+	_add("fight_crates", _show_crates)
+	_add("results_finds", _show_finds)
 
 
 func _add(shot: String, setup: Callable) -> void:
@@ -49,6 +56,11 @@ func _show_tab(t: String) -> void:
 		_garage = (load("res://scenes/garage.tscn") as PackedScene).instantiate()
 		root.add_child(_garage)
 	_garage.show_tab(t)
+
+
+func _show_part_cards() -> void:
+	_garage.show_tab("GARAGE")
+	_garage.open_slot(0)   # chassis: Common, Uncommon, Rare and Epic cards
 
 
 func _show_rarity() -> void:
@@ -71,7 +83,48 @@ func _show_rarity() -> void:
 		var l := UI.label(r, 24, UI.rarity_color(r))
 		l.position = Vector2(14, 40)
 		card.add_child(l)
-		UI.rarity_frame(card, r)
+		UI.rarity_frame(card, r).set("t", 1.0)   # shimmer mid-sweep for the shot
+
+
+const SWATCHES := [
+	"COL_OB_GRASS", "COL_OB_PAVE", "COL_OB_SIDING", "COL_OB_ROOF", "COL_OB_GRADE", "COL_OB_MOTE",
+	"COL_FX_HOT", "COL_FX_WHITE_HOT", "COL_FX_EMBER", "COL_FX_SCORCH",
+	"COL_FX_SCORCH_EDGE", "COL_FX_SMOKE",
+	"COL_GARAGE_FLOOR", "COL_GARAGE_FLOOR_LINE", "COL_GARAGE_OIL", "COL_GARAGE_PEGBOARD",
+	"COL_GARAGE_WALL", "COL_GARAGE_STREET_NIGHT", "COL_GARAGE_GAS_RED",
+	"COL_GARAGE_DUST", "COL_GARAGE_SPARK",
+	"COL_ZOMBIE_SHIRT_0", "COL_ZOMBIE_PANTS_0",
+	"COL_ZOMBIE_SHIRT_1", "COL_ZOMBIE_PANTS_1",
+	"COL_ZOMBIE_SHIRT_2", "COL_ZOMBIE_PANTS_2",
+	"COL_ZOMBIE_SHIRT_3", "COL_ZOMBIE_PANTS_3",
+	"COL_ZOMBIE_SHIRT_4", "COL_ZOMBIE_PANTS_4",
+	"COL_ZOMBIE_SHIRT_5", "COL_ZOMBIE_PANTS_5",
+	"COL_ZOMBIE_EYE", "COL_ZOMBIE_FLASH", "COL_TANK_SHIRT", "COL_TANK_PANTS", "COL_TANK_SKIN",
+]
+
+
+func _show_swatches() -> void:
+	_strip.queue_free()
+	_strip = Control.new()
+	_strip.theme = UI.make()
+	_strip.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.add_child(_strip)
+	var bg := ColorRect.new()
+	bg.color = T.COL_ROAD
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_strip.add_child(bg)
+	var consts: Dictionary = T.new().get_script().get_script_constant_map()
+	for i in SWATCHES.size():
+		var n: String = SWATCHES[i]
+		var pos := Vector2(16 + (i % 9) * 140, 16 + (i / 9) * 140)
+		var sw := ColorRect.new()
+		sw.color = consts[n]
+		sw.position = pos
+		sw.size = Vector2(130, 90)
+		_strip.add_child(sw)
+		var l := UI.label(n.trim_prefix("COL_"), 11, Color(0.9, 0.9, 0.88))
+		l.position = pos + Vector2(0, 94)
+		_strip.add_child(l)
 
 
 func _show_fight() -> void:
@@ -79,22 +132,23 @@ func _show_fight() -> void:
 	change_scene_to_file("res://scenes/mission.tscn")
 
 
-func _show_gauges() -> void:
+## One schematic crate per rarity in a row ahead of the rig (beams by tier).
+func _show_crates() -> void:
 	var m: Node = current_scene
-	m.set_process(false)   # hold these HUD values for the shot
-	m.set_physics_process(false)
-	m.hud.set_lock_available(true)
-	var kinds: Array[String] = ["overcharge", "mines"]
-	m.hud.set_abilities(kinds)
-	m.hud.set_armor(0.62)
-	m.hud.set_defense(0.4, PackedFloat32Array([0.8, 0.5, 0.6, 0.3]), 0.9)
+	var Pickup: GDScript = load("res://scripts/pickup.gd")
+	var at: Vector2 = m.vehicle.global_position + Vector2(-250, 150)
+	for i in T.RARITY_ORDER.size():
+		var p: Node2D = Pickup.new()
+		p.part = {"name": T.RARITY_ORDER[i], "rarity": T.RARITY_ORDER[i], "category": "Weapon"}
+		p.position = at + Vector2(i * 100, 0)
+		m.pickups.add_child(p)
+	m.hud.banner("SCHEMATIC: HAULER FRAME", UI.rarity_color("Epic"), 3.0)
 
 
-func _show_kbm() -> void:
-	var pad: Node = root.get_node_or_null("Pad")
-	if pad != null:
-		pad.set("kbm", true)
-	current_scene.hud._pad_badges()
+func _show_finds() -> void:
+	var hud: Node = current_scene.hud
+	hud.show_result("JOB DONE", "Job pay +120    Kill scrap +45    Time 3:12", "RETURN TO GARAGE", T.COL_ORANGE)
+	hud.show_finds([["New schematic: Courier Frame", "Uncommon"], ["New schematic: Bulwark Frame", "Rare"], ["New schematic: Hauler Frame", "Epic"]])
 
 
 func _process(_delta: float) -> bool:
@@ -110,5 +164,5 @@ func _process(_delta: float) -> bool:
 		quit()
 		return true
 	_steps[_step].call()
-	_wait = 150 if _names[_step] == "fight" else SETTLE
+	_wait = 150 if _names[_step] == "fight" else (70 if _names[_step] == "results_finds" else SETTLE)
 	return false
