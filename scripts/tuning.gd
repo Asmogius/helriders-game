@@ -61,6 +61,10 @@ const COL_FX_EMBER := Color(0.6, 0.18, 0.078)           # cooling fireball edge 
 const COL_FX_SCORCH := Color(0.071, 0.063, 0.059)       # scorch decal core (18, 16, 15)
 const COL_FX_SCORCH_EDGE := Color(0.149, 0.133, 0.118)  # scorch decal outer fringe, lighter, half alpha (38, 34, 30; fx_sheet.py scorch())
 const COL_FX_SMOKE := Color(0.349, 0.329, 0.302)        # smoke puffs, mid shade of the ramp (89, 84, 77; fx_sheet.py SMOKE = fx.gd dust 0.35,0.33,0.3)
+const TRACER_RIVET := Color(1, 0.588, 0.275)          # rivet_gun tracer glow, hot rivet slug (255, 150, 70; PR #33 tracer_styles.gd Color8)
+const TRACER_ENEMY_CORE := Color(1.0, 0.6, 0.55)      # enemy tracer core: DEFAULT_ENEMY, convoy_nose, scrapper (255, 153, 140; PR #33 tracer_styles.gd)
+const TRACER_HARPOON_CABLE := Color(0.8, 0.78, 0.6)   # harpoon tracer glow, the cable line (204, 199, 153; PR #33 tracer_styles.gd)
+const TRACER_HARPOON_STEEL := Color(0.655, 0.66, 0.668)# harpoon tracer core, steel hook head (167, 168, 170; PR #33 tracer_styles.gd)
 
 # P6 Garage: Workshop bay room (V2.1/V2.2; PR #37). Dark, unlit surfaces.
 const COL_GARAGE_FLOOR := Color(0.227, 0.224, 0.216)    # bay slab (58, 57, 55)
