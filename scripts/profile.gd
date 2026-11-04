@@ -57,6 +57,7 @@ const Parts := preload("res://scripts/parts.gd")
 const Loadout := preload("res://scripts/loadout.gd")
 const Missions := preload("res://scripts/missions.gd")
 const Crew := preload("res://scripts/crew.gd")
+const LOST_DAYS := T.LOST_RETURN_DAYS
 
 const SAVE_VERSION := 1
 const SINGLE_SLOTS := ["chassis", "engine", "drive", "armor_front", "armor_sides", "armor_rear"]
@@ -89,6 +90,11 @@ var exp_board_day := 0
 var expeditions: Array = []         # trips under way: offer + "team" ids + "days_left" + "odds"
 var expedition_reports: Array = []  # lines about the trips that came back last
 var last_wreck_survivors: Array[String] = []  # names Last Rites saved on the last wreck
+var lost: Array = []                # crew lost in wrecks, on their way back: member + "back_in" days
+var rehire_pool: Array = []         # lost crew who turned up again (level 1, perks reset)
+var rehire_day := 0                 # the day today's rehire card was drawn
+var rehire_pick := -1               # id of today's rehire card (-1 = none)
+var rehire_taken := false           # hired today
 var roll_override := -1.0           # tests: 0..1 replaces every expedition/Last Rites roll
 var luck := RandomNumberGenerator.new()  # expedition and Last Rites rolls
 var _ready_state := false           # set once a game is loaded or started
@@ -133,6 +139,11 @@ func new_game() -> void:
 	expeditions = []
 	expedition_reports = []
 	last_wreck_survivors = []
+	lost = []
+	rehire_pool = []
+	rehire_day = 0
+	rehire_pick = -1
+	rehire_taken = false
 	save_game()
 
 
@@ -365,6 +376,7 @@ func finish_day() -> void:
 	research_today = 0
 	active_mission = {}
 	board = Missions.make_board(day, board_size(), int(upgrades.get("quality", 0)))
+	_advance_lost()
 	ensure_saloon()
 	_advance_expeditions()
 	save_game()
@@ -483,6 +495,11 @@ func record_wreck() -> int:
 			m.seated = false
 			m.rest = T.LAST_RITES_REST
 			last_wreck_survivors.append(str(m.name))
+	for m: Dictionary in crew:
+		if bool(m.seated) and LOST_DAYS.has(str(m.rarity)):
+			var gone := (m as Dictionary).duplicate(true)
+			gone["back_in"] = int(LOST_DAYS[str(m.rarity)])
+			lost.append(gone)
 	crew = crew.filter(func(m: Dictionary) -> bool: return not bool(m.seated))
 	save_game()
 	changed.emit()
@@ -785,6 +802,93 @@ func hire_basic(role: String) -> bool:
 	save_game()
 	changed.emit()
 	return true
+
+
+# --- Lost crew and rehires (§14) ---
+
+## A day passes for the lost: whoever's time is up joins the rehire pool at
+## level 1 with their specialty and rarity, perks reset.
+func _advance_lost() -> void:
+	var still: Array = []
+	for m: Dictionary in lost:
+		m.back_in = int(m.back_in) - 1
+		if int(m.back_in) > 0:
+			still.append(m)
+			continue
+		var back := m.duplicate(true)
+		back.erase("back_in")
+		back.xp = 0.0
+		back.perks = []
+		back.perk_offer = []
+		back.rest = 0
+		back.seated = false
+		rehire_pool.append(back)
+	lost = still
+
+
+## Today's rehire card (drawn at random from the pool, once a day), or {}.
+func rehire_offer() -> Dictionary:
+	if rehire_pool.is_empty() or rehire_done_today():
+		return {}
+	if rehire_day != day or _pool_index(rehire_pick) < 0:
+		var dice := RandomNumberGenerator.new()
+		dice.seed = hash("helriders-rehire-%d" % day)
+		rehire_pick = int(rehire_pool[dice.randi_range(0, rehire_pool.size() - 1)].id)
+		rehire_day = day
+		rehire_taken = false
+	var m: Dictionary = rehire_pool[_pool_index(rehire_pick)].duplicate(true)
+	var discount := T.REHIRE_DISCOUNT + float(T.UPGRADES.old_faces.per_level) * upgrade_level("old_faces")
+	m["price"] = roundi(float(T.CREW_PRICES[str(m.rarity)]) * (1.0 - discount))
+	m["hired"] = false
+	m["rehire"] = true
+	m.xp = hire_start_xp(m)
+	return m
+
+
+func _pool_index(id: int) -> int:
+	for i in rehire_pool.size():
+		if int(rehire_pool[i].id) == id:
+			return i
+	return -1
+
+
+## Hire today's rehire card. Needs the scrap and a free roster slot.
+func rehire() -> bool:
+	var offer := rehire_offer()
+	if offer.is_empty() or roster_full():
+		return false
+	var price := hire_price(offer)
+	if price > scrap:
+		return false
+	scrap -= price
+	rehire_pool.remove_at(_pool_index(int(offer.id)))
+	offer.erase("rehire")
+	var m := _add_crew(offer)
+	m.xp = hire_start_xp(m)
+	_auto_seat(m)
+	rehire_pick = -1
+	rehire_taken = true
+	save_game()
+	changed.emit()
+	return true
+
+
+## Send today's rehire away for good (back to the general hire pool).
+func dismiss_rehire() -> bool:
+	var offer := rehire_offer()
+	if offer.is_empty():
+		return false
+	rehire_pool.remove_at(_pool_index(int(offer.id)))
+	rehire_pick = -1
+	rehire_taken = true   # no second card today
+	save_game()
+	changed.emit()
+	return true
+
+
+## The card is spent for today (hired or sent away).
+func rehire_done_today() -> bool:
+	return rehire_day == day and rehire_taken
 
 
 ## A job was finished: the crew on it split the skulls as XP, and anyone
@@ -1129,6 +1233,11 @@ func save_game() -> void:
 		"exp_board_day": exp_board_day,
 		"expeditions": expeditions,
 		"expedition_reports": expedition_reports,
+		"lost": lost,
+		"rehire_pool": rehire_pool,
+		"rehire_day": rehire_day,
+		"rehire_pick": rehire_pick,
+		"rehire_taken": rehire_taken,
 	}
 	var file := FileAccess.open(save_path, FileAccess.WRITE)
 	if file == null:
@@ -1208,6 +1317,22 @@ func load_game() -> bool:
 				offer.xp = float((raw as Dictionary).get("xp", 0.0))
 				saloon.append(offer)
 		saloon_day = int(data.get("saloon_day", 0))
+		lost = []
+		for raw: Variant in data.get("lost", []):
+			var m := _clean_member(raw)
+			if not m.is_empty() and raw is Dictionary:
+				m.seated = false
+				m["back_in"] = maxi(int((raw as Dictionary).get("back_in", 1)), 1)
+				lost.append(m)
+		rehire_pool = []
+		for raw: Variant in data.get("rehire_pool", []):
+			var m := _clean_member(raw)
+			if not m.is_empty():
+				m.seated = false
+				rehire_pool.append(m)
+		rehire_day = int(data.get("rehire_day", 0))
+		rehire_pick = int(data.get("rehire_pick", -1))
+		rehire_taken = bool(data.get("rehire_taken", false))
 	else:
 		# A save from before crew: the starter pair joins, seated.
 		_starter_crew()
