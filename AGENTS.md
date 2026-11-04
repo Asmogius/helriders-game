@@ -65,6 +65,7 @@ The owner works from a phone and has no computer, so nobody opens the Godot edit
 godot --headless --path . --import                  # must print no "SCRIPT ERROR"
 godot --headless --fixed-fps 60 --path . -s res://tests/smoke_test.gd   # must end "SMOKE TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/garage_test.gd  # must end "GARAGE TEST PASSED"
+godot --headless --fixed-fps 60 --path . -s res://tests/layout_test.gd   # must end "LAYOUT TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/missions_test.gd # must end "MISSIONS TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/crew_test.gd     # must end "CREW TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/research_test.gd # must end "RESEARCH TEST PASSED"

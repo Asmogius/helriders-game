@@ -57,7 +57,7 @@ const TAG_COMPACT_H := 56.0        # five tags on one side: shorter, so the shee
 const TAG_COMPACT_TOP := 100.0
 const TAG_COMPACT_GAP := 5.0
 const RIG_SCALE := 3.4
-const FOOTER_H := 72.0
+const FOOTER_H := UI.BAR_H  # shared grid (ui_theme.gd)
 const SHEET_H := 236.0
 
 var selected := -1                 # index into SLOTS of the open sheet, -1 = closed
