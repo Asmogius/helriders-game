@@ -1,0 +1,60 @@
+{
+ "scale": 3.4,
+ "sample_colours": {
+  "GARAGE_FLOOR": [
+   58,
+   57,
+   55
+  ],
+  "GARAGE_FLOOR_LINE": [
+   120,
+   104,
+   60
+  ],
+  "GARAGE_OIL": [
+   24,
+   23,
+   24
+  ],
+  "GARAGE_PEGBOARD": [
+   74,
+   60,
+   44
+  ],
+  "GARAGE_WALL": [
+   46,
+   48,
+   52
+  ],
+  "GARAGE_STREET_NIGHT": [
+   30,
+   34,
+   44
+  ],
+  "GARAGE_GAS_RED": [
+   110,
+   40,
+   34
+  ]
+ },
+ "workshop_bay": {
+  "size": [
+   376,
+   212
+  ],
+  "lift": [
+   188.0,
+   85.29411764705883
+  ]
+ },
+ "workshop_bay_wide": {
+  "size": [
+   459,
+   212
+  ],
+  "lift": [
+   229.5,
+   85.29411764705883
+  ]
+ }
+}
