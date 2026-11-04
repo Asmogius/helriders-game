@@ -240,7 +240,7 @@ A PlayStation-style pad (any pad Godot maps) works alongside touch. The first pa
 
 ## Windows
 
-The game also builds for Windows: every build on main attaches helriders-windows.zip (one helriders.exe) next to the APK. With a controller it plays exactly as on the phone. Settings has DISPLAY: WINDOWED / FULLSCREEN (F11 or Alt+Enter also flip it, saved), and Esc is the back button. Mouse and keyboard controls are the next step.
+The game also builds for Windows: every build on main attaches helriders-windows.zip (one helriders.exe) next to the APK. With a controller it plays exactly as on the phone. Settings has DISPLAY: WINDOWED / FULLSCREEN (F11 or Alt+Enter also flip it, saved), and Esc is the back button. Mouse and keyboard: WASD or the arrow keys drive (the rig turns toward the way you press, like the left stick); the turret follows the mouse; hold the left button to fire (the Mortar lands where you point); right click toggles LOCK (with LOCK on and no click, the turret is left to the lock); Q / E / F fire utilities 1-3; Tab opens the crew wheel (point and click, or press 1-4; right click closes it); Esc pauses. The game switches to mouse-and-keyboard wording as soon as you use them and back on a pad press. Keys aren't rebindable yet.
 
 ## Mods and Perks
 

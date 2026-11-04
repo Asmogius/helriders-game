@@ -606,6 +606,7 @@ func _physics_process(delta: float) -> void:
 	vehicle.drive_input = hud.left_stick.output
 	vehicle.aim_input = hud.right_stick.output
 	_pad_input()
+	_kbm_input()
 	if tutorial:
 		_tutorial_tick()
 	if auto_spawn_specials:
@@ -802,6 +803,13 @@ const TUT_PAD_TIPS := {
 }
 
 
+const TUT_KBM_TIPS := {
+	0: "DRIVE: hold W A S D (or the arrow keys) for the way you want to go. The rig turns to follow.",
+	1: "SHOOT: the turret follows your mouse. Point at a zombie and hold the left button to fire.",
+	2: "LOCK: right-click. While it's on, your turret picks targets and fires by itself.",
+}
+
+
 ## Touch <-> controller mid-tutorial: swap the tip's wording.
 func _on_pad_mode(_on: bool) -> void:
 	if tutorial and tut_step < TUT_TIPS.size() and not bool(_tut_mark.get("spawned", false)):
@@ -810,6 +818,8 @@ func _on_pad_mode(_on: bool) -> void:
 
 func _tut_tip(i: int) -> String:
 	var pad := _pad()
+	if pad != null and bool(pad.get("kbm")) and TUT_KBM_TIPS.has(i):
+		return str(TUT_KBM_TIPS[i])
 	if pad == null or not bool(pad.get("active")) or not TUT_PAD_TIPS.has(i):
 		return TUT_TIPS[i]
 	var swapped := bool(pad.call("sticks_swapped"))
@@ -950,6 +960,7 @@ func _wreck_sequence(aboard: Array[String]) -> void:
 ## A tap (or any pad button) during the wreck skips to the card.
 func _input(event: InputEvent) -> void:
 	if not _in_wreck:
+		_kbm_event(event)
 		return
 	if (event is InputEventScreenTouch and (event as InputEventScreenTouch).pressed) or (event is InputEventMouseButton and (event as InputEventMouseButton).pressed) \
 			or (event is InputEventJoypadButton and (event as InputEventJoypadButton).pressed):
@@ -1063,6 +1074,103 @@ func _pad_input() -> void:
 		vehicle.fire_trigger = false
 	else:
 		vehicle.fire_trigger = false
+
+
+# --- Mouse and keyboard (PC; pad.gd tracks the scheme) ------------------------------
+# WASD / arrows drive, the turret follows the mouse, left click fires (the
+# Mortar lands where you point), right click toggles LOCK, Q / E / F fire
+# utilities 1-3, Tab opens the crew wheel (point and click, or 1-4), Esc pauses.
+# With LOCK on and no click, the turret is left to the lock.
+
+var kbm_mouse_override := Vector2.INF   # tests: a world point standing in for the mouse
+var kbm_fire_override := -1             # tests: 1 = left button held, 0 = not
+
+
+func _kbm_on() -> bool:
+	var pad := _pad()
+	return pad != null and bool(pad.get("kbm"))
+
+
+func _kbm_mouse() -> Vector2:
+	return kbm_mouse_override if kbm_mouse_override != Vector2.INF else get_global_mouse_position()
+
+
+func _kbm_firing() -> bool:
+	if kbm_fire_override >= 0:
+		return kbm_fire_override == 1
+	return Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
+
+
+func _kbm_input() -> void:
+	if not _kbm_on() or state != State.RUNNING:
+		return
+	if hud.is_crew_wheel_open():
+		var dir := get_viewport().get_mouse_position() - hud.wheel_center()
+		hud.pad_wheel_point(dir.normalized() if dir.length() > 40.0 else Vector2.ZERO)
+		vehicle.drive_input = Vector2.ZERO
+		vehicle.aim_input = Vector2.ZERO
+		vehicle.fire_trigger = false
+		return
+	var drive := PadScript.kbm_drive()
+	if drive != Vector2.ZERO:
+		vehicle.drive_input = drive
+	var to := _kbm_mouse() - vehicle.global_position
+	var dir := to.normalized() if to.length() > 1.0 else Vector2.RIGHT.rotated(vehicle.rotation)
+	if _kbm_firing():
+		var push := 1.0
+		var mortar := _mortar_stats()
+		if not mortar.is_empty():
+			# The shell lands where you point (within the Mortar's reach).
+			var t := clampf(inverse_lerp(float(mortar.get("min_range", 300.0)), float(mortar.get("max_range", 1200.0)), to.length()), 0.0, 1.0)
+			push = lerpf(Vehicle.AIM_DEADZONE, 1.0, t)
+		vehicle.aim_input = dir * maxf(push, Vehicle.AIM_DEADZONE + 0.01)
+		vehicle.fire_trigger = true
+	else:
+		vehicle.fire_trigger = false
+		if not vehicle.lock_enabled:
+			vehicle.aim_input = dir * 0.45   # the turret follows the mouse without firing
+
+
+## Keys and clicks that do one thing per press.
+func _kbm_event(event: InputEvent) -> void:
+	var pad := _pad()
+	if pad != null and ProfileScript.is_desktop() and (event is InputEventKey or event is InputEventMouseButton):
+		pad.call("set_kbm", true)   # the fight hears input before Pad does
+	if not _kbm_on() or state != State.RUNNING or menu != null or hud.is_result_visible() or hud.is_choice_open():
+		return
+	if event is InputEventMouseButton and (event as InputEventMouseButton).pressed:
+		var mb := event as InputEventMouseButton
+		if hud.is_crew_wheel_open():
+			if mb.button_index == MOUSE_BUTTON_LEFT:
+				hud.pad_wheel_confirm()
+			elif mb.button_index == MOUSE_BUTTON_RIGHT:
+				hud.close_crew_wheel()
+		elif mb.button_index == MOUSE_BUTTON_RIGHT:
+			hud.pad_lock()
+	elif event is InputEventKey and (event as InputEventKey).pressed and not (event as InputEventKey).echo:
+		var key := int((event as InputEventKey).physical_keycode)
+		if hud.is_crew_wheel_open() and key >= KEY_1 and key <= KEY_9:
+			hud.pick_crew(key - KEY_1)
+			return
+		match PadScript.kbm_action(key):
+			"ability_1":
+				use_ability(0)
+			"ability_2":
+				use_ability(1)
+			"ability_3":
+				use_ability(2)
+			"crew":
+				if hud.is_crew_wheel_open():
+					hud.close_crew_wheel()
+				else:
+					hud.open_crew_wheel()
+
+
+func _mortar_stats() -> Dictionary:
+	for w: Dictionary in vehicle.gun_stats:
+		if str(w.get("kind", "")) == "mortar":
+			return w
+	return {}
 
 
 func _has_mortar() -> bool:

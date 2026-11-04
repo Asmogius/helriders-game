@@ -2,7 +2,8 @@ extends SceneTree
 ## Headless test for playing on a PC: Esc is the back button (garage: one
 ## level at a time; fight: pause, and Esc again resumes), the Settings page
 ## has a DISPLAY (windowed / fullscreen) toggle that is saved, and F11 or
-## Alt+Enter flips it.
+## Alt+Enter flips it. Mouse and keyboard: WASD drive, the mouse aims, left
+## click fires, right click LOCK, Q/E/F utilities, Tab and 1-4 the crew wheel.
 ##
 ## Run:  godot --headless --fixed-fps 60 --path . -s res://tests/pc_test.gd
 
@@ -10,12 +11,15 @@ const Garage := preload("res://scripts/garage.gd")
 const Mission := preload("res://scripts/mission.gd")
 const Missions := preload("res://scripts/missions.gd")
 const ProfileScript := preload("res://scripts/profile.gd")
+const Parts := preload("res://scripts/parts.gd")
+const Crew := preload("res://scripts/crew.gd")
 
 var profile: ProfileScript
 var garage: Garage
 var main: Mission
 var frame := 0
 var failures: Array[String] = []
+var mark_picked := false
 
 
 func _initialize() -> void:
@@ -34,6 +38,25 @@ func _key(code: Key, alt := false) -> void:
 		e.physical_keycode = code
 		e.pressed = down
 		e.alt_pressed = alt
+		Input.parse_input_event(e)
+	Input.flush_buffered_events()
+
+
+func _hold(code: Key, down: bool) -> void:
+	var e := InputEventKey.new()
+	e.keycode = code
+	e.physical_keycode = code
+	e.pressed = down
+	Input.parse_input_event(e)
+	Input.flush_buffered_events()
+
+
+func _click(button: MouseButton) -> void:
+	for down: bool in [true, false]:
+		var e := InputEventMouseButton.new()
+		e.button_index = button
+		e.pressed = down
+		e.position = Vector2(640, 360)
 		Input.parse_input_event(e)
 	Input.flush_buffered_events()
 
@@ -82,15 +105,55 @@ func _process(_delta: float) -> bool:
 			_key(KEY_ESCAPE)
 		8:
 			_check(garage.menu == null, "Esc backs out of the menu (settings, then closed)")
+			_check(bool(root.get_node("Pad").get("kbm")), "keys on a PC switch to mouse-and-keyboard mode")
+			_check(garage._hint.text.begins_with("Click a slot"), "garage hints say click, not tap")
 			garage.queue_free()
 			main = (load("res://scenes/mission.tscn") as PackedScene).instantiate() as Mission
 			main.mission_override = Missions.make("clear", 1, 7)
 			main.auto_spawn_specials = false
+			var rng := RandomNumberGenerator.new()
+			rng.seed = 3
+			main.crew_override = [Crew.make("driver", "Common", rng)]
 			root.add_child(main)
-		12:
+		11:
+			main.zombies.spawn_budget = 0
+			main.zombies.clear_all()
+			var l: Dictionary = Parts.STARTER_LOADOUT.duplicate(true)
+			l.utility = ["nitro_bottle"]
+			main.apply_rig(profile.build_stats(l))
+			main.vehicle.armor_max = 100000.0
+			main.vehicle.armor = main.vehicle.armor_max
+			_hold(KEY_W, true)
+			main.kbm_mouse_override = main.vehicle.global_position + Vector2(300, 0)
+			main.kbm_fire_override = 0
+		13:
+			var v := main.vehicle
+			_check(v.drive_input.distance_to(Vector2(0, -1)) < 0.01, "W drives up the screen")
+			_check(v.aim_input.distance_to(Vector2(0.45, 0)) < 0.01 and not v.fire_trigger, "the turret follows the mouse without firing")
+			_hold(KEY_W, false)
+			main.kbm_fire_override = 1
+		15:
+			var v := main.vehicle
+			_check(v.fire_trigger and v.aim_input.length() > 0.99, "holding the left button fires")
+			main.kbm_fire_override = 0
+			var hud: Variant = main.get("hud")
+			_check(hud._ability_buttons[0].pad_badge == "Q" and hud._crew_button.pad_badge == "TAB" and str(hud._hint.text).begins_with("WASD"), "HUD shows key badges and the WASD control line")
+			_key(KEY_Q)
+			_check(float(main.vehicle.abilities[0].ready_in) > 0.0, "Q fires the first utility")
+			hud._lock_button.visible = true
+			var lock: bool = hud._lock_button.on
+			_click(MOUSE_BUTTON_RIGHT)
+			_check(hud._lock_button.on != lock, "right click toggles LOCK")
+			_key(KEY_TAB)
+			_check(hud.is_crew_wheel_open(), "Tab opens the crew wheel")
+			mark_picked = false
+			hud.crew_picked.connect(func(_i: int) -> void: mark_picked = true)
+			_key(KEY_1)
+			_check(mark_picked and not hud.is_crew_wheel_open(), "1 picks the first crew member")
+		18:
 			_key(KEY_ESCAPE)
 			_check(paused and main.menu != null, "Esc pauses the fight")
-		14:
+		20:
 			_key(KEY_ESCAPE)
 			_check(not paused and main.menu == null, "Esc again resumes")
 			_finish()
