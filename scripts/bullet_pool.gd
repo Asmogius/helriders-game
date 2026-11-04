@@ -251,7 +251,47 @@ func _chain_hit(first: Node2D, at: Vector2, damage: float, team: int, dtype: Str
 		from = best.global_position
 
 
+# --- V4.3 style sample (P2): tracers with a short glowing tail from the fx
+# atlas (additive). Missing atlas -> the line + dot below (fallback). --------
+const AtlasLocal := preload("res://scripts/fx_atlas_local.gd")   # P0 stand-in
+var _tracer: RefCounted
+var _tracer_tried := false
+
+
+func _tracer_atlas() -> RefCounted:
+	if not _tracer_tried:
+		_tracer_tried = true
+		_tracer = AtlasLocal.open("res://art/fx/fx_atlas.json")
+		if _tracer != null and _tracer.has("tracer_glow"):
+			var m := CanvasItemMaterial.new()
+			m.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+			material = m
+			texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		else:
+			_tracer = null
+	return _tracer
+
+
+func _draw_tracers(a: RefCounted) -> void:
+	var tex: Texture2D = a.texture
+	var glow: Rect2 = a.rect("tracer_glow")
+	var core: Rect2 = a.rect("tracer_core")
+	for i in _count:
+		var head := _pos[i]
+		var ang := _vel[i].angle()
+		var col := T.COL_ORANGE if _team[i] == TEAM_PLAYER else T.COL_ENEMY
+		draw_set_transform(head, ang, Vector2(TRAIL / glow.size.x * 1.15, 1.0))
+		draw_texture_rect_region(tex, Rect2(Vector2(-glow.size.x + 2.0, -glow.size.y * 0.5), glow.size), glow, col)
+		draw_set_transform(head, ang, Vector2.ONE)
+		draw_texture_rect_region(tex, Rect2(Vector2(-core.size.x + 1.0, -core.size.y * 0.5), core.size), core)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
 func _draw() -> void:
+	var a := _tracer_atlas()
+	if a != null:
+		_draw_tracers(a)
+		return
 	for i in _count:
 		var head := _pos[i]
 		var tail := head - _vel[i].normalized() * TRAIL

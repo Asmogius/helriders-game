@@ -17,6 +17,16 @@ var _drag := PackedFloat32Array()
 var _col := PackedColorArray()
 var _count := 0
 
+# --- V4 style sample (P2): atlas sprites for the explosion. Missing atlas ->
+# the square particles below stay the whole look (fallback). -----------------
+const FxGlow := preload("res://scripts/fx_glow.gd")
+const AtlasLocal := preload("res://scripts/fx_atlas_local.gd")   # P0 stand-in
+const ATLAS_JSON := "res://art/fx/fx_atlas.json"
+var atlas: RefCounted
+var glow: Node2D       # additive: flash, fireball, shockwave
+var smoke: Node2D      # normal blend: smoke column, debris chips
+var decals: Node2D     # under the rigs: scorch
+
 
 func _ready() -> void:
 	_pos.resize(MAX_PARTICLES)
@@ -26,6 +36,18 @@ func _ready() -> void:
 	_size.resize(MAX_PARTICLES)
 	_drag.resize(MAX_PARTICLES)
 	_col.resize(MAX_PARTICLES)
+	atlas = AtlasLocal.open(ATLAS_JSON)
+	if atlas != null:
+		decals = FxGlow.new()
+		decals.setup(atlas, false)
+		decals.z_index = -1          # scorch under rigs and zombies
+		add_child(decals)
+		smoke = FxGlow.new()
+		smoke.setup(atlas, false)
+		add_child(smoke)
+		glow = FxGlow.new()
+		glow.setup(atlas, true)
+		add_child(glow)
 
 
 func emit(at: Vector2, velocity: Vector2, life: float, size: float, color: Color, drag := 3.0) -> void:
@@ -75,6 +97,9 @@ func flame(at: Vector2) -> void:
 
 
 func explosion(at: Vector2, carry: Vector2) -> void:
+	if glow != null:
+		_atlas_explosion(at, carry)
+		return
 	# Armor plates and hull chunks.
 	var palette: Array[Color] = [T.COL_STEEL, T.COL_RUST, T.COL_STEEL.darkened(0.3), T.COL_CYAN]
 	for i in 36:
@@ -137,3 +162,30 @@ func _draw() -> void:
 		color.a *= clampf(_life[i] / _max_life[i], 0.0, 1.0)
 		var s := _size[i]
 		draw_rect(Rect2(_pos[i] - Vector2(s, s) * 0.5, Vector2(s, s)), color)
+
+
+## V4.4 sample sequence: flash -> fireball (additive) -> shockwave ring ->
+## flung debris -> a rising smoke column that drifts; a scorch decal stays.
+func _atlas_explosion(at: Vector2, carry: Vector2) -> void:
+	for l: Node2D in [glow, smoke, decals]:
+		l.set("density", density)
+	glow.spawn("flash", 3, at, Vector2.ZERO, 0.12, 2.2, 2.8, Color.WHITE, 0.0, randf() * TAU, 0.0, 0.0, 0.0, true)
+	glow.spawn("fireball", 6, at, carry * 0.2, 0.7, 1.7, 2.3, Color.WHITE, 3.0, randf() * TAU, 0.0, 0.0, 1.0, true)
+	for i in 3:
+		var off := Vector2.RIGHT.rotated(randf() * TAU) * randf_range(10.0, 22.0)
+		glow.spawn("fireball", 6, at + off, carry * 0.2 + off * 2.0, randf_range(0.45, 0.6), 0.9, 1.3, Color.WHITE, 3.0, randf() * TAU, 0.0, 0.0, 1.0)
+	glow.spawn("ring", 1, at, Vector2.ZERO, 0.35, 0.3, 2.6, Color(1.0, 1.0, 1.0, 0.9), 0.0, 0.0, 0.0, 0.0, 0.0, true)
+	for i in 14:
+		var dir := Vector2.RIGHT.rotated(randf() * TAU)
+		var chip := "chip_rust_%d" % (i % 3) if i % 2 == 0 else "chip_steel_%d" % (i % 3)
+		smoke.spawn(chip, 1, at, carry * 0.4 + dir * randf_range(160.0, 520.0), randf_range(0.7, 1.3), 2.0, 2.0, Color.WHITE, 2.5, randf() * TAU, randf_range(-14.0, 14.0), 0.0, 1.0)
+	var drift := Vector2(randf_range(-14.0, 14.0), 0.0)
+	for i in 7:
+		var sz := "smoke_%d" % mini(3, 1 + i / 2)
+		smoke.spawn(sz, 1, at + Vector2(randf_range(-10.0, 10.0), randf_range(-6.0, 6.0)), drift + Vector2(randf_range(-10.0, 10.0), -randf_range(10.0, 30.0)),
+				randf_range(1.8, 3.2), 1.2, 3.4, Color(1.0, 1.0, 1.0, 0.85), 0.6, randf() * TAU, randf_range(-0.6, 0.6), 18.0)
+	decals.spawn("scorch", 1, at, Vector2.ZERO, 30.0, 1.6, 1.6, Color(1.0, 1.0, 1.0, 0.9), 0.0, randf() * TAU, 0.0, 0.0, 1.0, true)
+	# A few square embers keep the old sparkle.
+	for i in 10:
+		var dir := Vector2.RIGHT.rotated(randf() * TAU)
+		emit(at, dir * randf_range(120.0, 380.0), randf_range(0.25, 0.5), 3.0, T.COL_ORANGE.lightened(0.3), 4.0)
