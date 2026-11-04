@@ -252,9 +252,14 @@ func _think_flank(delta: float) -> void:
 				goal = (spot - global_position).normalized()
 			if firing and not _was_firing:
 				strafes += 1
-			# Break when the guns overheat or one of our facings is stripped.
-			if _guns_hot() or _facing_stripped():
+			# Break when the guns overheat (once per overheat: it doesn't keep
+			# fleeing while they cool) or one of our facings is stripped.
+			var hot := _guns_hot()
+			if (hot and not _broke_hot) or _facing_stripped():
 				_start_break(to_player)
+				_broke_hot = hot
+			elif not hot:
+				_broke_hot = false
 		Mode.BREAK:
 			goal = (_break_to - global_position).normalized()
 			if global_position.distance_to(_break_to) < 80.0 or _mode_time <= 0.0:
@@ -280,6 +285,7 @@ func _think_flank(delta: float) -> void:
 
 
 var _was_firing := false
+var _broke_hot := false   # already broke off for this overheat
 var _stripped_seen := 0
 
 

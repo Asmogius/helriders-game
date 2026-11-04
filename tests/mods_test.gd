@@ -213,9 +213,12 @@ func _process(_delta: float) -> bool:
 				var to: Vector2 = o.get("_break_to")
 				var d := to.distance_to(SPOT)
 				_check(d >= 499.0 and d <= 701.0, "the break point is 500-700 px from the player (%d)" % int(d))
+			if frame > 603 and frame < 900 and int((mark.o as Node).get("mode")) == EnemyRig.Mode.FLANK:
+				mark.reflanked = true
 			if frame == 900:
 				var o: Node = mark.o
-				_check(int(o.get("mode")) != EnemyRig.Mode.BREAK, "then it re-flanks")
+				_check(bool(mark.get("reflanked", false)), "then it re-flanks")
+				_check(int(o.get("breaks")) == int(mark.b0) + 1, "one break per overheat, not a fresh one every time it arrives while its guns cool (%d)" % (int(o.get("breaks")) - int(mark.b0)))
 				mark.b1 = int(o.get("breaks"))
 				o.set("mode", EnemyRig.Mode.FLANK)
 				var fa: PackedFloat32Array = o.get("facing_armor")
