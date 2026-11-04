@@ -25,7 +25,7 @@ const CARD_W := 23.0 * UI.GRID       # slot card cell: 184 x 64
 const CARD_H := UI.MIN_TOUCH
 const STATS_W := 42.0 * UI.GRID      # 336
 const RIG_Y := 0.42      # rig centre, fraction of the content height
-const OPEN_SCALE := 0.72 # rig scale while the part sheet is open
+const OPEN_SCALE := 0.85 # rig scale while the part sheet is open
 
 
 static func left_w() -> float:
@@ -93,7 +93,12 @@ static func apply(g: Control) -> void:
 	# --- right: the stats panel, always on the GARAGE tab --------------------
 	var sheet_stats: Control = g.get("_stat_sheet")
 	sheet_stats.set("single_column", true)
-	_place(sheet_stats, right)
+	var sheet_h: float = g.SHEET_H
+	if open:   # the part sheet runs under the stats panel too: 3 cards at 1280
+		_place(sheet_stats, Rect2(right.position, Vector2(right.size.x, right.size.y - sheet_h - GAP)))
+	else:
+		_place(sheet_stats, right)
+	sheet_stats.set("only_changed", open)
 	sheet_stats.visible = on_garage and g.profile.has_rig()
 	if not open and sheet_stats.visible:
 		var now: Dictionary = g.call("_built", g.profile.rig)
@@ -102,14 +107,13 @@ static func apply(g: Control) -> void:
 	# --- centre: rig, meters, crew / job / hint, or the part sheet -----------
 	var holder: Node2D = g.get("_rig_holder")
 	var sheet: Control = g.get("_sheet")
-	var sheet_h: float = g.SHEET_H
 	var rig_area := centre
 	if open:
 		rig_area = Rect2(centre.position, Vector2(centre.size.x, centre.size.y - sheet_h - GAP))
-		_place(sheet, Rect2(centre.position.x, centre.end.y - sheet_h, centre.size.x, sheet_h))
+		_place(sheet, Rect2(centre.position.x, centre.end.y - sheet_h, right.end.x - centre.position.x, sheet_h))
 		var title: Label = g.get("_sheet_title")
 		title.clip_text = true
-		title.size = Vector2(centre.size.x - 2.0 * UI.GRID * 2.0, 4.0 * UI.GRID)
+		title.size = Vector2(right.end.x - centre.position.x - 4.0 * UI.GRID, 4.0 * UI.GRID)
 		title.add_theme_font_size_override("font_size", 15)
 	holder.position = Vector2(rig_area.get_center().x, rig_area.position.y + rig_area.size.y * (0.5 if open else RIG_Y))
 	holder.scale = Vector2.ONE * (OPEN_SCALE if open else 1.0)
@@ -118,17 +122,22 @@ static func apply(g: Control) -> void:
 	_place(touch, rig_area)
 	touch.mouse_filter = Control.MOUSE_FILTER_IGNORE if open else Control.MOUSE_FILTER_STOP
 	var meter: Control = g.get("_power_meter")
-	var y := centre.end.y - 3.0 * 32.0 - 48.0
+	# meters 44, crew row MIN_TOUCH (it opens the INN), job and hint 24 each
+	var heights := {"_crew_line": UI.MIN_TOUCH, "_job": 3.0 * UI.GRID, "_hint": 3.0 * UI.GRID}
+	var y := centre.end.y - 44.0 - UI.GRID * 0.5 - UI.MIN_TOUCH - 6.0 * UI.GRID
 	_place(meter, Rect2(centre.position.x, y, centre.size.x, 44.0))
 	meter.visible = not open and g.profile.has_rig()
-	y += 48.0
+	y += 44.0 + UI.GRID * 0.5
 	for name: String in ["_crew_line", "_job", "_hint"]:
 		var c: Control = g.get(name)
-		_place(c, Rect2(centre.position.x, y, centre.size.x, 4.0 * UI.GRID))
+		var h: float = heights[name]
+		_place(c, Rect2(centre.position.x, y, centre.size.x, h))
+		c.custom_minimum_size.y = h
 		if c is Label:
 			(c as Label).clip_text = true
+			(c as Label).vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		c.add_theme_font_size_override("font_size", 15)
-		y += 4.0 * UI.GRID
+		y += h
 	(g.get("_crew_line") as Control).visible = not open
 	(g.get("_job") as Control).visible = not open
 	(g.get("_hint") as Control).visible = not open

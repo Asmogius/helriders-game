@@ -1349,6 +1349,7 @@ class StatSheet extends Control:
 	const ROW_H := 26.0
 	var single_column := false   # V2.3 sample: one tall column (garage_layout.gd)
 	var _row_h := ROW_H
+	var only_changed := false    # V2.3 sample: list just the rows the previewed part changes
 	# [label, key, higher is better, decimals, suffix]
 	const LEFT := [
 		["TOP SPEED", "speed", true, 0, ""],
@@ -1442,7 +1443,15 @@ class StatSheet extends Control:
 		draw_rect(Rect2(Vector2.ZERO, size), UI.PANEL_EDGE, false, 2.0)
 		draw_string(font, Vector2(16, 28), title, HORIZONTAL_ALIGNMENT_LEFT, size.x - 32.0, 17, T.COL_ORANGE)
 		var col_w := (size.x - 56.0) / 2.0
-		if single_column:   # V2.3 sample: the stats panel on the right
+		if single_column and only_changed:   # V2.3 sample: short panel over the part sheet
+			col_w = size.x - 32.0
+			var rows: Array = (LEFT + RIGHT).filter(_changed)
+			if rows.is_empty():
+				draw_string(font, Vector2(16, 60), "No change", HORIZONTAL_ALIGNMENT_LEFT, col_w, 15, UI.TEXT_DIM)
+			_row_h = minf(ROW_H, (size.y - 44.0) / float(maxi(rows.size(), 1)))
+			_column(font, rows, Vector2(16, 34), col_w)
+			_row_h = ROW_H
+		elif single_column:   # V2.3 sample: the stats panel on the right
 			col_w = size.x - 32.0
 			_row_h = minf(ROW_H, (size.y - 64.0) / float(LEFT.size() + RIGHT.size()))
 			_column(font, LEFT, Vector2(16, 34), col_w)
@@ -1463,9 +1472,18 @@ class StatSheet extends Control:
 				why.append("power")
 			if float(after.capacity) > 0.0 and float(after.weight) > float(after.capacity):
 				why.append("weight")
-			draw_string(font, foot, "OVERLOAD (%s): speed and acceleration -%d%%" % [" + ".join(why), roundi((1.0 - m_after) * 100.0)], HORIZONTAL_ALIGNMENT_LEFT, size.x - 32.0, 15, UI.BAD)
+			var msg := "OVERLOAD (%s): speed and acceleration -%d%%" % [" + ".join(why), roundi((1.0 - m_after) * 100.0)]
+			if single_column:   # V2.3 sample: narrow panel
+				msg = "OVERLOAD: speed, accel -%d%%" % roundi((1.0 - m_after) * 100.0)
+			draw_string(font, foot, msg, HORIZONTAL_ALIGNMENT_LEFT, size.x - 32.0, 15, UI.BAD)
 		elif m_now < 1.0:
 			draw_string(font, foot, "Overload cleared", HORIZONTAL_ALIGNMENT_LEFT, size.x - 32.0, 15, UI.GOOD)
+
+	func _changed(r: Array) -> bool:
+		var key: String = r[1]
+		if absf(float(now[key]) - float(after[key])) >= 0.05:
+			return true
+		return LIMITS.has(key) and absf(float(now[LIMITS[key]]) - float(after[LIMITS[key]])) >= 0.05
 
 	func _column(font: Font, rows: Array, origin: Vector2, width: float) -> void:
 		var y := origin.y
