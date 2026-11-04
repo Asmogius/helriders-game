@@ -114,3 +114,24 @@ Every enemy hull has an `elite_trim` layer (gold spine stripe and nose chevron).
 **Enemy colours:** enemy red `#F23D29`, acid `#99F240`, goop `#E0A458` and elite gold `#FFC740`. `tests/art_content_test.gd` fails if an enemy sheet contains cyan `#40D1E0`, push orange `#ED7A2B`, shield `#8CBFFF` or truck `#73D980`.
 
 **Export:** `export_presets.cfg` includes `art/sprites/*.json`, so the APK ships the metadata.
+
+
+## Enemy rigs and weapon scale (PR #15)
+
+| Rig script | art id | body (px) | notes |
+|---|---|---|---|
+| enemy_rig.gd | outrider | 74x32 | elite_trim when is_elite() |
+| bulwark_rig.gd | bulwark | 84x46 | armored plow; `charge_glow` layer while Mode.ATTACK |
+| gunner_rig.gd | gunner | 74x40 | turret `gunner_rig` on turret_mount |
+| scrapper_rig.gd | scrapper | 62x32 | dropper tray chunk |
+| scrapper_gunner_rig.gd | scrapper_gunner | 64x34 | turret gun id `scrapper` -> sheet `scrapper_turret` (ART_WEAPON_ALIASES) |
+| convoy_rig.gd | convoy | 96x46 | ram + nose guns baked into the hull; hitch point |
+| convoy_trailer.gd | convoy_trailer | 70x40 | `_art_meta_path()` override; turret `convoy_turret` |
+| patcher_rig.gd | patcher | 66x34 | `winch` point; cable/hook/revive drawn over the sheet |
+
+Every enemy hull has an `elite_trim` layer (except the trailer), wreck chunks
+and frames centred on the ground footprint. Collision is unchanged (capsule
+from body_len/body_wid). Weapons are modelled at 1 px per voxel like the hulls:
+turret rings ~21 px, muzzles where the old code-drawn barrels ended
+(pintle 30.5 px from the pivot, Gunner burst 34 px). Review shot:
+`tools/art/capture_enemies.gd` -> `art/previews/capture_enemies.png`.
