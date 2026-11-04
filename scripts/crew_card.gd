@@ -24,6 +24,7 @@ var status_color := UI.TEXT_DIM
 var selected := false
 var dim := false            # resting or already hired
 var flashed := false           # V6.5: this card played the level-up flash (tests, capture)
+var _icons: RefCounted = UI.icons()   # V6.3: class icon in the portrait chip
 
 
 func _ready() -> void:
@@ -79,7 +80,8 @@ func _draw() -> void:
 	for part in str(member.name).split(" "):
 		if part != "":
 			initials += part.substr(0, 1)
-	draw_string(font, Vector2(16, 54), initials, HORIZONTAL_ALIGNMENT_CENTER, 46, 20, Color(UI.TEXT, a))
+	if not _icons.draw(self, str(member.get("role", "")), Rect2(chip.position + Vector2(7, 7), Vector2(32, 32)), Color(role_color, a)):
+		draw_string(font, Vector2(16, 54), initials, HORIZONTAL_ALIGNMENT_CENTER, 46, 20, Color(UI.TEXT, a))
 	draw_string(font, Vector2(74, 40), Crew.role_name(member).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, w - 58, 18, Color(role_color, a))
 	draw_string(font, Vector2(74, 62), "%s - %s" % [member.rarity, Crew.specialty_name(member)], HORIZONTAL_ALIGNMENT_LEFT, w - 58, 14, Color(rarity, a))
 	if Crew.perks_due(member) > 0:
