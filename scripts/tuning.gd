@@ -519,20 +519,20 @@ const STRIP_MINE_PER := 40.0         # armor per scrap
 const STRIP_MINE_CAP := 25.0
 const TAIL_SWIPE_SHARE := 0.6
 const RACING_LINE_ADD := 0.5
-# DRAFT (invented, pending review):
-const CLEAR_OUT_PUSH := 2.0          # DRAFT: Shockwave knockback x2 with Clear Out
-const JUGGERNAUT_FLING := 0.8        # DRAFT: the rammed rig is thrown at 1.8x the impact speed
-const SLINGSHOT_SPEED := 250.0       # DRAFT: "at speed" = over 250 px/s when Chain Drag ends
-const SLINGSHOT_FLING := 1.0         # DRAFT: the flung rig gets 100% of your velocity
-const SLINGSHOT_TIME := 1.5          # DRAFT: a wall crash within 1.5 s counts as the RAM
-const TAIL_SWIPE_TIME := 0.6         # DRAFT: "while swinging" = 0.6 s after the Bootleg Turn
-const NEAR_MISS_RANGE := 60.0        # DRAFT: an enemy round within 60 px that flies on
-const RACING_LINE_CAP := 3.0         # DRAFT: at most +3 s per Hard Line
-const SHRAPNEL_DAMAGE := 0.5         # DRAFT: splash = 50% of the round
-const SHRAPNEL_STORM_DAMAGE := 15.0  # DRAFT: per pulled item
-const SHRAPNEL_STORM_RADIUS := 80.0  # DRAFT: around where it lay
-const DRONE_BAIT_ORBIT := 160.0      # DRAFT: Bait Drones hover further out
-const DRONE_ZOMBIE_DPS := 8.0        # DRAFT: a zombie touching a drone (shambler dps)
+# Agreed with the owner (2026-11-04; first drafted by the Grok content bots):
+const CLEAR_OUT_PUSH := 2.0          # Shockwave knockback x2 with Clear Out
+const JUGGERNAUT_FLING := 0.8        # the rammed rig is thrown at 1.8x the impact speed
+const SLINGSHOT_SPEED := 250.0       # "at speed" = over 250 px/s when Chain Drag ends
+const SLINGSHOT_FLING := 1.0         # the flung rig gets 100% of your velocity
+const SLINGSHOT_TIME := 1.5          # a wall crash within 1.5 s counts as the RAM
+const TAIL_SWIPE_TIME := 0.6         # "while swinging" = 0.6 s after the Bootleg Turn
+const NEAR_MISS_RANGE := 60.0        # an enemy round within 60 px that flies on
+const RACING_LINE_CAP := 3.0         # at most +3 s per Hard Line
+const SHRAPNEL_DAMAGE := 0.5         # splash = 50% of the round
+const SHRAPNEL_STORM_DAMAGE := 15.0  # per pulled item
+const SHRAPNEL_STORM_RADIUS := 80.0  # around where it lay
+const DRONE_BAIT_ORBIT := 160.0      # Bait Drones hover further out
+const DRONE_ZOMBIE_DPS := 8.0        # a zombie touching a drone (shambler dps)
 const POWER_DIVERT_CAP := 80.0       # +1 shield per unused power point, cap 80
 const DRONE_ORBIT := 70.0            # gap-filler: drones circle this far out
 const DRONE_RANGE := 380.0           # gap-filler: same reach as a 1000 px/s gun
@@ -592,6 +592,30 @@ const WRECK_SLOWMO := 0.3        # game speed on the final hit...
 const WRECK_SLOWMO_TIME := 0.8   # ...for this long (real seconds)
 const WRECK_SWARM := 6           # zombies that close on the wreck
 const WRECK_SWARM_RANGE := 280.0
+
+# Keywords DRIFT and OVERLOAD (§14; the owner approved gap-filler definitions,
+# 2026-11-04). DRIFT: sliding sideways faster than DRIFT_SIDE_SPEED while
+# rolling; it "ends" when the slide dies, if it lasted DRIFT_MIN_TIME.
+# OVERLOAD: a heat gun running at OVERLOAD_HEAT or more of its bar (before it
+# locks hot). Enemy heat guns can be OVERLOADed too.
+const COOK_OFF_BARREL_MULT := 1.5   # Demolisher: barrels set off during Cook Off +50% (proposal 01)
+const OUTRIDER_RETREAT_HP := 0.25      # an Outrider this hurt runs to a Patcher, if one's alive...
+const OUTRIDER_RETREAT_DONE := 0.45    # ...until it's patched back up to this
+const OUTRIDER_DRIFT_KICK := 0.5       # its break-off turn slides: grip cut for this long...
+const OUTRIDER_DRIFT_GRIP := 0.3       # ...to this share
+const BULWARK_SCREEN_RANGE := 400.0    # it body-blocks for a Gunner Rig or Patcher this close
+const BULWARK_SCREEN_GAP := 160.0      # standing this far out from the ally, toward you
+const DRIFT_SIDE_SPEED := 160.0
+const DRIFT_MIN_FWD := 150.0
+const DRIFT_MIN_TIME := 0.4
+const OVERLOAD_HEAT := 0.75
+const HIT_AND_RUN_TIME := 2.0      # Raider frame mod: after a DRIFT...
+const HIT_AND_RUN_DAMAGE := 0.15   # ...+15% damage
+const DRIFT_FUEL_REFUND := 3.0     # Nitro Bottle mod: seconds off its cooldown per DRIFT
+const CLEAN_EXIT_REFUND := 1.0     # Wheelman perk: seconds off Hard Line per DRIFT during it
+const OVERLOAD_COIL_JUMPS := 3     # Arc Projector mod: the chain hits 2 extra targets
+const MOBILE_WORKSHOP_AT := 0.30   # Hauler mod: when HP first falls under 30%...
+const MOBILE_WORKSHOP_HEAL := 0.15 # ...restore 15% of max HP, once per mission
 
 const CREW_PRICES := {"Common": 0, "Uncommon": 80, "Rare": 200, "Epic": 450, "Legendary": 900, "Mythic": 1600}
 # Lost crew (§14; agreed with the owner): a crew member lost in a wreck turns
@@ -980,7 +1004,29 @@ const PUSH_MARKER_GAP := 600.0       # extract and push markers at least this fa
 const PUSH_RADIUS := 110.0
 const PUSH_EXTRACT_WINDOW := 20.0    # after the timer: drive in within this, or it ends on its own
 const PUSH_NO_TYPES := ["courier"]   # never offered on these
-# PENDING the owner's confirmation (proposal 01 §3.3): Retrieve offers the push
-# beacon once every non-deep cache is taken; Escort offers it only if the
-# optional site was skipped. Flip to false to keep Push off both job types.
-const PUSH_RETRIEVE_ESCORT_DRAFT := true
+# Agreed with the owner (proposal 01 §3.3): Retrieve offers the push beacon
+# once every non-deep cache is taken; Escort offers it only if the optional
+# site was skipped. Flip to false to keep Push off both job types.
+const PUSH_RETRIEVE_ESCORT := true   # agreed: Retrieve after the non-deep caches, Escort only if the optional site was skipped
+# --- Audio (DESIGN "Audio / Soundtrack"; agreed with the owner 2026-11-04) ----------------
+const MUSIC_FADE := 1.5             # seconds for a scene change (garage <-> fight)
+const MUSIC_LAYER_FADE := 2.0       # seconds for a combat layer to cross in or out
+const MUSIC_SILENT_DB := -60.0      # a layer that is "off" (kept playing so it stays in sync)
+const MUSIC_INTENSITY_HOLD := 4.0   # seconds before intensity may drop again
+const MUSIC_CHECK_EVERY := 0.5      # seconds between intensity checks in the fight
+# Intensity 1 (Contact) / 2 (Crossfire): enemy rigs alive OR zombies alive at or above.
+const MUSIC_MID_RIGS := 1
+const MUSIC_MID_ZOMBIES := 10
+const MUSIC_HIGH_RIGS := 2
+const MUSIC_HIGH_ZOMBIES := 22
+# Boosts: each adds steps on top of the count (result capped at 2, Crossfire).
+const MUSIC_ELITE_BOOST := 1           # Hunt's Elite or a Convoy Lead alive
+const MUSIC_LOW_ARMOR := 0.3           # player's rig at or under this share of armor
+const MUSIC_LOW_ARMOR_BOOST := 1
+const MUSIC_SURVIVE_FINAL_SECONDS := 30.0   # Survive's last stretch (the final wave)
+const MUSIC_SURVIVE_FINAL_BOOST := 2
+const MUSIC_PAUSE_DUCK_DB := -12.0     # music under the pause menu / radio call
+const MUSIC_DUCK_FADE := 0.3
+
+# --- Combat SFX (agreed with the owner 2026-11-04) -----------------------------------------------------
+const SFX_WINDUP_PITCH := [0.9, 1.25]   # Bulwark roar pitch at wind-up start / end

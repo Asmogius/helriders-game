@@ -129,6 +129,10 @@ func _blast(at: Vector2, r: float, damage: float, team: int, dtype: String, extr
 		body.call("take_hit", dmg, away.normalized() * 300.0, "blast", dtype)
 		if extra.has("buildup_kind") and body.has_method("add_buildup"):
 			body.call("add_buildup", int(extra.buildup_kind), float(extra.buildup))
+	if dtype == "acid" or extra.has("puddle_r"):
+		var music := get_node_or_null("/root/MusicManager")
+		if music != null:
+			music.play_sfx("acid_impact")
 	if extra.has("puddle_r") and hazards != null:
 		hazards.call("add_acid", at, float(extra.puddle_r), float(extra.puddle_t), team)
 

@@ -13,6 +13,7 @@ extends "res://scripts/enemy_rig.gd"
 ## cuts it short). The Convoy Lead extends this script and inherits it all.
 signal windup_started
 signal windup_ended
+signal rammed_player   # it hit you and backs off (ram impact sound)
 
 const BACKOFF_STEER := 0.5   # radians off straight back while reversing
 
@@ -81,6 +82,12 @@ func _ready() -> void:
 		connect("windup_started", _on_windup_started)
 
 
+const GUNNER_SCRIPT := preload("res://scripts/gunner_rig.gd")
+
+var screening := false   # body-blocking for an ally right now
+var screens := 0          # times it started screening (tests)
+
+
 func _init() -> void:
 	team = BulletPool.TEAM_ENEMY
 	apply_stats(T.BULWARK)
@@ -107,6 +114,8 @@ func _physics_process(delta: float) -> void:
 	super(delta)
 	if was_winding and not is_winding_up():
 		windup_ended.emit()
+		if _music() != null:
+			_music().stop_windup(self)
 	if is_wrecked or player == null or mode == Mode.UNSTICK:
 		return
 	# Rammed the player this tick: back off, then come again.
@@ -116,6 +125,9 @@ func _physics_process(delta: float) -> void:
 			_mode_time = T.BULWARK_BACKOFF
 			_side = 1.0 if randf() < 0.5 else -1.0
 			backoffs += 1
+			rammed_player.emit()
+			if _music() != null:
+				_music().play_sfx("ram_impact")
 			break
 
 
@@ -138,6 +150,13 @@ func _think(delta: float) -> void:
 			# Aim at where the player is heading, not where they are.
 			var player_vel: Vector2 = player.get("velocity")
 			goal = (player.global_position + player_vel * clampf(dist / max_speed, 0.0, 0.5) - global_position).normalized()
+			# Screening: a Gunner Rig or Patcher close by, and you closer to it
+			# than to us: drive in between and body-block.
+			var ward := _ward(dist)
+			screening = ward != null
+			if screening:
+				var block := ward.global_position + (player.global_position - ward.global_position).normalized() * T.BULWARK_SCREEN_GAP
+				goal = (block - global_position).normalized()
 			if player_down:
 				throttle = 0.3
 			elif _sees_player and dist >= float(T.BULWARK_CHARGE_RANGE[0]) and dist <= float(T.BULWARK_CHARGE_RANGE[1]) \
@@ -147,6 +166,8 @@ func _think(delta: float) -> void:
 				_mode_time = T.BULWARK_WINDUP
 				windups += 1
 				windup_started.emit()
+				if _music() != null:
+					_music().start_windup(self)   # engine roar, pitch follows windup_progress()
 				queue_redraw()
 		Mode.WINDUP:
 			# Engine roar and headlight flare: it holds and keeps its nose on you.
@@ -202,6 +223,24 @@ func _think(delta: float) -> void:
 
 
 ## True if a hit coming from world point `from` lands on the armored front.
+## The ally it should screen (a Gunner Rig or Patcher within range that you're
+## closer to than you are to this Bulwark), or null.
+func _ward(dist_to_player: float) -> Node2D:
+	var parent := get_parent()
+	if parent == null or player == null:
+		return null
+	for n in parent.get_children():
+		if n == self or bool(n.get("is_wrecked")) or not (n.has_method("pop_hook") or n.get_script() == GUNNER_SCRIPT):
+			continue
+		var ally := n as Node2D
+		if ally.global_position.distance_to(global_position) <= T.BULWARK_SCREEN_RANGE \
+				and player.global_position.distance_to(ally.global_position) < dist_to_player:
+			if not screening:
+				screens += 1
+			return ally
+	return null
+
+
 func is_front(from: Vector2) -> bool:
 	var forward := Vector2.RIGHT.rotated(rotation)
 	return absf(forward.angle_to(from - global_position)) < T.BULWARK_FRONT_ARC
@@ -271,3 +310,7 @@ func _draw() -> void:
 			draw_circle(Vector2(half_l + 6.0, sy * (half_w - 8.0)), 9.0, flare)
 		draw_colored_polygon(PackedVector2Array([Vector2(half_l + 6.0, -half_w), Vector2(half_l + 120.0, -half_w - 30.0),
 			Vector2(half_l + 120.0, half_w + 30.0), Vector2(half_l + 6.0, half_w)]), Color(1.0, 0.95, 0.75, 0.18))
+
+
+func _music() -> Node:
+	return get_node_or_null("/root/MusicManager")

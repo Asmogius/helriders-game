@@ -37,6 +37,7 @@ const Hunter := preload("res://scripts/hunter.gd")
 const BulletPool := preload("res://scripts/bullet_pool.gd")
 const MinePool := preload("res://scripts/mine_pool.gd")
 const ShellPool := preload("res://scripts/shell_pool.gd")
+const KeywordFx := preload("res://scripts/keyword_fx.gd")
 const Fx := preload("res://scripts/fx.gd")
 const Pickup := preload("res://scripts/pickup.gd")
 const LockReticle := preload("res://scripts/lock_reticle.gd")
@@ -120,6 +121,7 @@ var marked: Node2D               # the last target a Spotter marked (tests)
 var bullets: BulletPool
 var mines: MinePool
 var shells: ShellPool             # Mortar shells in flight
+var keywords: KeywordFx           # keyword popups (§14 feedback)
 var fx: Fx
 var pickups: Node2D
 var reticle: LockReticle
@@ -165,11 +167,13 @@ var tutorial := false           # the Training Run (optional, from MENU)
 var tut_step := 0               # 0 drive, 1 shoot, 2 lock, 3 rig, 4 salvage, 5 done
 var _tut_mark := {}
 var _seen_timer := 0.0
+var _sludger_call := false      # Retrieve: the Sludger comes with the next danger rig call
 var _events: Array = []          # [seconds, kind, kills that also trigger it (-1 = none), fired]
 
 
 func _ready() -> void:
 	profile = get_node("/root/Profile")
+	_music_start.call_deferred()
 	tutorial = profile.tutorial_active or bool(mission_override.get("tutorial", false))
 	if tutorial:
 		spec = Missions.make("clear", 1, 1)
@@ -210,6 +214,7 @@ func _ready() -> void:
 	bullets.z_index = 4
 	mines = MinePool.new()
 	shells = ShellPool.new()
+	keywords = KeywordFx.new()
 	enemy_mines = MinePool.new()
 	enemy_mines.enemy = true
 	fx = Fx.new()
@@ -291,7 +296,7 @@ func _ready() -> void:
 		add_child(truck)
 	for h in hunters:
 		add_child(h)
-	for node: Node in [bullets, shells, fx, reticle, camera, hud]:
+	for node: Node in [bullets, shells, keywords, fx, reticle, camera, hud]:
 		add_child(node)
 
 	camera.set_bounds(Rect2(Vector2.ZERO, T.WORLD_SIZE))
@@ -343,6 +348,9 @@ func _ready() -> void:
 		hud.choice_made.connect(_on_optional_choice)
 	hud.restart_requested.connect(return_to_garage)
 	hud.pause_pressed.connect(open_menu)
+	vehicle.keyword.connect(keywords.pop)
+	for rig in _all_enemy_rigs():
+		rig.keyword.connect(keywords.pop)
 	for b in barrels:
 		b.died.connect(func(_at: Vector2) -> void: profile.discover("hazards", "barrel_" + b.kind))
 		b.died.connect(_chain_reaction)
@@ -516,7 +524,10 @@ func _configure_mission() -> void:
 			if not _swap_event("scrapper" if skulls <= 3 else "outrider", "torcher"):
 				_events.append([75.0, "torcher", -1, false])
 	if not tutorial and Missions.has_sludger(spec):
-		_events.append([90.0, "sludger", -1, false])
+		if mission_type == "retrieve":
+			_sludger_call = true   # it answers the first rig call as the danger rises
+		else:
+			_events.append([90.0, "sludger", -1, false])
 	for i in 1:
 		torchers.append(TorcherRig.new())
 		sludgers.append(SludgerRig.new())
@@ -610,6 +621,7 @@ func _process(_delta: float) -> void:
 		scrap += vehicle.strip_pending   # Strip Mine
 		vehicle.strip_pending = 0.0
 	_refresh_hud()
+	_music_tick(_delta)
 	hud.right_stick.set_gauges(vehicle.weapon_gauges())
 	bullets.big_game = float(vehicle.crew_mod("big_game"))
 
@@ -1338,8 +1350,10 @@ func reach_checkpoint() -> void:
 	if checkpoint_index >= checkpoints.size():
 		var tier := courier_tier()
 		var title := "DELIVERED  -  %s" % tier.to_upper() if tier != "late" else "DELIVERED LATE"
+		_sfx("courier_complete")
 		_succeed(title, "Time %s" % _clock(elapsed), float(T.COURIER_TIER_PAY[tier]))
 	else:
+		_sfx("courier_checkpoint")
 		hud.banner("CHECKPOINT %d / %d" % [checkpoint_index, checkpoints.size()], T.COL_CYAN, 1.2)
 
 
@@ -1446,7 +1460,13 @@ func _set_danger(step: int) -> void:
 	danger = step
 	zombies.cap = mini(_base_cap + step * T.RETRIEVE_CAP_STEP, T.ZOMBIE_CAP)
 	zombies.speed_bonus = 1.0 + step * T.RETRIEVE_SPEED_STEP
-	if rose and T.RETRIEVE_RIG_STEPS.has(step) and _rig_calls_made < _rig_calls:
+	if rose and T.RETRIEVE_RIG_STEPS.has(step) and _sludger_call:
+		# Retrieve's Sludger is called in like the other rigs, on the first
+		# danger step that calls one (or the first step, if none are due).
+		_sludger_call = false
+		_events.append([elapsed, "sludger", -1, false])
+		hud.banner("THE BLOCK IS STIRRING  -  DANGER %d" % step, Color(0.95, 0.8, 0.3), 2.0)
+	elif rose and T.RETRIEVE_RIG_STEPS.has(step) and _rig_calls_made < _rig_calls:
 		_events.append([elapsed, _rig_call_kind(_rig_calls_made), -1, false])
 		_rig_calls_made += 1
 		hud.banner("THE BLOCK IS STIRRING  -  DANGER %d" % step, Color(0.95, 0.8, 0.3), 2.0)
@@ -1558,6 +1578,8 @@ func _fail(title: String, detail: String) -> void:
 	get_tree().paused = false
 	Engine.time_scale = 1.0
 	state = State.FAILED
+	if _music != null:
+		_music.end_combat()
 	for p in pickups.get_children():
 		_take_salvage(p as Pickup)
 	bank_report = profile.bank_run(int(scrap), _pending_ids())
@@ -2139,6 +2161,8 @@ func _succeed(title: String, detail: String, pay_mult: float) -> void:
 	hud.close_crew_wheel(false)
 	Engine.time_scale = 1.0
 	state = State.CLEARED
+	if _music != null:
+		_music.end_combat()
 	# The job's done: anything still on the ground gets hauled home.
 	for p in pickups.get_children():
 		_take_salvage(p as Pickup)
@@ -2191,7 +2215,7 @@ func _mission_reward_schematic(pay_mult: float) -> String:
 # --- Extract or Push (§14, proposal 01) ------------------------------------------
 
 ## Can this job offer the push now? Escort only if the risky site was
-## skipped (pending the owner's confirmation, T.PUSH_RETRIEVE_ESCORT_DRAFT).
+## skipped (agreed with the owner, T.PUSH_RETRIEVE_ESCORT).
 func _push_offerable() -> bool:
 	if not push_allowed:
 		return false
@@ -2313,6 +2337,8 @@ func _on_wrecked() -> void:
 	hud.close_crew_wheel(false)
 	Engine.time_scale = 1.0
 	state = State.WRECKED
+	if _music != null:
+		_music.play_wreck()
 	camera.shake(1.0)
 	var aboard: Array[String] = []
 	for m in profile.seated_crew():
@@ -2459,3 +2485,63 @@ class CourierMarkers extends Node2D:
 			else:
 				draw_arc(p, r * 0.7, 0.0, TAU, 40, Color(c, 0.35), 2.0)
 			draw_string(font, p + Vector2(-30, 10), str(i + 1), HORIZONTAL_ALIGNMENT_CENTER, 60, 30, Color(c, 0.95 if i == index else 0.4))
+
+
+# --- Music and effects (MusicManager autoload) ------------------------------------
+
+var _music: Node = null
+var _music_wait := 0.0
+var _courier_tier := "gold"
+
+
+func _music_start() -> void:
+	_music = get_node_or_null("/root/MusicManager")
+	if _music == null:
+		return
+	_music.start_combat(mission_type == "courier")
+	for rig in _all_enemy_rigs():
+		rig.wrecked.connect(_sfx.bind("rig_wrecked"))
+
+
+## A few times a second: what's in the fight picks the combat layer. Rigs and
+## zombies alive set the base; an elite alive, the player's rig low on armor
+## and the last stretch of a Survive each push it up a step (tuning.gd).
+func _music_tick(delta: float) -> void:
+	if _music == null or state != State.RUNNING:
+		return
+	_music_wait -= delta
+	if _music_wait > 0.0:
+		return
+	_music_wait = T.MUSIC_CHECK_EVERY
+	_music.set_intensity(_music.intensity_for(active_rig_count(), zombies.active_count(), music_boosts()))
+	if mission_type == "courier":
+		var tier := courier_tier()
+		if tier != _courier_tier:
+			_courier_tier = tier
+			_sfx("courier_warning")   # a par tier just slipped away
+
+
+## Steps the music goes up on top of the rig/zombie count.
+func music_boosts() -> int:
+	var n := 0
+	if _elite_alive():
+		n += T.MUSIC_ELITE_BOOST
+	if vehicle != null and vehicle.armor_max > 0.0 and vehicle.armor / vehicle.armor_max <= T.MUSIC_LOW_ARMOR:
+		n += T.MUSIC_LOW_ARMOR_BOOST
+	if mission_type == "survive" and float(Missions.stat(spec, "seconds")) - elapsed <= T.MUSIC_SURVIVE_FINAL_SECONDS:
+		n += T.MUSIC_SURVIVE_FINAL_BOOST
+	return n
+
+
+func _elite_alive() -> bool:
+	if elite != null and not elite.is_wrecked:
+		return true
+	for rig in convoys:
+		if not rig.is_wrecked:
+			return true
+	return false
+
+
+func _sfx(id: String) -> void:
+	if _music != null:
+		_music.play_sfx(id)

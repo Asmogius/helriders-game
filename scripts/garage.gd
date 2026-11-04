@@ -95,6 +95,9 @@ var _crew_line: Button
 
 func _ready() -> void:
 	profile = get_node("/root/Profile")
+	var music := get_node_or_null("/root/MusicManager")
+	if music != null:
+		music.play_garage()
 	if auto_resume and profile.resume_job():
 		# Agreed with the owner: a job quit or closed mid-fight starts over.
 		get_tree().change_scene_to_file.call_deferred(MISSION_SCENE)
@@ -768,6 +771,7 @@ func _make_card(slot: Dictionary, id: String, current: String, now: Dictionary) 
 		card.rarity_color = Parts.color_of(part)
 		card.headline = _headline(part)
 		card.mod_line = mod_line(part)
+		card.mod_chips = mod_chips(part)
 	if id == current:
 		card.installed = true
 	else:
@@ -834,6 +838,19 @@ static func mod_line(part: Dictionary) -> String:
 		var at := Mods.unlock_level(str(m[0]))
 		bits.append(str(m[2]).to_upper() + ("" if level >= at else " LV%d" % at))
 	return ("MODS  " + "  /  ".join(bits)) if not bits.is_empty() else ""
+
+
+## Keyword chips for the part's mods (§14): [keyword, unlocked] for each mod
+## that carries a keyword. The card draws them in the keyword's color, dim
+## while locked.
+static func mod_chips(part: Dictionary) -> Array:
+	var out: Array = []
+	var level := int(part.get("level", 1))
+	for m: Array in Mods.reachable(str(part.get("id", "")), Parts.max_level(part)):
+		var kw := str(m[4]) if m.size() > 4 else ""
+		if T.KEYWORDS.has(kw):
+			out.append([kw, level >= Mods.unlock_level(str(m[0]))])
+	return out
 
 
 ## What an internal or utility part does, in a few words.
@@ -1130,6 +1147,7 @@ class PartCard extends Button:
 	var subtitle := ""
 	var headline := ""
 	var mod_line := ""
+	var mod_chips: Array = []   # [keyword, unlocked]
 	var deltas: Array = []          # [text, better] pairs
 	var status := ""
 	var status_color := Color.WHITE
@@ -1175,6 +1193,12 @@ class PartCard extends Button:
 			x += w + 12.0
 		if mod_line != "":
 			draw_string(font, Vector2(12, size.y - 54.0), mod_line, HORIZONTAL_ALIGNMENT_LEFT, size.x - 24.0, 12, Color(UI.TEXT_DIM, 0.8 * dim))
+		# Keyword chips: one per keyword mod, in its color, 40% while locked.
+		for k in mod_chips.size():
+			var chip: Array = mod_chips[k]
+			var col: Color = (T.KEYWORDS[str(chip[0])] as Dictionary).color
+			col.a = (1.0 if bool(chip[1]) else 0.4) * dim
+			draw_rect(Rect2(size.x - 26.0 - 18.0 * k, 8.0, 12.0, 12.0), col)
 		if warning != "":
 			draw_string(font, Vector2(12, size.y - 34.0), warning, HORIZONTAL_ALIGNMENT_LEFT, size.x - 24.0, 14, UI.BAD)
 		draw_string(font, Vector2(12, size.y - 12.0), status, HORIZONTAL_ALIGNMENT_LEFT, size.x - 24.0, 16, status_color)
