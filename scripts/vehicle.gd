@@ -1403,7 +1403,7 @@ func _lob(w: Dictionary, from: Vector2, landing: Vector2, flight: float) -> bool
 	if str(w.get("id", "")) == "sludger":
 		lobs += 1
 		if lobs % 2 == 0:
-			damage = T.SLUDGER_GOOP_DAMAGE
+			damage = T.SLUDGER_GOOP_DAMAGE * skull_damage
 			radius = T.SLUDGER_GOOP_RADIUS
 			dtype = ""
 			extra = {"buildup_kind": StatusBars.GOOP, "buildup": T.SLUDGER_GOOP_BUILDUP}
@@ -2434,6 +2434,17 @@ func is_overloaded_gun() -> bool:
 	return false
 
 
+## Every gun's damage and the ram, times `m` (the skull's enemy damage, or a
+## Hunt Elite's multiplier).
+func scale_damage(m: float) -> void:
+	bullet_damage *= m
+	for w in gun_stats:
+		w.bullet_damage = float(w.bullet_damage) * m
+		if w.has("zombie_damage"):
+			w.zombie_damage = float(w.zombie_damage) * m
+	ram_damage *= m
+
+
 ## Keyword feedback: ask for a popup of `kw` over this rig (or at `at`), at
 ## most once per T.KEYWORD_THROTTLE per keyword.
 func keyword_pop(kw: String, at := Vector2.INF) -> void:
@@ -2820,6 +2831,7 @@ func _area_hit(at: Vector2, radius: float, damage: float, dtype: String) -> int:
 # Numbers: proposal 01 §3.1 and DESIGN §14 crew perk table (approved). Numbers
 # neither gives are T.* constants in tuning.gd (agreed with the owner).
 
+var skull_damage := 1.0            # enemy rigs: T.ENEMY_DAMAGE_BY_SKULL (scale_damage)
 var grip_mult := 1.0                # an AI driver throwing the rig into a slide
 var drifting := false              # DRIFT keyword: sliding sideways at speed
 var drifts := 0                    # DRIFTs ended (tests, keyword feedback)

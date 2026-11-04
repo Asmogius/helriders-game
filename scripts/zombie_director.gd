@@ -29,6 +29,7 @@ var spawn_points: Array[Vector2] = []
 var spawn_budget := T.CLEAR_SHAMBLERS   # shamblers left to spawn this mission
 # Crowd shape; the mission sets these before the director enters the tree.
 var cap := T.ZOMBIE_CAP                  # most alive at once (can rise mid-job up to pool_size)
+var damage_mult := 1.0                   # the skull's enemy damage, given to each zombie
 var pool_size := 0                       # zombies built up front; 0 = cap
 var start_count := T.ZOMBIE_START        # alive at the start
 var ramp_seconds := T.ZOMBIE_RAMP_SECONDS  # +1 allowed alive every N seconds
@@ -220,6 +221,7 @@ func _spawn_pack(limit: int) -> void:
 			kind = "tank"
 			tanks_left -= 1
 		zombie.activate(at + Vector2(randf_range(-6.0, 6.0), randf_range(-6.0, 6.0)), kind)
+		zombie.damage_mult = damage_mult
 		_active.append(zombie)
 		spawn_budget -= 1
 
@@ -229,6 +231,7 @@ func spawn_at(at: Vector2, kind := "shambler") -> Zombie:
 	for candidate in _pool:
 		if not candidate.active:
 			candidate.activate(at, kind)
+			candidate.damage_mult = damage_mult
 			_active.append(candidate)
 			return candidate
 	return null

@@ -42,6 +42,7 @@ var charge_dir := Vector2.ZERO
 var charge_hits := 0         # tests and feedback
 
 var _stats: Dictionary = T.ZOMBIE_KINDS.shambler
+var damage_mult := 1.0     # the skull's enemy damage (the director sets it)
 var _circle: CircleShape2D
 var _shape: CollisionShape2D
 var _knock := Vector2.ZERO
@@ -214,7 +215,7 @@ func step(delta: float, desired: Vector2, target: Node2D) -> void:
 			if kind == "boomer":
 				burst = true
 				return
-			target.call("take_damage", float(_stats.dps) * delta * _taken_by(target), position - target.position)
+			target.call("take_damage", float(_stats.dps) * damage_mult * delta * _taken_by(target), position - target.position)
 			if kind == "brute" or kind == "tank":
 				var push := (target.position - position).normalized() * T.BRUTE_SHOVE * delta
 				target.set("velocity", (target.get("velocity") as Vector2) + push)

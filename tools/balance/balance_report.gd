@@ -19,7 +19,7 @@ const T := preload("res://scripts/tuning.gd")
 const TARGET := [15.0, 13.0, 11.0, 9.0, 7.5, 6.0]
 const LIMIT := 120.0   # stop a run after this many seconds alive
 
-const REPEATS := 3     # runs per cell (different seeds); the report shows the mean
+const REPEATS := 5     # runs per cell (different seeds); the report shows the mean
 # Builds that fit their power and weight budgets at their Research level.
 const BUILDS := {
 	"starter": {},
@@ -147,7 +147,7 @@ func _spawn_roster(skulls: int) -> void:
 				"scrappers":
 					main.spawn_scrapper(p)
 			n += 1
-	var cap := int(Missions.stat(spec, "cap"))
+	var cap := main.zombies.cap   # the job's horde, smaller at 1-2 skulls
 	for i in cap:
 		var kind := "shambler"
 		var roll := randf()
