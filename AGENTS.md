@@ -70,6 +70,7 @@ godot --headless --fixed-fps 60 --path . -s res://tests/crew_test.gd     # must 
 godot --headless --fixed-fps 60 --path . -s res://tests/research_test.gd # must end "RESEARCH TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/expedition_test.gd # must end "EXPEDITION TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/zombie_test.gd     # must end "ZOMBIE TEST PASSED"
+godot --headless --fixed-fps 60 --path . -s res://tests/zombie_sample_test.gd # must end "ZOMBIE SAMPLE TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/gunner_test.gd     # must end "GUNNER TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/scrapper_test.gd   # must end "SCRAPPER TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/convoy_test.gd     # must end "CONVOY TEST PASSED"
