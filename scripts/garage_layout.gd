@@ -254,4 +254,4 @@ static func _draw_shadow(sh: Node2D, rig: Node2D, scale: float) -> void:
 		for i in 32:
 			var a := TAU * i / 32.0
 			pts.append(Vector2(cos(a) * l * f, sin(a) * w * f + w * 0.12))
-		sh.draw_colored_polygon(pts, Color(0, 0, 0, 0.2))
+		sh.draw_colored_polygon(pts, T.COL_GARAGE_CONTACT_SHADOW)
