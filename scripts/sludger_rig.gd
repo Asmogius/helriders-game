@@ -66,6 +66,9 @@ func _lob(w: Dictionary, from: Vector2, landing: Vector2, flight: float) -> bool
 	var ok := super(w, from, landing, flight)
 	if ok:
 		shells_thrown += 1
+		var music := get_node_or_null("/root/MusicManager")
+		if music != null:
+			music.play_sfx("acid_fire")
 	return ok
 
 

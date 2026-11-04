@@ -984,3 +984,25 @@ const PUSH_NO_TYPES := ["courier"]   # never offered on these
 # once every non-deep cache is taken; Escort offers it only if the optional
 # site was skipped. Flip to false to keep Push off both job types.
 const PUSH_RETRIEVE_ESCORT := true   # agreed: Retrieve after the non-deep caches, Escort only if the optional site was skipped
+# --- Audio (DESIGN "Audio / Soundtrack"; agreed with the owner 2026-11-04) ----------------
+const MUSIC_FADE := 1.5             # seconds for a scene change (garage <-> fight)
+const MUSIC_LAYER_FADE := 2.0       # seconds for a combat layer to cross in or out
+const MUSIC_SILENT_DB := -60.0      # a layer that is "off" (kept playing so it stays in sync)
+const MUSIC_INTENSITY_HOLD := 4.0   # seconds before intensity may drop again
+const MUSIC_CHECK_EVERY := 0.5      # seconds between intensity checks in the fight
+# Intensity 1 (Contact) / 2 (Crossfire): enemy rigs alive OR zombies alive at or above.
+const MUSIC_MID_RIGS := 1
+const MUSIC_MID_ZOMBIES := 10
+const MUSIC_HIGH_RIGS := 2
+const MUSIC_HIGH_ZOMBIES := 22
+# Boosts: each adds steps on top of the count (result capped at 2, Crossfire).
+const MUSIC_ELITE_BOOST := 1           # Hunt's Elite or a Convoy Lead alive
+const MUSIC_LOW_ARMOR := 0.3           # player's rig at or under this share of armor
+const MUSIC_LOW_ARMOR_BOOST := 1
+const MUSIC_SURVIVE_FINAL_SECONDS := 30.0   # Survive's last stretch (the final wave)
+const MUSIC_SURVIVE_FINAL_BOOST := 2
+const MUSIC_PAUSE_DUCK_DB := -12.0     # music under the pause menu / radio call
+const MUSIC_DUCK_FADE := 0.3
+
+# --- Combat SFX (agreed with the owner 2026-11-04) -----------------------------------------------------
+const SFX_WINDUP_PITCH := [0.9, 1.25]   # Bulwark roar pitch at wind-up start / end

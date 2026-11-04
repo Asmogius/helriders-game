@@ -13,6 +13,7 @@ extends "res://scripts/enemy_rig.gd"
 ## cuts it short). The Convoy Lead extends this script and inherits it all.
 signal windup_started
 signal windup_ended
+signal rammed_player   # it hit you and backs off (ram impact sound)
 
 const BACKOFF_STEER := 0.5   # radians off straight back while reversing
 
@@ -107,6 +108,8 @@ func _physics_process(delta: float) -> void:
 	super(delta)
 	if was_winding and not is_winding_up():
 		windup_ended.emit()
+		if _music() != null:
+			_music().stop_windup(self)
 	if is_wrecked or player == null or mode == Mode.UNSTICK:
 		return
 	# Rammed the player this tick: back off, then come again.
@@ -116,6 +119,9 @@ func _physics_process(delta: float) -> void:
 			_mode_time = T.BULWARK_BACKOFF
 			_side = 1.0 if randf() < 0.5 else -1.0
 			backoffs += 1
+			rammed_player.emit()
+			if _music() != null:
+				_music().play_sfx("ram_impact")
 			break
 
 
@@ -147,6 +153,8 @@ func _think(delta: float) -> void:
 				_mode_time = T.BULWARK_WINDUP
 				windups += 1
 				windup_started.emit()
+				if _music() != null:
+					_music().start_windup(self)   # engine roar, pitch follows windup_progress()
 				queue_redraw()
 		Mode.WINDUP:
 			# Engine roar and headlight flare: it holds and keeps its nose on you.
@@ -271,3 +279,7 @@ func _draw() -> void:
 			draw_circle(Vector2(half_l + 6.0, sy * (half_w - 8.0)), 9.0, flare)
 		draw_colored_polygon(PackedVector2Array([Vector2(half_l + 6.0, -half_w), Vector2(half_l + 120.0, -half_w - 30.0),
 			Vector2(half_l + 120.0, half_w + 30.0), Vector2(half_l + 6.0, half_w)]), Color(1.0, 0.95, 0.75, 0.18))
+
+
+func _music() -> Node:
+	return get_node_or_null("/root/MusicManager")

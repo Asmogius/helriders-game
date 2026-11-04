@@ -421,6 +421,9 @@ func _process(delta: float) -> void:
 
 
 func show_result(title: String, subtitle: String, button_text: String, accent: Color) -> void:
+	var music := get_node_or_null("/root/MusicManager")
+	if music != null:
+		music.play_sfx("results")
 	hide_controls()
 	_title.text = title
 	_title.add_theme_color_override("font_color", accent)

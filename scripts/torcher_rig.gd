@@ -87,6 +87,9 @@ func rupture() -> void:
 		return
 	ruptured = true
 	var at := global_position
+	var music := get_node_or_null("/root/MusicManager")
+	if music != null:
+		music.play_sfx("torcher_rupture")
 	if fx != null:
 		fx.call("blast", at, T.BARREL_RADIUS * 0.7)
 	if hazards != null:
