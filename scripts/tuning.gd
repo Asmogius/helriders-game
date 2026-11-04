@@ -506,6 +506,18 @@ const SALOON_OFFERS := 3               # paid hires on offer each day
 const SALOON_ODDS := {"Uncommon": 60.0, "Rare": 28.0, "Epic": 9.0, "Legendary": 2.5, "Mythic": 0.5}
 const CREW_WHEEL_SLOWMO := 0.25       # game speed while the crew wheel is open
 const CREW_WHEEL_COOLDOWN := 3.0       # seconds after it closes before it opens again
+# --- Settings (pause menu; agreed with the owner) ------------------------------
+# Quality presets: frame cap (0 = no cap), share of particles and blood
+# splats drawn, and screen shake. The game picks one for the phone at first
+# launch; the player can change it.
+const QUALITY := {
+	"Low": {"fps": 30, "fx": 0.4, "splats": 0.4, "shake": 0.6},
+	"Medium": {"fps": 30, "fx": 0.7, "splats": 0.7, "shake": 1.0},
+	"High": {"fps": 60, "fx": 0.85, "splats": 1.0, "shake": 1.0},
+	"Ultra": {"fps": 0, "fx": 1.0, "splats": 1.0, "shake": 1.0},
+}
+const QUALITY_ORDER := ["Low", "Medium", "High", "Ultra"]
+
 const CREW_PRICES := {"Common": 0, "Uncommon": 80, "Rare": 200, "Epic": 450, "Legendary": 900, "Mythic": 1600}
 # Lost crew (§14; agreed with the owner): a crew member lost in a wreck turns
 # up again after 3 days (Uncommon), a day more per rarity step, and joins the

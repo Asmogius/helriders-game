@@ -90,6 +90,9 @@ var exp_board_day := 0
 var expeditions: Array = []         # trips under way: offer + "team" ids + "days_left" + "odds"
 var expedition_reports: Array = []  # lines about the trips that came back last
 var last_wreck_survivors: Array[String] = []  # names Last Rites saved on the last wreck
+var discovered := {}                # Database: category -> ids the player has met
+var settings := {}                  # quality, shake, music, effects (own file; survives new games)
+var settings_path := "user://helriders_settings.cfg"
 var lost: Array = []                # crew lost in wrecks, on their way back: member + "back_in" days
 var rehire_pool: Array = []         # lost crew who turned up again (level 1, perks reset)
 var rehire_day := 0                 # the day today's rehire card was drawn
@@ -104,11 +107,9 @@ func _ready() -> void:
 	# Tests may have started a game before the autoload is ready; keep it.
 	if not _ready_state and not load_game():
 		new_game()
-	# The app was closed during a mission: the crew pulled out. No loot, no
-	# penalty, rig intact, but the day is gone.
-	if run_active:
-		notice = "You pulled out of yesterday's job. No loot, no penalty, and the day passed."
-		finish_day()
+	load_settings()
+	# The app was closed during a mission: the garage sends you straight back
+	# into the same job, the fight reset (resume_job()). Nothing is lost.
 
 
 func new_game() -> void:
@@ -139,6 +140,7 @@ func new_game() -> void:
 	expeditions = []
 	expedition_reports = []
 	last_wreck_survivors = []
+	discovered = {}
 	lost = []
 	rehire_pool = []
 	rehire_day = 0
@@ -338,9 +340,18 @@ func apply_loadout(target: Dictionary) -> bool:
 # --- Runs ---------------------------------------------------------------------------
 
 func start_run() -> void:
-	record.runs = int(record.runs) + 1
+	if not run_active:   # a restart or a relaunch mid-job is the same run
+		record.runs = int(record.runs) + 1
 	run_active = true
+	if not active_mission.is_empty():
+		discover("jobs", str(active_mission.get("type", "")))
 	save_game()
+
+
+## Closed or quit mid-job: on the next launch the garage drops you back into
+## it, the fight reset.
+func resume_job() -> bool:
+	return run_active and has_mission()
 
 
 # --- Days, the board, districts --------------------------------------------------
@@ -509,6 +520,7 @@ func record_wreck() -> int:
 # --- Crew ---------------------------------------------------------------------------
 
 func _add_crew(member: Dictionary) -> Dictionary:
+	discover("crew", Crew.specialty(member))
 	var m := member.duplicate(true)
 	m.erase("price")
 	m.erase("hired")
@@ -1233,6 +1245,7 @@ func save_game() -> void:
 		"exp_board_day": exp_board_day,
 		"expeditions": expeditions,
 		"expedition_reports": expedition_reports,
+		"discovered": discovered,
 		"lost": lost,
 		"rehire_pool": rehire_pool,
 		"rehire_day": rehire_day,
@@ -1298,6 +1311,14 @@ func load_game() -> bool:
 			board.append(clean)
 	active_mission = _clean_mission(data.get("active_mission", {}))
 	run_active = bool(data.get("run_active", false))
+	discovered = {}
+	var saved_found: Dictionary = data.get("discovered", {})
+	for cat: String in saved_found:
+		if saved_found[cat] is Array:
+			var ids: Array = []
+			for id: Variant in saved_found[cat]:
+				ids.append(str(id))
+			discovered[cat] = ids
 	ensure_board()
 	if data.has("crew"):
 		crew = []
@@ -1467,3 +1488,105 @@ static func _clean_loadout(raw: Variant) -> Dictionary:
 				list.append(str(id))
 		out[key] = list
 	return out
+
+
+# --- Database (what the player has met) -------------------------------------------
+
+## Mark `id` in `category` as met. Saves only when it's new.
+func discover(category: String, id: String) -> bool:
+	if id == "":
+		return false
+	var list: Array = discovered.get(category, [])
+	if list.has(id):
+		return false
+	list.append(id)
+	discovered[category] = list
+	save_game()
+	return true
+
+
+## Has the player met it? Owned schematics, crew on the roster and open
+## districts always count.
+func is_discovered(category: String, id: String) -> bool:
+	match category:
+		"parts":
+			if schematics.has(id):
+				return true
+		"crew":
+			for m: Dictionary in crew:
+				if Crew.specialty(m) == id:
+					return true
+		"places":
+			for i in T.DISTRICTS.size():
+				if str(T.DISTRICTS[i].id) == id and is_district_open(i):
+					return true
+	return (discovered.get(category, []) as Array).has(id)
+
+
+# --- Settings (own file, kept across new games) ------------------------------------
+
+func load_settings() -> void:
+	settings = {"quality": auto_quality(), "shake": true, "music": 0.8, "effects": 0.8}
+	if persist:
+		var cfg := ConfigFile.new()
+		if cfg.load(settings_path) == OK:
+			var q := str(cfg.get_value("video", "quality", settings.quality))
+			if T.QUALITY.has(q):
+				settings.quality = q
+			settings.shake = bool(cfg.get_value("video", "shake", true))
+			settings.music = clampf(float(cfg.get_value("audio", "music", 0.8)), 0.0, 1.0)
+			settings.effects = clampf(float(cfg.get_value("audio", "effects", 0.8)), 0.0, 1.0)
+	apply_settings()
+
+
+func save_settings() -> void:
+	apply_settings()
+	if not persist:
+		return
+	var cfg := ConfigFile.new()
+	cfg.set_value("video", "quality", settings.quality)
+	cfg.set_value("video", "shake", settings.shake)
+	cfg.set_value("audio", "music", settings.music)
+	cfg.set_value("audio", "effects", settings.effects)
+	cfg.save(settings_path)
+
+
+func set_setting(key: String, value: Variant) -> void:
+	if settings.is_empty():
+		load_settings()
+	settings[key] = value
+	save_settings()
+	changed.emit()
+
+
+## A first guess for this phone: fewer cores, lower preset. Headless runs
+## (tests, CI) always get Ultra, which draws everything.
+static func auto_quality() -> String:
+	if DisplayServer.get_name() == "headless":
+		return "Ultra"
+	var cores := OS.get_processor_count()
+	if cores <= 4:
+		return "Low"
+	if cores <= 6:
+		return "Medium"
+	return "High"
+
+
+func quality() -> Dictionary:
+	return T.QUALITY[str(settings.get("quality", "Ultra"))]
+
+
+## Frame cap now; the mission reads effects, splats and shake when it starts.
+## Volumes go to the Music and Effects buses (made here if missing).
+func apply_settings() -> void:
+	Engine.max_fps = int(quality().fps)
+	for bus: String in ["Music", "Effects"]:
+		var i := AudioServer.get_bus_index(bus)
+		if i < 0:
+			AudioServer.add_bus()
+			i = AudioServer.bus_count - 1
+			AudioServer.set_bus_name(i, bus)
+			AudioServer.set_bus_send(i, "Master")
+		var v := float(settings.get(bus.to_lower(), 0.8))
+		AudioServer.set_bus_volume_db(i, linear_to_db(maxf(v, 0.0001)))
+		AudioServer.set_bus_mute(i, v <= 0.0)

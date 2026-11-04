@@ -4,6 +4,9 @@ extends Node2D
 const T := preload("res://scripts/tuning.gd")
 const MAX_SPLATS := 120
 
+var density := 1.0      # share of splats drawn (quality preset)
+var _skip := 0.0
+
 var _pos := PackedVector2Array()
 var _rot := PackedFloat32Array()
 var _seed := PackedInt32Array()
@@ -18,6 +21,11 @@ func _ready() -> void:
 
 
 func add(at: Vector2) -> void:
+	if density < 1.0:
+		_skip += density
+		if _skip < 1.0:
+			return
+		_skip -= 1.0
 	_pos[_next] = at
 	_rot[_next] = randf() * TAU
 	_seed[_next] = randi()
