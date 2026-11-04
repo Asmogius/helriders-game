@@ -58,7 +58,7 @@ const TAG_COMPACT_H := 56.0        # five tags on one side: shorter, so the shee
 const TAG_COMPACT_TOP := 100.0
 const TAG_COMPACT_GAP := 5.0
 const RIG_SCALE := 3.4
-const FOOTER_H := 72.0
+const FOOTER_H := UI.BAR_H  # shared grid (ui_theme.gd)
 const SHEET_H := 236.0
 
 var selected := -1                 # index into SLOTS of the open sheet, -1 = closed
@@ -66,6 +66,10 @@ var profile: ProfileScript         # the /root/Profile autoload
 var preview: Vehicle
 
 var _rig_holder: Node2D
+const WorkshopRoom := preload("res://scripts/workshop_room.gd")   # V2 sample (P6)
+const GarageLayout := preload("res://scripts/garage_layout.gd")   # V2.3 sample: reading order
+const GarageFocus := preload("res://scripts/garage_focus.gd")     # V2.3 sample: open slot lights its part
+var _workshop: Control
 var _rig_touch: Control
 var _stat_sheet: StatSheet
 var _preview := ""                 # part id previewed in the open sheet ("" = empty slot)
@@ -119,6 +123,13 @@ func _ready() -> void:
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg)
 	add_child(FloorGrid.new())
+	# --- V2 style sample (P6): the Workshop bay room behind the GARAGE tab. ---
+	_workshop = WorkshopRoom.new()
+	add_child(_workshop)
+	_workshop.set_open(true, true)
+	var focus := GarageFocus.new()
+	focus.garage = self
+	add_child(focus)
 
 	_build_rig_area()
 	_build_top_bar()
@@ -205,6 +216,7 @@ func _show_stat_sheet(on: bool) -> void:
 	_callouts.visible = not on
 	_rings.visible = not on
 	_rig_touch.mouse_filter = Control.MOUSE_FILTER_IGNORE if on else Control.MOUSE_FILTER_STOP
+	GarageLayout.apply(self)   # V2.3 sample
 
 
 ## First tap on a card previews it; a second tap on the same card fits it.
@@ -457,9 +469,7 @@ func _build_top_bar() -> void:
 	var presets := _button("PRESETS", 150)
 	presets.pressed.connect(_open_presets)
 	bar.add_child(presets)
-	var upgrades := _button("UPGRADES", 170)
-	upgrades.pressed.connect(_open_upgrades)
-	bar.add_child(upgrades)
+	# Rig upgrades (fabrication / loot / salvage) moved to RESEARCH (Cameron); UI hosts them there.
 	_rebuild = _button("REBUILD", 200)
 	_rebuild.pressed.connect(rebuild)
 	UI.accent(_rebuild, T.COL_CYAN)
@@ -520,6 +530,7 @@ func _layout_tags() -> void:
 			tag.offset_top = y
 			tag.offset_bottom = y + h
 			y += h + gap
+	GarageLayout.apply(self)   # V2.3 sample: the slot grid
 
 
 func _build_sheet() -> void:
@@ -591,6 +602,7 @@ func _button(text: String, min_width: float) -> Button:
 func _layout() -> void:
 	# The rig sits in the middle, nudged up so the sheet doesn't cover it.
 	_rig_holder.position = Vector2(size.x * 0.5, 290.0)
+	GarageLayout.apply(self)   # V2.3 sample
 
 
 # --- Refresh ---------------------------------------------------------------------
@@ -1141,11 +1153,14 @@ func _upgrade_effect(key: String) -> String:
 
 func _on_tab(tab_name: String) -> void:
 	tab = tab_name
+	if _workshop != null:
+		_workshop.set_open(tab_name == "GARAGE")   # V2 sample: rooms fade (P6)
 	_comms.visible = tab_name == "COMMS"
 	_inn.visible = tab_name == "INN"
 	_saloon.visible = tab_name == "SALOON"
 	_research.visible = tab_name == "RESEARCH"
 	_rig_holder.visible = tab_name == "GARAGE" and not _stat_sheet.visible   # V0.1
+	GarageLayout.apply(self)   # V2.3 sample
 	if tab_name == "GARAGE":
 		_close_overlay()
 		return
@@ -1281,7 +1296,7 @@ class PartCard extends Button:
 		var dim := 0.45 if disabled else 1.0
 		UI.draw_fit(self, font, Vector2(12, 30), title, HORIZONTAL_ALIGNMENT_LEFT, size.x - 24.0, 19, Color(UI.TEXT, dim))
 		draw_string(font, Vector2(12, 50), subtitle, HORIZONTAL_ALIGNMENT_LEFT, size.x - 24.0, 14, Color(rarity_color, 0.9 * dim))
-		draw_string(font, Vector2(12, 72), headline, HORIZONTAL_ALIGNMENT_LEFT, size.x - 24.0, 14, Color(UI.TEXT_DIM, dim))
+		UI.draw_fit(self, font, Vector2(12, 72), headline, HORIZONTAL_ALIGNMENT_LEFT, size.x - 24.0, 14, Color(UI.TEXT_DIM, dim))   # long Drive lines shrink, never clip
 		var y := 94.0
 		var x := 12.0
 		for d: Array in deltas:
@@ -1344,6 +1359,10 @@ class StatSheet extends Control:
 	const Loadout := preload("res://scripts/loadout.gd")
 	const BulletPool := preload("res://scripts/bullet_pool.gd")
 	const ROW_H := 26.0
+	var single_column := false   # V2.3 sample: one tall column (garage_layout.gd)
+	var _row_h := ROW_H
+	var headline := false        # V2.3 sample: only the HEADLINE rows (garage_layout.gd)
+	const HEADLINE := ["speed", "accel", "hp", "front", "dps"]
 	# [label, key, higher is better, decimals, suffix]
 	const LEFT := [
 		["TOP SPEED", "speed", true, 0, ""],
@@ -1437,10 +1456,25 @@ class StatSheet extends Control:
 		draw_rect(Rect2(Vector2.ZERO, size), UI.PANEL_EDGE, false, 2.0)
 		draw_string(font, Vector2(16, 28), title, HORIZONTAL_ALIGNMENT_LEFT, size.x - 32.0, 17, T.COL_ORANGE)
 		var col_w := (size.x - 56.0) / 2.0
-		_column(font, LEFT, Vector2(16, 42), col_w)
-		_column(font, RIGHT, Vector2(40 + col_w, 42), col_w)
+		if single_column and headline:   # V2.3 sample: one small box, 5 headline stats
+			col_w = size.x - 32.0
+			var rows: Array = (LEFT + RIGHT).filter(func(r: Array) -> bool: return HEADLINE.has(r[1]))
+			_column(font, rows, Vector2(16, 30), col_w)
+			var more: Array = (LEFT + RIGHT).filter(func(r: Array) -> bool: return not HEADLINE.has(r[1]) and _changed(r))
+			if not more.is_empty():
+				var names: Array = more.map(func(r: Array) -> String: return str(r[0]))
+				draw_string(font, Vector2(16, 30 + (rows.size() + 1) * ROW_H - 4.0), "ALSO: " + ", ".join(names), HORIZONTAL_ALIGNMENT_LEFT, col_w, 12, UI.TEXT_DIM)
+		elif single_column:   # V2.3 sample: the stats panel on the right
+			col_w = size.x - 32.0
+			_row_h = minf(ROW_H, (size.y - 64.0) / float(LEFT.size() + RIGHT.size()))
+			_column(font, LEFT, Vector2(16, 34), col_w)
+			_column(font, RIGHT, Vector2(16, 34 + LEFT.size() * _row_h + 4.0), col_w)
+			_row_h = ROW_H
+		else:
+			_column(font, LEFT, Vector2(16, 42), col_w)
+			_column(font, RIGHT, Vector2(40 + col_w, 42), col_w)
 		var count := maxi(int(now.weapon_count), int(after.weapon_count))
-		if count > 1:
+		if count > 1 and not single_column:
 			draw_string(font, Vector2(40 + col_w, 47), "gun rows show WEAPON %d" % (int(now.weapon) + 1), HORIZONTAL_ALIGNMENT_RIGHT, col_w, 12, UI.TEXT_DIM)
 		var m_now: float = now.mobility
 		var m_after: float = after.mobility
@@ -1451,14 +1485,23 @@ class StatSheet extends Control:
 				why.append("power")
 			if float(after.capacity) > 0.0 and float(after.weight) > float(after.capacity):
 				why.append("weight")
-			draw_string(font, foot, "OVERLOAD (%s): speed and acceleration -%d%%" % [" + ".join(why), roundi((1.0 - m_after) * 100.0)], HORIZONTAL_ALIGNMENT_LEFT, size.x - 32.0, 15, UI.BAD)
+			var msg := "OVERLOAD (%s): speed and acceleration -%d%%" % [" + ".join(why), roundi((1.0 - m_after) * 100.0)]
+			if single_column:   # V2.3 sample: narrow panel
+				msg = "OVERLOAD: speed, accel -%d%%" % roundi((1.0 - m_after) * 100.0)
+			draw_string(font, foot, msg, HORIZONTAL_ALIGNMENT_LEFT, size.x - 32.0, 15, UI.BAD)
 		elif m_now < 1.0:
 			draw_string(font, foot, "Overload cleared", HORIZONTAL_ALIGNMENT_LEFT, size.x - 32.0, 15, UI.GOOD)
+
+	func _changed(r: Array) -> bool:
+		var key: String = r[1]
+		if absf(float(now[key]) - float(after[key])) >= 0.05:
+			return true
+		return LIMITS.has(key) and absf(float(now[LIMITS[key]]) - float(after[LIMITS[key]])) >= 0.05
 
 	func _column(font: Font, rows: Array, origin: Vector2, width: float) -> void:
 		var y := origin.y
 		for r: Array in rows:
-			y += ROW_H
+			y += _row_h
 			var key: String = r[1]
 			var a: float = now[key]
 			var b: float = after[key]
