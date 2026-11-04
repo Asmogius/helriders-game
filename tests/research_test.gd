@@ -47,7 +47,8 @@ func _process(_delta: float) -> bool:
 		mission.auto_spawn_specials = false
 		root.add_child(mission)
 	if frame == 6:
-		var expected := float(profile.build_stats(profile.rig).armor)
+		var built := profile.build_stats(profile.rig)
+		var expected := float(built.armor) + float(built.shield)   # every layer, shield included
 		_check(is_equal_approx(mission.vehicle.armor_max, expected) and expected > float(Loadout.build(profile.rig).armor),
 			"the mission rig rolls out with levelled armor (%d)" % int(mission.vehicle.armor_max))
 		_finish()
@@ -68,8 +69,8 @@ func _check_math() -> void:
 	_check(is_equal_approx(float(wheels.turn_mult), 1.16) and is_equal_approx(float(wheels.grip), 5.5 * 1.16) and float(wheels.brake) == 1500.0,
 		"Drive: turn and grip grow, braking doesn't")
 	var frame_part := Parts.at_level(Parts.get_part("scrap_frame"), 2)
-	_check(is_equal_approx(float(frame_part.armor), 60.0 * 1.04) and is_equal_approx(float(frame_part.weight_capacity), 104.0)
-		and float(frame_part.max_speed) == 560.0, "Chassis: armor and weight capacity grow")
+	_check(is_equal_approx(float(frame_part.hp), 150.0 * 1.04) and is_equal_approx(float(frame_part.weight_capacity), 104.0)
+		and float(frame_part.max_speed) == 560.0, "Chassis: HP and weight capacity grow")
 	var coolant := Parts.at_level(Parts.get_part("coolant_loop"), 8)
 	_check(is_equal_approx(float(coolant.fire_rate_mult), 1.0 + 0.15 * 1.28), "Internal: the modifier grows (Coolant +15% -> +19%)")
 	var cage := Parts.at_level(Parts.get_part("roll_cage"), 8)
@@ -87,7 +88,8 @@ func _check_math() -> void:
 	var plain := Loadout.build(Parts.STARTER_LOADOUT)
 	var lv := {"scrap_frame": 5, "scrap_plating": 5, "pintle_turret": 3}
 	var levelled := Loadout.build(Parts.STARTER_LOADOUT, lv)
-	_check(is_equal_approx(float(levelled.armor), (60.0 + 90.0) * 1.16), "the build adds up levelled chassis and plating armor")
+	_check(is_equal_approx(float(levelled.hp), 150.0 * 1.16) and is_equal_approx(float(levelled.front), 80.0 * 1.16) and is_equal_approx(float(levelled.side), 80.0 * 1.16),
+		"the build uses the levelled frame HP and plating on every facing")
 	_check(is_equal_approx(float(levelled.bullet_damage), 9.0 * 1.08), "the build's weapon uses its level")
 	_check(float(levelled.power_draw) == float(plain.power_draw) and float(levelled.weight) == float(plain.weight),
 		"levels don't touch the power or weight budget")

@@ -16,10 +16,10 @@ const T := preload("res://scripts/tuning.gd")
 
 const CHASSIS := 0      # indexes into Garage.SLOTS
 const DRIVE := 2
-const ARMOR := 3
-const WEAPON_2 := 5
-const INTERNAL_1 := 6
-const UTILITY_2 := 9
+const ARMOR := 3        # ARMOR FRONT (then SIDES 4, REAR 5)
+const WEAPON_2 := 7
+const INTERNAL_1 := 8
+const UTILITY_2 := 11
 
 var profile: ProfileScript
 var garage: Garage
@@ -63,10 +63,10 @@ func _process(_delta: float) -> bool:
 func _run_checks() -> void:
 	# --- New game ----------------------------------------------------------------
 	_check(profile.has_rig() and profile.scrap == 60, "new game: starter rig and 60 scrap")
-	_check(profile.schematics.size() == 6, "new game: the six starter schematics")
+	_check(profile.schematics.size() == 7, "new game: the seven starter schematics")
 	_check(not garage._deploy.disabled, "DEPLOY is available with a complete rig")
 	var visible_tags := garage._tags.filter(func(t: Control) -> bool: return t.visible).size()
-	_check(visible_tags == 8, "Scrap Frame shows 8 slots (4 core, 1 weapon, 2 internal, 1 utility)")
+	_check(visible_tags == 10, "Scrap Frame shows 10 slots (3 core, 3 armor, 1 weapon, 2 internal, 1 utility)")
 	var seated := profile.seated_crew()
 	_check(seated.size() == 2 and seated[0].role == "driver" and seated[1].role == "gunner" and seated[0].rarity == "Common", "new game: a free Common Driver and Gunner, seated")
 	_check(garage._crew_line.visible and garage._crew_line.text.contains("DRIVER") and garage._crew_line.text.contains(str(seated[1].name)), "the crew line under the rig names the seats")
@@ -74,7 +74,8 @@ func _run_checks() -> void:
 	var with_crew := garage._built(profile.rig)
 	_check(float(with_crew.turn_rate) > float(Loadout.build(profile.rig).turn_rate), "the stat sheet includes the Driver's turn bonus")
 
-	# The starter has no targeting computer; fit the free one for the power checks.
+	# The starter has no targeting computer; fit the free one in place of its
+	# Junk Emitter (same power) for the power checks.
 	garage.open_slot(INTERNAL_1)
 	_check(garage.choose("targeting_computer") and profile.scrap == 60, "the Targeting Computer is a free Common schematic")
 	garage.close_sheet()
@@ -130,13 +131,15 @@ func _run_checks() -> void:
 	garage.open_slot(ARMOR)
 	garage.preview_part("riot_plating")
 	print("  Riot Plating weight %d / %d, mobility %.2f" % [int(sheet.after.weight), int(sheet.after.capacity), float(sheet.after.mobility)])
-	_check(int(sheet.now.weight) == 80 and int(sheet.after.weight) == 100, "stat sheet shows weight load (Riot Plating: 80 > 100 of 100 without the computer)")
+	_check(int(sheet.now.weight) == 90 and int(sheet.after.weight) == 96, "stat sheet shows weight load (Riot Plating on the front: 90 > 96 of 100)")
 	garage.close_sheet()
-	var heavy := profile.with_part(Parts.STARTER_LOADOUT, "armor", 0, "riot_plating")
+	var heavy := Parts.STARTER_LOADOUT.duplicate(true)
+	for slot: String in ["armor_front", "armor_sides", "armor_rear"]:
+		heavy = profile.with_part(heavy, slot, 0, "riot_plating")
 	heavy.internal = ["targeting_computer"]
 	var heavy_stats := Loadout.build(heavy)
-	_check(int(heavy_stats.weight) == 105 and Loadout.mobility(heavy_stats) < 1.0, "Riot Plating on the starter is 105 / 100 weight: overloaded")
-	_check(garage.StatSheet.overload_cause(heavy_stats).contains("WT 105/100"), "the overload names weight as the cause")
+	_check(int(heavy_stats.weight) == 119 and Loadout.mobility(heavy_stats) < 1.0, "Riot Plating all round on the starter is 119 / 100 weight: overloaded")
+	_check(garage.StatSheet.overload_cause(heavy_stats).contains("WT 119/100"), "the overload names weight as the cause")
 	garage.open_slot(CHASSIS)
 	_check(garage.choose("bulwark_frame") and profile.rig.chassis == "bulwark_frame", "Bulwark Frame fitted")
 	garage.close_sheet()

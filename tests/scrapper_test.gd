@@ -142,7 +142,7 @@ func _check_tables() -> void:
 		"Oil Slick: Uncommon, 90 scrap, 10 power, 10 weight, every 14 s")
 	_check(float(part.oil_radius) * 2.0 == 140.0 and float(part.oil_time) == 12.0, "Oil Slick: 140 wide for 12 s")
 	var dps := float(T.SCRAPPER.fire_rate) * float(T.SCRAPPER.bullet_damage)
-	_check(is_equal_approx(dps, 10.0) and float(T.SCRAPPER.armor) == 200.0 and float(T.SCRAPPER.max_speed) == 580.0, "Scrapper: 200 armor, speed 580, ~10 damage/s")
+	_check(is_equal_approx(dps, 10.0) and float(T.SCRAPPER.hp) == 90.0 and float(T.SCRAPPER.max_speed) == 580.0, "Scrapper: HP 90 (§14 layers), speed 580, ~10 damage/s")
 	_check(not Missions.threats_text(Missions.make("clear", 1, 7)).contains("Scrapper"), "Clear 1 skull: no Scrapper")
 	_check(Missions.threats_text(Missions.make("clear", 2, 7)).contains("1 Scrapper"), "Clear 2 skulls: the first enemy rig is a Scrapper")
 	_check(Missions.threats_text(Missions.make("courier", 2, 7)).contains("1 Scrapper"), "Courier 2 skulls: a Scrapper on the route")

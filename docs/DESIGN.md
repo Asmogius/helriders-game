@@ -298,6 +298,8 @@ Spiked Ram Plate is renamed Zed Sled (code rename pending). Unlock levels: Minor
 
 Replaces the single armor pool (§4 Armor Sections, §8 Bulwark front rule).
 
+**Built (2026-11-04).** Agreed gap-fillers: the starter carries Scrap Plating on all three slots and the Junk Emitter (100/100 power, 95/100 weight); old saves copy their one plate to all three slots (a front-only ram plate to the front only). Structural Bracing gives +25 max HP (and keeps +15 ram). Cowcatcher Ram: front only, 124 armor, front-slot weight 22. Convoy Lead cab: HP 200, front 250, sides 70, rear 60, shield 30 from 4 skulls; trailer: HP 120, front 50, sides 65, rear 50 (350 in total, not the 300 it had). The salvage truck: HP 120, 70 on every facing. Enemy shields recharge like the Junk Emitter (3 s delay, ~5 s refill). Not yet built: the other shield generators (Capacitor Bank, Flux Coil, Reflex Emitter), which arrive with their drop sources.
+
 - Three layers for player and enemy rigs: shield (recharges) -> armor (directional, never regenerates) -> HP (structure; zero = wreck).
 - HP comes from the chassis, plus some parts that raise max HP (e.g., Structural Bracing).
 - Three armor slots: Front, Sides (one part covers both flanks), Rear. Any armor part fits any slot except front-only ram plates (Zed Sled). All count against weight.

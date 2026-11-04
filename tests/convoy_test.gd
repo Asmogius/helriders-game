@@ -86,9 +86,9 @@ func _process(_delta: float) -> bool:
 			if frame == 24:
 				_check(not c.trailer.blocked, "from behind, the trailer turret has a clear shot")
 				# The ram takes half.
-				var a := c.armor
+				var hp := c.hp
 				c.take_hit(40.0, Vector2.LEFT * 10.0)   # travelling left: hit from in front
-				_check(is_equal_approx(a - c.armor, 20.0), "the ram on the nose takes half damage")
+				_check(c.last_facing == c.FRONT and c.facing_max[0] == 250.0 and c.hp == hp, "the plow is a very heavy front plate (250); a nose hit never reaches HP")
 				_next()
 		2:  # Shoot the trailer off
 			if frame == 1:
@@ -151,13 +151,13 @@ func _convoy_seed(type: String, skulls: int) -> int:
 
 func _check_tables() -> void:
 	var cow := Parts.get_part("cowcatcher_ram")
-	_check(cow.rarity == "Rare" and float(cow.armor) == 140.0 and float(cow.ram_damage) == 170.0 and float(cow.weight) == 65.0 and float(cow.power) == 0.0 and int(cow.cost) == 180,
-		"Cowcatcher Ram: Rare, armor 140, ram 170, weight 65, 180 scrap")
+	_check(cow.rarity == "Rare" and float(cow.armor) == 124.0 and float(cow.ram_damage) == 170.0 and float(cow.weight) == 22.0 and bool(cow.front_only) and int(cow.cost) == 180,
+		"Cowcatcher Ram: Rare, front only, 124 armor, ram 170, weight 22, 180 scrap")
 	var hood := Parts.get_part("hood_guns")
 	_check(hood.rarity == "Rare" and int(hood.mount) == 1 and absf(float(hood.fire_rate) * float(hood.bullet_damage) - 56.0) < 0.1 and float(hood.power) == 40.0 and float(hood.weight) == 20.0 and int(hood.cost) == 170,
 		"Hood Guns: Rare fixed, ~56 DPS, 40 power, 20 weight, 170 scrap")
 	_check(Parts.DROP_POOLS.convoy.has("cowcatcher_ram") and Parts.DROP_POOLS.convoy.has("hood_guns") and Parts.DROP_POOLS.convoy.has("heavy_mg_turret"), "its pool: Rare parts plus both new ones")
-	_check(float(T.CONVOY.armor) == 650.0 and float(T.CONVOY_TRAILER.armor) == 300.0 and float(T.CONVOY.ram_damage) == 120.0, "cab 650, trailer 300, ram 120")
+	_check(float(T.CONVOY.armor) == 650.0 and float(T.CONVOY_TRAILER.armor) == 350.0 and float(T.CONVOY.ram_damage) == 120.0, "cab 650, trailer 350 in total, ram 120")
 	_check(absf(float(T.CONVOY_TRAILER.fire_rate) * float(T.CONVOY_TRAILER.bullet_damage) - 30.0) < 0.1 and absf(float(T.CONVOY.fire_rate) * float(T.CONVOY.bullet_damage) - 32.0) < 0.1,
 		"turret ~30 damage/s, nose guns ~32")
 	var spec := Missions.make("clear", 4, 77)

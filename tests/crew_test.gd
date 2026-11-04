@@ -366,7 +366,8 @@ func _mission_step(f: int) -> void:
 		_check(mission.use_crew_ability(0) and is_equal_approx(absf(rig.rotation), PI) and rig.velocity.x < -290.0, "Bootleg Turn: swings round, keeping speed")
 		rig.velocity = Vector2.ZERO
 		rig.rotation = 0.0
-		rig.armor = rig.armor_max - 60.0
+		rig.armor = rig.armor_max
+		rig.facing_armor[0] = rig.facing_max[0] - 60.0   # a battered nose for the repair to fix
 		var hp := rig.armor
 		_check(mission.use_crew_ability(2) and is_equal_approx(rig.armor - hp, 39.0), "Field Repair (Epic): 39 armor back")
 		_check(rig.ability_active("repair_guard") and is_equal_approx(float(rig.crew_mod("taken")), 0.7 * (1.0 - 0.07)), "an Epic Patcher's repair also cuts damage 30% for 3 s")

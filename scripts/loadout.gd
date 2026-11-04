@@ -49,8 +49,13 @@ static func build(loadout: Dictionary, levels: Dictionary = {}) -> Dictionary:
 	var engine := _part(str(loadout.get("engine", "")), levels)
 	var drive := _part(str(loadout.get("drive", "")), levels)
 	var plates := {}
+	# An old-style loadout with one "armor" plate: it goes on all three slots
+	# (a front-only plate on the front only), as in old saves.
+	var legacy := str(loadout.get("armor", "")) if not loadout.has("armor_front") else ""
 	for slot: String in ARMOR_SLOTS:
-		var p := _part(str(loadout.get(slot, "")), levels)
+		var p := _part(str(loadout.get(slot, legacy)), levels)
+		if legacy != "" and slot != "armor_front" and bool(p.get("front_only", false)):
+			p = {}
 		if not p.is_empty() and (p.category != "Armor" or (slot != "armor_front" and bool(p.get("front_only", false)))):
 			push_warning("Loadout: %s can't go in %s" % [p.id, slot])
 			p = {}

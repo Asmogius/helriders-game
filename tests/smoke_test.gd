@@ -178,11 +178,12 @@ func _process(_delta: float) -> bool:
 		_check(rig.is_overloaded() and moved < free_run * 0.95, "an over-budget build costs speed")
 		main.hud.left_stick.output = Vector2.ZERO
 
-	# --- Weight overload: same run with Riot Plating (105 / 100 weight) ----------
+	# --- Weight overload: same run with Riot Plating all round (114 / 100 weight) -
 	if frame == 2345:
 		var heavy := Parts.STARTER_LOADOUT.duplicate(true)
-		heavy.armor = "riot_plating"
-		heavy.internal = ["targeting_computer"]  # 105 / 100 weight, 100 / 100 power
+		for slot: String in ["armor_front", "armor_sides", "armor_rear"]:
+			heavy[slot] = "riot_plating"
+		heavy.internal = []  # 114 / 100 weight, 75 / 100 power
 		main.apply_rig(Loadout.build(heavy))
 		_reset_rig(ROAD_EAST, 0.0)
 		mark = rig.global_position
@@ -233,7 +234,8 @@ func _process(_delta: float) -> bool:
 	# --- Utilities: Emergency Patch and Mine Dropper ----------------------------------
 	if frame == 2570:
 		var courier := {
-			"chassis": "courier_frame", "engine": "junk_v6", "drive": "street_wheels", "armor": "outrider_light_plating",
+			"chassis": "courier_frame", "engine": "junk_v6", "drive": "street_wheels",
+			"armor_front": "outrider_light_plating", "armor_sides": "outrider_light_plating", "armor_rear": "outrider_light_plating",
 			"weapons": ["pintle_turret"], "utility": ["emergency_patch", "mine_dropper"], "internal": [],
 		}
 		main.apply_rig(Loadout.build(courier))
@@ -243,9 +245,9 @@ func _process(_delta: float) -> bool:
 		_reset_rig(OPEN_SPOT, 0.0)
 		main.zombies.clear_all()
 		_check(main.hud.ability_count() == 2 and main.hud.has_crew_button() and main.hud.crew_wheel_size() == 1, "two utilities: two HUD buttons, plus CREW for the Driver")
-		rig.armor = 20.0
+		rig.armor = 20.0   # HP 20, every facing stripped
 		main.hud.press_ability(0)
-		_check(is_equal_approx(rig.armor, 55.0), "Emergency Patch restores 35 armor")
+		_check(is_equal_approx(rig.armor, 55.0) and is_equal_approx(rig.hp, 20.0), "Emergency Patch restores 35 armor (to a facing, not HP)")
 		main.hud.press_ability(0)
 		_check(is_equal_approx(rig.armor, 55.0) and rig.ability_charge(0) > 0.9, "the patch has to cool down before it works again")
 		main.hud.press_ability(1)
@@ -280,16 +282,16 @@ func _process(_delta: float) -> bool:
 		_check(bw.is_inside_tree() and bw.backoffs >= 1, "the Bulwark drives straight at you and rams")
 		_check(main.bullets.enemy_shots > shots_mark, "its light forward gun fires")
 		_check(enemy_damage > 0.0, "the Bulwark hurts the rig")
-		# Armored front: the same hit does half on the nose.
+		# Defense layers (§14): a very heavy front plate, a thin rear one.
 		bw.armor = bw.armor_max
 		var forward := Vector2.RIGHT.rotated(bw.rotation)
-		bw.take_hit(20.0, -forward * 140.0)
-		var front := bw.armor_max - bw.armor
-		bw.armor = bw.armor_max
-		bw.take_hit(20.0, forward * 140.0)
-		var rear := bw.armor_max - bw.armor
-		print("  20-damage hit on the front %.0f, on the rear %.0f" % [front, rear])
-		_check(is_equal_approx(front, 10.0) and is_equal_approx(rear, 20.0), "hits on its armored front do half damage")
+		bw.take_hit(20.0, -forward * 140.0)   # travelling backwards: hits the nose
+		var front_hit := bw.last_facing
+		bw.take_hit(20.0, forward * 140.0)    # travelling forwards: hits the tail
+		print("  Bulwark front %.0f / %.0f, rear %.0f / %.0f, HP %.0f" % [bw.facing_armor[0], bw.facing_max[0], bw.facing_armor[3], bw.facing_max[3], bw.hp])
+		_check(front_hit == Vehicle.FRONT and bw.last_facing == Vehicle.REAR, "hits land on the facing they come from")
+		_check(bw.facing_max[0] == 180.0 and bw.facing_max[3] == 50.0 and is_equal_approx(bw.facing_armor[0], 160.0) and is_equal_approx(bw.facing_armor[3], 30.0) and bw.hp == bw.hp_max,
+			"the Bulwark's heavy front plate and thin rear both soak hits before HP")
 		armor_mark = float(main.pickups.get_child_count())
 		# Step away first, so the salvage isn't scooped up on the spot.
 		rig.global_position = bw.global_position + Vector2(0, 420)
@@ -399,8 +401,10 @@ func _process(_delta: float) -> bool:
 
 func _check_loadouts(rig: Vehicle) -> void:
 	var starter := Loadout.build(Parts.STARTER_LOADOUT)
-	_check(is_equal_approx(starter.max_speed, 560.0) and is_equal_approx(starter.armor, 150.0) and is_equal_approx(starter.acceleration, 640.0), "starter parts add up to the starter rig")
-	_check(float(starter.lock_range) == 0.0 and int(starter.power_draw) == 75, "the starter carries no targeting computer: 75 power, no LOCK")
+	_check(is_equal_approx(starter.max_speed, 560.0) and is_equal_approx(starter.acceleration, 640.0)
+		and float(starter.hp) == 150.0 and float(starter.front) == 80.0 and float(starter.side) == 80.0 and float(starter.rear) == 80.0 and float(starter.shield) == 30.0,
+		"starter parts add up: HP 150, Scrap Plating 80 on every facing, a 30 shield")
+	_check(float(starter.lock_range) == 0.0 and int(starter.power_draw) == 100 and int(starter.weight) == 95, "the starter (with its Junk Emitter) runs 100 / 100 power, 95 / 100 weight, no LOCK")
 	_check(rig.can_lock() and main.hud.is_lock_button_visible(), "the Advanced Targeting Computer gives LOCK")
 	print("  lock build power %.0f / %.0f" % [rig.power_draw, rig.power_output])
 	_check(rig.power_draw <= rig.power_output, "the lock build fits its power budget")

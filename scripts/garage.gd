@@ -785,7 +785,7 @@ func _headline(part: Dictionary) -> String:
 		"Drive":
 			return "PWR %d  WT %d  GRIP %.1f  SPD x%.2f" % [int(part.power), int(part.weight), float(part.grip), float(part.speed_mult)]
 		"Armor":
-			var where := "FRONT ONLY" if bool(part.get("front_only", false)) else "WT %d/%d SIDES" % [int(part.weight), int(part.get("weight_sides", part.weight))]
+			var where := "FRONT ONLY" if bool(part.get("front_only", false)) else "WT %d/%d" % [int(part.weight), int(part.get("weight_sides", part.weight))]
 			return "%d / FACING  RAM %d  %s" % [int(part.armor), int(part.ram_damage), where]
 		"Weapon":
 			var dps := float(part.fire_rate) * float(part.bullet_damage) * int(part.get("pellets", 1)) * int(part.get("burst", 1))
@@ -1167,21 +1167,19 @@ class StatSheet extends Control:
 	const UI := preload("res://scripts/ui_theme.gd")
 	const Loadout := preload("res://scripts/loadout.gd")
 	const BulletPool := preload("res://scripts/bullet_pool.gd")
-	const ROW_H := 29.0
+	const ROW_H := 26.0
 	# [label, key, higher is better, decimals, suffix]
 	const LEFT := [
 		["TOP SPEED", "speed", true, 0, ""],
 		["ACCELERATION", "accel", true, 0, ""],
 		["TURN RATE", "turn", true, 0, " DEG/S"],
 		["GRIP", "grip", true, 1, ""],
-		["BRAKING", "brake", true, 0, ""],
+		["RAM DAMAGE", "ram", true, 0, ""],
 		["HP", "hp", true, 0, ""],
 		["FRONT ARMOR", "front", true, 0, ""],
 		["SIDE ARMOR", "side", true, 0, " EACH"],
 		["REAR ARMOR", "rear", true, 0, ""],
 		["SHIELD", "shield", true, 0, ""],
-		["RAM DAMAGE", "ram", true, 0, ""],
-		["POWER LOAD", "load", false, 0, ""],
 	]
 	const RIGHT := [
 		["DPS (ALL GUNS)", "dps", true, 0, ""],
@@ -1191,6 +1189,8 @@ class StatSheet extends Control:
 		["SPREAD", "spread", false, 1, " DEG"],
 		["TURRET AIM", "aim", true, 0, " DEG/S"],
 		["LOCK RANGE", "lock", true, 0, ""],
+		["BRAKING", "brake", true, 0, ""],
+		["POWER LOAD", "load", false, 0, ""],
 		["WEIGHT LOAD", "weight", false, 0, ""],
 	]
 	# Rows shown as "used / limit": compared by headroom, not the raw load.

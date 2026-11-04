@@ -503,7 +503,7 @@ const GUNNER := {
 	"coast": 280.0,
 	"turn_rate": 3.0,
 	"grip": 7.0,
-	"armor": 340.0,            # total of the layers below (§14 table)
+	"armor": 345.0,            # total of the layers below (§14 table; was 340)
 	"hp": 120.0, "front": 60.0, "side": 55.0, "rear": 55.0,
 	"shield": 30.0, "shield_skulls": 4, "shield_delay": 3.0, "shield_refill": 5.0,   # a shield from 4 skulls
 	"ram_damage": 40.0,
@@ -528,7 +528,7 @@ const SCRAPPER := {
 	"coast": 280.0,
 	"turn_rate": 3.5,
 	"grip": 6.5,
-	"armor": 200.0,            # total of the layers below (§14 table)
+	"armor": 230.0,            # total of the layers below (§14 table; was 200)
 	"hp": 90.0, "front": 35.0, "side": 35.0, "rear": 35.0,
 	"ram_damage": 30.0,
 	"mount": 0,                # one weak turret
@@ -573,7 +573,7 @@ const CONVOY_TRAILER := {
 	"coast": 300.0,
 	"turn_rate": 1.5,
 	"grip": 8.0,
-	"armor": 300.0,            # total of the layers below (agreed with the owner)
+	"armor": 350.0,            # total of the layers below (agreed with the owner; was 300)
 	"hp": 120.0, "front": 50.0, "side": 65.0, "rear": 50.0,
 	"ram_damage": 60.0,
 	"mount": 0,                # the heavy turret
