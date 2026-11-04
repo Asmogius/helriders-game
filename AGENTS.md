@@ -93,6 +93,7 @@ godot --headless --fixed-fps 60 --path . -s res://tests/keywords_test.gd   # mus
 godot --headless --fixed-fps 60 --path . -s res://tests/pad_test.gd        # must end "PAD TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/save_test.gd       # must end "SAVE TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/pc_test.gd         # must end "PC TEST PASSED"
+godot --headless --fixed-fps 60 --path . -s res://tests/zombie_sample_test.gd # must end "ZOMBIE SAMPLE TEST PASSED"
 ```
 
 - Tests must call `Profile.new_game()` with `persist = false` first, so they never touch a real save.
