@@ -35,6 +35,7 @@ func _initialize() -> void:
 		_add("garage_" + t.to_lower(), _show_tab.bind(t))
 	_add("rarity_tiers", _show_rarity)
 	_add("fight", _show_fight)
+	_add("fight_status", _show_status)   # V6.3: status icons on the HUD strip
 
 
 func _add(shot: String, setup: Callable) -> void:
@@ -75,6 +76,13 @@ func _show_rarity() -> void:
 func _show_fight() -> void:
 	_strip.queue_free()
 	change_scene_to_file("res://scenes/mission.tscn")
+
+
+func _show_status() -> void:
+	var m: Node = current_scene
+	m.set_process(false)   # freeze the fight so the HUD keeps these values for the shot
+	m.set_physics_process(false)
+	m.hud.set_statuses(PackedFloat32Array([40, 100, 70, 0, 100, 25]), PackedFloat32Array([0, 3, 0, 0, 2, 0]))
 
 
 func _process(_delta: float) -> bool:

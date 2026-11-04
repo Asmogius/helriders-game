@@ -8,16 +8,12 @@ extends RefCounted
 var texture: Texture2D
 var regions := {}
 
-static var _cache := {}
-
-
-## Cached per path (without extension), e.g. load_atlas("res://art/fx/fx").
+## Loads the atlas at `base` (path without extension), e.g. "res://art/fx/fx".
+## Drawers keep the one they use in a member var; the texture itself is shared
+## through ResourceLoader's cache. (No static cache: nothing outlives the tree.)
 static func load_atlas(base: String) -> RefCounted:
-	if _cache.has(base):
-		return _cache[base]
 	var a := new()
 	a._load(base)
-	_cache[base] = a
 	return a
 
 

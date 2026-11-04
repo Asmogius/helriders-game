@@ -75,6 +75,8 @@ var _power_meter: PowerMeter
 var _hint: Label
 var _scrap_label: Label
 var _stats_label: Label
+var _stats_icons: Control   # V6.3 icon row over the stat line
+const IconLine := preload("res://scripts/icon_line.gd")
 var _toast: Label
 var _toast_tween: Tween
 var _no_rig: Label
@@ -469,6 +471,13 @@ func _build_top_bar() -> void:
 	_stats_label.offset_top = 66.0
 	_stats_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(_stats_label)
+	# V6.3: the stat line as icons + numbers; the label keeps the text (tests,
+	# fallback) and hides while the icon row draws.
+	_stats_icons = IconLine.new()
+	_stats_icons.anchor_right = 1.0
+	_stats_icons.offset_top = 64.0
+	_stats_icons.offset_bottom = 92.0
+	add_child(_stats_icons)
 
 
 func _build_tags() -> void:
@@ -603,6 +612,8 @@ func _refresh() -> void:
 	var built := _built(profile.rig)
 	_refresh_crew_line()
 	_stats_label.text = _stats_line(built, has_rig)
+	_stats_icons.items = _stats_items(built) if has_rig and _stats_icons.get("_icons").ok() else []
+	_stats_label.visible = (_stats_icons.items as Array).is_empty()
 	_power_meter.set_values(float(built.power_draw), float(built.power_output), float(built.weight), float(built.weight_capacity))
 	_power_meter.visible = has_rig and selected < 0
 
@@ -648,6 +659,24 @@ func _refresh_crew_line() -> void:
 	var color := UI.BAD if blocked else T.COL_CYAN
 	for state: String in ["font_color", "font_hover_color", "font_pressed_color"]:
 		_crew_line.add_theme_color_override(state, color)
+
+
+## V6.3: the stat line as [icon, label, value, tint] for the icon row.
+func _stats_items(s: Dictionary) -> Array:
+	var m := Loadout.mobility(s)
+	var items: Array = [
+		["hp", "HP", str(int(s.get("hp", 0.0))), UI.GOOD],
+		["armor", "ARMOR", "%d/%d/%d" % [int(s.get("front", 0.0)), int(s.get("side", 0.0)), int(s.get("rear", 0.0))], UI.TEXT_DIM],
+		["shield", "SHIELD", str(int(s.get("shield", 0.0))), T.COL_CYAN],
+		["speed", "SPEED", str(roundi(float(s.max_speed) * m)), UI.TEXT_DIM],
+		["accel", "ACCEL", str(roundi(float(s.acceleration) * m)), UI.TEXT_DIM],
+		["dps", "DPS", str(roundi(Loadout.total_dps(s))), T.COL_ORANGE],
+		["lock", "LOCK", str(int(s.lock_range)) if float(s.lock_range) > 0.0 else "NONE", UI.TEXT_DIM],
+	]
+	var over := StatSheet.overload_cause(s)
+	if over != "":
+		items.append(["power", "", over, T.COL_ORANGE])
+	return items
 
 
 func _stats_line(s: Dictionary, complete: bool) -> String:
