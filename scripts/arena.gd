@@ -28,8 +28,19 @@ const MapAmbient := preload("res://scripts/map_ambient.gd")
 const STYLED_DISTRICTS := ["outer_blocks"]
 static var outer_blocks_style := false
 var _chunks: Array = []        # [[Rect2, Texture2D], ...] from MapArt.bake_chunks
-var bake_ms := 0.0             # last bake time (perf captures)
-var bake_bytes := 0            # GPU bytes of the baked chunks
+var bake_ms := 0.0             # last bake, start to textures ready (perf captures)
+var bake_main_ms := 0.0        # of which spent on the main thread (atlas reads, uploads)
+var bake_peak_bytes := 0       # static memory peak above the pre-bake level
+var bake_bytes := 0            # GPU bytes of the baked map
+var bake_cached := false       # the last bake came from the cache (RESTART)
+var _task := -1                # WorkerThreadPool task while baking
+var _task_out: Array = []
+var _bake_t0 := 0
+var _mem0 := 0
+# Last bake, keyed by layout + variation (seed_for) + texture mode; one entry,
+# so RESTART of the same job skips the bake and memory stays bounded.
+static var _cache_key := ""
+static var _cache_chunks: Array = []
 
 
 func _init() -> void:
@@ -74,12 +85,80 @@ func is_styled() -> bool:
 
 
 func _setup_style() -> void:
-	var t0 := Time.get_ticks_usec()
-	_chunks = MapArt.bake_chunks(self)   # empty when art is missing: code-drawn look stays
-	bake_ms = (Time.get_ticks_usec() - t0) / 1000.0
-	if _chunks.is_empty():
+	_bake_t0 = Time.get_ticks_usec()
+	_mem0 = OS.get_static_memory_usage()
+	var single := MapArt.max_texture_size() >= maxi(int(T.WORLD_SIZE.x), int(T.WORLD_SIZE.y))
+	var data := MapArt.snapshot(self)
+	var key := "%s:%d:%d:%s" % [str(layout.get("id", "")), MapArt.seed_for(data), hash(str(layout.get("surfaces", []))), str(single)]
+	if key == _cache_key and not _cache_chunks.is_empty():
+		bake_cached = true
+		_use_chunks(_cache_chunks)
+		bake_main_ms = (Time.get_ticks_usec() - _bake_t0) / 1000.0
+		bake_ms = bake_main_ms
 		return
+	_cache_key = ""
+	_cache_chunks = []   # drop the old map before baking the new one
+	var src := MapArt.load_sources()   # main thread: texture reads
+	if src.is_empty():
+		return   # missing art: code-drawn look stays
+	bake_main_ms = (Time.get_ticks_usec() - _bake_t0) / 1000.0
+	_task_out = []
+	var out := _task_out
+	_task = WorkerThreadPool.add_task(func() -> void: out.append_array(MapArt.bake_images(data, src, single)), false, "map bake")
+	set_meta("bake_key", key)
+	set_process(true)
+
+
+## True while the background bake runs (the code-drawn look shows meanwhile).
+func is_baking() -> bool:
+	return _task >= 0
+
+
+## Blocks until a running bake finishes (tests and captures).
+func finish_bake() -> void:
+	if _task >= 0:
+		WorkerThreadPool.wait_for_task_completion(_task)
+		_task = -1
+		_bake_done()
+
+
+func _process(_delta: float) -> void:
+	if _task < 0:
+		set_process(false)
+		return
+	if WorkerThreadPool.is_task_completed(_task):
+		WorkerThreadPool.wait_for_task_completion(_task)
+		_task = -1
+		_bake_done()
+
+
+func _exit_tree() -> void:
+	if _task >= 0:   # never leave a worker writing into a freed arena
+		WorkerThreadPool.wait_for_task_completion(_task)
+		_task = -1
+
+
+func _bake_done() -> void:
+	set_process(false)
+	bake_peak_bytes = maxi(0, int(OS.get_static_memory_peak_usage()) - _mem0)
+	var t1 := Time.get_ticks_usec()
+	var chunks: Array = []
+	for c: Array in _task_out:
+		chunks.append([c[0], ImageTexture.create_from_image(c[1])])
+	_task_out = []   # free the images
+	bake_main_ms += (Time.get_ticks_usec() - t1) / 1000.0
+	bake_ms = (Time.get_ticks_usec() - _bake_t0) / 1000.0
+	if chunks.is_empty():
+		return
+	_cache_key = str(get_meta("bake_key", ""))
+	_cache_chunks = chunks
+	_use_chunks(chunks)
+
+
+func _use_chunks(chunks: Array) -> void:
+	_chunks = chunks
 	bake_bytes = MapArt.chunk_bytes(_chunks)
+	queue_redraw()
 	var profile := get_node_or_null("/root/Profile")
 	var low := profile != null and profile.has_method("quality") and float(profile.quality().fx) < 0.5
 	if not low:

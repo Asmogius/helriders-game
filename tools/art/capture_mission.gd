@@ -138,17 +138,25 @@ func _print_perf() -> void:
 	var arena: Variant = _current.get("arena")
 	var styled := false
 	var bake := 0.0
+	var main_ms := 0.0
+	var peak := 0
+	var cached := false
+	var map_draws := 0
 	var bytes := 0
 	if arena is Object and is_instance_valid(arena) and (arena as Object).has_method("is_styled"):
 		styled = arena.is_styled()
 		bake = float(arena.bake_ms)
+		main_ms = float(arena.bake_main_ms)
+		peak = int(arena.bake_peak_bytes)
+		cached = bool(arena.bake_cached)
+		map_draws = (arena._chunks as Array).size()
 		bytes = int(arena.bake_bytes)
 	var fps := 0.0
 	for f: float in _fps:
 		fps += f
 	fps /= maxf(1.0, _fps.size())
-	print("PERF layout=%s styled=%s bake_ms=%.0f map_tex_mb=%.1f draw_calls=%d tex_mem_mb=%.1f fps=%.1f" % [
-		_layout, str(styled), bake, bytes / 1048576.0,
+	print("PERF layout=%s styled=%s bake_ms=%.0f main_thread_ms=%.1f peak_ram_mb=%.1f cached=%s map_draws=%d map_tex_mb=%.1f draw_calls=%d tex_mem_mb=%.1f fps=%.1f" % [
+		_layout, str(styled), bake, main_ms, peak / 1048576.0, str(cached), map_draws, bytes / 1048576.0,
 		int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)),
 		Performance.get_monitor(Performance.RENDER_TEXTURE_MEM_USED) / 1048576.0, fps])
 

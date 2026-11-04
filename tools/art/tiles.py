@@ -123,6 +123,17 @@ def worn_bar(rng, h, w):
     return t
 
 
+def wheel_stop(rng):
+    """Parking wheel stop: a short concrete kerb bar, lit on top, 1 px outline."""
+    h, w = 8, 34
+    img = np.tile(PAVE * 1.25, (h, w, 1)) + noise(rng, h, w, 6)[..., None]
+    img[:2] *= 1.15
+    img[-2:] *= 0.7
+    img[0, :] = img[-1, :] = (20, 19, 21)
+    img[:, 0] = img[:, -1] = (20, 19, 21)
+    return rgba(img)
+
+
 def main():
     rng = random.Random(4207)
     tiles = {}
@@ -138,6 +149,9 @@ def main():
     tiles["lane_dash"] = lane_dash()
     tiles["zebra"] = worn_bar(rng, 10, 44)
     tiles["stop_bar"] = worn_bar(rng, 8, 100)
+    # Parking lots (layouts.gd `surfaces`): stall line and wheel stop.
+    tiles["bay_line"] = worn_bar(rng, 56, 3)
+    tiles["wheel_stop"] = wheel_stop(rng)
     # Shelf-pack into one atlas, 1 px gutter.
     W = 512
     x = y = row = 0

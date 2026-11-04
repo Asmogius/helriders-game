@@ -15,6 +15,9 @@ extends RefCounted
 ## rotation]] (barricades that never cut anything off), jobs, and the V5.7
 ## design notes: district, landmark (what the player steers by), arena (an
 ## open fighting space, Rect2) and chokes (narrow gaps, kept clear of nudges).
+## Optional `surfaces` [[Rect2, kind]] are visual only (the map style bakes
+## them; collision, nav and spawns never read them): "parking" is an asphalt
+## lot with kerbs, "bays" a double row of painted stalls with wheel stops.
 
 const T := preload("res://scripts/tuning.gd")
 
@@ -137,6 +140,12 @@ const LAYOUTS := {
 		],
 		"blocks": [[Vector2(990, 420), Vector2(190, 36), 0.0], [Vector2(2210, 1980), Vector2(190, 36), 0.0],
 			[Vector2(1900, 650), Vector2(36, 190), 0.0], [Vector2(700, 1790), Vector2(36, 190), 0.0]],
+		"surfaces": [
+			[Rect2(40, 790, 810, 860), "parking"], [Rect2(1130, 790, 940, 860), "parking"], [Rect2(2350, 790, 810, 860), "parking"],
+			[Rect2(70, 922, 750, 116), "bays"], [Rect2(70, 1392, 750, 116), "bays"],
+			[Rect2(1160, 922, 880, 116), "bays"], [Rect2(1160, 1392, 880, 116), "bays"],
+			[Rect2(2380, 922, 750, 116), "bays"], [Rect2(2380, 1392, 750, 116), "bays"],
+		],
 	},
 	"alleys": {
 		"name": "Back Alleys",
@@ -504,6 +513,7 @@ static func build(id: String, vary_seed := 0) -> Dictionary:
 		"arena": src.get("arena", Rect2()),
 		"chokes": (src.get("chokes", []) as Array).duplicate(),
 		"blocks_used": 0,
+		"surfaces": (src.get("surfaces", []) as Array).duplicate(true),
 	}
 	if vary_seed == 0:
 		return out
@@ -574,6 +584,8 @@ static func _mirror(out: Dictionary, fx: bool, fy: bool) -> void:
 		for r: Rect2 in out[key]:
 			list.append(mr.call(r))
 		out[key] = list
+	for s: Array in out.surfaces:
+		s[0] = mr.call(s[0])
 	for key: String in ["checkpoints", "barrel_spots", "spawn_points", "chokes"]:
 		var list: Array = []
 		for p: Vector2 in out[key]:

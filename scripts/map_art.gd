@@ -21,26 +21,129 @@ const CHUNK_MAX := 2048
 const GREEN_TRIES_PER_MPX := 45.0
 
 
-## Whole-map bake, cut into chunks: [[Rect2 world rect, ImageTexture], ...].
-## Empty when the art is missing (the arena keeps its code-drawn look).
-## Ground is opaque, so chunks are stored RGB565 (2 bytes/px, no mipmaps):
-## ~14.6 MB for the whole map instead of ~29 MB as RGBA8.
-static func bake_chunks(arena: Object) -> Array:
-	var full := Rect2(Vector2.ZERO, T.WORLD_SIZE)
-	var img := bake_image(arena, full)
-	if img == null:
+## Paint target: a window (`view`) onto the logical bake area. The painters
+## work in bake-area coordinates; the canvas shifts and clips every write, so
+## the whole map can be painted chunk by chunk with identical decisions (same
+## seed, same placement) and no seams, without a full-map RGBA image.
+class Canvas extends RefCounted:
+	var image: Image
+	var view: Rect2i      # this image's rect inside the bake area
+	var size: Vector2i    # whole bake area (what the painters see)
+
+	func _init(area: Vector2i, v: Rect2i) -> void:
+		size = area
+		view = v
+		image = Image.create(v.size.x, v.size.y, false, Image.FORMAT_RGBA8)
+
+	func get_size() -> Vector2i:
+		return size
+
+	func _clip(src_rect: Rect2i, dst: Vector2i) -> Array:
+		var d := Rect2i(dst - view.position, src_rect.size)
+		var cl := d.intersection(Rect2i(Vector2i.ZERO, view.size))
+		if cl.size.x <= 0 or cl.size.y <= 0:
+			return []
+		return [Rect2i(src_rect.position + (cl.position - d.position), cl.size), cl.position]
+
+	func blend_rect(src: Image, src_rect: Rect2i, dst: Vector2i) -> void:
+		var c := _clip(src_rect, dst)
+		if not c.is_empty():
+			image.blend_rect(src, c[0], c[1])
+
+	func blit_rect(src: Image, src_rect: Rect2i, dst: Vector2i) -> void:
+		var c := _clip(src_rect, dst)
+		if not c.is_empty():
+			image.blit_rect(src, c[0], c[1])
+
+	func fill_rect(r: Rect2i, c: Color) -> void:
+		var cl := Rect2i(r.position - view.position, r.size).intersection(Rect2i(Vector2i.ZERO, view.size))
+		if cl.size.x > 0 and cl.size.y > 0:
+			image.fill_rect(cl, c)
+
+	func set_pixelv(p: Vector2i, c: Color) -> void:
+		var q := p - view.position
+		if q.x >= 0 and q.y >= 0 and q.x < view.size.x and q.y < view.size.y:
+			image.set_pixelv(q, c)
+
+
+## Size a single map texture may have. RenderingDevice backends report it;
+## the GL Compatibility renderer exposes no query, and every GLES3 phone we
+## target (2020-era Adreno/Mali/PowerVR) does at least 4096, so assume that.
+## Tests and low-end fallbacks can force chunks with `max_texture_override`.
+static var max_texture_override := 0
+static func max_texture_size() -> int:
+	if max_texture_override > 0:
+		return max_texture_override
+	var rd := RenderingServer.get_rendering_device()
+	if rd != null:
+		return int(rd.limit_get(RenderingDevice.LIMIT_MAX_TEXTURE_SIZE_2D))
+	return 4096
+
+
+## Atlas images, read on the main thread (texture reads are not thread-safe).
+## Empty when the art is missing.
+static var tiles_path := TILES   # tests point this at a missing file (fallback check)
+static func load_sources() -> Dictionary:
+	var tiles: RefCounted = ArtAtlas.load_atlas(tiles_path)
+	var house: RefCounted = ArtAtlas.load_atlas(HOUSE)
+	if not tiles.ok() or not house.ok():
+		return {}
+	var ti := _image_of(tiles.texture)
+	var hi := _image_of(house.texture)
+	if ti == null or hi == null:
+		return {}
+	var props: RefCounted = ArtAtlas.load_atlas(PROPS)
+	var pi: Image = _image_of(props.texture) if props.ok() else null
+	return {"tiles": tiles, "house": house, "props": props, "ti": ti, "hi": hi, "pi": pi}
+
+
+## Plain-data copy of what the bake reads, safe to hand to a worker thread.
+static func snapshot(arena: Object) -> Dictionary:
+	return {"layout": arena.get("layout"), "roads": arena.roads, "buildings": arena.buildings, "props": arena.props,
+		"checkpoints": arena.checkpoints, "barrel_spots": arena.barrel_spots, "player_start": arena.get("player_start")}
+
+
+## Whole-map bake (thread-safe given `snapshot` + `load_sources`). Painted
+## chunk by chunk (each <= CHUNK_MAX a side, RGBA8 only while it is painted)
+## and converted to RGB565 (opaque, no mipmaps). With `single`, the chunks are
+## copied into ONE 565 image (one draw); otherwise returned as chunks.
+## Returns [[Rect2 world rect, Image], ...]; empty without sources.
+static func bake_images(data: Dictionary, src: Dictionary, single: bool) -> Array:
+	if src.is_empty():
 		return []
+	var full := Rect2(Vector2.ZERO, T.WORLD_SIZE)
 	var nx := ceili(full.size.x / CHUNK_MAX)
 	var ny := ceili(full.size.y / CHUNK_MAX)
 	var cw := ceili(full.size.x / nx)
 	var chh := ceili(full.size.y / ny)
+	var whole: Image = null
+	if single:
+		whole = Image.create(int(full.size.x), int(full.size.y), false, Image.FORMAT_RGB565)
 	var out: Array = []
 	for gy in ny:
 		for gx in nx:
 			var r := Rect2i(gx * cw, gy * chh, mini(cw, int(full.size.x) - gx * cw), mini(chh, int(full.size.y) - gy * chh))
-			var part := img.get_region(r)
+			var cv := Canvas.new(Vector2i(full.size), r)
+			_paint(cv, data, full, src)
+			var part := cv.image
+			cv.image = null
 			part.convert(Image.FORMAT_RGB565)
-			out.append([Rect2(r), ImageTexture.create_from_image(part)])
+			if single:
+				whole.blit_rect(part, Rect2i(Vector2i.ZERO, part.get_size()), r.position)
+			else:
+				out.append([Rect2(r), part])
+	if single:
+		out.append([full, whole])
+	_sil_cache.clear()
+	return out
+
+
+## Synchronous whole-map bake into textures (kept for tools): [[Rect2, ImageTexture], ...].
+static func bake_chunks(arena: Object) -> Array:
+	var imgs := bake_images(snapshot(arena), load_sources(), max_texture_size() >= maxi(int(T.WORLD_SIZE.x), int(T.WORLD_SIZE.y)))
+	var out: Array = []
+	for c: Array in imgs:
+		out.append([c[0], ImageTexture.create_from_image(c[1])])
 	return out
 
 
@@ -55,7 +158,7 @@ static func chunk_bytes(chunks: Array) -> int:
 
 ## Same layout data in -> same picture out; a different seeded variation
 ## (nudged props, barricades, mirroring) -> different decor.
-static func seed_for(arena: Object) -> int:
+static func seed_for(arena: Variant) -> int:
 	var key := ""
 	var l: Variant = arena.get("layout")
 	if l is Dictionary:
@@ -80,18 +183,23 @@ static func bake(arena: Object, corner := CORNER) -> ImageTexture:
 
 
 static func bake_image(arena: Object, corner: Rect2) -> Image:
-	var tiles: RefCounted = ArtAtlas.load_atlas(TILES)
-	var house: RefCounted = ArtAtlas.load_atlas(HOUSE)
-	if not tiles.ok() or not house.ok():
+	var src := load_sources()
+	if src.is_empty():
 		return null
-	var ti := _image_of(tiles.texture)
-	var hi := _image_of(house.texture)
-	if ti == null or hi == null:
-		return null
-	var props: RefCounted = ArtAtlas.load_atlas(PROPS)
-	var pi: Image = _image_of(props.texture) if props.ok() else null
-	var size := Vector2i(corner.size)
-	var img := Image.create(size.x, size.y, false, Image.FORMAT_RGBA8)
+	var cv := Canvas.new(Vector2i(corner.size), Rect2i(Vector2i.ZERO, Vector2i(corner.size)))
+	_paint(cv, snapshot(arena), corner, src)
+	return cv.image
+
+
+## Paints the bake area `corner` (world rect) onto `img`, whose coordinates
+## are relative to `corner`. Same data in, same picture out (seeded).
+static func _paint(img: Canvas, arena: Variant, corner: Rect2, src: Dictionary) -> void:
+	var tiles: RefCounted = src.tiles
+	var house: RefCounted = src.house
+	var props: RefCounted = src.props
+	var ti: Image = src.ti
+	var hi: Image = src.hi
+	var pi: Variant = src.pi
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_for(arena)
 	var off := corner.position
@@ -107,11 +215,32 @@ static func bake_image(arena: Object, corner: Rect2) -> Image:
 		elif corner.intersects(b.grow(24)):
 			straddle.append(Rect2(b.position - off, b.size))
 	var junctions := _junctions(roads)
+	# Visual-only lot data (layouts.gd `surfaces`); old layouts have none.
+	# Lots get their own rng so layouts with lots keep every other decor
+	# placement of their seed (and layouts without lots are untouched).
+	var lot_rng := RandomNumberGenerator.new()
+	lot_rng.seed = seed_for(arena) ^ 0x5A17
+	var lots: Array = []
+	var bays: Array = []
+	var lay: Variant = arena.get("layout")
+	if lay is Dictionary:
+		for sf: Array in (lay as Dictionary).get("surfaces", []):
+			var sr: Rect2 = sf[0]
+			if not sr.intersects(corner):
+				continue
+			var local := Rect2(sr.position - off, sr.size)
+			if str(sf[1]) == "parking":
+				lots.append(local)
+			elif str(sf[1]) == "bays":
+				bays.append(local)
 
 	# Lawn everywhere, then sidewalks along roads and aprons round houses.
 	_fill(img, ti, tiles, "grass_", Rect2(Vector2.ZERO, corner.size), rng)
 	for r: Rect2 in roads:
 		_fill(img, ti, tiles, "pave_", r.grow(SIDEWALK), rng)
+	for p: Rect2 in lots:
+		_fill(img, ti, tiles, "asphalt_", p, lot_rng)
+		_lot_kerb(img, p)
 	for b: Rect2 in inside:
 		_fill(img, ti, tiles, "pave_", b.grow(14), rng)
 	# Asphalt as one surface (junctions filled once, no overlapping strips).
@@ -154,9 +283,12 @@ static func bake_image(arena: Object, corner: Rect2) -> Image:
 
 	if pi != null:
 		_street_decals(img, pi, props, roads, junctions, keep_off, points, rng)
+	_parking(img, ti, tiles, pi, props, lots, bays, keep_off, points, lot_rng)
 
 	# Bushes and trees, off roads and sidewalks.
 	var green_off: Array = keep_off.duplicate()
+	for p: Rect2 in lots:
+		green_off.append(p.grow(6))
 	for r: Rect2 in roads:
 		green_off.append(r.grow(SIDEWALK + 4))
 	for i in int(GREEN_TRIES_PER_MPX * corner.size.x * corner.size.y / 1.0e6):
@@ -180,11 +312,10 @@ static func bake_image(arena: Object, corner: Rect2) -> Image:
 		_building(img, hi, house, pi, props, b, style, rng)
 		style += 1
 	if pi != null:
-		_street_props(img, pi, props, roads, junctions, inside, keep_off + lanes, points, rng, prop_boxes + road_lanes)
+		_street_props(img, pi, props, roads, junctions, inside, keep_off + lanes + lots, points, rng, prop_boxes + road_lanes)
 	# Buildings that cross the corner edge keep their code-drawn look.
 	for b: Rect2 in straddle:
 		img.fill_rect(Rect2i(b.grow(4).position.floor(), b.grow(4).size.ceil() + Vector2(18, 18)), Color(0, 0, 0, 0))
-	return img
 
 
 ## Every overlap of a horizontal and a vertical road.
@@ -212,7 +343,7 @@ static func _gutter_color() -> Color:
 
 ## Rounded kerbs where the sidewalks meet at a junction: the asphalt sweeps
 ## into each block corner on a quarter circle, with the kerb drawn on the arc.
-static func _curb_returns(img: Image, src: Image, atlas: RefCounted, j: Rect2) -> void:
+static func _curb_returns(img: Canvas, src: Image, atlas: RefCounted, j: Rect2) -> void:
 	var asphalt: Rect2 = atlas.region("asphalt_0")
 	var bounds := Rect2i(Vector2i.ZERO, img.get_size())
 	var curb := _curb_color()
@@ -236,7 +367,7 @@ static func _curb_returns(img: Image, src: Image, atlas: RefCounted, j: Rect2) -
 
 ## Kerbs along both long edges and the centre dashes, both stopping at the
 ## junction box (no strips crossing the other road).
-static func _curbs_and_lines(img: Image, src: Image, atlas: RefCounted, r: Rect2, junctions: Array, rng: RandomNumberGenerator) -> void:
+static func _curbs_and_lines(img: Canvas, src: Image, atlas: RefCounted, r: Rect2, junctions: Array, rng: RandomNumberGenerator) -> void:
 	var curb := _curb_color()
 	var gutter := _gutter_color()
 	var dash: Rect2 = atlas.region("lane_dash")
@@ -276,6 +407,71 @@ static func _curbs_and_lines(img: Image, src: Image, atlas: RefCounted, r: Rect2
 			t += 92.0
 
 
+## Kerb round a parking lot, with a driveway gap in the middle of each side.
+static func _lot_kerb(img: Canvas, p: Rect2) -> void:
+	var curb := _curb_color()
+	var gutter := _gutter_color()
+	var gap := 140.0
+	var cx := p.get_center().x
+	var cy := p.get_center().y
+	for seg: Vector2 in [Vector2(p.position.x, cx - gap * 0.5), Vector2(cx + gap * 0.5, p.end.x)]:
+		_rect(img, Rect2(seg.x, p.position.y - 4, seg.y - seg.x, 4), curb)
+		_rect(img, Rect2(seg.x, p.position.y, seg.y - seg.x, 1), gutter)
+		_rect(img, Rect2(seg.x, p.end.y, seg.y - seg.x, 4), curb)
+		_rect(img, Rect2(seg.x, p.end.y - 1, seg.y - seg.x, 1), gutter)
+	for seg: Vector2 in [Vector2(p.position.y - 4, cy - gap * 0.5), Vector2(cy + gap * 0.5, p.end.y + 4)]:
+		_rect(img, Rect2(p.position.x - 4, seg.x, 4, seg.y - seg.x), curb)
+		_rect(img, Rect2(p.position.x, seg.x, 1, seg.y - seg.x), gutter)
+		_rect(img, Rect2(p.end.x, seg.x, 4, seg.y - seg.x), curb)
+		_rect(img, Rect2(p.end.x - 1, seg.x, 1, seg.y - seg.x), gutter)
+
+
+## Parking lots: painted stall lines in each double row of bays (flat paint),
+## wheel stops (skipped near stops, barrels, chokes and props), and cracks and
+## oil on the lot asphalt. Bake time only; nothing here collides.
+static func _parking(img: Canvas, ti: Image, tiles: RefCounted, pi: Image, props: RefCounted, lots: Array, bays: Array, keep_off: Array, points: Array, rng: RandomNumberGenerator) -> void:
+	const STALL := 60.0
+	var line: Image = null
+	if tiles.has("bay_line"):
+		line = ti.get_region(Rect2i(tiles.region("bay_line")))
+	var paint := T.COL_OB_PAVE.lightened(0.45)
+	paint.a = 0.55
+	for b: Rect2 in bays:
+		var mid := b.get_center().y
+		var stripe := Image.create(int(b.size.x), 2, false, Image.FORMAT_RGBA8)
+		stripe.fill(paint)
+		_blend_sub(img, stripe, Rect2i(Vector2i.ZERO, stripe.get_size()), Vector2(b.position.x, mid - 1))
+		var x := b.position.x
+		while x <= b.end.x + 0.5:
+			if line != null:
+				_blend_sub(img, line, Rect2i(Vector2i.ZERO, line.get_size()), Vector2(x - 1, b.position.y))
+				_blend_sub(img, line, Rect2i(Vector2i.ZERO, line.get_size()), Vector2(x - 1, b.end.y - line.get_height()))
+			if x + STALL <= b.end.x + 0.5 and tiles.has("wheel_stop"):
+				var reg: Rect2 = tiles.region("wheel_stop")
+				var cx := x + STALL * 0.5 - reg.size.x * 0.5
+				for at: Vector2 in [Vector2(cx, b.position.y + 8), Vector2(cx, b.end.y - 8 - reg.size.y)]:
+					var box := Rect2(at, reg.size)
+					if rng.randf() < 0.12 or _hits(box, keep_off) or _near(box.get_center(), points, 60.0):
+						continue
+					_shadow(img, box, Vector2(2, 2), 0.3)
+					_blend_sub(img, ti, Rect2i(reg), at)
+			x += STALL
+	if pi == null:
+		return
+	var kinds := ["crack_", "crack_", "oil_", "oil_", "pothole_", "crack_"]
+	for p: Rect2 in lots:
+		for i in int(p.size.x * p.size.y / 22000.0):
+			var kind: String = kinds[rng.randi_range(0, kinds.size() - 1)]
+			var id := kind + str(rng.randi_range(0, 3 if kind == "crack_" else 2))
+			if not props.has(id):
+				continue
+			var reg: Rect2 = props.region(id)
+			var at := Vector2(rng.randf_range(p.position.x + 6, p.end.x - reg.size.x - 6), rng.randf_range(p.position.y + 6, p.end.y - reg.size.y - 6))
+			if _near(at + reg.size * 0.5, points, 40.0):
+				continue
+			_decal(img, pi, props, id, at)
+
+
 ## [start, end] minus the cut intervals, as Vector2(from, to) pieces.
 static func _segments(start: float, end: float, cuts: Array) -> Array:
 	cuts.sort_custom(func(a: Vector2, b: Vector2) -> bool: return a.x < b.x)
@@ -292,7 +488,7 @@ static func _segments(start: float, end: float, cuts: Array) -> Array:
 
 ## Zebra crosswalks on every arm of a junction and a stop line across the
 ## lane that drives into it (right-hand traffic).
-static func _crossings(img: Image, src: Image, atlas: RefCounted, j: Rect2, roads: Array) -> void:
+static func _crossings(img: Canvas, src: Image, atlas: RefCounted, j: Rect2, roads: Array) -> void:
 	var zebra := src.get_region(Rect2i(atlas.region("zebra")))      # 10 x 44, long side along traffic
 	var zebra_v := zebra.duplicate() as Image
 	zebra_v.rotate_90(CLOCKWISE)
@@ -322,7 +518,7 @@ static func _crossings(img: Image, src: Image, atlas: RefCounted, j: Rect2, road
 		_tile_bar(img, bar, Rect2(xs, sy, j.size.x * 0.5 - 12.0, 8))
 
 
-static func _tile_bar(img: Image, piece: Image, r: Rect2) -> void:
+static func _tile_bar(img: Canvas, piece: Image, r: Rect2) -> void:
 	var ps := Vector2(piece.get_size())
 	var horiz := r.size.x >= r.size.y
 	var t := 0.0
@@ -335,12 +531,12 @@ static func _tile_bar(img: Image, piece: Image, r: Rect2) -> void:
 		t += w
 
 
-static func _blend(img: Image, piece: Image, at: Vector2) -> void:
+static func _blend(img: Canvas, piece: Image, at: Vector2) -> void:
 	_blend_sub(img, piece, Rect2i(Vector2i.ZERO, piece.get_size()), at)
 
 
 ## blend_rect clipped to the image (pieces near the corner edge).
-static func _blend_sub(img: Image, piece: Image, sub: Rect2i, at: Vector2) -> void:
+static func _blend_sub(img: Canvas, piece: Image, sub: Rect2i, at: Vector2) -> void:
 	var dst := Rect2i(Vector2i(at.floor()), sub.size)
 	var cl := dst.intersection(Rect2i(Vector2i.ZERO, img.get_size()))
 	if cl.size.x <= 0 or cl.size.y <= 0:
@@ -350,7 +546,7 @@ static func _blend_sub(img: Image, piece: Image, sub: Rect2i, at: Vector2) -> vo
 
 ## Flat storytelling on the ground: cracks, potholes, oil, puddles on the
 ## asphalt; weeds in the kerb line, trash and blood on sidewalks; scorch marks.
-static func _street_decals(img: Image, pi: Image, atlas: RefCounted, roads: Array, junctions: Array, keep_off: Array, points: Array, rng: RandomNumberGenerator) -> void:
+static func _street_decals(img: Canvas, pi: Image, atlas: RefCounted, roads: Array, junctions: Array, keep_off: Array, points: Array, rng: RandomNumberGenerator) -> void:
 	var road_kinds := ["crack_", "crack_", "pothole_", "oil_", "puddle_", "crack_", "oil_"]
 	for r: Rect2 in roads:
 		var n := int(r.size.x * r.size.y / 15000.0)
@@ -402,14 +598,14 @@ static func _street_decals(img: Image, pi: Image, atlas: RefCounted, roads: Arra
 		_decal(img, pi, atlas, "blood_pool_0", Vector2(j.position.x - 120, j.end.y - 48))
 
 
-static func _decal(img: Image, pi: Image, atlas: RefCounted, id: String, at: Vector2) -> void:
+static func _decal(img: Canvas, pi: Image, atlas: RefCounted, id: String, at: Vector2) -> void:
 	if not atlas.has(id):
 		return
 	_blend_sub(img, pi, Rect2i(atlas.region(id)), at)
 
 
 ## A voxel prop sprite with its soft shadow. `at` is the sprite's top-left.
-static func _sprite(img: Image, pi: Image, atlas: RefCounted, id: String, at: Vector2, shadow := 0.3) -> Rect2:
+static func _sprite(img: Canvas, pi: Image, atlas: RefCounted, id: String, at: Vector2, shadow := 0.3) -> Rect2:
 	if not atlas.has(id):
 		return Rect2()
 	var reg := Rect2i(atlas.region(id))
@@ -424,7 +620,7 @@ static func _sprite(img: Image, pi: Image, atlas: RefCounted, id: String, at: Ve
 ## the junctions, wrecked and burnt cars on the verges, a sandbag and barrier
 ## checkpoint, fences behind the lots, a dumpster by the shop block. Lanes,
 ## stops and barrel spots stay clear, so nothing looks like a hidden wall.
-static func _street_props(img: Image, pi: Image, atlas: RefCounted, roads: Array, junctions: Array, houses: Array, keep_off: Array, points: Array, rng: RandomNumberGenerator, hard_off: Array = []) -> void:
+static func _street_props(img: Canvas, pi: Image, atlas: RefCounted, roads: Array, junctions: Array, houses: Array, keep_off: Array, points: Array, rng: RandomNumberGenerator, hard_off: Array = []) -> void:
 	var items: Array = []   # [bottom y, id, top-left, shadow]
 	var taken: Array = keep_off.duplicate()
 	var place := func(id: String, foot: Vector2, shadow: float, force: bool) -> bool:
@@ -539,7 +735,7 @@ static func _image_of(tex: Texture2D) -> Image:
 
 
 ## Tiles `rect` (clipped to the image) with a random variant of `prefix`.
-static func _fill(img: Image, src: Image, atlas: RefCounted, prefix: String, rect: Rect2, rng: RandomNumberGenerator) -> void:
+static func _fill(img: Canvas, src: Image, atlas: RefCounted, prefix: String, rect: Rect2, rng: RandomNumberGenerator) -> void:
 	var r := rect.intersection(Rect2(Vector2.ZERO, Vector2(img.get_size())))
 	if r.size.x <= 0 or r.size.y <= 0:
 		return
@@ -560,7 +756,7 @@ static func _fill(img: Image, src: Image, atlas: RefCounted, prefix: String, rec
 ## rooftop clutter; houses alternate a hip roof with a lower flat garage wing
 ## and a gable turned north-south. All seen at the 30 degree tilt: roof from
 ## above, south wall below it.
-static func _building(img: Image, src: Image, atlas: RefCounted, pi: Image, props: RefCounted, b: Rect2, style: int, rng: RandomNumberGenerator) -> void:
+static func _building(img: Canvas, src: Image, atlas: RefCounted, pi: Image, props: RefCounted, b: Rect2, style: int, rng: RandomNumberGenerator) -> void:
 	_shadow(img, b, Vector2(14, 10), 0.38)
 	var roof_v := rng.randi_range(0, 2)
 	var wall_v := rng.randi_range(0, 2)
@@ -604,7 +800,7 @@ static func _outline() -> Color:
 
 
 ## Hip roof: north slope lit, south dark, west and east triangles in between.
-static func _roof_hip(img: Image, src: Image, atlas: RefCounted, roof: Rect2, v: int, rng: RandomNumberGenerator) -> void:
+static func _roof_hip(img: Canvas, src: Image, atlas: RefCounted, roof: Rect2, v: int, rng: RandomNumberGenerator) -> void:
 	var ridge := roof.position.y + roof.size.y * 0.5
 	_fill_piece(img, src, atlas, "roof%d_lit_" % v, Rect2(roof.position, Vector2(roof.size.x, ridge - roof.position.y)), rng)
 	_fill_piece(img, src, atlas, "roof%d_dark_" % v, Rect2(Vector2(roof.position.x, ridge), Vector2(roof.size.x, roof.end.y - ridge)), rng)
@@ -625,7 +821,7 @@ static func _roof_hip(img: Image, src: Image, atlas: RefCounted, roof: Rect2, v:
 
 
 ## Gable with the ridge running north-south: west slope lit, east dark.
-static func _roof_gable_ns(img: Image, src: Image, atlas: RefCounted, roof: Rect2, v: int, rng: RandomNumberGenerator) -> void:
+static func _roof_gable_ns(img: Canvas, src: Image, atlas: RefCounted, roof: Rect2, v: int, rng: RandomNumberGenerator) -> void:
 	var mid := roof.position.x + floorf(roof.size.x * 0.5)
 	_fill_piece(img, src, atlas, "roof%d_lit_" % v, Rect2(roof.position, Vector2(mid - roof.position.x, roof.size.y)), rng)
 	_fill_piece(img, src, atlas, "roof%d_dark_" % v, Rect2(Vector2(mid, roof.position.y), Vector2(roof.end.x - mid, roof.size.y)), rng)
@@ -634,7 +830,7 @@ static func _roof_gable_ns(img: Image, src: Image, atlas: RefCounted, roof: Rect
 	_frame(img, roof, o)
 
 
-static func _roof_flat(img: Image, src: Image, atlas: RefCounted, roof: Rect2, rng: RandomNumberGenerator) -> void:
+static func _roof_flat(img: Canvas, src: Image, atlas: RefCounted, roof: Rect2, rng: RandomNumberGenerator) -> void:
 	var y := roof.position.y
 	while y < roof.end.y:
 		var x := roof.position.x
@@ -655,7 +851,7 @@ static func _roof_flat(img: Image, src: Image, atlas: RefCounted, roof: Rect2, r
 
 
 ## Rooftop clutter: AC units, vents, a water tank on big blocks, junk.
-static func _rooftop(img: Image, pi: Image, props: RefCounted, roof: Rect2, rng: RandomNumberGenerator, big: bool) -> void:
+static func _rooftop(img: Canvas, pi: Image, props: RefCounted, roof: Rect2, rng: RandomNumberGenerator, big: bool) -> void:
 	var taken: Array = []
 	var want := ["ac", "ac", "vent", "vent", "vent", "ac", "debris_2"] if big else ["vent", "ac"]
 	if big:
@@ -678,7 +874,7 @@ static func _rooftop(img: Image, pi: Image, props: RefCounted, roof: Rect2, rng:
 
 
 ## Single-storey south wall from 32 px pieces, optionally cut down to `h` rows.
-static func _wall(img: Image, src: Image, atlas: RefCounted, x0: float, w: float, y: float, h: int, wall_v: int, rng: RandomNumberGenerator, garage := false) -> void:
+static func _wall(img: Canvas, src: Image, atlas: RefCounted, x0: float, w: float, y: float, h: int, wall_v: int, rng: RandomNumberGenerator, garage := false) -> void:
 	var n := int(w / 32.0)
 	var door := rng.randi_range(1, maxi(1, n - 2))
 	for i in n:
@@ -695,7 +891,7 @@ static func _wall(img: Image, src: Image, atlas: RefCounted, x0: float, w: float
 
 
 ## Two-storey shop-front wall (flat-roof block).
-static func _wall2(img: Image, src: Image, atlas: RefCounted, x0: float, w: float, y: float, rng: RandomNumberGenerator) -> void:
+static func _wall2(img: Canvas, src: Image, atlas: RefCounted, x0: float, w: float, y: float, rng: RandomNumberGenerator) -> void:
 	var kinds := ["window", "window", "boarded", "broken", "lit", "shutter", "window", "boarded"]
 	var n := int(w / 32.0)
 	var door := rng.randi_range(2, maxi(2, n - 3))
@@ -709,24 +905,24 @@ static func _wall2(img: Image, src: Image, atlas: RefCounted, x0: float, w: floa
 	_rect(img, Rect2(x0, y + WALL2_H - 2, w, 2), _outline())
 
 
-static func _frame(img: Image, r: Rect2, c: Color) -> void:
+static func _frame(img: Canvas, r: Rect2, c: Color) -> void:
 	_rect(img, Rect2(r.position.x, r.position.y, r.size.x, 2), c)
 	_rect(img, Rect2(r.position.x, r.position.y, 2, r.size.y), c)
 	_rect(img, Rect2(r.end.x - 2, r.position.y, 2, r.size.y), c)
 
 
-static func _px(img: Image, p: Vector2i, c: Color) -> void:
+static func _px(img: Canvas, p: Vector2i, c: Color) -> void:
 	if Rect2i(Vector2i.ZERO, img.get_size()).has_point(p):
 		img.set_pixelv(p, c)
 
 
-static func _tint_row(img: Image, at: Vector2i, w: int, c: Color) -> void:
+static func _tint_row(img: Canvas, at: Vector2i, w: int, c: Color) -> void:
 	var row := Image.create(w, 1, false, Image.FORMAT_RGBA8)
 	row.fill(c)
 	_blend(img, row, Vector2(at))
 
 
-static func _fill_piece(img: Image, src: Image, atlas: RefCounted, prefix: String, r: Rect2, rng: RandomNumberGenerator) -> void:
+static func _fill_piece(img: Canvas, src: Image, atlas: RefCounted, prefix: String, r: Rect2, rng: RandomNumberGenerator) -> void:
 	var y := r.position.y
 	while y < r.end.y:
 		var x := r.position.x
@@ -737,13 +933,13 @@ static func _fill_piece(img: Image, src: Image, atlas: RefCounted, prefix: Strin
 		y += ROOF_TILE
 
 
-static func _rect(img: Image, r: Rect2, c: Color) -> void:
+static func _rect(img: Canvas, r: Rect2, c: Color) -> void:
 	var cl := r.intersection(Rect2(Vector2.ZERO, Vector2(img.get_size())))
 	if cl.size.x > 0 and cl.size.y > 0:
 		img.fill_rect(Rect2i(cl.position.floor(), cl.size.ceil()), c)
 
 
-static func _shadow(img: Image, r: Rect2, by: Vector2, alpha: float) -> void:
+static func _shadow(img: Canvas, r: Rect2, by: Vector2, alpha: float) -> void:
 	var s := Rect2(r.position + by, r.size).intersection(Rect2(Vector2.ZERO, Vector2(img.get_size())))
 	if s.size.x <= 0 or s.size.y <= 0:
 		return

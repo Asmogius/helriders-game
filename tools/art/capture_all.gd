@@ -119,6 +119,8 @@ func _show_map_corner(sample: bool, zoom := 0.84, at := Vector2(750, 440), crowd
 	root.add_child(_map)
 	var arena: Node2D = Arena.new()
 	_map.add_child(arena)
+	if arena.has_method("finish_bake"):
+		arena.finish_bake()   # the bake runs on a worker; shoot the finished map
 	var cam := Camera2D.new()
 	cam.position = at
 	cam.zoom = Vector2(zoom, zoom)

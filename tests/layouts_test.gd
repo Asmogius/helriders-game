@@ -89,6 +89,9 @@ func _check_layout(id: String) -> void:
 			elif nav.astar.get_id_path(nav.cell_of(start), nav.cell_of(p)).is_empty():
 				bad.append("%s %s cut off (vary %d)" % [s[0], str(p), vary])
 		bad.append_array(_design_issues(arena, nav, start, arena.layout, vary))
+		for sf: Array in arena.layout.get("surfaces", []):
+			if not Rect2(Vector2.ZERO, T.WORLD_SIZE).encloses(sf[0]):
+				bad.append("surface %s out of bounds (vary %d)" % [str(sf[0]), vary])
 		if arena.spawn_points.size() < 4:
 			bad.append("only %d spawn points (vary %d)" % [arena.spawn_points.size(), vary])
 		arena.free()
