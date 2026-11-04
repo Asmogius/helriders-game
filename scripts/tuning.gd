@@ -36,6 +36,10 @@ const RARITY_COLORS := {
 	"Legendary": Color(1.0, 0.72, 0.25),
 	"Mythic": Color(1.0, 0.36, 0.42),
 }
+# Perk tiers show as a rarity frame (V1.3): minor, major, signature.
+const PERK_TIER_RARITY := {"minor": "Rare", "major": "Epic", "signature": "Legendary"}
+# Fight crate beam height (px) per rarity tier 1..6 (V1.3; art only).
+const RARITY_BEAM := [0.0, 40.0, 80.0, 140.0, 220.0, 320.0]
 
 # --- Arena ---------------------------------------------------------------------
 const WORLD_SIZE := Vector2(3200, 2400)

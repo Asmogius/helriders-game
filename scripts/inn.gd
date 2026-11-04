@@ -303,6 +303,7 @@ func _perk_card(m: Dictionary, perk: String, card_size: Vector2) -> Button:
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(box)
 	var shared := Crew.SHARED_PERKS.has(perk)
+	UI.rarity_frame(card, UI.perk_rarity(_perk_tier(m, perk)))   # V1.3: perk tier colours
 	var parts: Array = [
 		[Crew.perk_name(perk).to_upper(), 26, T.COL_ORANGE],
 		["ANY CLASS" if shared else "%s PERK" % Crew.role_name(m).to_upper(), 15, UI.TEXT_DIM if shared else Crew.role_color(m)],
@@ -314,6 +315,15 @@ func _perk_card(m: Dictionary, perk: String, card_size: Vector2) -> Button:
 		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		box.add_child(l)
 	return card
+
+
+## "minor", "major" or "signature" for a specialty perk; "" for old class perks.
+func _perk_tier(m: Dictionary, perk: String) -> String:
+	var tiers: Dictionary = Crew.SPECIALTY_PERKS.get(Crew.specialty(m), {})
+	for tier: String in tiers:
+		if (tiers[tier] as Array).has(perk):
+			return tier
+	return ""
 
 
 func pick_perk(perk: String) -> bool:
