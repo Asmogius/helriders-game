@@ -40,9 +40,9 @@ var _passed := PackedByteArray()   # targets a bullet has already gone through
 var _rail := PackedByteArray()     # Rail Line: rigs it may still pierce
 var _src: Array = []               # who fired it (Arc Feedback)
 var _flag := PackedByteArray()     # bit 0 Shrapnel round; bit 1 passed close to the player; bit 2 near-miss counted
-var _near := PackedFloat32Array()
+var _near := PackedFloat32Array()   # last distance to the player rig (Racing Line)
 var _style := PackedByteArray()    # V4.3 tracer look (tracer_styles.gd); visual only
-var next_style := -1               # set by the shooter just before fire(); -1 = team default  # last distance to the player rig (Racing Line)
+var next_style := -1               # set by the shooter just before fire(); -1 = team default
 var shrapnel_splashes := 0         # tests
 ## The player's rig: its mods and crew perks change player hits
 ## (player_pre_hit / player_post_hit on vehicle.gd).
