@@ -295,7 +295,91 @@ func _on_hit(_damage: float, impulse: Vector2) -> void:
 	queue_redraw()
 
 
+# --- V3 style sample (P3): voxel zombie sheets for the Shambler and the Tank.
+# Drawing only: reads kind, rotation, charge state and _flash; never changes
+# stats or AI. Missing atlas or another kind -> the code-drawn body below.
+# The atlas is loaded once and shared (static); no per-zombie art nodes.
+const ZOMBIE_ATLAS := "res://art/zombies/zombies.json"   # P0 atlas loader stand-in
+static var _art_meta: Dictionary = {}
+static var _art_tex: Texture2D
+static var _art_tried := false
+var art_pose_override := ""      # captures and tests: force a pose row (e.g. "lunge_1")
+var _art_t := 0.0                # walk cycle phase, advanced by distance walked
+var _art_last := Vector2.ZERO
+var _art_key := -1
+
+
+static func art_atlas() -> Dictionary:
+	if not _art_tried:
+		_art_tried = true
+		if FileAccess.file_exists(ZOMBIE_ATLAS):
+			var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(ZOMBIE_ATLAS))
+			var tex_path := ZOMBIE_ATLAS.get_base_dir().path_join("zombies.png")
+			if data is Dictionary and ResourceLoader.exists(tex_path):
+				_art_meta = data
+				_art_tex = load(tex_path)
+	return _art_meta
+
+
+func has_art() -> bool:
+	return (art_atlas().get("kinds", {}) as Dictionary).has(kind)
+
+
+## The pose row this zombie shows now (Shambler rows carry a variant prefix).
+func art_row() -> String:
+	var pose := "walk_%d" % (int(_art_t) % 4)
+	if _flash > 0.5:
+		return "flash"
+	if kind == "tank":
+		match charge:
+			Charge.WINDUP:
+				pose = "roar_%d" % (int(Time.get_ticks_msec() / 125) % 2)
+			Charge.CHARGE:
+				pose = "charge"
+			Charge.STUMBLE:
+				pose = "stumble"
+	if art_pose_override != "":
+		pose = art_pose_override
+	if kind == "shambler" and pose != "flash":
+		var info: Dictionary = _art_meta.kinds.shambler
+		return "v%d_%s" % [get_instance_id() % int(info.variants), pose]   # no RNG: seeded spawns stay put
+	return pose
+
+
+func art_heading() -> int:
+	var n: int = int(_art_meta.get("headings", 16))
+	return posmod(int(round(global_rotation / (TAU / float(n)))), n)
+
+
+func _process(_delta: float) -> void:
+	if not active or not has_art():
+		return
+	if texture_filter != CanvasItem.TEXTURE_FILTER_NEAREST:
+		texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_art_t += position.distance_to(_art_last) / (6.0 if kind == "shambler" else 10.0)   # one frame per 6/10 px walked
+	_art_last = position
+	var key := art_heading() * 64 + art_row().hash() % 64
+	if key != _art_key:
+		_art_key = key
+		queue_redraw()
+
+
+func _draw_art() -> void:
+	var info: Dictionary = _art_meta.kinds[kind]
+	var row: Array = (info.rows as Dictionary).get(art_row(), info.rows.values()[0])
+	var fw: float = info.frame_w
+	var fh: float = info.frame_h
+	var src := Rect2(float(row[0]) + art_heading() * fw, float(row[1]), fw, fh)
+	draw_set_transform(Vector2.ZERO, -rotation, Vector2.ONE)   # sheets carry the heading; never rotate them
+	draw_texture_rect_region(_art_tex, Rect2(Vector2(-fw, -fh) * 0.5, Vector2(fw, fh)), src)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
 func _draw() -> void:
+	if has_art():
+		_draw_art()
+		draw_status(radius + 4.0)
+		return
 	match kind:
 		"brute":
 			_draw_body(1.45, T.COL_BRUTE, T.COL_ZOMBIE_DARK.darkened(0.2))
