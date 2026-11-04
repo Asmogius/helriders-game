@@ -123,7 +123,13 @@ static func target_for(rig: Node2D, slot: Dictionary, part_id: String) -> Sprite
 	var layers: Dictionary = rig.get("_layer_sprites")
 	var key := String(slot.key)
 	match key:
-		"chassis", "engine":
+		"engine":
+			# #64's engine_mount layer ("engine:<id>"); the hull only if this frame has none.
+			for id: String in layers:
+				if id.begins_with("engine:"):
+					return layers[id]
+			return hull
+		"chassis":
 			return hull
 		"drive", "armor_front", "armor_sides", "armor_rear":
 			var prefix := "drive:" if key == "drive" else "armor:"

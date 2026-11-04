@@ -82,6 +82,17 @@ func _run() -> void:
 	var rig: Node2D = g.get("preview")
 	var lit_any := false
 	var seen := {}
+	# Engine (#64): the engine_mount layer lights, not the whole hull.
+	g.open_slot(1)
+	for f in 3:
+		await process_frame
+	var eng: Sprite2D = focus.lit()
+	var eng_layer: Variant = null
+	for id: String in (rig.get("_layer_sprites") as Dictionary):
+		if id.begins_with("engine:"):
+			eng_layer = rig.get("_layer_sprites")[id]
+	check(eng_layer != null, "rig shows an engine layer")
+	check(eng != null and eng == eng_layer and eng != rig.get("_hull_art"), "engine slot lights the engine layer, not the hull")
 	for i in [0, 2, 3, 6]:   # chassis, drive, armor front, weapon 1
 		g.open_slot(i)
 		for f in 3:

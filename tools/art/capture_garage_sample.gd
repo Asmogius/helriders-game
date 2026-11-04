@@ -33,8 +33,8 @@ func _process(_delta: float) -> bool:
 			p.schematics.append("half_track")
 		p.scrap += 1000
 		p.apply_loadout(p.with_part(p.rig, "drive", 0, "half_track"))
-	if _frames == 40 and _mode in ["slot", "halftracks", "weapon"]:
-		_g.call("open_slot", {"slot": 3, "halftracks": 2, "weapon": 6}[_mode])
+	if _frames == 40 and _mode in ["slot", "halftracks", "weapon", "engine"]:
+		_g.call("open_slot", {"slot": 3, "halftracks": 2, "weapon": 6, "engine": 1}[_mode])
 	if _frames == 50 and _mode == "fade":
 		_g.call("show_tab", "RESEARCH")
 	if _frames == (57 if _mode == "fade" else 90):
