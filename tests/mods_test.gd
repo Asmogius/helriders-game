@@ -177,6 +177,9 @@ func _process(_delta: float) -> bool:
 				if bool(b.call("is_winding_up")):
 					mark.seen = true
 					var pr := float(b.call("windup_progress"))
+					var mm := root.get_node_or_null("MusicManager")
+					if mm != null:
+						mark.pitch_max = maxf(float(mark.get("pitch_max", 0.0)), float(mm.call("windup_pitch")))
 					mark.prog_ok = bool(mark.get("prog_ok", true)) and pr >= 0.0 and pr <= 1.0
 					if not mark.has("wind_speed"):
 						mark.wind_speed = (b.get("velocity") as Vector2).length()
@@ -187,6 +190,11 @@ func _process(_delta: float) -> bool:
 				_check(bool(mark.get("prog_ok", false)), "windup_progress() stays in 0..1 while winding up")
 				_check(main.bullets.enemy_shots > int(mark.shots), "its light gun fires while it lines up")
 				_check(int(b.get("charges")) >= 1, "after the 0.5 s wind-up it charges")
+				var mm := root.get_node("MusicManager")
+				_check(int(mm.sfx_counts.get("bulwark_windup", 0)) >= 1, "the wind-up plays the engine roar on Effects")
+				_check(float(mark.get("pitch_max", 0.0)) > float(T.SFX_WINDUP_PITCH[0]) + 0.1, "the roar's pitch rises with windup_progress() (%.2f)" % float(mark.get("pitch_max", 0.0)))
+				print("  ram impacts heard: %d (rams: %d)" % [int(mm.sfx_counts.get("ram_impact", 0)), int(b.get("backoffs"))])
+				_check(int(mm.sfx_counts.get("ram_impact", 0)) == int(b.get("backoffs")), "every ram on the player plays the ram impact")
 				b.call("take_damage", 1000000.0, Vector2.ZERO, false, "")
 				_next()
 		1:  # Outrider: flanks into the side/rear arcs, strafes, breaks on overheat

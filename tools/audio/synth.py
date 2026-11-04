@@ -347,3 +347,59 @@ write_ogg("sfx/rig_wrecked.ogg", oneshot(0.8, [(crunch, 0, 0)] + [(metal(r, 0.45
 tt = t_of(0.45)
 tone = lambda f: fade_tail(np.sin(2 * np.pi * f * tt) * env(len(tt), 0.004, 0.09) + 0.15 * np.sin(4 * np.pi * f * tt) * env(len(tt), 0.002, 0.03))
 write_ogg("sfx/results_confirm.ogg", oneshot(0.7, [(tone(330), 0, 0), (tone(247), 0.13, 0)], 0.1))
+
+# --- Combat SFX pass (Bulwark charge, Torcher, Sludger; PRs #16/#17) -------------
+r = np.random.default_rng(51)
+
+# Bulwark wind-up: diesel roar revving up over ~0.5 s. Firing pulses (AM) on a
+# rising detuned saw, a noisy intake rumble, gentle drive. In game its pitch
+# also follows windup_progress().
+d = 0.55; tt = t_of(d); n = len(tt)
+f = 48 + 52 * (tt / d) ** 1.4
+ph = np.cumsum(f) / SR
+eng = 0.6 * (2 * (ph % 1) - 1) + 0.4 * (2 * ((ph * 1.01 + 0.3) % 1) - 1)
+fire = 0.55 + 0.45 * np.sin(2 * np.pi * ph * 0.5) ** 2          # cylinder pulses
+rumble = lp(r.standard_normal(n), 400) * 0.6
+roar = sat(lp((eng * fire + rumble) * (0.35 + 0.65 * (tt / d)), 900 + 1400 * tt / d), 2.2)
+roar *= np.minimum(tt / 0.03, 1) * np.minimum((d - tt) / 0.04, 1)
+write_ogg("sfx/bulwark_windup.ogg", oneshot(d, [(roar, 0, 0)], 0.08, -17))
+
+# Ram impact: heavy low thud, crumpling metal, short scrape.
+thud = lp(sat(kick(r, 1.3, 0.6), 1.8), 1500)
+scrape = lp(hp(r.standard_normal(int(0.35 * SR)), 1200), 4000) * env(int(0.35 * SR), 0.01, 0.1) * 0.25
+write_ogg("sfx/ram_impact.ogg", oneshot(0.8, [(thud, 0, 0), (scrape, 0.03, 0.3)] +
+          [(metal(r, 0.5, f0, 0.3, 2200), 0.01 + 0.04 * i, r.uniform(-0.5, 0.5)) for i, f0 in enumerate([140, 210, 175])], 0.15, -16))
+
+# Torcher tank rupture: pressure hiss, then a fuel "whoomph" (noise swelling
+# through an opening filter) and crackle.
+L = 1.6; n = int(L * SR); tt = secs(n)
+hiss = hp(r.standard_normal(int(0.15 * SR)), 3000) * np.linspace(0.2, 0.6, int(0.15 * SR))
+whoomph_n = r.standard_normal(n)
+cut = 200 + 2200 * np.exp(-((tt - 0.25) / 0.18) ** 2)
+whoomph = onepole(whoomph_n, 1 - np.exp(-2 * np.pi * cut / SR)) * np.minimum(tt / 0.08, 1) * np.exp(-tt / 0.45)
+boom = lp(kick(r, 1.0, 0.8), 600)
+crackle = np.zeros(n)
+for _ in range(40):
+    i = int(r.uniform(0.15, 1.4) * SR); k = int(0.004 * SR)
+    crackle[i:i + k] += r.uniform(0.2, 0.6) * hp(r.standard_normal(k), 2000) * np.exp(-tt[i:i + k] * 0 - np.arange(k) / (0.001 * SR))
+crackle *= np.exp(-tt / 0.6)
+write_ogg("sfx/torcher_rupture.ogg", oneshot(L, [(hiss, 0, 0), (sat(1.4 * whoomph, 1.5), 0.1, 0), (boom, 0.1, 0), (crackle, 0, 0.3)], 0.25, -15))
+
+# Sludger acid shell fire: hollow mortar "thunk" plus a wet gurgle.
+tt = t_of(0.4)
+thunk = np.sin(2 * np.pi * np.cumsum(140 * np.exp(-tt / 0.08) + 70) / SR) * env(len(tt), 0.002, 0.07)
+pop = lp(r.standard_normal(len(tt)), 1800) * np.exp(-tt / 0.02) * 0.5
+gurgle = np.sin(2 * np.pi * np.cumsum(300 + 120 * np.sin(2 * np.pi * 23 * tt)) / SR) * env(len(tt), 0.03, 0.08) * 0.2
+write_ogg("sfx/acid_fire.ogg", oneshot(0.45, [(fade_tail(thunk + pop), 0, 0), (fade_tail(gurgle), 0.05, 0.2)], 0.12, -19))
+
+# Acid shell impact: wet splat, then a fizzing sizzle with bubble pops.
+L = 1.0; n = int(L * SR); tt = secs(n)
+splat = lp(r.standard_normal(int(0.12 * SR)), 1400) * env(int(0.12 * SR), 0.002, 0.03)
+sizzle = lp(hp(r.standard_normal(n), 4000), 9000) * np.minimum(tt / 0.05, 1) * np.exp(-tt / 0.35) * 0.35
+sizzle *= 0.7 + 0.3 * np.sin(2 * np.pi * 31 * tt)
+items = [(splat, 0, 0), (sizzle, 0.02, 0)]
+for _ in range(7):  # bubble blips: fast upward chirps
+    bd = 0.035; bt = t_of(bd); f0 = r.uniform(500, 1100)
+    b = np.sin(2 * np.pi * np.cumsum(f0 * (1 + 2 * bt / bd)) / SR) * env(len(bt), 0.002, 0.01) * 0.25
+    items.append((fade_tail(b), r.uniform(0.08, 0.7), r.uniform(-0.6, 0.6)))
+write_ogg("sfx/acid_impact.ogg", oneshot(L, items, 0.1, -19))

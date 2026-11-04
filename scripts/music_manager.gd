@@ -25,6 +25,11 @@ const SFX := {
 	"wreck_hit": "res://audio/sfx/wreck_hit.ogg",
 	"rig_wrecked": "res://audio/sfx/rig_wrecked.ogg",
 	"results": "res://audio/sfx/results_confirm.ogg",
+	"bulwark_windup": "res://audio/sfx/bulwark_windup.ogg",
+	"ram_impact": "res://audio/sfx/ram_impact.ogg",
+	"torcher_rupture": "res://audio/sfx/torcher_rupture.ogg",
+	"acid_fire": "res://audio/sfx/acid_fire.ogg",
+	"acid_impact": "res://audio/sfx/acid_impact.ogg",
 }
 const SFX_VOICES := 6
 
@@ -35,9 +40,12 @@ var _layers: Array[AudioStreamPlayer] = []
 var _wreck: AudioStreamPlayer
 var _voices: Array[AudioStreamPlayer] = []
 var _next_voice := 0
+var sfx_counts := {}                # id -> times played (tests)
 var _tweens := {}                   # player -> Tween
 var _sfx_cache := {}
 var _last_raise := -100.0
+var _windup: AudioStreamPlayer      # Bulwark engine roar; pitch follows the wind-up
+var _windup_rig: Node = null
 var _duck: AudioEffectAmplify       # on the Music bus; dips while the tree is paused
 ## Headless runs (tests, CI) set everything up but don't start playback: the
 ## dummy audio driver otherwise keeps playbacks alive past quit and Godot
@@ -57,11 +65,13 @@ func _ready() -> void:
 	_wreck = _player("Music")
 	for i in SFX_VOICES:
 		_voices.append(_player("Effects"))
+	_windup = _player("Effects")
 
 
 ## Music dips under the pause menu and the driver's radio call (any pause),
 ## so the settings volume stays the player's own.
 func _process(delta: float) -> void:
+	_follow_windup()
 	if _duck == null:
 		return
 	var target := T.MUSIC_PAUSE_DUCK_DB if get_tree().paused else 0.0
@@ -174,6 +184,45 @@ func end_combat() -> void:
 		mode = ""
 
 
+## A Bulwark starts its wind-up (`windup_started`): the engine roar plays on its
+## own voice and its pitch rises with the rig's windup_progress().
+func start_windup(rig: Node) -> void:
+	_windup_rig = rig
+	if not SFX.has("bulwark_windup"):
+		return
+	if not _sfx_cache.has("bulwark_windup"):
+		_sfx_cache["bulwark_windup"] = _load(SFX["bulwark_windup"], false)
+	_windup.stream = _sfx_cache["bulwark_windup"]
+	_windup.volume_db = 0.0
+	_windup.pitch_scale = T.SFX_WINDUP_PITCH[0]
+	sfx_counts["bulwark_windup"] = int(sfx_counts.get("bulwark_windup", 0)) + 1
+	_play(_windup)
+
+
+## The wind-up ended (it charged, rammed, wrecked or got stuck).
+func stop_windup(rig: Node) -> void:
+	if rig != _windup_rig:
+		return
+	_windup_rig = null
+	if _windup.playing:
+		_fade(_windup, T.MUSIC_SILENT_DB, 0.08, true)
+
+
+func _follow_windup() -> void:
+	if _windup_rig == null:
+		return
+	if not is_instance_valid(_windup_rig) or not _windup_rig.has_method("windup_progress"):
+		_windup_rig = null
+		return
+	var p: float = _windup_rig.call("windup_progress")
+	_windup.pitch_scale = lerpf(T.SFX_WINDUP_PITCH[0], T.SFX_WINDUP_PITCH[1], p)
+
+
+## Pitch the wind-up voice is at now (tests).
+func windup_pitch() -> float:
+	return _windup.pitch_scale
+
+
 ## One-shot effect on the Effects bus (round-robin voices).
 func play_sfx(id: String, volume_db := 0.0) -> void:
 	if not SFX.has(id):
@@ -181,6 +230,7 @@ func play_sfx(id: String, volume_db := 0.0) -> void:
 		return
 	if not _sfx_cache.has(id):
 		_sfx_cache[id] = _load(SFX[id], false)
+	sfx_counts[id] = int(sfx_counts.get(id, 0)) + 1
 	var p := _voices[_next_voice]
 	_next_voice = (_next_voice + 1) % _voices.size()
 	p.stream = _sfx_cache[id]
@@ -195,6 +245,6 @@ func _exit_tree() -> void:
 			tw.kill()
 	_tweens.clear()
 	_sfx_cache.clear()
-	for p: AudioStreamPlayer in [_yard, _wreck] + _layers + _voices:
+	for p: AudioStreamPlayer in [_yard, _wreck, _windup] + _layers + _voices:
 		p.stop()
 		p.stream = null

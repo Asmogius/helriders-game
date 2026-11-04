@@ -27,3 +27,15 @@ Key E (E, F, G, A#, B), 92 BPM for combat, 70 BPM for the garage.
 | audio/sfx/wreck_hit.ogg | Player rig wrecked | 1.6 s | Low-passed kick boom + filtered noise, scattered metal debris, room | Original, generated in-repo |
 | audio/sfx/rig_wrecked.ogg | Enemy rig wrecked | 0.8 s | Short low-passed crunch + three metal hits | Original, generated in-repo |
 | audio/sfx/results_confirm.ogg | Results card: dry confirmation | 0.7 s | Two short clean tones (E4, B3) | Original, generated in-repo |
+
+## Combat SFX pass (Bulwark charge, Torcher, Sludger)
+
+Same tool, same license (original, generated in-repo by `tools/audio/synth.py`).
+
+| File | Use | Length | How it was made | License |
+|---|---|---|---|---|
+| audio/sfx/bulwark_windup.ogg | Bulwark charge wind-up (pitch also follows `windup_progress()` in game, 0.9x to 1.25x) | 0.55 s | Detuned saw engine rising 48 to 100 Hz with cylinder-pulse AM, low-passed noise rumble, opening filter, soft drive, crescendo | Original, generated in-repo |
+| audio/sfx/ram_impact.ogg | Bulwark rams the player | 0.8 s | Low-passed driven kick thud, three low metal hits, short filtered scrape | Original, generated in-repo |
+| audio/sfx/torcher_rupture.ogg | Torcher's fuel tank ruptures | 1.6 s | Pressure hiss, noise "whoomph" through a swelling filter, low boom, decaying fire crackle | Original, generated in-repo |
+| audio/sfx/acid_fire.ogg | Sludger lobs a shell | 0.45 s | Pitch-dropping sine "thunk" + noise pop, wobbling wet gurgle | Original, generated in-repo |
+| audio/sfx/acid_impact.ogg | Acid shell (or Acid Lobber glob) lands | 1.0 s | Low-passed wet splat, fizzing high-passed sizzle, random rising bubble blips | Original, generated in-repo |

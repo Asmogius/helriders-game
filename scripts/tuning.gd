@@ -957,3 +957,6 @@ const MUSIC_SURVIVE_FINAL_SECONDS := 30.0   # Survive's last stretch (the final 
 const MUSIC_SURVIVE_FINAL_BOOST := 2
 const MUSIC_PAUSE_DUCK_DB := -12.0     # music under the pause menu / radio call
 const MUSIC_DUCK_FADE := 0.3
+
+# --- Combat SFX (first pass) -----------------------------------------------------
+const SFX_WINDUP_PITCH := [0.9, 1.25]   # Bulwark roar pitch at wind-up start / end

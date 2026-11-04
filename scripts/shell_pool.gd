@@ -106,6 +106,10 @@ func _burst(i: int) -> void:
 		var extra := _extra[i]
 		if extra.has("buildup_kind") and body.has_method("add_buildup"):
 			body.call("add_buildup", int(extra.buildup_kind), float(extra.buildup))
+	if _dtype[i] == "acid" or _extra[i].has("puddle_r"):
+		var music := get_node_or_null("/root/MusicManager")
+		if music != null:
+			music.play_sfx("acid_impact")
 	if _extra[i].has("puddle_r") and hazards != null:
 		hazards.call("add_acid", at, float(_extra[i].puddle_r), float(_extra[i].puddle_t), _team[i])
 

@@ -193,6 +193,7 @@ func _process(_delta: float) -> bool:
 				var behind := Vector2.RIGHT.rotated(float(t.get("rotation")) + PI)
 				t.call("take_damage", 50.0, behind, false, "")
 				_check(bool(t.get("ruptured")) and main.hazards.fire_count() > 0, "a 40+ rear hit ruptures the Torcher's tank into burning ground")
+				_check(int(root.get_node("MusicManager").sfx_counts.get("torcher_rupture", 0)) >= 1, "the rupture plays its sound")
 				t.call("take_damage", 100000.0, Vector2.ZERO, false, "")
 				_next()
 		4:  # Sludger: lobs alternating acid and goop shells
@@ -202,6 +203,8 @@ func _process(_delta: float) -> bool:
 			if frame == 420:
 				var s: Node = mark.s
 				_check(int(s.get("shells_thrown")) >= 2, "the Sludger lobs shells from range (%d)" % int(s.get("shells_thrown")))
+				var counts: Dictionary = root.get_node("MusicManager").sfx_counts
+				_check(int(counts.get("acid_fire", 0)) >= 2 and int(counts.get("acid_impact", 0)) >= 1, "acid shells play fire and impact sounds (%d / %d)" % [int(counts.get("acid_fire", 0)), int(counts.get("acid_impact", 0))])
 				s.call("take_damage", 100000.0, Vector2.ZERO, false, "")
 				_next()
 		5:  # Jammer, Goop Launcher, Scrapper in its own lit oil

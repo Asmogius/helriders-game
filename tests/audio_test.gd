@@ -71,6 +71,9 @@ func _run() -> void:
 	_check(str(music._layers[1].stream.resource_path) == MM.COURIER_MID, "Courier swaps in the tighter pulse")
 	music.play_wreck()
 	_check(music.mode == "wreck" and music._wreck.stream != null, "wreck plays the drone")
+	for id: String in ["bulwark_windup", "ram_impact", "torcher_rupture", "acid_fire", "acid_impact"]:
+		music.play_sfx(id)
+		_check(int(music.sfx_counts.get(id, 0)) >= 1, "%s plays on Effects" % id)
 	music.play_sfx("results")
 	_check(music._voices.any(func(v: AudioStreamPlayer) -> bool: return v.stream != null and v.bus == "Effects"), "results cue plays on Effects")
 
