@@ -435,6 +435,7 @@ const SCHEMATIC_DROP_CHANCE := 0.5     # a wrecked Outrider drops a schematic, e
 const SCRAP_CACHE := 20                # scrap in a cache crate
 const WRECK_PENALTY := 0.25            # a wreck costs this x the lost build's value in scrap
 const PRESET_COUNT := 3
+const PRESET_NAME_MAX := 18     # characters in a preset's name
 const BOARD_SIZE := 3                  # missions on the Comms board each day
 
 # Garage upgrade tracks: 3 levels each, bought with scrap.

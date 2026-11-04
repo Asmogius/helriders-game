@@ -11,9 +11,6 @@ const COLORS := {
 	"cross": Color(0.5, 0.7, 1.0),
 }
 
-## Ability index -> face button (Square, Triangle, Circle fire utilities 1-3).
-const ABILITY := ["square", "triangle", "circle"]
-
 
 static func draw(ci: CanvasItem, at: Vector2, glyph: String, r := 13.0) -> void:
 	ci.draw_circle(at, r, BG)

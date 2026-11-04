@@ -41,12 +41,33 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventJoypadButton and (event as InputEventJoypadButton).pressed:
 		device = event.device
 		set_active(true)
-		_route(int((event as InputEventJoypadButton).button_index))
-	elif event is InputEventJoypadMotion and absf((event as InputEventJoypadMotion).axis_value) > 0.5:
-		device = event.device
-		set_active(true)
+		var b := int((event as InputEventJoypadButton).button_index)
+		if capturing != "":
+			_capture(b)
+			get_viewport().set_input_as_handled()   # the press binds; it doesn't also click
+			return
+		_route(b)
+	elif event is InputEventJoypadMotion:
+		var m := event as InputEventJoypadMotion
+		if absf(m.axis_value) > 0.5:
+			device = event.device
+			set_active(true)
+		# L2 / R2 are axes: a pull past halfway counts as a press (rebindable).
+		if m.axis == JOY_AXIS_TRIGGER_LEFT or m.axis == JOY_AXIS_TRIGGER_RIGHT:
+			var k := 0 if m.axis == JOY_AXIS_TRIGGER_LEFT else 1
+			var down := m.axis_value > 0.6
+			if down and not _trig_down[k]:
+				var code := TRIGGER_BASE + int(m.axis)
+				if capturing != "":
+					_capture(code)
+					get_viewport().set_input_as_handled()
+				else:
+					_route(code)
+			if down or m.axis_value < 0.3:
+				_trig_down[k] = down
 	elif (event is InputEventScreenTouch and (event as InputEventScreenTouch).pressed) \
 			or (event is InputEventMouseButton and (event as InputEventMouseButton).pressed):
+		capturing = ""
 		set_active(false)
 
 
@@ -75,6 +96,8 @@ static func hint(touch: String, pad: String) -> String:
 
 ## A stick with the deadzone taken out (screen directions, like the thumb sticks).
 func stick(left: bool) -> Vector2:
+	if sticks_swapped():
+		left = not left
 	if override.has("left" if left else "right"):
 		return override["left" if left else "right"]
 	var v := Vector2(Input.get_joy_axis(device, JOY_AXIS_LEFT_X if left else JOY_AXIS_RIGHT_X),
@@ -85,10 +108,142 @@ func stick(left: bool) -> Vector2:
 	return v / l * clampf((l - DEAD) / (1.0 - DEAD), 0.0, 1.0)
 
 
-func r2() -> bool:
+## Is the FIRE button (R2 unless rebound) held?
+func fire_held() -> bool:
 	if override.has("r2"):
 		return bool(override.r2)
-	return Input.get_joy_axis(device, JOY_AXIS_TRIGGER_RIGHT) > TRIGGER
+	return held("fire")
+
+
+## Is the button bound to `action` held right now?
+func held(action: String) -> bool:
+	var code := binding(action)
+	if code >= TRIGGER_BASE:
+		return Input.get_joy_axis(device, (code - TRIGGER_BASE) as JoyAxis) > TRIGGER
+	return code >= 0 and Input.is_joy_button_pressed(device, code as JoyButton)
+
+
+# --- Button mapping (Settings > CONTROLLER) ---------------------------------------
+# Fight actions can be rebound to any pad button, L2 or R2; menus keep the
+# D-pad, Cross, Circle and L1 / R1. The map lives in Profile.settings
+# ("pad_map": action -> code, "pad_swap": sticks swapped), saved with the
+# other settings. Codes are Godot joypad buttons, or TRIGGER_BASE + axis for
+# L2 / R2.
+
+const TRIGGER_BASE := 100
+const ACTIONS := ["fire", "ability_1", "ability_2", "ability_3", "lock", "crew", "pause"]
+const ACTION_NAMES := {"fire": "FIRE", "ability_1": "UTILITY 1", "ability_2": "UTILITY 2", "ability_3": "UTILITY 3",
+	"lock": "LOCK", "crew": "CREW WHEEL", "pause": "PAUSE"}
+const DEFAULT_MAP := {"fire": TRIGGER_BASE + JOY_AXIS_TRIGGER_RIGHT, "ability_1": JOY_BUTTON_X, "ability_2": JOY_BUTTON_Y,
+	"ability_3": JOY_BUTTON_B, "lock": JOY_BUTTON_RIGHT_SHOULDER, "crew": JOY_BUTTON_LEFT_SHOULDER, "pause": JOY_BUTTON_START}
+## PlayStation names (Godot's buttons use the Xbox layout's positions).
+const BUTTON_NAMES := {JOY_BUTTON_A: "CROSS", JOY_BUTTON_B: "CIRCLE", JOY_BUTTON_X: "SQUARE", JOY_BUTTON_Y: "TRIANGLE",
+	JOY_BUTTON_BACK: "CREATE", JOY_BUTTON_GUIDE: "PS", JOY_BUTTON_START: "OPTIONS", JOY_BUTTON_LEFT_STICK: "L3",
+	JOY_BUTTON_RIGHT_STICK: "R3", JOY_BUTTON_LEFT_SHOULDER: "L1", JOY_BUTTON_RIGHT_SHOULDER: "R1",
+	JOY_BUTTON_DPAD_UP: "D-PAD UP", JOY_BUTTON_DPAD_DOWN: "D-PAD DOWN", JOY_BUTTON_DPAD_LEFT: "D-PAD LEFT",
+	JOY_BUTTON_DPAD_RIGHT: "D-PAD RIGHT", JOY_BUTTON_MISC1: "MUTE", JOY_BUTTON_TOUCHPAD: "TOUCHPAD",
+	TRIGGER_BASE + JOY_AXIS_TRIGGER_LEFT: "L2", TRIGGER_BASE + JOY_AXIS_TRIGGER_RIGHT: "R2"}
+
+signal map_changed
+var capturing := ""          # an action waiting for its new button (Settings), or ""
+var _trig_down := [false, false]
+
+
+func _settings() -> Dictionary:
+	var profile := get_node_or_null("/root/Profile")
+	return profile.get("settings") if profile != null else {}
+
+
+## The code bound to `action` (DEFAULT_MAP unless rebound).
+func binding(action: String) -> int:
+	var m: Variant = _settings().get("pad_map", {})
+	if m is Dictionary and (m as Dictionary).has(action):
+		return int(m[action])
+	return int(DEFAULT_MAP.get(action, -1))
+
+
+## The fight action a pressed code is bound to, or "".
+func action_for(code: int) -> String:
+	for a: String in ACTIONS:
+		if binding(a) == code:
+			return a
+	return ""
+
+
+## "R2", "SQUARE"... for an action's button.
+func button_name(action: String) -> String:
+	return code_name(binding(action))
+
+
+static func code_name(code: int) -> String:
+	return str(BUTTON_NAMES.get(code, "BUTTON %d" % code))
+
+
+## The HUD badge for an action: a face-button shape, or its short name.
+func badge(action: String) -> String:
+	var code := binding(action)
+	match code:
+		JOY_BUTTON_A:
+			return "cross"
+		JOY_BUTTON_B:
+			return "circle"
+		JOY_BUTTON_X:
+			return "square"
+		JOY_BUTTON_Y:
+			return "triangle"
+	var n := code_name(code)
+	return {"OPTIONS": "OPT", "CREATE": "CRT", "TOUCHPAD": "PAD", "D-PAD UP": "UP", "D-PAD DOWN": "DN",
+		"D-PAD LEFT": "LT", "D-PAD RIGHT": "RT", "MUTE": "MUT"}.get(n, n.left(3))
+
+
+## Bind `action` to `code`. An action already on that button swaps over to
+## this one's old button, so nothing is ever left unbound.
+func bind(action: String, code: int) -> void:
+	var m := {}
+	for a: String in ACTIONS:
+		m[a] = binding(a)
+	var old: int = m[action]
+	for a: String in ACTIONS:
+		if a != action and int(m[a]) == code:
+			m[a] = old
+	m[action] = code
+	_store("pad_map", m)
+
+
+func reset_map() -> void:
+	_store("pad_map", DEFAULT_MAP.duplicate())
+	_store("pad_swap", false)
+
+
+## Left stick aims and right stick drives (Settings).
+func sticks_swapped() -> bool:
+	return bool(_settings().get("pad_swap", false))
+
+
+func set_sticks_swapped(on: bool) -> void:
+	_store("pad_swap", on)
+
+
+## Wait for the next pad press and bind it to `action`.
+func start_capture(action: String) -> void:
+	capturing = action
+
+
+func cancel_capture() -> void:
+	capturing = ""
+
+
+func _capture(code: int) -> void:
+	var a := capturing
+	capturing = ""
+	bind(a, code)
+
+
+func _store(key: String, value: Variant) -> void:
+	var profile := get_node_or_null("/root/Profile")
+	if profile != null:
+		profile.call("set_setting", key, value)
+	map_changed.emit()
 
 
 # --- Buttons ---------------------------------------------------------------------

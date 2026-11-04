@@ -141,6 +141,7 @@ func _ready() -> void:
 		add_child(panel)
 
 	_toast = UI.label("", 22, T.COL_ORANGE)
+	_toast.z_index = 12   # above overlays and the menu
 	_toast.anchor_right = 1.0
 	_toast.offset_top = 100.0
 	_toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -934,6 +935,7 @@ func _open_overlay(title: String, body: Control) -> void:
 	_close_overlay()
 	close_sheet()
 	_overlay = Control.new()
+	_overlay.z_index = 10   # above the rig preview (its sprites draw at z 1-3)
 	_overlay.add_to_group("pad_modal")   # controller: focus stays in it, Circle closes it
 	_overlay.set_meta("pad_close", _close_overlay)
 	_overlay.anchor_right = 1.0
@@ -978,24 +980,28 @@ func _close_overlay() -> void:
 func _open_presets() -> void:
 	var body := VBoxContainer.new()
 	body.add_theme_constant_override("separation", 10)
-	body.add_child(UI.label("Save your current rig, or switch to a saved one. Parts you don't have are built for scrap.", 18, UI.TEXT_DIM))
+	body.add_child(UI.label("Save your current rig, or switch to a saved one. Parts you don't have are built for scrap. NAME gives a preset its own name.", 18, UI.TEXT_DIM))
 	for i in T.PRESET_COUNT:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 10)
 		var p := profile.preset(i)
-		var name_label := UI.label("P%d" % (i + 1), 24, T.COL_CYAN)
-		name_label.custom_minimum_size = Vector2(44, 0)
+		var name_label := UI.label(profile.preset_name(i), 22, T.COL_CYAN)
+		name_label.custom_minimum_size = Vector2(200, 0)
+		name_label.clip_text = true
 		row.add_child(name_label)
 		var summary := UI.label(_summary(p) if not p.is_empty() else "Empty", 18, UI.TEXT if not p.is_empty() else UI.TEXT_DIM)
 		summary.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		summary.clip_text = true
-		summary.custom_minimum_size = Vector2(380, 0)
+		summary.custom_minimum_size = Vector2(260, 0)
 		row.add_child(summary)
-		var save := _button("SAVE", 110)
+		var rename := _button("NAME", 100)
+		rename.pressed.connect(open_rename.bind(i))
+		row.add_child(rename)
+		var save := _button("SAVE", 100)
 		save.disabled = not profile.has_rig()
 		save.pressed.connect(func() -> void:
 			profile.save_preset(i)
-			toast("Saved to P%d" % (i + 1))
+			toast("Saved to %s" % profile.preset_name(i))
 			_open_presets())
 		row.add_child(save)
 		var cost := profile.build_cost(p) if not p.is_empty() else 0
@@ -1003,11 +1009,51 @@ func _open_presets() -> void:
 		load_button.disabled = p.is_empty() or cost > profile.scrap or p == profile.rig
 		load_button.pressed.connect(func() -> void:
 			if profile.load_preset(i):
-				toast("Loaded P%d" % (i + 1))
+				toast("Loaded %s" % profile.preset_name(i))
 			_close_overlay())
 		row.add_child(load_button)
 		body.add_child(row)
 	_open_overlay("PRESETS", body)
+
+
+var _rename_edit: LineEdit   # the name box while naming a preset
+
+
+## Name preset `index`: a text box (the phone's keyboard comes up), DONE / CANCEL.
+func open_rename(index: int) -> void:
+	var body := VBoxContainer.new()
+	body.add_theme_constant_override("separation", 12)
+	body.add_child(UI.label("Name this preset (up to %d letters). Leave it empty to go back to P%d." % [T.PRESET_NAME_MAX, index + 1], 18, UI.TEXT_DIM))
+	_rename_edit = LineEdit.new()
+	_rename_edit.max_length = T.PRESET_NAME_MAX
+	_rename_edit.placeholder_text = "P%d" % (index + 1)
+	_rename_edit.text = str(profile.preset_names[index]) if index < profile.preset_names.size() else ""
+	_rename_edit.custom_minimum_size = Vector2(520, 60)
+	_rename_edit.add_theme_font_size_override("font_size", 26)
+	_rename_edit.text_submitted.connect(func(_t: String) -> void: finish_rename(index))
+	body.add_child(_rename_edit)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	var done := _button("DONE", 160)
+	UI.accent(done, T.COL_CYAN)
+	done.pressed.connect(finish_rename.bind(index))
+	row.add_child(done)
+	var cancel := _button("CANCEL", 160)
+	cancel.pressed.connect(_open_presets)
+	row.add_child(cancel)
+	body.add_child(row)
+	_open_overlay("NAME %s" % profile.preset_name(index), body)
+	_rename_edit.grab_focus.call_deferred()   # brings up the keyboard
+	_rename_edit.caret_column = _rename_edit.text.length()
+
+
+func finish_rename(index: int) -> void:
+	if _rename_edit == null or not is_instance_valid(_rename_edit):
+		return
+	profile.rename_preset(index, _rename_edit.text)
+	toast("Preset named %s" % profile.preset_name(index))
+	_rename_edit = null
+	_open_presets()
 
 
 func _summary(loadout: Dictionary) -> String:
