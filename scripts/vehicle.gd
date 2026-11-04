@@ -426,8 +426,13 @@ func art_layer_modulate(_id: String) -> Color:
 ## frame for its own aim, placed on the hull's projected mount point.
 ## Gameplay (bodies, turret pivots, muzzles) is untouched.
 func _update_art() -> void:
+	# ==== P6 garage preview scale (art/garage-preview-scale) ====
+	# Art-only: `sc` and every `* sc` below in this function. Top-level art doesn't inherit the rig's scale: copy it (the garage preview
+	# shows the rig at RIG_SCALE 3.4), and scale every point offset by it.
+	var sc := absf(global_scale.x)
 	if _hull_art != null:
 		_hull_art.visible = visible
+		_hull_art.scale = Vector2(sc, sc)
 		_hull_art.global_position = global_position
 		_hull_art.heading = global_rotation
 		_hull_art.modulate = Color.WHITE if is_wrecked else Color.WHITE.lerp(Color(1.6, 1.4, 1.2), _flash * 0.6)
@@ -449,21 +454,24 @@ func _update_art() -> void:
 			continue
 		var a: Sprite2D = t.art
 		a.heading = t.global_rotation
+		a.scale = Vector2(sc, sc)
 		var base: Vector2 = t.global_position
 		if _hull_art != null:
-			base = global_position + _hull_art.point_offset(art_mount_name(i, total))
-		a.global_position = base - a.point_offset("pivot")
+			base = global_position + _hull_art.point_offset(art_mount_name(i, total)) * sc
+		a.global_position = base - a.point_offset("pivot") * sc
 		if t.glow != null:
 			t.glow.visible = t.hot and t.visible
-			t.glow.global_position = a.global_position + a.point_offset("muzzle")
+			t.glow.global_position = a.global_position + a.point_offset("muzzle") * sc
 	for k in _fixed_art.size():
 		var fa := _fixed_art[k]
 		fa.visible = visible and not is_wrecked
 		fa.heading = global_rotation
-		var at := global_position + Vector2(body_len * 0.35, 0.0).rotated(global_rotation)
+		fa.scale = Vector2(sc, sc)
+		var at := global_position + Vector2(body_len * 0.35, 0.0).rotated(global_rotation) * sc
 		if _hull_art != null and _hull_art.meta.has("points") and _hull_art.meta.points.has("nose_mount"):
-			at = global_position + _hull_art.point_offset("nose_mount")
-		fa.global_position = at - fa.point_offset("pivot")
+			at = global_position + _hull_art.point_offset("nose_mount") * sc
+		fa.global_position = at - fa.point_offset("pivot") * sc
+	# ==== end P6 garage preview scale ====
 
 
 ## Which hull point turret `index` of `total` sits on.
