@@ -66,18 +66,18 @@ class Canvas extends RefCounted:
 			image.set_pixelv(q, c)
 
 
-## Size a single map texture may have. RenderingDevice backends report it;
-## the GL Compatibility renderer exposes no query, and every GLES3 phone we
-## target (2020-era Adreno/Mali/PowerVR) does at least 4096, so assume that.
-## Tests and low-end fallbacks can force chunks with `max_texture_override`.
+## Size a single map texture may have, or 0 when it can't be queried.
+## RenderingDevice backends report it. The GL Compatibility renderer (ours)
+## exposes no query, so it gets 0 and the map stays in 4 chunks of <= 2048
+## (the V5.1 single-draw exception). Tests force a size with the override.
 static var max_texture_override := 0
 static func max_texture_size() -> int:
 	if max_texture_override > 0:
 		return max_texture_override
 	var rd := RenderingServer.get_rendering_device()
-	if rd != null:
-		return int(rd.limit_get(RenderingDevice.LIMIT_MAX_TEXTURE_SIZE_2D))
-	return 4096
+	if rd == null:
+		return 0
+	return int(rd.limit_get(RenderingDevice.LIMIT_MAX_TEXTURE_SIZE_2D))
 
 
 ## Atlas images, read on the main thread (texture reads are not thread-safe).
@@ -140,7 +140,7 @@ static func bake_images(data: Dictionary, src: Dictionary, single: bool) -> Arra
 
 ## Synchronous whole-map bake into textures (kept for tools): [[Rect2, ImageTexture], ...].
 static func bake_chunks(arena: Object) -> Array:
-	var imgs := bake_images(snapshot(arena), load_sources(), max_texture_size() >= maxi(int(T.WORLD_SIZE.x), int(T.WORLD_SIZE.y)))
+	var imgs := bake_images(snapshot(arena), load_sources(), max_texture_size() >= 4096)
 	var out: Array = []
 	for c: Array in imgs:
 		out.append([c[0], ImageTexture.create_from_image(c[1])])

@@ -30,17 +30,34 @@ static var outer_blocks_style := false
 var _chunks: Array = []        # [[Rect2, Texture2D], ...] from MapArt.bake_chunks
 var bake_ms := 0.0             # last bake, start to textures ready (perf captures)
 var bake_main_ms := 0.0        # of which spent on the main thread (atlas reads, uploads)
-var bake_peak_bytes := 0       # static memory peak above the pre-bake level
 var bake_bytes := 0            # GPU bytes of the baked map
 var bake_cached := false       # the last bake came from the cache (RESTART)
 var _task := -1                # WorkerThreadPool task while baking
 var _task_out: Array = []
 var _bake_t0 := 0
-var _mem0 := 0
 # Last bake, keyed by layout + variation (seed_for) + texture mode; one entry,
 # so RESTART of the same job skips the bake and memory stays bounded.
 static var _cache_key := ""
 static var _cache_chunks: Array = []
+# Bakes whose arena left the tree mid-bake: never waited on there (a quit must
+# not stall); reaped here once their worker finishes, results discarded.
+static var _orphans: Array[int] = []
+
+signal bake_finished
+
+
+## Drops the restart cache (the mission calls this when the player leaves the
+## job for the garage or menu; RESTART keeps it).
+static func clear_cache() -> void:
+	_cache_key = ""
+	_cache_chunks = []
+
+
+static func _reap_orphans() -> void:
+	for id: int in _orphans.duplicate():
+		if WorkerThreadPool.is_task_completed(id):
+			WorkerThreadPool.wait_for_task_completion(id)
+			_orphans.erase(id)
 
 
 func _init() -> void:
@@ -85,9 +102,9 @@ func is_styled() -> bool:
 
 
 func _setup_style() -> void:
+	_reap_orphans()
 	_bake_t0 = Time.get_ticks_usec()
-	_mem0 = OS.get_static_memory_usage()
-	var single := MapArt.max_texture_size() >= maxi(int(T.WORLD_SIZE.x), int(T.WORLD_SIZE.y))
+	var single := MapArt.max_texture_size() >= 4096
 	var data := MapArt.snapshot(self)
 	var key := "%s:%d:%d:%s" % [str(layout.get("id", "")), MapArt.seed_for(data), hash(str(layout.get("surfaces", []))), str(single)]
 	if key == _cache_key and not _cache_chunks.is_empty():
@@ -106,6 +123,7 @@ func _setup_style() -> void:
 	var out := _task_out
 	_task = WorkerThreadPool.add_task(func() -> void: out.append_array(MapArt.bake_images(data, src, single)), false, "map bake")
 	set_meta("bake_key", key)
+	process_mode = Node.PROCESS_MODE_ALWAYS   # keeps polling while the mission holds the start paused
 	set_process(true)
 
 
@@ -133,14 +151,17 @@ func _process(_delta: float) -> void:
 
 
 func _exit_tree() -> void:
-	if _task >= 0:   # never leave a worker writing into a freed arena
-		WorkerThreadPool.wait_for_task_completion(_task)
+	# Quit mid-bake: don't block on the worker. It only writes into its own
+	# array (not this node), so let it finish; it is reaped later, unused.
+	if _task >= 0:
+		_orphans.append(_task)
 		_task = -1
+		_task_out = []
 
 
 func _bake_done() -> void:
 	set_process(false)
-	bake_peak_bytes = maxi(0, int(OS.get_static_memory_peak_usage()) - _mem0)
+	process_mode = Node.PROCESS_MODE_INHERIT
 	var t1 := Time.get_ticks_usec()
 	var chunks: Array = []
 	for c: Array in _task_out:
@@ -149,10 +170,12 @@ func _bake_done() -> void:
 	bake_main_ms += (Time.get_ticks_usec() - t1) / 1000.0
 	bake_ms = (Time.get_ticks_usec() - _bake_t0) / 1000.0
 	if chunks.is_empty():
+		bake_finished.emit()
 		return
 	_cache_key = str(get_meta("bake_key", ""))
 	_cache_chunks = chunks
 	_use_chunks(chunks)
+	bake_finished.emit()
 
 
 func _use_chunks(chunks: Array) -> void:

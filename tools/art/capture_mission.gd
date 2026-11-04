@@ -7,7 +7,7 @@ extends SceneTree
 ##   ... -s res://tools/art/capture_mission.gd -- out_dir --all-layouts [--seed=N] [--type=clear]
 ## --style forces the Outer Blocks map style on (arena.gd `outer_blocks_style`; only
 ## Outer Blocks layouts change). --perf prints bake time, draw calls, texture memory
-## and FPS for each capture (FPS is meaningless under software rendering / vsync).
+## and FPS for each capture (peak RAM: tools/art/bake_mem.gd, one fresh process per layout) (FPS is meaningless under software rendering / vsync).
 ## Under --headless there is no rendered image: it prints an error and exits with code 2.
 ## With a layout picked, the camera pulls out to show the whole map.
 ## Tool only: runs on a throwaway profile (no save written), changes no gameplay.
@@ -139,7 +139,6 @@ func _print_perf() -> void:
 	var styled := false
 	var bake := 0.0
 	var main_ms := 0.0
-	var peak := 0
 	var cached := false
 	var map_draws := 0
 	var bytes := 0
@@ -147,7 +146,6 @@ func _print_perf() -> void:
 		styled = arena.is_styled()
 		bake = float(arena.bake_ms)
 		main_ms = float(arena.bake_main_ms)
-		peak = int(arena.bake_peak_bytes)
 		cached = bool(arena.bake_cached)
 		map_draws = (arena._chunks as Array).size()
 		bytes = int(arena.bake_bytes)
@@ -155,8 +153,8 @@ func _print_perf() -> void:
 	for f: float in _fps:
 		fps += f
 	fps /= maxf(1.0, _fps.size())
-	print("PERF layout=%s styled=%s bake_ms=%.0f main_thread_ms=%.1f peak_ram_mb=%.1f cached=%s map_draws=%d map_tex_mb=%.1f draw_calls=%d tex_mem_mb=%.1f fps=%.1f" % [
-		_layout, str(styled), bake, main_ms, peak / 1048576.0, str(cached), map_draws, bytes / 1048576.0,
+	print("PERF layout=%s styled=%s bake_ms=%.0f main_thread_ms=%.1f cached=%s map_draws=%d map_tex_mb=%.1f draw_calls=%d tex_mem_mb=%.1f fps=%.1f" % [
+		_layout, str(styled), bake, main_ms, str(cached), map_draws, bytes / 1048576.0,
 		int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)),
 		Performance.get_monitor(Performance.RENDER_TEXTURE_MEM_USED) / 1048576.0, fps])
 
