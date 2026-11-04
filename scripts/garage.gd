@@ -21,9 +21,12 @@ const Crew := preload("res://scripts/crew.gd")
 const Missions := preload("res://scripts/missions.gd")
 const MISSION_SCENE := "res://scenes/mission.tscn"
 const GameMenu := preload("res://scripts/game_menu.gd")
+const GarageTour := preload("res://scripts/garage_tour.gd")
 
 var auto_resume := true    # closed mid-job last time: go straight back in (tests switch it off)
 var menu: GameMenu
+var tour: GarageTour
+var tab := "GARAGE"        # the station on screen
 
 # Slot tags: the loadout slot, where its line points on the rig (rig-local
 # pixels), and which screen side the tag sits on (0 left, 1 right). Second
@@ -94,6 +97,8 @@ func _ready() -> void:
 	if auto_resume and profile.resume_job():
 		# Agreed with the owner: a job quit or closed mid-fight starts over.
 		get_tree().change_scene_to_file.call_deferred(MISSION_SCENE)
+	elif profile.tour_active:
+		start_tour.call_deferred()
 	theme = UI.make()
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 
@@ -238,6 +243,9 @@ func rebuild() -> bool:
 ## Launch today's job. No job yet: off to Comms to pick one. No Driver, or a
 ## turret no one can aim: off to the Inn.
 func deploy() -> void:
+	if profile.tour_active:
+		toast("Finish or skip the tour first")
+		return
 	if not profile.has_rig():
 		return
 	if not profile.has_mission():
@@ -1025,6 +1033,7 @@ func _upgrade_effect(key: String) -> String:
 
 
 func _on_tab(tab_name: String) -> void:
+	tab = tab_name
 	_comms.visible = tab_name == "COMMS"
 	_inn.visible = tab_name == "INN"
 	_saloon.visible = tab_name == "SALOON"
@@ -1439,6 +1448,7 @@ func open_menu() -> GameMenu:
 	menu = GameMenu.new()
 	menu.setup(profile, false)
 	menu.closed.connect(func() -> void: menu = null)
+	menu.tutorial_requested.connect(start_tutorial)
 	add_child(menu)
 	return menu
 
@@ -1449,3 +1459,23 @@ func _notification(what: int) -> void:
 			menu.back()
 		else:
 			open_menu()
+
+
+## The optional tutorial (MENU): the Training Run, then the garage tour.
+func start_tutorial() -> void:
+	if profile.tour_active:
+		return
+	profile.tutorial_active = true
+	get_tree().change_scene_to_file(MISSION_SCENE)
+
+
+func start_tour() -> GarageTour:
+	if tour != null or not profile.tour_active:
+		return tour
+	close_sheet()
+	tour = GarageTour.new()
+	tour.garage = self
+	tour.profile = profile
+	tour.finished.connect(func() -> void: tour = null)
+	add_child(tour)
+	return tour

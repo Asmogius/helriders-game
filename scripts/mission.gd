@@ -137,13 +137,21 @@ var optional_index := -1
 var optional_name := ""
 
 var menu: GameMenu              # the pause menu while it's open
+var tutorial := false           # the Training Run (optional, from MENU)
+var tut_step := 0               # 0 drive, 1 shoot, 2 lock, 3 rig, 4 salvage, 5 done
+var _tut_mark := {}
 var _seen_timer := 0.0
 var _events: Array = []          # [seconds, kind, kills that also trigger it (-1 = none), fired]
 
 
 func _ready() -> void:
 	profile = get_node("/root/Profile")
-	if not mission_override.is_empty():
+	tutorial = profile.tutorial_active or bool(mission_override.get("tutorial", false))
+	if tutorial:
+		spec = Missions.make("clear", 1, 1)
+		spec.name = "Training Run"
+		spec["tutorial"] = true
+	elif not mission_override.is_empty():
 		spec = mission_override
 	elif profile.has_mission():
 		spec = profile.active_mission
@@ -186,10 +194,18 @@ func _ready() -> void:
 	markers.z_index = 1
 
 	# The rig from the garage. Tests (or a missing rig) fall back to the starter.
-	var loadout: Dictionary = profile.rig if profile.has_rig() else Parts.STARTER_LOADOUT
-	vehicle.apply_stats(profile.build_stats(loadout))
-	vehicle.set_crew(crew_override if not crew_override.is_empty() else profile.seated_crew())
-	profile.start_run()
+	if tutorial:
+		# A loaner rig and crew: nothing of yours rides, nothing can be lost.
+		vehicle.apply_stats(Loadout.build(T.TUTORIAL_LOADOUT))
+		vehicle.cannot_wreck = true
+		var dice := RandomNumberGenerator.new()
+		dice.seed = 7
+		vehicle.set_crew([Crew.make("driver", "Common", dice), Crew.make("gunner", "Common", dice)])
+	else:
+		var loadout: Dictionary = profile.rig if profile.has_rig() else Parts.STARTER_LOADOUT
+		vehicle.apply_stats(profile.build_stats(loadout))
+		vehicle.set_crew(crew_override if not crew_override.is_empty() else profile.seated_crew())
+		profile.start_run()
 
 	_configure_mission()
 
@@ -465,6 +481,12 @@ func _configure_mission() -> void:
 	for i in maxi(convoy_count, 1):
 		convoys.append(ConvoyRig.new())
 	convoy = convoys[0] as ConvoyRig
+	if tutorial:
+		# Scripted: nothing comes on its own.
+		_events.clear()
+		zombies.spawn_budget = 0
+		zombies.start_count = 0
+		target_kills = 1 << 30
 	# Patcher: one, rolled per job; it waits for an ally to work on.
 	use_patcher = Missions.has_patcher(spec)
 	patchers.append(PatcherRig.new())
@@ -488,6 +510,8 @@ func _physics_process(delta: float) -> void:
 			profile.discover("enemies", str(z.kind))
 	vehicle.drive_input = hud.left_stick.output
 	vehicle.aim_input = hud.right_stick.output
+	if tutorial:
+		_tutorial_tick()
 	if auto_spawn_specials:
 		_run_events()
 	_collect_pickups()
@@ -622,6 +646,107 @@ func _on_crew_ability(kind: String, a: Dictionary) -> void:
 
 func return_to_garage() -> void:
 	Engine.time_scale = 1.0
+	if tutorial:
+		# Done: on to the garage tour (a sandbox; end_tour puts it all back).
+		profile.tutorial_active = false
+		if tut_step >= 5:
+			profile.begin_tour()
+	get_tree().change_scene_to_file(GARAGE_SCENE)
+
+
+# --- Tutorial: the Training Run ------------------------------------------------------
+
+const TUT_TIPS := [
+	"DRIVE: push the LEFT stick where you want to go. The rig turns to follow. Pull back to reverse.",
+	"SHOOT: push the RIGHT stick toward a zombie to aim the turret. Push it all the way to fire.",
+	"LOCK: tap the LOCK button. While it's on, your turret picks targets and fires by itself.",
+	"ENEMY RIG: an Outrider is coming. Keep moving, it shoots back. Wreck it.",
+	"SALVAGE: drive over the crate to pick up its schematic.",
+]
+
+
+func _tutorial_tick() -> void:
+	if not _tut_mark.has("step") or int(_tut_mark.step) != tut_step:
+		_tut_begin()
+	match tut_step:
+		0:
+			if vehicle.global_position.distance_to(_tut_mark.from) > 350.0:
+				_tut_next()
+		1:
+			if kills - int(_tut_mark.kills) >= 4:
+				_tut_next()
+		2:
+			if not bool(_tut_mark.get("spawned", false)):
+				if vehicle.lock_enabled:
+					_tut_mark.spawned = true
+					_tut_mark.kills = kills
+					hud.set_tip("Good. Now let LOCK do the aiming: just drive.")
+					_tut_spawn_pack(4)
+			elif kills - int(_tut_mark.kills) >= 4:
+				_tut_next()
+			elif zombies.active_zombies().is_empty():
+				_tut_spawn_pack(4 - (kills - int(_tut_mark.kills)))
+		3:
+			if outrider.is_wrecked:
+				_tut_next()
+		4:
+			if not salvage.is_empty():
+				_tut_next()
+
+
+func _tut_begin() -> void:
+	_tut_mark = {"step": tut_step, "kills": kills, "from": vehicle.global_position}
+	if tut_step < TUT_TIPS.size():
+		hud.set_tip(TUT_TIPS[tut_step])
+	match tut_step:
+		1:
+			_tut_spawn_pack(4)
+		3:
+			var o := spawn_outrider(_open_spot(650.0))
+			if o != null:
+				o.armor_max = o.armor_max * 0.6   # a softer one for practice
+				o.armor = o.armor_max
+		5:
+			hud.set_tip("")
+			state = State.CLEARED
+			hud.show_result("TRAINING DONE",
+				"That's the fight: drive, shoot, lock on, wreck rigs and haul their salvage home.\nNext, the garage: that's where salvage turns into parts.\nNothing here counted: no day passed and nothing was paid.",
+				"TO THE GARAGE", T.COL_CYAN)
+
+
+func _tut_next() -> void:
+	tut_step += 1
+	hud.banner("NICE", T.COL_CYAN, 1.0)
+
+
+func _tut_spawn_pack(count: int) -> void:
+	for i in maxi(count, 0):
+		zombies.spawn_at(_open_spot(360.0 + 40.0 * i), "shambler")
+
+
+## A clear spot about `dist` from the rig (not inside a building), with a
+## line of sight to it.
+func _open_spot(dist: float) -> Vector2:
+	var space := get_world_2d().direct_space_state
+	var q := PhysicsPointQueryParameters2D.new()
+	q.collision_mask = T.LAYER_WORLD
+	var start := randf() * TAU
+	for k in 16:
+		var at := vehicle.global_position + Vector2.RIGHT.rotated(start + TAU * k / 16.0) * dist
+		if at.x < 80.0 or at.y < 80.0 or at.x > T.WORLD_SIZE.x - 80.0 or at.y > T.WORLD_SIZE.y - 80.0:
+			continue
+		q.position = at
+		if space.intersect_point(q, 1).is_empty() and vehicle._has_los(at):
+			return at
+	return vehicle.global_position + Vector2.RIGHT.rotated(start) * dist
+
+
+## Leave the Training Run from the pause menu: back to the garage, no tour.
+func leave_tutorial() -> void:
+	menu = null
+	get_tree().paused = false
+	profile.tutorial_active = false
+	Engine.time_scale = 1.0
 	get_tree().change_scene_to_file(GARAGE_SCENE)
 
 
@@ -656,7 +781,8 @@ func open_menu() -> GameMenu:
 	Engine.time_scale = 1.0
 	get_tree().paused = true
 	menu = GameMenu.new()
-	menu.setup(profile, true)
+	menu.setup(profile, true, tutorial)
+	menu.leave_requested.connect(leave_tutorial)
 	menu.resumed.connect(_on_menu_closed)
 	menu.restart_requested.connect(restart_job)
 	hud.add_child(menu)
@@ -1255,6 +1381,8 @@ func _refresh_hud() -> void:
 
 
 func _status_line() -> String:
+	if tutorial:
+		return "TRAINING RUN   %d / 5" % mini(tut_step + 1, 5)
 	var tail := "      SCRAP  %d" % int(scrap)
 	match mission_type:
 		"survive":
@@ -1418,6 +1546,13 @@ func _drop(at: Vector2, pool: String, guaranteed: bool, cache: int, rig: Node = 
 func _on_outrider_wrecked(rig: EnemyRig) -> void:
 	camera.shake(0.6)
 	if _wrecked_again(rig):
+		return
+	if tutorial:
+		var crate := Pickup.new()
+		crate.part = Parts.get_part(T.TUTORIAL_PART)
+		crate.position = rig.global_position + (vehicle.global_position - rig.global_position).normalized() * 70.0
+		pickups.add_child(crate)
+		hud.banner("RIG DOWN", T.COL_CYAN)
 		return
 	_drop(rig.global_position, "outrider", false, T.SCRAP_CACHE, rig)
 	hud.banner("RIG DOWN  -  GRAB THE SALVAGE", T.COL_CYAN)

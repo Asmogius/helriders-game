@@ -8,6 +8,8 @@ extends Control
 signal resumed
 signal restart_requested
 signal closed
+signal tutorial_requested
+signal leave_requested
 
 const T := preload("res://scripts/tuning.gd")
 const UI := preload("res://scripts/ui_theme.gd")
@@ -16,6 +18,7 @@ const ProfileScript := preload("res://scripts/profile.gd")
 
 var profile: ProfileScript
 var in_job := false
+var in_tutorial := false     # the Training Run: LEAVE TUTORIAL instead of a resume-on-relaunch job
 var page := "main"            # main / settings / database
 var category := "parts"       # Database tab
 var restart_armed := false    # RESTART JOB needs a second tap
@@ -24,9 +27,10 @@ var _panel: PanelContainer
 var _body: VBoxContainer
 
 
-func setup(p: ProfileScript, job: bool) -> void:
+func setup(p: ProfileScript, job: bool, tutorial := false) -> void:
 	profile = p
 	in_job = job
+	in_tutorial = tutorial
 
 
 func _ready() -> void:
@@ -129,12 +133,23 @@ func _main_page() -> void:
 	if in_job:
 		_button("RESUME", resume, T.COL_CYAN)
 		_button("TAP AGAIN TO RESTART THE JOB" if restart_armed else "RESTART JOB", restart, T.COL_ORANGE if restart_armed else Color.TRANSPARENT)
+	if in_tutorial:
+		_button("LEAVE TUTORIAL", func() -> void: leave_requested.emit())
 	_button("SETTINGS", show_page.bind("settings"))
 	_button("DATABASE", show_page.bind("database"))
+	if not in_job:
+		_button("TUTORIAL", func() -> void: tutorial_requested.emit())
 	_button("QUIT GAME", quit_game)
 	if not in_job:
 		_button("CLOSE", close, T.COL_CYAN)
-	var note := UI.label("Quitting or closing the app mid-job puts you back into the same job next time, the fight reset." if in_job else "", 18, UI.TEXT_DIM)
+	var note_text := ""
+	if in_tutorial:
+		note_text = "The Training Run uses a loaner rig and crew. Nothing here counts and nothing can be lost."
+	elif in_job:
+		note_text = "Quitting or closing the app mid-job puts you back into the same job next time, the fight reset."
+	else:
+		note_text = "TUTORIAL: a guided Training Run on a loaner rig, then a tour of the garage. Costs no day; nothing is kept."
+	var note := UI.label(note_text, 18, UI.TEXT_DIM)
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_body.add_child(note)
 
