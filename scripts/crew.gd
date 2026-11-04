@@ -827,6 +827,10 @@ static func _apply_active(m: Dictionary, active: Dictionary) -> void:
 				if float(a.get("servos", 0.0)) > 0.0:   # Tight Servos
 					m.aim *= 1.25
 					m.lock *= 1.1
+			"tune_glow":   # Afterglow: Tune-Up's boosts fade out linearly over 4 s
+				var share := clampf(float(a.left) / T.AFTERGLOW_TIME, 0.0, 1.0)
+				m.speed *= 1.0 + float(a.speed) * share
+				m.fire *= 1.0 + float(a.fire) * share
 			"power_divert":
 				if float(a.get("grid", 0.0)) > 0.0:   # Grid Priority: utilities cool twice as fast
 					m.util_cd *= 0.5

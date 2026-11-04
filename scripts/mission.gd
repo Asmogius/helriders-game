@@ -345,6 +345,7 @@ func _ready() -> void:
 	hud.pause_pressed.connect(open_menu)
 	for b in barrels:
 		b.died.connect(func(_at: Vector2) -> void: profile.discover("hazards", "barrel_" + b.kind))
+		b.died.connect(_chain_reaction)
 	# Quality preset: how much is drawn, and how hard the camera shakes.
 	var q := profile.quality()
 	fx.density = float(q.fx)
@@ -575,6 +576,7 @@ func _physics_process(delta: float) -> void:
 		vehicle.aim_input = Vector2.ZERO
 		return
 	elapsed += delta
+	_tick_flare(delta)
 	_seen_timer -= delta
 	if _seen_timer <= 0.0:
 		_seen_timer = 1.0
@@ -603,6 +605,10 @@ func _physics_process(delta: float) -> void:
 
 func _process(_delta: float) -> void:
 	_pass_mark()
+	zombies.contagion = vehicle.has_sp("sp_contagion")
+	if vehicle.strip_pending > 0.0:
+		scrap += vehicle.strip_pending   # Strip Mine
+		vehicle.strip_pending = 0.0
 	_refresh_hud()
 	hud.right_stick.set_gauges(vehicle.weapon_gauges())
 	bullets.big_game = float(vehicle.crew_mod("big_game"))
@@ -718,12 +724,28 @@ func _on_crew_ability(kind: String, a: Dictionary) -> void:
 					if int(c.get("lock_priority")) >= 2 and c.global_position.distance_squared_to(vehicle.global_position) <= r2:
 						c.call("apply_status", 1.3 + weak, 1.0, float(a.time))
 						signal_flare_marks += 1
+			if vehicle.has_sp("sp_flashbang"):
+				# Flashbang: the ignition stuns zombies inside for 1.5 s.
+				for z in zombies.active_zombies():
+					if z.global_position.distance_squared_to(vehicle.global_position) <= r2:
+						z.status.trigger(StatusBars.SHOCK, T.FLASHBANG_STUN)
+						flashbanged += 1
+			if vehicle.has_sp("sp_magnesium") or vehicle.has_sp("sp_pinned"):
+				_flare = {"at": vehicle.global_position, "r": float(a.radius), "left": float(a.time),
+					"burn": vehicle.has_sp("sp_magnesium"), "pin": vehicle.has_sp("sp_pinned")}
 			fx.call("blast", vehicle.global_position, 60.0)
 		"magnet":
 			var r := float(a.radius)
 			for p in pickups.get_children():
 				if (p as Node2D).global_position.distance_to(vehicle.global_position) <= r:
+					var lay := (p as Node2D).global_position
+					if vehicle.has_sp("sp_second_look") and (p as Pickup).part.is_empty() and _rig_crate.values().has(p):
+						_second_look(p as Pickup)
 					_take_salvage(p as Pickup)
+					if vehicle.has_sp("sp_shrapnel_storm"):
+						# Shrapnel Storm: the pulled salvage tears through enemies where it lay.
+						vehicle.call("_area_hit", lay, T.SHRAPNEL_STORM_RADIUS, T.SHRAPNEL_STORM_DAMAGE, "")
+						shrapnel_storms += 1
 					if vehicle.has_sp("sp_scrap_plating") and _scrap_plating < 30.0:
 						var add := minf(2.0, 30.0 - _scrap_plating)   # Scrap Plating: 2 per pickup, cap 30
 						_scrap_plating += add
@@ -1462,7 +1484,7 @@ func _fail(title: String, detail: String) -> void:
 		_take_salvage(p as Pickup)
 	bank_report = profile.bank_run(int(scrap), _pending_ids())
 	profile.finish_day()
-	profile.bank_crew(0, injured_crew_ids(), bool(vehicle.crew_mod("triage")))
+	profile.bank_crew(0, _rest_ids(), bool(vehicle.crew_mod("triage")))
 	var lines := detail + "\nKill scrap +%d    Time %s" % [int(scrap), _clock(elapsed)]
 	for id: String in bank_report.unlocked:
 		lines += "\nNew schematic: " + Parts.describe(Parts.get_part(id))
@@ -1581,6 +1603,10 @@ func _add_kill(points: int, rig := false) -> void:
 		if vehicle.has_mod("cargo_bay"):
 			mult *= 1.0 + Mods.CARGO_BAY   # Hauler Frame's Cargo Bay mod
 	scrap += points * mult
+	if vehicle.ability_active("gold_rush"):
+		# Gold Rush's share of the kill (Safe Deposit banks it even on a wreck).
+		var gr := 1.0 + float((vehicle._active["gold_rush"] as Dictionary).get("bonus", 0.0))
+		gold_rush_scrap += points * mult * (1.0 - 1.0 / gr)
 	if state == State.RUNNING and mission_type == "clear" and kills >= target_kills and push_state == Push.NONE:
 		_succeed("BLOCK CLEARED", "", 1.0)
 
@@ -1681,6 +1707,7 @@ func _drop(at: Vector2, pool: String, guaranteed: bool, cache: int, rig: Node = 
 	var pickup := Pickup.new()
 	if rig != null:
 		_rig_crate[rig] = pickup
+		_crate_pool[pickup] = pool
 	var unknown := profile.unknown_schematics(Parts.DROP_POOLS[pool], _pending_ids())
 	var chance := minf(profile.schematic_chance() + float(vehicle.crew_mod("schematic")), 0.95)
 	if rig != null:
@@ -1805,6 +1832,11 @@ func _on_rig_revived(rig: EnemyRig) -> void:
 	_revived[rig] = true
 	kills -= 1
 	var crate: Variant = _rig_crate.get(rig)
+	if crate != null and is_instance_valid(crate) and (crate as Node).get_parent() == pickups and vehicle.has_sp("sp_snatch"):
+		# Snatch (Magpie): the crate is yours before the Patcher can take it back.
+		_take_salvage(crate as Pickup)
+		snatched += 1
+		crate = null
 	if crate != null and is_instance_valid(crate) and (crate as Node).get_parent() == pickups:
 		pickups.remove_child(crate)
 		_held_crate[rig] = crate
@@ -1909,6 +1941,61 @@ func _rig_wreck_perks(at: Vector2) -> void:
 
 
 var powder_kegs := 0   # tests
+var flashbanged := 0   # tests
+var shrapnel_storms := 0
+var snatched := 0
+var second_looks := 0
+var chain_reactions := 0
+var gold_rush_scrap := 0.0
+var _flare := {}
+var _crate_pool := {}
+
+
+## Magnesium (burns inside) and Pinned (no Hunter pounce) last as long as the Flare.
+func _tick_flare(delta: float) -> void:
+	if _flare.is_empty():
+		return
+	_flare.left = float(_flare.left) - delta
+	if float(_flare.left) <= 0.0:
+		_flare = {}
+		return
+	var at: Vector2 = _flare.at
+	var r := float(_flare.r)
+	if bool(_flare.burn):
+		for z in zombies.active_zombies():
+			if z.global_position.distance_to(at) <= r:
+				z.add_buildup(StatusBars.FIRE, T.MAGNESIUM_BUILDUP * delta)
+		for c: Node2D in lock_candidates():
+			if int(c.get("lock_priority")) >= 2 and c.has_method("add_buildup") and c.global_position.distance_to(at) <= r:
+				c.call("add_buildup", StatusBars.FIRE, T.MAGNESIUM_BUILDUP * delta)
+	if bool(_flare.pin):
+		for h in hunters:
+			if h.active and h.global_position.distance_to(at) <= r:
+				h.pinned_left = 0.2
+
+
+## Second Look (Magpie): a pulled rig crate that rolled scrap rolls again.
+func _second_look(p: Pickup) -> void:
+	second_looks += 1
+	var unknown := profile.unknown_schematics(Parts.DROP_POOLS[str(_crate_pool.get(p, "outrider"))], _pending_ids())
+	var chance := minf(profile.schematic_chance() + float(vehicle.crew_mod("schematic")), 0.95)
+	if not unknown.is_empty() and (always_drop_schematic or randf() < chance):
+		p.part = Parts.get_part(unknown.pick_random())
+
+
+## Chain Reaction (Demolisher): a barrel set off during Cook Off lights oil 200 px out.
+func _chain_reaction(at: Vector2) -> void:
+	if vehicle.ability_active("cook_off") and vehicle.has_sp("sp_chain_reaction"):
+		hazards.call("ignite_oil", at, T.CHAIN_REACTION_OIL)
+		chain_reactions += 1
+
+
+## Crew who rest after the job (Full Recovery: nobody).
+func _rest_ids() -> Array[int]:
+	if vehicle.has_sp("sp_full_recovery"):
+		var none: Array[int] = []
+		return none
+	return injured_crew_ids()
 
 
 func _salvage_plating() -> void:
@@ -1987,7 +2074,7 @@ func _succeed(title: String, detail: String, pay_mult: float) -> void:
 	bank_report = profile.bank_run(int(scrap) + pay, ids)
 	profile.finish_day()
 	# After the day ends, so tonight doesn't count toward anyone's rest.
-	var crew_lines := profile.bank_crew(roundi(skulls * T.PUSH_XP) if pushed else skulls, injured_crew_ids(), bool(vehicle.crew_mod("triage")))
+	var crew_lines := profile.bank_crew(roundi(skulls * T.PUSH_XP) if pushed else skulls, _rest_ids(), bool(vehicle.crew_mod("triage")))
 	var lines := "Job pay +%d    Kill scrap +%d    Time %s" % [pay, int(scrap), _clock(elapsed)]
 	if detail != "":
 		lines = detail + "\n" + lines
@@ -2151,6 +2238,11 @@ func _on_wrecked() -> void:
 	for m in profile.seated_crew():
 		aboard.append(str(m.name))
 	var penalty := profile.record_wreck()
+	var deposit := 0
+	if vehicle.has_sp("sp_safe_deposit") and gold_rush_scrap >= 1.0:
+		deposit = int(gold_rush_scrap)   # Safe Deposit: Gold Rush scrap survives the wreck
+		profile.scrap += deposit
+		scrap -= deposit
 	var saved := profile.last_wreck_survivors.duplicate()
 	var lost := aboard.filter(func(n: String) -> bool: return not saved.has(n))
 	profile.finish_day()
@@ -2169,6 +2261,8 @@ func _on_wrecked() -> void:
 		lines += "\nLast Rites: %s pulled through, resting %d days." % [", ".join(saved), T.LAST_RITES_REST]
 	if penalty > 0:
 		lines += "\nWreck penalty: -%d scrap." % penalty
+	if deposit > 0:
+		lines += "\nSafe Deposit: %d Gold Rush scrap kept." % deposit
 	if scrap >= 1.0 or not salvage.is_empty():
 		lines += "\nSalvage lost with the rig: %d scrap" % int(scrap)
 		if not salvage.is_empty():

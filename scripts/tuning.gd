@@ -500,6 +500,39 @@ const RESEARCH_MAX_LEVEL := {"Common": 5, "Uncommon": 8, "Rare": 12, "Epic": 16,
 # Part mods (DESIGN §14): the Research level each tier unlocks at.
 # Implement-03: ability numbers from DESIGN §14 (agreed), perk numbers from
 # proposal 01 §3.1. Gap-fillers are marked.
+# Implement-04 perk numbers. Approved (proposal 01 §3.1 / DESIGN §14 table):
+const AFTERBURN_WIDTH := 50.0        # trail width (px)
+const AFTERBURN_TIME := 3.0          # each patch burns 3 s
+const AFTERBURN_BUILDUP := 20.0      # fire buildup/s on contact
+const AFTERGLOW_TIME := 4.0
+const ARC_FEEDBACK_SHOCK := 30.0
+const ARC_FEEDBACK_CD := 0.5
+const BULLDOG_REEL_TO := 120.0
+const CHAIN_REACTION_OIL := 200.0
+const CONTAGION_RADIUS := 120.0
+const CONTAGION_BUILDUP := 40.0
+const COUNTERWEIGHT := 1.25
+const FLASHBANG_STUN := 1.5
+const MAGNESIUM_BUILDUP := 15.0      # fire buildup/s inside the Flare
+const SHRAPNEL_RADIUS := 40.0
+const STRIP_MINE_PER := 40.0         # armor per scrap
+const STRIP_MINE_CAP := 25.0
+const TAIL_SWIPE_SHARE := 0.6
+const RACING_LINE_ADD := 0.5
+# DRAFT (invented, pending review):
+const CLEAR_OUT_PUSH := 2.0          # DRAFT: Shockwave knockback x2 with Clear Out
+const JUGGERNAUT_FLING := 0.8        # DRAFT: the rammed rig is thrown at 1.8x the impact speed
+const SLINGSHOT_SPEED := 250.0       # DRAFT: "at speed" = over 250 px/s when Chain Drag ends
+const SLINGSHOT_FLING := 1.0         # DRAFT: the flung rig gets 100% of your velocity
+const SLINGSHOT_TIME := 1.5          # DRAFT: a wall crash within 1.5 s counts as the RAM
+const TAIL_SWIPE_TIME := 0.6         # DRAFT: "while swinging" = 0.6 s after the Bootleg Turn
+const NEAR_MISS_RANGE := 60.0        # DRAFT: an enemy round within 60 px that flies on
+const RACING_LINE_CAP := 3.0         # DRAFT: at most +3 s per Hard Line
+const SHRAPNEL_DAMAGE := 0.5         # DRAFT: splash = 50% of the round
+const SHRAPNEL_STORM_DAMAGE := 15.0  # DRAFT: per pulled item
+const SHRAPNEL_STORM_RADIUS := 80.0  # DRAFT: around where it lay
+const DRONE_BAIT_ORBIT := 160.0      # DRAFT: Bait Drones hover further out
+const DRONE_ZOMBIE_DPS := 8.0        # DRAFT: a zombie touching a drone (shambler dps)
 const POWER_DIVERT_CAP := 80.0       # +1 shield per unused power point, cap 80
 const DRONE_ORBIT := 70.0            # gap-filler: drones circle this far out
 const DRONE_RANGE := 380.0           # gap-filler: same reach as a 1000 px/s gun

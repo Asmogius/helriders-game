@@ -21,6 +21,9 @@ static func kind_of(dtype: String) -> int:
 	return T.STATUS_TYPES.find(dtype)
 
 
+var drain_mult := 1.0   # Clean Lines (Gearhead perk): 2x during Tune-Up
+
+
 func reset() -> void:
 	build.fill(0.0)
 	left.fill(0.0)
@@ -82,4 +85,4 @@ func tick(delta: float) -> void:
 			# Drain only for the time past the delay.
 			var over := minf(_quiet[k] - T.STATUS_DRAIN_DELAY, delta)
 			if over > 0.0:
-				build[k] = maxf(build[k] - T.STATUS_DRAIN * over, 0.0)
+				build[k] = maxf(build[k] - T.STATUS_DRAIN * drain_mult * over, 0.0)

@@ -22,6 +22,8 @@ var tanks_left := 0                      # Tanks still to come this job
 var alt_target: Node2D                   # Escort: the truck; each zombie goes for the nearer one
 var bait: Node2D                         # a GOOPED enemy rig (proposal 01): zombies near it go for it
 var bait_left := 0.0
+var contagion := false                   # the mission sets it while a Poisoner has Contagion
+var contagion_bursts := 0                # tests
 var speed_bonus := 1.0                   # Retrieve: the horde speeds up as the danger climbs
 var spawn_points: Array[Vector2] = []
 var spawn_budget := T.CLEAR_SHAMBLERS   # shamblers left to spawn this mission
@@ -254,4 +256,10 @@ func _on_zombie_died(at: Vector2, zombie: Zombie) -> void:
 					target.call("fill_status", StatusBars.GOOP)   # GOOPED: the mission marks the rig
 			"slimer":
 				hazards.add_slime(at, T.SLIME_PUDDLE_RADIUS)
+	if contagion and zombie.status.active(StatusBars.TOXIC):
+		# Contagion (Poisoner): a TOXIC zombie bursts, 40 toxic buildup within 120 px.
+		contagion_bursts += 1
+		for other in _active:
+			if other.position.distance_to(at) <= T.CONTAGION_RADIUS:
+				other.add_buildup(StatusBars.TOXIC, T.CONTAGION_BUILDUP)
 	zombie_killed.emit(at, zombie.kind)

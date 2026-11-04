@@ -38,6 +38,10 @@ var _rider := PackedFloat32Array() # Cook Off: share of damage added as a fire h
 var rider_hits := 0                # fire rider hits landed (tests)
 var _passed := PackedByteArray()   # targets a bullet has already gone through
 var _rail := PackedByteArray()     # Rail Line: rigs it may still pierce
+var _src: Array = []               # who fired it (Arc Feedback)
+var _flag := PackedByteArray()     # bit 0 Shrapnel round; bit 1 passed close to the player; bit 2 near-miss counted
+var _near := PackedFloat32Array()  # last distance to the player rig (Racing Line)
+var shrapnel_splashes := 0         # tests
 ## The player's rig: its mods and crew perks change player hits
 ## (player_pre_hit / player_post_hit on vehicle.gd).
 var player_rig: Node2D = null
@@ -62,6 +66,9 @@ func _ready() -> void:
 	_rider.resize(MAX_BULLETS)
 	_passed.resize(MAX_BULLETS)
 	_rail.resize(MAX_BULLETS)
+	_src.resize(MAX_BULLETS)
+	_flag.resize(MAX_BULLETS)
+	_near.resize(MAX_BULLETS)
 	var circle := CircleShape2D.new()
 	circle.radius = T.ARC_CHAIN_RANGE
 	_chain_query.shape = circle
@@ -69,7 +76,7 @@ func _ready() -> void:
 
 ## `dtype` is a damage type ("" kinetic, "fire", "acid", "shock"...); `life` > 0
 ## overrides the range (seconds of flight); `chain` makes a hit jump once.
-func fire(origin: Vector2, velocity: Vector2, damage: float, team := TEAM_PLAYER, pierce := 0, dtype := "", life := 0.0, chain := false, rider := 0.0) -> void:
+func fire(origin: Vector2, velocity: Vector2, damage: float, team := TEAM_PLAYER, pierce := 0, dtype := "", life := 0.0, chain := false, rider := 0.0, src: Node2D = null, shrapnel := false) -> void:
 	if team == TEAM_PLAYER:
 		shots_fired += 1
 	else:
@@ -86,6 +93,9 @@ func fire(origin: Vector2, velocity: Vector2, damage: float, team := TEAM_PLAYER
 	_chain[_count] = 1 if chain else 0
 	_rider[_count] = rider
 	_passed[_count] = 0
+	_src[_count] = src
+	_flag[_count] = 1 if shrapnel else 0
+	_near[_count] = INF
 	_rail[_count] = 1 if team == TEAM_PLAYER and player_rig != null and is_instance_valid(player_rig) and bool(player_rig.call("rail_line_ok")) else 0
 	_count += 1
 
@@ -124,7 +134,18 @@ func _physics_process(delta: float) -> void:
 				var by_player := _team[i] == TEAM_PLAYER and player_rig != null and is_instance_valid(player_rig)
 				if by_player:
 					dmg = float(player_rig.call("player_pre_hit", collider, dmg, dtype, int(_passed[i])))
+				var armor_before := float(collider.call("_armor_total")) if by_player and priority >= 2 and collider.has_method("_armor_total") else -1.0
+				var on_player := _team[i] != TEAM_PLAYER and player_rig != null and collider == player_rig
+				var shield_before := float(player_rig.get("shield")) if on_player else 0.0
 				collider.call("take_hit", dmg, _vel[i].normalized() * 140.0, "shot", dtype)
+				if armor_before >= 0.0 and is_instance_valid(collider):
+					player_rig.call("armor_dealt", armor_before - float(collider.call("_armor_total")))   # Strip Mine
+				if on_player:
+					player_rig.call("shot_by", _src[i], shield_before > 0.0)   # Arc Feedback
+				if by_player and (_flag[i] & 1) != 0:
+					# Shrapnel (Demolisher): a burst's last round splashes 40 px.
+					player_rig.call("_area_hit", hit.position, T.SHRAPNEL_RADIUS, dmg * T.SHRAPNEL_DAMAGE, dtype)
+					shrapnel_splashes += 1
 				var goes_on := (_pierce[i] > 0 and priority == 1) or (_rail[i] > 0 and priority >= 2)
 				if by_player and is_instance_valid(collider):
 					player_rig.call("player_post_hit", collider, dmg, dtype, goes_on)
@@ -159,6 +180,15 @@ func _physics_process(delta: float) -> void:
 			_remove(i)
 			continue
 		_pos[i] = to
+		if _team[i] != TEAM_PLAYER and player_rig != null and (_flag[i] & 4) == 0:
+			# Racing Line: an enemy round that comes close and then flies on is a near-miss.
+			var d := to.distance_to(player_rig.global_position)
+			if d < T.NEAR_MISS_RANGE:
+				_flag[i] |= 2
+			elif (_flag[i] & 2) != 0 and d > _near[i]:
+				_flag[i] |= 4
+				player_rig.call("near_miss")
+			_near[i] = d
 		if _life[i] <= 0.0:
 			_remove(i)
 			continue
@@ -179,6 +209,9 @@ func _remove(i: int) -> void:
 	_rider[i] = _rider[_count]
 	_passed[i] = _passed[_count]
 	_rail[i] = _rail[_count]
+	_src[i] = _src[_count]
+	_flag[i] = _flag[_count]
+	_near[i] = _near[_count]
 	if _count == 0:
 		queue_redraw()
 

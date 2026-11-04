@@ -263,7 +263,8 @@ func _charge_contact(target: Node2D, touching: bool, wall_normal: Vector2) -> vo
 	if hit:
 		charge_hits += 1
 		target.call("take_damage", T.TANK_CHARGE_DAMAGE * _taken_by(target), position - target.position)
-		target.set("velocity", (target.get("velocity") as Vector2) + charge_dir * T.TANK_SHOVE)
+		if not (target.has_method("immovable") and bool(target.call("immovable"))):   # Immovable Line
+			target.set("velocity", (target.get("velocity") as Vector2) + charge_dir * T.TANK_SHOVE)
 		target.rotation += randf_range(0.2, 0.4) * (1.0 if randf() < 0.5 else -1.0)
 		charge = Charge.WALK
 		charge_cooldown = T.TANK_CHARGE_COOLDOWN
