@@ -12,6 +12,47 @@ const GOOD := Color(0.45, 0.85, 0.5)
 const BAD := Color(0.95, 0.38, 0.3)
 
 
+# --- Fonts (P7 / V6.1) -----------------------------------------------------------
+# Black Ops One (SIL OFL 1.1, see docs/ART_CREDITS.md), the owner's pick for the
+# whole interface. If the file is missing the engine font stays (fallback rule).
+const FONT_PATH := "res://art/ui/fonts/BlackOpsOne-Regular.ttf"
+
+
+## The interface font, or the engine default if the art file is missing.
+static func font() -> Font:
+	if ResourceLoader.exists(FONT_PATH):
+		return load(FONT_PATH)
+	return ThemeDB.fallback_font
+
+
+## Makes every Control and every custom _draw that asks ThemeDB.fallback_font
+## use the interface font. Runs once, from the first make() (garage, menus) or
+## the fight HUD's _ready, whichever comes first; later calls do nothing.
+static func apply_fonts() -> void:
+	var f := font()
+	if ThemeDB.fallback_font == f:
+		return   # already applied
+	ThemeDB.fallback_font = f
+	var project := ThemeDB.get_project_theme()
+	if project != null:
+		project.default_font = f
+	ThemeDB.get_default_theme().default_font = f
+
+
+## Font size that fits `text` in `width` px: `size`, shrunk down to `min_size`.
+## Black Ops One is wide, so fixed-width HUD and card labels use this.
+static func fit_size(f: Font, text: String, width: float, size: int, min_size := 10) -> int:
+	var s := size
+	while s > min_size and f.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, s).x > width:
+		s -= 1
+	return s
+
+
+## draw_string that never spills past `width` (shrinks the font instead).
+static func draw_fit(canvas: CanvasItem, f: Font, at: Vector2, text: String, align: HorizontalAlignment, width: float, size: int, color: Color) -> void:
+	canvas.draw_string(f, at, text, align, width, fit_size(f, text, width, size), color)
+
+
 # --- Icons (P7 / V6.3) ------------------------------------------------------------
 # 16 px white glyphs from tools/art/icons.py, tinted when drawn.
 const ArtAtlas := preload("res://scripts/art_atlas.gd")
@@ -25,7 +66,9 @@ static func icons() -> RefCounted:
 
 
 static func make() -> Theme:
+	apply_fonts()
 	var th := Theme.new()
+	th.default_font = font()
 	th.default_font_size = 22
 	th.set_color("font_color", "Label", TEXT)
 	th.set_color("font_outline_color", "Label", Color(0, 0, 0, 0.8))
