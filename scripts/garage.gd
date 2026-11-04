@@ -466,9 +466,7 @@ func _build_top_bar() -> void:
 	var presets := _button("PRESETS", 150)
 	presets.pressed.connect(_open_presets)
 	bar.add_child(presets)
-	var upgrades := _button("UPGRADES", 170)
-	upgrades.pressed.connect(_open_upgrades)
-	bar.add_child(upgrades)
+	# Rig upgrades (fabrication / loot / salvage) moved to RESEARCH (Cameron); UI hosts them there.
 	_rebuild = _button("REBUILD", 200)
 	_rebuild.pressed.connect(rebuild)
 	UI.accent(_rebuild, T.COL_CYAN)
@@ -1090,53 +1088,6 @@ func _summary(loadout: Dictionary) -> String:
 			if str(id) != "":
 				names.append(str(Parts.get_part(str(id)).name))
 	return " / ".join(names)
-
-
-func _open_upgrades() -> void:
-	var body := VBoxContainer.new()
-	body.add_theme_constant_override("separation", 12)
-	body.add_child(UI.label("Scrap  %d" % profile.scrap, 22, T.COL_ORANGE))
-	for key: String in ["fabrication", "loot", "salvage"]:
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 14)
-		var info := VBoxContainer.new()
-		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		info.add_child(UI.label(str(T.UPGRADES[key].name), 24, UI.TEXT))
-		info.add_child(UI.label(_upgrade_effect(key), 17, UI.TEXT_DIM))
-		row.add_child(info)
-		var level := profile.upgrade_level(key)
-		var max_level: int = (T.UPGRADES[key].costs as Array).size()
-		row.add_child(UI.label("LV %d/%d" % [level, max_level], 22, T.COL_CYAN))
-		var cost := profile.upgrade_cost(key)
-		var buy := _button("MAXED" if cost < 0 else "BUY  %d" % cost, 170)
-		buy.disabled = cost < 0 or cost > profile.scrap
-		buy.pressed.connect(func() -> void:
-			if profile.buy_upgrade(key):
-				toast("%s upgraded" % str(T.UPGRADES[key].name))
-			_open_upgrades())
-		row.add_child(buy)
-		body.add_child(row)
-	_open_overlay("GARAGE UPGRADES", body)
-
-
-func _upgrade_effect(key: String) -> String:
-	var level := profile.upgrade_level(key)
-	var step: float = T.UPGRADES[key].per_level
-	var next := level + 1
-	var max_level: int = (T.UPGRADES[key].costs as Array).size()
-	var now_text := ""
-	var next_text := ""
-	match key:
-		"fabrication":
-			now_text = "Parts cost %d%% less" % roundi(step * level * 100.0)
-			next_text = "%d%%" % roundi(step * next * 100.0)
-		"loot":
-			now_text = "Outrider schematic drop chance %d%%" % roundi(profile.schematic_chance() * 100.0)
-			next_text = "%d%%" % roundi(minf(T.SCHEMATIC_DROP_CHANCE + step * next, 0.95) * 100.0)
-		"salvage":
-			now_text = "Scrap from kills +%d%%" % roundi(step * level * 100.0)
-			next_text = "+%d%%" % roundi(step * next * 100.0)
-	return now_text if level >= max_level else "%s    (next: %s)" % [now_text, next_text]
 
 
 func _on_tab(tab_name: String) -> void:

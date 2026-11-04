@@ -56,6 +56,21 @@ func _run() -> void:
 				check((b as Button).size.y >= UI.MIN_TOUCH, "%s: action button %s touch size" % [sz, (b as Button).text])
 		var bar: Control = (g.get("_deploy") as Control).get_parent()
 		check(bar.visible and bar.position.y + bar.size.y <= sz.y - g.FOOTER_H + 0.5, "%s: action bar above the tabs" % sz)
+	# V5: the garage preview (only) wears the HD sheets, with a contact shadow.
+	var prev: Node2D = g.get("preview")
+	if DirAccess.dir_exists_absolute(GarageLayout.HD_DIR):
+		check(prev.get("art_dir") == GarageLayout.HD_DIR, "preview uses the HD sheets")
+		var hull: Sprite2D = prev.get("_hull_art")
+		if hull != null:
+			check(int(hull.meta.get("px_per_voxel", 1)) == 2 and String(hull.meta_path).begins_with(GarageLayout.HD_DIR), "HD hull sheet, 2 px per voxel")
+			check(is_equal_approx(hull.scale.x * 2.0, absf(prev.global_scale.x)), "HD sheet drawn at half scale (same size on screen)")
+	var plain: Node = load("res://scripts/vehicle.gd").new()
+	check(plain.get("art_dir") == "", "rigs outside the garage keep the normal sheets")
+	plain.free()
+	check((g.get("_rig_holder") as Node).get_node_or_null("ContactShadow") != null, "contact shadow under the rig")
+	# Rig upgrades moved to RESEARCH: no UPGRADES button here.
+	for b: Node in ((g.get("_deploy") as Control).get_parent()).get_children():
+		check(not (b is Button and (b as Button).text == "UPGRADES"), "no UPGRADES on the workshop screen")
 	# Focus: opening a slot lights that part's sprite; closing clears it.
 	var focus: Node = null
 	for c in g.get_children():

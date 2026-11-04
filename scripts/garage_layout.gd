@@ -5,7 +5,7 @@ extends RefCounted
 ##           the part sheet under that when a slot is open
 ##   right:  the stats, one panel (always on; shows now -> after while previewing)
 ##   bottom: one action bar above the station tabs (BACK / EQUIP while a slot
-##           is open, PRESETS / UPGRADES / REBUILD / DEPLOY otherwise)
+##           is open, PRESETS / REBUILD / DEPLOY otherwise; rig upgrades live on RESEARCH)
 ## No callout lines: the open slot's part lights up on the rig (garage_focus.gd).
 ## garage.gd builds the nodes as before and calls apply() from _layout(),
 ## _layout_tags() and _show_stat_sheet(), so the rarity code (P1) is untouched.
@@ -114,6 +114,7 @@ static func apply(g: Control) -> void:
 		title.clip_text = true
 		title.size = Vector2(right.end.x - centre.position.x - 4.0 * UI.GRID, 4.0 * UI.GRID)
 		title.add_theme_font_size_override("font_size", 15)
+	_hd_preview(g, holder)
 	var zoom := OPEN_SCALE if open else RIG_ZOOM
 	holder.position = rig_area.get_center()
 	holder.scale = Vector2.ONE * zoom
@@ -205,3 +206,37 @@ static func _action_bar(g: Control, size: Vector2, footer_h: float, open: bool, 
 	for c: Node in g.get_children():
 		if c.has_meta("v23_menu"):
 			_place(c as Control, Rect2(safe.end.x - 18.0 * UI.GRID, safe.position.y - UI.GRID, 18.0 * UI.GRID, TOP_H))
+
+
+## V5 sample: the preview rig wears the HD sheets (art/sprites_hd/, 2 px per
+## voxel, soft light + AO) and gets a soft contact shadow on the pad.
+const HD_DIR := "res://art/sprites_hd/"
+static var hd_enabled := true   # profile_garage.gd "sd" compares without it
+
+
+static func _hd_preview(g: Control, holder: Node2D) -> void:
+	var rig: Node2D = g.get("preview")
+	if rig == null:
+		return
+	var want := HD_DIR if hd_enabled and DirAccess.dir_exists_absolute(HD_DIR) else ""
+	if rig.get("art_dir") != want:
+		rig.set("art_dir", want)
+	if holder.get_node_or_null("ContactShadow") == null:
+		var sh := Node2D.new()
+		sh.name = "ContactShadow"
+		sh.draw.connect(_draw_shadow.bind(sh, rig, float(g.RIG_SCALE)))
+		holder.add_child(sh)
+		holder.move_child(sh, 0)   # under the rig
+
+
+## Stepped (pixel) soft shadow: 4 nested ellipses, darkest in the middle.
+static func _draw_shadow(sh: Node2D, rig: Node2D, scale: float) -> void:
+	var l: float = float(rig.get("body_len")) * scale * 0.62
+	var w: float = float(rig.get("body_wid")) * scale * 0.62
+	for k in 4:
+		var f := 1.0 - k * 0.12
+		var pts := PackedVector2Array()
+		for i in 32:
+			var a := TAU * i / 32.0
+			pts.append(Vector2(cos(a) * l * f, sin(a) * w * f + w * 0.12))
+		sh.draw_colored_polygon(pts, Color(0, 0, 0, 0.2))

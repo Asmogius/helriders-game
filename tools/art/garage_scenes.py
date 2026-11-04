@@ -114,8 +114,18 @@ def build(X, Y=240, Z=78):
             for y in range(cy - r // 2, cy + r // 2 + 1):
                 if rng.random() < 0.7:
                     g[x, y, 0] = IDX["garage_oil"]
-    # plain back wall, no corrugation detail
+    # back wall: plain sheet with a few panel seams, a steel baseboard and a
+    # rail at the top (v5: a little richer, still calm)
     box(g, 0, X, 0, 8, 0, Z, "garage_wall")
+    for x in range(mid % 48, X, 48):
+        box(g, x, x + 1, 8, 9, 6, Z - 6, "steel_dark")
+    box(g, 0, X, 8, 10, 0, 5, "steel_dark")
+    box(g, 0, X, 8, 9, Z - 6, Z - 4, "steel_dark")
+    # two quiet props at the far edges, in the vignette: a tyre pair (left)
+    # and a low tool chest (right), well away from the cards and stats
+    tyre_stack(g, 40, 30, 2)
+    box(g, X - 70, X - 40, 12, 26, 0, 14, "steel_dark")
+    box(g, X - 69, X - 41, 13, 25, 14, 15, "rust")
     # floor pad (the old lift, quieter): dark disc, thin steel rim, a few cyan
     # marker dots instead of the busy hazard ring
     cyl(g, mid, ly, 44, 1, 3, "steel_dark")
@@ -146,7 +156,7 @@ def vignette(img, lx, ly, rx, ry, floor=0.45):
 def render(g, cols, view_w, lift):
     X, Y, Z = g.shape
     canvas = int(math.hypot(X, Y)) + Z + 8
-    img = render_frame(g, cols, 0.0, canvas=canvas)
+    img = render_frame(g, cols, 0.0, canvas=canvas, hd=True)   # v5: soft light + baked AO
     # project the lift centre to crop around it
     t = math.radians(30.0)
     cx, cy = X / 2.0, Y / 2.0

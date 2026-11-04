@@ -64,7 +64,13 @@ func point_offset(point: String, at := -1) -> Vector2:
 	if not meta.has("points") or not meta.points.has(point):
 		return Vector2.ZERO
 	var o: Array = meta.points[point][frame if at < 0 else at]
-	return Vector2(float(o[0]), float(o[1]))
+	return Vector2(float(o[0]), float(o[1])) / ppv()
+
+
+## Sheet pixels per voxel: 1 in game, 2 for the garage HD sheets. Offsets come
+## back in voxel-pixels and the sprite scale divides by it, so both match.
+func ppv() -> float:
+	return float(meta.get("px_per_voxel", 1))
 
 
 ## Texture of a wreck chunk's sheet (same frame layout as the composite).
