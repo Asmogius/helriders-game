@@ -10,11 +10,16 @@ const T := preload("res://scripts/tuning.gd")
 const UI := preload("res://scripts/ui_theme.gd")
 const Parts := preload("res://scripts/parts.gd")
 const ProfileScript := preload("res://scripts/profile.gd")
+const RigUpgrades := preload("res://scripts/rig_upgrades.gd")
 
 const CATEGORY_ORDER := ["Chassis", "Engine", "Drive", "Armor", "Weapon", "Internal", "Utility"]
 const RARITY_ORDER := ["Common", "Uncommon", "Rare", "Epic", "Legendary"]
 const LIST_W := 600.0
 const ROW_H := 62.0
+# TODO(p7-layout-grid #57): use UI.MIN_TOUCH / UI.MARGIN / UI.GAP once on main.
+const MIN_TOUCH := 64.0
+const MARGIN := 20.0
+const GAP := 14.0
 
 var profile: ProfileScript
 var selected := ""        # schematic id shown on the right
@@ -29,6 +34,12 @@ var _stats: VBoxContainer
 var _note: Label
 var _level_up: Button
 var _upgrades: Control
+var showing_rig := false   # the RIG UPGRADES view instead of the schematic list
+var _rig_toggle: Button
+var _schematic_view: Array[Control] = []
+var _rig_view: PanelContainer
+var _rig_scrap: Label
+var _rig_rows: VBoxContainer
 
 
 func _ready() -> void:
@@ -48,13 +59,19 @@ func _ready() -> void:
 	var bar := HBoxContainer.new()
 	bar.anchor_left = 1.0
 	bar.anchor_right = 1.0
-	bar.offset_left = -400.0
-	bar.offset_right = -20.0
+	bar.offset_left = -640.0
+	bar.offset_right = -MARGIN
 	bar.offset_top = 10.0
-	bar.offset_bottom = 60.0
+	bar.offset_bottom = 10.0 + MIN_TOUCH
 	bar.alignment = BoxContainer.ALIGNMENT_END
+	bar.add_theme_constant_override("separation", int(GAP))
 	add_child(bar)
+	_rig_toggle = _button("RIG UPGRADES", 240)
+	_rig_toggle.custom_minimum_size.y = MIN_TOUCH
+	_rig_toggle.pressed.connect(func() -> void: show_rig_upgrades(not showing_rig))
+	bar.add_child(_rig_toggle)
 	var upgrades := _button("UPGRADES", 170)
+	upgrades.custom_minimum_size.y = MIN_TOUCH
 	upgrades.pressed.connect(open_upgrades)
 	bar.add_child(upgrades)
 
@@ -68,6 +85,7 @@ func _ready() -> void:
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.scroll_deadzone = 14
 	add_child(scroll)
+	_schematic_view.append(scroll)
 	_rows = VBoxContainer.new()
 	_rows.custom_minimum_size = Vector2(LIST_W - 16.0, 0)
 	_rows.add_theme_constant_override("separation", 8)
@@ -82,6 +100,7 @@ func _ready() -> void:
 	panel.offset_top = 96.0
 	panel.offset_bottom = -12.0
 	add_child(panel)
+	_schematic_view.append(panel)
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 8)
 	panel.add_child(column)
@@ -104,6 +123,7 @@ func _ready() -> void:
 	_level_up.pressed.connect(level_selected)
 	column.add_child(_level_up)
 
+	_build_rig_view()
 	profile.changed.connect(refresh)
 	refresh()
 
@@ -159,6 +179,7 @@ func refresh() -> void:
 	for id in ids:
 		_rows.add_child(_make_row(id))
 	_fill_detail()
+	refresh_rig()
 
 
 func _first_levelable(ids: Array[String]) -> String:
@@ -309,6 +330,98 @@ static func _num(v: float) -> String:
 
 static func _pct(v: float) -> String:
 	return "%+d%%" % roundi(v * 100.0)
+
+
+# --- Rig upgrades view -------------------------------------------------------------
+# The rig tracks (Fabrication Discount, Loot Quality, Salvage Yield), moved here
+# from the garage Workshop. Display only: buying goes through
+# profile.buy_upgrade, exactly as the garage overlay does.
+
+func _build_rig_view() -> void:
+	_rig_view = PanelContainer.new()
+	_rig_view.anchor_right = 1.0
+	_rig_view.anchor_bottom = 1.0
+	_rig_view.offset_left = MARGIN
+	_rig_view.offset_right = -MARGIN
+	_rig_view.offset_top = 96.0
+	_rig_view.offset_bottom = -12.0
+	_rig_view.visible = false
+	add_child(_rig_view)
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", int(GAP))
+	_rig_view.add_child(column)
+	var head := HBoxContainer.new()
+	var title := UI.label("RIG UPGRADES", 30, T.COL_ORANGE)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(title)
+	_rig_scrap = UI.label("", 26, T.COL_ORANGE)
+	head.add_child(_rig_scrap)
+	column.add_child(head)
+	_rig_rows = VBoxContainer.new()
+	_rig_rows.add_theme_constant_override("separation", int(GAP))
+	column.add_child(_rig_rows)
+	var note := UI.label("Bought with scrap. Every rig you build gets them.", 18, UI.TEXT_DIM)
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD
+	column.add_child(note)
+
+
+func show_rig_upgrades(on: bool) -> void:
+	showing_rig = on
+	for c: Control in _schematic_view:
+		c.visible = not on
+	_rig_view.visible = on
+	if on:
+		UI.accent(_rig_toggle, T.COL_CYAN)
+	else:
+		for state: String in ["normal", "hover", "pressed"]:
+			_rig_toggle.remove_theme_stylebox_override(state)
+		_rig_toggle.remove_theme_color_override("font_color")
+	_rig_toggle.text = "SCHEMATICS" if on else "RIG UPGRADES"
+	refresh_rig()
+
+
+func refresh_rig() -> void:
+	if _rig_view == null:
+		return
+	_rig_scrap.text = "Scrap  %d" % profile.scrap
+	for c in _rig_rows.get_children():
+		_rig_rows.remove_child(c)
+		c.queue_free()
+	for key: String in RigUpgrades.KEYS:
+		var row := HBoxContainer.new()
+		row.custom_minimum_size.y = 96.0
+		row.add_theme_constant_override("separation", int(GAP))
+		var info := VBoxContainer.new()
+		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		info.alignment = BoxContainer.ALIGNMENT_CENTER
+		info.add_child(UI.label(str(T.UPGRADES[key].name), 28, UI.TEXT))
+		var effect := UI.label(RigUpgrades.effect_text(profile, key), 20, UI.TEXT_DIM)
+		effect.autowrap_mode = TextServer.AUTOWRAP_WORD
+		info.add_child(effect)
+		row.add_child(info)
+		var level := profile.upgrade_level(key)
+		var max_level: int = (T.UPGRADES[key].costs as Array).size()
+		var lv := UI.label("LV %d/%d" % [level, max_level], 26, T.COL_CYAN)
+		lv.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(lv)
+		var cost := profile.upgrade_cost(key)
+		var buy := _button("MAXED" if cost < 0 else "BUY  %d" % cost, 240)
+		buy.name = "Buy_" + key
+		buy.custom_minimum_size.y = MIN_TOUCH
+		buy.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		buy.disabled = cost < 0 or cost > profile.scrap
+		if not buy.disabled:
+			UI.accent(buy, T.COL_ORANGE)
+		buy.pressed.connect(buy_rig_upgrade.bind(key))
+		row.add_child(buy)
+		_rig_rows.add_child(row)
+
+
+## Buy the next level of a rig track (same call as the garage). Returns success.
+func buy_rig_upgrade(key: String) -> bool:
+	var ok := profile.buy_upgrade(key)
+	refresh_rig()
+	return ok
 
 
 # --- Upgrades overlay ------------------------------------------------------------
