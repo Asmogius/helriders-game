@@ -18,22 +18,10 @@ from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-import inspect  # noqa: E402
 import voxel_render  # noqa: E402
 from voxel_render import write_import  # noqa: E402
 
-# voxel_render.render_frame culls side faces with view = (0, -sin t, cos t), so
-# it draws the up-screen (north) sides and drops the south sides, which the
-# projection and depth order say face the camera. Small free-standing rigs hide
-# this; a room can't (no back-wall face, holes in front of objects). The sample
-# renders through a local copy with the sign fixed; fixing the shared renderer
-# would re-render every rig sheet, so it's raised in the PR instead.
-_src = inspect.getsource(voxel_render.render_frame).replace(
-    "view = np.array([0.0, -st, ct])", "view = np.array([0.0, st, ct])")
-assert "[0.0, st, ct]" in _src
-_ns = dict(vars(voxel_render))
-exec(_src, _ns)
-render_frame = _ns["render_frame"]
+from voxel_render import render_frame  # noqa: E402  (side-face fix landed in #56)
 from palette import PALETTE  # noqa: E402
 
 OUT = os.path.join(HERE, "..", "..", "art", "garage")
