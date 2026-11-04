@@ -40,7 +40,9 @@ var _passed := PackedByteArray()   # targets a bullet has already gone through
 var _rail := PackedByteArray()     # Rail Line: rigs it may still pierce
 var _src: Array = []               # who fired it (Arc Feedback)
 var _flag := PackedByteArray()     # bit 0 Shrapnel round; bit 1 passed close to the player; bit 2 near-miss counted
-var _near := PackedFloat32Array()  # last distance to the player rig (Racing Line)
+var _near := PackedFloat32Array()   # last distance to the player rig (Racing Line)
+var _style := PackedByteArray()    # V4.3 tracer look (tracer_styles.gd); visual only
+var next_style := -1               # set by the shooter just before fire(); -1 = team default
 var shrapnel_splashes := 0         # tests
 ## The player's rig: its mods and crew perks change player hits
 ## (player_pre_hit / player_post_hit on vehicle.gd).
@@ -69,6 +71,7 @@ func _ready() -> void:
 	_src.resize(MAX_BULLETS)
 	_flag.resize(MAX_BULLETS)
 	_near.resize(MAX_BULLETS)
+	_style.resize(MAX_BULLETS)
 	var circle := CircleShape2D.new()
 	circle.radius = T.ARC_CHAIN_RANGE
 	_chain_query.shape = circle
@@ -96,6 +99,7 @@ func fire(origin: Vector2, velocity: Vector2, damage: float, team := TEAM_PLAYER
 	_src[_count] = src
 	_flag[_count] = 1 if shrapnel else 0
 	_near[_count] = INF
+	_style[_count] = next_style if next_style >= 0 else (0 if team == TEAM_PLAYER else 1)
 	_rail[_count] = 1 if team == TEAM_PLAYER and player_rig != null and is_instance_valid(player_rig) and bool(player_rig.call("rail_line_ok")) else 0
 	_count += 1
 
@@ -211,6 +215,7 @@ func _remove(i: int) -> void:
 	_rail[i] = _rail[_count]
 	_src[i] = _src[_count]
 	_flag[i] = _flag[_count]
+	_style[i] = _style[_count]
 	_near[i] = _near[_count]
 	if _count == 0:
 		queue_redraw()
@@ -251,13 +256,73 @@ func _chain_hit(first: Node2D, at: Vector2, damage: float, team: int, dtype: Str
 		from = best.global_position
 
 
-func _draw() -> void:
-	for i in _count:
-		var head := _pos[i]
-		var tail := head - _vel[i].normalized() * TRAIL
-		if _team[i] == TEAM_PLAYER:
-			draw_line(tail, head, T.COL_ORANGE, 3.0)
-			draw_rect(Rect2(head - Vector2(2.0, 2.0), Vector2(4.0, 4.0)), Color(1.0, 0.9, 0.6))
+# --- V4.3 style sample (P2): tracers with a short glowing tail from the fx
+# atlas (additive). Missing atlas -> the line + dot below (fallback). --------
+const ArtAtlas := preload("res://scripts/art_atlas.gd")   # P0 atlas loader
+const TracerStyles := preload("res://scripts/tracer_styles.gd")
+var _tracer: RefCounted
+var _tracer_tried := false
+
+
+func _tracer_atlas() -> RefCounted:
+	if not _tracer_tried:
+		_tracer_tried = true
+		_tracer = ArtAtlas.load_atlas("res://art/fx/fx_atlas")
+		if _tracer.ok() and _tracer.has("tracer_glow"):
+			var m := CanvasItemMaterial.new()
+			m.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+			material = m
+			texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		else:
-			draw_line(tail, head, T.COL_ENEMY, 3.0)
-			draw_rect(Rect2(head - Vector2(2.0, 2.0), Vector2(4.0, 4.0)), Color(1.0, 0.6, 0.55))
+			_tracer = null
+	return _tracer
+
+
+func style_of(i: int) -> Dictionary:
+	return TracerStyles.style_at(_style[i])
+
+
+func _draw_tracers(a: RefCounted) -> void:
+	var tex: Texture2D = a.texture
+	var glow: Rect2 = a.region("tracer_glow")
+	var core: Rect2 = a.region("tracer_core")
+	for i in _count:
+		var st := style_of(i)
+		var head := _pos[i]
+		var ang := _vel[i].angle()
+		var length: float = TRAIL * float(st.length)
+		var width: float = st.width
+		var dash: int = st.dash
+		var col: Color = st.glow
+		if dash <= 0:
+			draw_set_transform(head, ang, Vector2(length / glow.size.x * 1.15, width))
+			draw_texture_rect_region(tex, Rect2(Vector2(-glow.size.x + 2.0, -glow.size.y * 0.5), glow.size), glow, col)
+		else:
+			# Dashes: n short streaks with gaps, fading toward the tail.
+			var seg := length / float(dash) * 0.6
+			for k in dash:
+				var at := head - _vel[i].normalized() * (length / float(dash)) * k
+				var c := col
+				c.a *= 1.0 - 0.3 * k
+				draw_set_transform(at, ang, Vector2(seg / glow.size.x * 1.6, width))
+				draw_texture_rect_region(tex, Rect2(Vector2(-glow.size.x + 2.0, -glow.size.y * 0.5), glow.size), glow, c)
+		var cc: Color = st.core
+		if cc.a > 0.0:
+			draw_set_transform(head, ang, Vector2(clampf(float(st.length), 0.5, 1.4), maxf(1.0, width)))
+			draw_texture_rect_region(tex, Rect2(Vector2(-core.size.x + 1.0, -core.size.y * 0.5), core.size), core, cc)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+func _draw() -> void:
+	var a := _tracer_atlas()
+	if a != null:
+		_draw_tracers(a)
+		return
+	for i in _count:
+		var st := style_of(i)
+		var head := _pos[i]
+		var tail := head - _vel[i].normalized() * TRAIL * float(st.length)
+		draw_line(tail, head, st.glow, 3.0 * float(st.width))
+		var cc: Color = st.core
+		if cc.a > 0.0:
+			draw_rect(Rect2(head - Vector2(2.0, 2.0), Vector2(4.0, 4.0)), cc)

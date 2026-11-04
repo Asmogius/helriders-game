@@ -18,6 +18,7 @@ signal crew_ability_used(kind: String, ability: Dictionary)   # Mark, Flare, Mag
 signal status_started(kind: int)   # a status bar filled (StatusBars index)
 signal revived                     # a Patcher brought this wreck back
 
+const TracerStyles := preload("res://scripts/tracer_styles.gd")   # P2 V4.3 tracer looks (visual only; see the P2 sections below)
 const T := preload("res://scripts/tuning.gd")
 const Hostile := preload("res://scripts/hostile.gd")
 const BulletPool := preload("res://scripts/bullet_pool.gd")
@@ -281,6 +282,7 @@ func apply_stats(s: Dictionary) -> void:
 	_reload_left.clear()
 	_heat.clear()
 	_overheated.clear()
+	_cache_tracer_styles()   # P2 V4.3 look: resolved once per mount, shots reuse it
 	for w in gun_stats:
 		_cooldowns.append(0.0)
 		_burst_left.append(0)
@@ -1547,10 +1549,33 @@ func _shoot(w: Dictionary, muzzle: Vector2, direction: Vector2) -> void:
 	if chain and has_mod("overload_coil") and _gun_overloaded(gun_stats.find(w)):
 		jumps = T.OVERLOAD_COIL_JUMPS
 		_perk_fired("overload_coil")
+	# ==== P2 V4.3 tracer look (art/sample-fx): visual only ====
+	bullets.next_style = tracer_style_of(w)
+	# ==== end P2 tracer look ====
 	for p in pellets:
 		var dir := direction.rotated(randf_range(-cone, cone))
 		bullets.fire(muzzle, dir * speed * randf_range(0.95, 1.05) if pellets > 1 else dir * speed, damage, team, pierce, dtype, 0.0, chain, rider, self,
 				_last_of_burst and has_sp("sp_shrapnel"), jumps)   # Shrapnel: the burst's last round splashes
+	bullets.next_style = -1   # P2 V4.3 tracer look: reset after the volley
+
+
+# ==== P2 V4.3 tracer looks (art/sample-fx) =========================================
+# Visual only: never read by damage, range, speed or fire rate. Each weapon's
+# tracer style index (player and enemy team) is resolved once in apply_stats()
+# and stored on the weapon under "_tracer"; _shoot() only reads it.
+
+func _cache_tracer_styles() -> void:
+	for w: Dictionary in gun_stats:
+		var id := str(w.get("id", ""))
+		w["_tracer"] = Vector2i(TracerStyles.index_for(id, false), TracerStyles.index_for(id, true))
+
+
+## The cached tracer style for weapon `w` on this rig's team (no lookup per shot).
+func tracer_style_of(w: Dictionary) -> int:
+	var c: Vector2i = w.get("_tracer", Vector2i.ZERO)
+	return c.x if team == BulletPool.TEAM_PLAYER else c.y
+
+# ==== end P2 V4.3 tracer looks ======================================================
 
 
 # --- Utilities ---------------------------------------------------------------------
@@ -2240,6 +2265,7 @@ class EnemyStatusBar extends Node2D:
 
 
 class CableLine extends Node2D:
+	const HARPOON_STYLE: Dictionary = TracerStyles.STYLES.harpoon   # P2 V4.3 look, resolved once
 	## The Harpoon's spear flash and its cable, in world space.
 	var _a := Vector2.ZERO
 	var _b := Vector2.ZERO
@@ -2274,7 +2300,12 @@ class CableLine extends Node2D:
 			draw_line(_a, _b, Color(0.8, 0.78, 0.6), 2.5)
 			draw_circle(_b, 4.0, Color(0.6, 0.6, 0.62))
 		elif _flash > 0.0:
-			draw_line(_a, _b, Color(0.9, 0.9, 0.85, _flash * 4.0), 3.0)
+			# ==== P2 V4.3 Harpoon look (art/sample-fx): cable plus a bright spear head ====
+			var a := clampf(_flash * 4.0, 0.0, 1.0)
+			draw_line(_a, _b, Color(HARPOON_STYLE.glow, a), 1.5 * float(HARPOON_STYLE.width))
+			var head_dir := (_b - _a).normalized()
+			draw_line(_b - head_dir * 14.0, _b, Color(HARPOON_STYLE.core, a), 3.0 * float(HARPOON_STYLE.width))
+			# ==== end P2 Harpoon look ====
 
 
 # --- Flag mods and specialty perks (proposal 01, implement-03) ----------------------
