@@ -38,9 +38,19 @@ func _ready() -> void:
 	resized.connect(queue_redraw)
 	visibility_changed.connect(_update_process)
 	var profile: Node = get_node_or_null("/root/Profile")
-	if profile != null and str(profile.get("settings").get("quality", "High")) == "Low":
-		animate = false
+	if profile != null:
+		# Re-read the preset whenever settings change, so toggling Low/High
+		# in the options takes effect on frames already on screen.
+		profile.changed.connect(_read_quality.bind(profile))
+		_read_quality(profile)
 	_update_process()
+
+
+## Animation follows the quality preset: off on Low, on otherwise.
+func _read_quality(profile: Node) -> void:
+	var low := str(profile.get("settings").get("quality", "High")) == "Low"
+	if animate == low:
+		animate = not low
 
 
 func tier() -> int:

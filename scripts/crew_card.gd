@@ -7,11 +7,18 @@ const UI := preload("res://scripts/ui_theme.gd")
 const Crew := preload("res://scripts/crew.gd")
 const SIZE := Vector2(286, 300)
 
-var member := {}:
+var member = {}:   # untyped so callers can clear it with null
 	set(v):
-		member = v
-		if not v.is_empty():   # V1.3: crew cards wear the shared rarity frame
-			UI.rarity_frame(self, str(v.get("rarity", "Common")))
+		member = v if v != null else {}
+		var f: Control = get_node_or_null("RarityFrame")
+		if v == null or v.is_empty():   # cleared: no member, no frame
+			if f != null:
+				f.hide()
+			queue_redraw()
+			return
+		# V1.3: crew cards wear the shared rarity frame
+		UI.rarity_frame(self, str(v.get("rarity", "Common"))).show()
+		queue_redraw()
 var status := ""
 var status_color := UI.TEXT_DIM
 var selected := false
