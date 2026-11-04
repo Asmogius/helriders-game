@@ -26,7 +26,6 @@ const Parts := preload("res://scripts/parts.gd")
 const RARITIES := ["Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic"]
 const MAX_LEVEL := [5, 8, 11, 14, 17, 20]
 const PERK_LEVELS := [3, 6, 9, 12, 15, 18]
-const MYTHIC_COLOR := Color(1.0, 0.36, 0.42)
 
 # Every class, in seat order. Driver and Gunner have their own seats; the rest
 # take a frame's open seats, one of each class aboard.
@@ -395,10 +394,7 @@ static func role_color(member: Dictionary) -> Color:
 
 
 static func color_of(member: Dictionary) -> Color:
-	var rarity := str(member.get("rarity", "Common"))
-	if rarity == "Mythic":
-		return MYTHIC_COLOR
-	return Parts.RARITY_COLORS.get(rarity, Color.WHITE)
+	return T.RARITY_COLORS.get(str(member.get("rarity", "Common")), Color.WHITE)
 
 
 # §14 renames: Welder -> Gearhead, Overclocker -> Conduit, Combat Medic -> Poisoner.

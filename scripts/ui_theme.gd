@@ -83,3 +83,36 @@ static func draw_skull(canvas: CanvasItem, center: Vector2, r: float, color: Col
 	else:
 		canvas.draw_arc(cranium, r * 0.8, 0.0, TAU, 20, PANEL_EDGE, 2.0)
 		canvas.draw_rect(jaw, PANEL_EDGE, false, 2.0)
+
+
+# --- Rarity helpers (P0 / VISUAL_PLAN V1.1) ------------------------------------
+# Every screen asks these for rarity colour; nothing else defines one.
+
+const RarityFrame := preload("res://scripts/rarity_frame.gd")
+
+
+## The colour of a rarity name ("Common" .. "Mythic"); white if unknown.
+static func rarity_color(r: String) -> Color:
+	return T.RARITY_COLORS.get(r, Color.WHITE)
+
+
+## 1 (Common) .. 6 (Mythic); 0 if unknown. Drives the pip row.
+static func rarity_tier(r: String) -> int:
+	return T.RARITY_ORDER.find(r) + 1
+
+
+## Adds (or updates) a rarity frame on `control`: border plus top strip and a
+## pip row. One child drawer, ignores the mouse, draws only when changed.
+static func rarity_frame(control: Control, r: String) -> Control:
+	var f: Control = control.get_node_or_null("RarityFrame")
+	if f == null:
+		f = RarityFrame.new()
+		f.name = "RarityFrame"
+		control.add_child(f)
+	f.set("rarity", r)
+	return f
+
+
+## BBCode for a RichTextLabel: the name in its rarity colour.
+static func rarity_text(text: String, r: String) -> String:
+	return "[color=#%s]%s[/color]" % [rarity_color(r).to_html(false), text]
