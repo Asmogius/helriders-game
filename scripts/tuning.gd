@@ -77,6 +77,7 @@ const COL_GARAGE_GAS_RED := Color(0.431, 0.157, 0.133)  # welding gas cylinders 
 const COL_GARAGE_DUST := Color(0.9, 0.88, 0.8)          # drifting dust motes, drawn at alpha 0.02-0.18 (230, 224, 204; garage_ambient.gd)
 const COL_GARAGE_SPARK := Color(1.0, 0.85, 0.5)         # weld sparks, alpha fades with life (255, 217, 128; garage_ambient.gd)
 const COL_GARAGE_FOCUS_EDGE := Color(0, 0, 0, 0.6)    # dark edge under the focus callout line and pulsing ring; the fade multiplies its alpha (garage_focus.gd)
+const COL_GARAGE_CONTACT_SHADOW := Color(0, 0, 0, 0.2) # soft contact shadow under the rig on the garage pad (garage_layout.gd)
 
 # P3 Zombies: Shambler and Tank sheets (V3.1/V3.2; PR #34). Baked by zombies.py.
 # Shambler clothing variants 0-5: shirt / trousers.
