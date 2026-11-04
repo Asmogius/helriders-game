@@ -173,6 +173,10 @@ func _ready() -> void:
 	_root.add_child(_wheel)
 
 	_build_overlay()
+	var pad := get_node_or_null("/root/Pad")
+	if pad != null:
+		pad.connect("mode_changed", _pad_badges)
+	_pad_badges()
 
 
 ## One round button per utility part ("patch", "mines"), in a row left of
@@ -196,6 +200,7 @@ func set_abilities(kinds: Array[String]) -> void:
 		_ability_buttons.append(b)
 		right_stick.blockers.append(b)
 	_layout_buttons()
+	_pad_badges()
 
 
 ## Right to left: LOCK (if any), CREW (if any crew), then utilities.
@@ -356,7 +361,17 @@ func set_power(used: float, output: float, weight := 0.0, capacity := 0.0) -> vo
 func set_lock_available(available: bool) -> void:
 	_lock_button.visible = available
 	_layout_buttons()
-	_hint.text = "LEFT THUMB  DRIVE      RIGHT THUMB  AIM + FIRE" + ("      LOCK  AUTO-AIM" if available else "")
+	_controls_hint()
+
+
+## The control line at the bottom, in touch or controller wording.
+func _controls_hint() -> void:
+	var lock := _lock_button.visible
+	var pad := get_node_or_null("/root/Pad")
+	if pad != null and bool(pad.get("active")):
+		_hint.text = "LEFT STICK  DRIVE      RIGHT STICK  AIM      R2  FIRE" + ("      R1  LOCK" if lock else "")
+	else:
+		_hint.text = "LEFT THUMB  DRIVE      RIGHT THUMB  AIM + FIRE" + ("      LOCK  AUTO-AIM" if lock else "")
 
 
 func set_status(kills: int, target: int, scrap: int) -> void:
@@ -439,6 +454,7 @@ func show_result(title: String, subtitle: String, button_text: String, accent: C
 func show_choice(speaker: String, text: String, yes_text: String, no_text: String) -> void:
 	close_choice()
 	_choice = Control.new()
+	_choice.add_to_group("pad_modal")   # controller: Cross picks, no backing out of the radio call
 	_choice.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_choice.process_mode = Node.PROCESS_MODE_ALWAYS
 	_root.add_child(_choice)
@@ -517,6 +533,7 @@ func result_text() -> String:
 
 func _build_overlay() -> void:
 	_overlay = Control.new()
+	_overlay.add_to_group("pad_modal")   # the results card
 	_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_overlay.visible = false
 	_root.add_child(_overlay)
@@ -587,7 +604,13 @@ class LockButton extends Control:
 	## Round toggle. Handles its own touches; the right stick ignores this area.
 	signal toggled(on: bool)
 	const T := preload("res://scripts/tuning.gd")
+	const PadGlyph := preload("res://scripts/pad_glyph.gd")
 	var on := false
+	var pad_badge := "":
+		set(value):
+			if value != pad_badge:
+				pad_badge = value
+				queue_redraw()
 	var has_target := false
 
 	func _ready() -> void:
@@ -628,6 +651,8 @@ class LockButton extends Control:
 			draw_circle(c, 5.0, accent)
 		var font := ThemeDB.fallback_font
 		draw_string(font, Vector2(0.0, size.y + 18.0), "LOCK", HORIZONTAL_ALIGNMENT_CENTER, size.x, 18, Color(accent, 0.9))
+		if pad_badge != "":
+			PadGlyph.draw(self, Vector2(size.x - 8.0, 8.0), pad_badge)
 
 
 class ThreatArrows extends Control:
@@ -666,7 +691,13 @@ class AbilityButton extends Control:
 	signal pressed
 	const T := preload("res://scripts/tuning.gd")
 	const LABELS := {"patch": "PATCH", "mines": "MINES", "oil": "OIL", "spikes": "SPIKES", "pulse": "PULSE", "hard_line": "HARD LINE", "overcharge": "OVERCHARGE"}
+	const PadGlyph := preload("res://scripts/pad_glyph.gd")
 	var kind := ""      # "hard_line", "overcharge", "patch", "mines" or "oil"
+	var pad_badge := "": # controller mode: the face button that fires it
+		set(value):
+			if value != pad_badge:
+				pad_badge = value
+				queue_redraw()
 	var charge := 0.0   # 0 ready, 1 just used
 	var disabled := false
 
@@ -759,6 +790,8 @@ class AbilityButton extends Control:
 		if disabled:
 			label = "INJURED"
 		draw_string(font, Vector2(-20.0, size.y + 18.0), label, HORIZONTAL_ALIGNMENT_CENTER, size.x + 40.0, 15, Color(tint, 0.9))
+		if pad_badge != "":
+			PadGlyph.draw(self, Vector2(size.x - 8.0, 8.0), pad_badge)
 
 
 class CrewButton extends Control:
@@ -766,7 +799,13 @@ class CrewButton extends Control:
 	## while the wheel itself cools down.
 	signal pressed
 	const T := preload("res://scripts/tuning.gd")
+	const PadGlyph := preload("res://scripts/pad_glyph.gd")
 	var has_ready := false
+	var pad_badge := "":
+		set(value):
+			if value != pad_badge:
+				pad_badge = value
+				queue_redraw()
 	var cooldown := 0.0   # 0..1
 
 	func _ready() -> void:
@@ -811,6 +850,8 @@ class CrewButton extends Control:
 			draw_circle(c + Vector2(r * 0.65, -r * 0.65), 8.0, T.COL_ORANGE)
 		var font := ThemeDB.fallback_font
 		draw_string(font, Vector2(-20.0, size.y + 18.0), "CREW", HORIZONTAL_ALIGNMENT_CENTER, size.x + 40.0, 15, Color(tint, 0.9))
+		if pad_badge != "":
+			PadGlyph.draw(self, Vector2(size.x - 8.0, 8.0), pad_badge)
 
 
 class CrewWheel extends Control:
@@ -823,6 +864,7 @@ class CrewWheel extends Control:
 	const RING := 150.0
 	const SLICE := 50.0
 	var entries: Array[Dictionary] = []
+	var hover := -1      # controller: the slice the stick points at
 	var charges := PackedFloat32Array()
 	var off: Array[bool] = []
 	var notes: Array[String] = []
@@ -860,6 +902,8 @@ class CrewWheel extends Control:
 		draw_arc(c, 40.0, 0.0, TAU, 32, Color(0.8, 0.78, 0.74), 2.5)
 		draw_line(c + Vector2(-12, -12), c + Vector2(12, 12), Color(0.85, 0.83, 0.78), 3.0)
 		draw_line(c + Vector2(-12, 12), c + Vector2(12, -12), Color(0.85, 0.83, 0.78), 3.0)
+		if hover >= 0 and hover < entries.size():
+			draw_arc(slice_pos(hover), SLICE + 6.0, 0.0, TAU, 32, T.COL_CYAN, 4.0)   # controller pick
 		for i in entries.size():
 			var e := entries[i]
 			var p := slice_pos(i)
@@ -1045,3 +1089,50 @@ func hide_controls() -> void:
 	for b in _ability_buttons:
 		b.visible = false
 	set_alert("")
+
+
+# --- Controller (pad.gd) ---------------------------------------------------------
+
+const PadGlyph := preload("res://scripts/pad_glyph.gd")
+
+
+## Controller mode: each button shows the pad button that works it.
+func _pad_badges(_on := false) -> void:
+	var pad := get_node_or_null("/root/Pad")
+	var on := pad != null and bool(pad.get("active"))
+	for i in _ability_buttons.size():
+		_ability_buttons[i].pad_badge = str(PadGlyph.ABILITY[i]) if on and i < PadGlyph.ABILITY.size() else ""
+	_lock_button.pad_badge = "R1" if on else ""
+	_crew_button.pad_badge = "L1" if on else ""
+	_controls_hint()
+
+
+## R1: the LOCK button, if it's showing.
+func pad_lock() -> void:
+	if _lock_button.visible:
+		_lock_button.press()
+
+
+## The stick points at a crew slice while the wheel is open.
+func pad_wheel_point(dir: Vector2) -> void:
+	if not _wheel.visible:
+		return
+	var n := _wheel.entries.size()
+	var want := -1
+	if dir.length() > 0.5 and n > 0:
+		# Slice 0 is at the top, then clockwise.
+		var a := wrapf(dir.angle() + PI / 2.0, 0.0, TAU)
+		want = roundi(a / (TAU / n)) % n
+	if want != _wheel.hover:
+		_wheel.hover = want
+		_wheel.queue_redraw()
+
+
+## Cross in the wheel: fire the highlighted crew member (or close if none).
+func pad_wheel_confirm() -> bool:
+	if not _wheel.visible:
+		return false
+	if _wheel.hover < 0:
+		close_crew_wheel()
+		return false
+	return pick_crew(_wheel.hover)

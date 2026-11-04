@@ -315,6 +315,8 @@ static func _pct(v: float) -> String:
 func open_upgrades() -> void:
 	close_upgrades()
 	_upgrades = Control.new()
+	_upgrades.add_to_group("pad_modal")
+	_upgrades.set_meta("pad_close", close_upgrades)
 	_upgrades.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_upgrades)
 	var dim := ColorRect.new()

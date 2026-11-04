@@ -16,6 +16,7 @@ config/quit_on_go_back=false
 
 Profile="*res://scripts/profile.gd"
 MusicManager="*res://scripts/music_manager.gd"
+Pad="*res://scripts/pad.gd"
 
 [display]
 

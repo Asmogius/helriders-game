@@ -28,6 +28,8 @@ func setup(p: ProfileScript, panel_title: String, track_keys: Array, effect_text
 
 
 func _ready() -> void:
+	add_to_group("pad_modal")
+	set_meta("pad_close", close)
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.6)

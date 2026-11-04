@@ -46,6 +46,7 @@ const Hud := preload("res://scripts/hud.gd")
 const GameMenu := preload("res://scripts/game_menu.gd")
 const NavGrid := preload("res://scripts/nav_grid.gd")
 const ProfileScript := preload("res://scripts/profile.gd")
+const PadScript := preload("res://scripts/pad.gd")
 const GARAGE_SCENE := "res://scenes/garage.tscn"
 const MISSION_SCENE := "res://scenes/mission.tscn"
 const STATUS_IDS := ["shock", "fire", "acid", "toxic", "slime", "goop"]
@@ -173,6 +174,9 @@ var _events: Array = []          # [seconds, kind, kills that also trigger it (-
 
 func _ready() -> void:
 	profile = get_node("/root/Profile")
+	var pad := get_node_or_null("/root/Pad")
+	if pad != null:
+		pad.connect("mode_changed", _on_pad_mode)
 	_music_start.call_deferred()
 	tutorial = profile.tutorial_active or bool(mission_override.get("tutorial", false))
 	if tutorial:
@@ -598,6 +602,7 @@ func _physics_process(delta: float) -> void:
 			profile.discover("enemies", str(z.kind))
 	vehicle.drive_input = hud.left_stick.output
 	vehicle.aim_input = hud.right_stick.output
+	_pad_input()
 	if tutorial:
 		_tutorial_tick()
 	if auto_spawn_specials:
@@ -786,6 +791,21 @@ const TUT_TIPS := [
 	"ENEMY RIG: an Outrider is coming. Keep moving, it shoots back. Wreck it.",
 	"SALVAGE: drive over the crate to pick up its schematic.",
 ]
+## The same tips for a controller (only the ones that differ).
+const TUT_PAD_TIPS := {
+	1: "SHOOT: aim the turret with the RIGHT stick at a zombie and hold R2 to fire.",
+	2: "LOCK: press R1. While it's on, your turret picks targets and fires by itself.",
+}
+
+
+## Touch <-> controller mid-tutorial: swap the tip's wording.
+func _on_pad_mode(_on: bool) -> void:
+	if tutorial and tut_step < TUT_TIPS.size() and not bool(_tut_mark.get("spawned", false)):
+		hud.set_tip(_tut_tip(tut_step))
+
+
+func _tut_tip(i: int) -> String:
+	return PadScript.hint(TUT_TIPS[i], str(TUT_PAD_TIPS.get(i, TUT_TIPS[i])))
 
 
 func _tutorial_tick() -> void:
@@ -820,7 +840,7 @@ func _tutorial_tick() -> void:
 func _tut_begin() -> void:
 	_tut_mark = {"step": tut_step, "kills": kills, "from": vehicle.global_position}
 	if tut_step < TUT_TIPS.size():
-		hud.set_tip(TUT_TIPS[tut_step])
+		hud.set_tip(_tut_tip(tut_step))
 	match tut_step:
 		1:
 			_tut_spawn_pack(4)
@@ -985,6 +1005,93 @@ func _rig_key(rig: EnemyRig) -> String:
 	if rig is GunnerRig:
 		return "gunner"
 	return "outrider"
+
+
+# --- Controller (pad.gd) ------------------------------------------------------------
+# Left stick drives, right stick aims and R2 fires (a light push only turns
+# the turret, as on the touch stick). Square / Triangle / Circle fire
+# utilities 1-3, R1 toggles LOCK, L1 opens the crew wheel (point with a
+# stick, Cross picks), Options pauses.
+
+var pad_aim := Vector2.RIGHT   # last aim direction, for R2 with the stick centred
+
+
+func _pad() -> Node:
+	return get_node_or_null("/root/Pad")
+
+
+func _pad_input() -> void:
+	var pad := _pad()
+	if pad == null or not bool(pad.get("active")):
+		vehicle.fire_trigger = false   # put the pad down mid-shot: stop firing
+		return
+	var drive: Vector2 = pad.call("stick", true)
+	var aim: Vector2 = pad.call("stick", false)
+	if hud.is_crew_wheel_open():
+		hud.pad_wheel_point(aim if aim != Vector2.ZERO else drive)
+		vehicle.drive_input = Vector2.ZERO
+		vehicle.aim_input = Vector2.ZERO
+		return
+	if drive != Vector2.ZERO:
+		vehicle.drive_input = drive
+	if aim != Vector2.ZERO:
+		pad_aim = aim.normalized()
+	if bool(pad.call("r2")):
+		# Fire: full push (the Mortar keeps the stick's push for its range).
+		var dir := pad_aim if aim == Vector2.ZERO else aim.normalized()
+		var push := 1.0 if vehicle.has_weapon() and not _has_mortar() else maxf(aim.length(), 0.55)
+		vehicle.aim_input = dir * push
+		vehicle.fire_trigger = true
+	elif aim != Vector2.ZERO:
+		vehicle.aim_input = aim.limit_length(0.45)   # turn the turret without firing
+		vehicle.fire_trigger = false
+	else:
+		vehicle.fire_trigger = false
+
+
+func _has_mortar() -> bool:
+	for w: Dictionary in vehicle.gun_stats:
+		if str(w.get("kind", "")) == "mortar":
+			return true
+	return false
+
+
+## Menu focus only when a panel is up (the pause menu, results, the radio call).
+func pad_wants_focus() -> bool:
+	return menu != null or hud.is_result_visible() or hud.is_choice_open()
+
+
+## A pad button in the fight. Returns true when it was used.
+func pad_button(button: int) -> bool:
+	if menu != null:
+		if button == JOY_BUTTON_START:
+			menu.resume()
+			return true
+		return false
+	if hud.is_result_visible() or hud.is_choice_open() or state != State.RUNNING:
+		return false
+	match button:
+		JOY_BUTTON_START:
+			open_menu()
+		JOY_BUTTON_X:
+			use_ability(0)
+		JOY_BUTTON_Y:
+			use_ability(1)
+		JOY_BUTTON_B:
+			use_ability(2)
+		JOY_BUTTON_RIGHT_SHOULDER:
+			hud.pad_lock()
+		JOY_BUTTON_LEFT_SHOULDER:
+			if hud.is_crew_wheel_open():
+				hud.close_crew_wheel()
+			else:
+				hud.open_crew_wheel()
+		JOY_BUTTON_A:
+			if hud.is_crew_wheel_open():
+				hud.pad_wheel_confirm()
+		_:
+			return false
+	return true
 
 
 # --- Pause menu ------------------------------------------------------------------------

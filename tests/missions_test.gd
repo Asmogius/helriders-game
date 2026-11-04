@@ -81,13 +81,17 @@ func _process(_delta: float) -> bool:
 				mark = {"crates": mission.pickups.get_child_count()}
 				e.take_damage(99999.0)
 			if frame == 305:
-				_check(mission.pickups.get_child_count() == int(mark.crates) + 1, "the Elite always drops something")
+				# Its wreck blast can take a nearby rig (its Patcher, say) with it,
+				# so look for the Elite's own crate rather than the newest one.
+				var crate: Variant = mission._rig_crate.get(mission.elite)
+				_check(crate != null and mission.pickups.get_child_count() >= int(mark.crates) + 1, "the Elite always drops something")
 				_check(mission.state == Mission.State.RUNNING, "Hunt isn't over until you grab the drop")
 				mark = {"known": profile.schematics.size()}
-				mission.vehicle.global_position = (mission.pickups.get_child(mission.pickups.get_child_count() - 1) as Node2D).global_position
+				if crate != null:
+					mission.vehicle.global_position = (crate as Node2D).global_position
 			if frame == 315:
 				_check(mission.state == Mission.State.CLEARED and mission.hud.result_text().contains("TARGET DOWN"), "grabbing the Elite's drop completes the Hunt")
-				_check(profile.schematics.size() == int(mark.known) + 1, "the Elite's schematic is banked")
+				_check(profile.schematics.size() >= int(mark.known) + 1, "the Elite's schematic is banked")
 				var driver: Dictionary = profile.crew[0]
 				print("  Driver XP after the Hunt %.1f, level %d" % [float(driver.xp), Crew.level(driver)])
 				_check(is_equal_approx(float(driver.xp), 4.5) and Crew.level(driver) == 2, "riding alone, the Driver takes all 4 XP and reaches level 2")

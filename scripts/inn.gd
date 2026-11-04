@@ -14,6 +14,7 @@ const Crew := preload("res://scripts/crew.gd")
 const CrewCard := preload("res://scripts/crew_card.gd")
 const ProfileScript := preload("res://scripts/profile.gd")
 const UpgradePanel := preload("res://scripts/upgrade_panel.gd")
+const PadScript := preload("res://scripts/pad.gd")
 
 const INN_UPGRADES := ["bunkhouse", "drill_yard", "infirmary", "second_team", "scout_network", "last_rites"]
 
@@ -158,13 +159,13 @@ func refresh() -> void:
 	_seat.text = "UNSEAT" if not sel.is_empty() and bool(sel.seated) else "SEAT"
 	_dismiss.disabled = sel.is_empty() or profile.is_away(sel)
 	_perk.visible = not sel.is_empty() and Crew.perks_due(sel) > 0
-	_dismiss.text = "TAP AGAIN" if _confirm_dismiss == selected_id and selected_id >= 0 else "DISMISS"
+	_dismiss.text = PadScript.hint("TAP AGAIN", "PRESS AGAIN") if _confirm_dismiss == selected_id and selected_id >= 0 else "DISMISS"
 	var hints: Array[String] = []
 	if profile.crew.is_empty():
 		hints.append("No crew. The Saloon always has a free Common Driver and Gunner.")
 	var waiting := profile.perks_waiting()
 	if waiting > 0:
-		hints.append("%d perk pick%s waiting: tap a PERK READY card, then PICK PERK." % [waiting, "" if waiting == 1 else "s"])
+		hints.append("%d perk pick%s waiting: %s a PERK READY card, then PICK PERK." % [waiting, "" if waiting == 1 else "s", PadScript.hint("tap", "pick")])
 	hints.append("Every 3rd level, pick 1 of 3 perks. Injured crew rest here after a run; each job ends a day. Dismissed crew are gone for good. A wreck kills everyone seated; crew at the Inn or away are safe.")
 	_empty.text = "\n".join(hints)
 	_away.text = _away_text()
@@ -434,7 +435,7 @@ func _fill_expeditions() -> void:
 	right.custom_minimum_size = Vector2(606, 0)
 	right.add_theme_constant_override("separation", 10)
 	_expeditions.add_child(right)
-	right.add_child(UI.label("TEAM  -  tap benched crew (up to %d)" % T.EXPEDITION_MAX_TEAM, 20, T.COL_CYAN))
+	right.add_child(UI.label("TEAM  -  %s benched crew (up to %d)" % [PadScript.hint("tap", "pick"), T.EXPEDITION_MAX_TEAM], 20, T.COL_CYAN))
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 8)

@@ -2,7 +2,7 @@ extends "res://scripts/bulwark_rig.gd"
 ## Convoy Lead: elite enemy rig (DESIGN §8; agreed with the owner). An armored
 ## semi with a ram, towing a short trailer with a heavy turret
 ## (convoy_trailer.gd). The cab hunts and rams like a slower, wider-turning
-## Bulwark (the ram takes half damage, from bulwark_rig.gd); two small guns on
+## Bulwark (the plow is a very heavy front plate, T.CONVOY.front); two small guns on
 ## the nose cover the front, since the trailer turret can't fire through the
 ## cab. Shoot the trailer off and the cab drives on lighter and faster; wreck
 ## the cab and the trailer goes with it. Counts as one rig toward the cap.
