@@ -1348,6 +1348,7 @@ class StatSheet extends Control:
 	const BulletPool := preload("res://scripts/bullet_pool.gd")
 	const ROW_H := 26.0
 	var single_column := false   # V2.3 sample: one tall column (garage_layout.gd)
+	var _row_h := ROW_H
 	# [label, key, higher is better, decimals, suffix]
 	const LEFT := [
 		["TOP SPEED", "speed", true, 0, ""],
@@ -1443,13 +1444,15 @@ class StatSheet extends Control:
 		var col_w := (size.x - 56.0) / 2.0
 		if single_column:   # V2.3 sample: the stats panel on the right
 			col_w = size.x - 32.0
+			_row_h = minf(ROW_H, (size.y - 64.0) / float(LEFT.size() + RIGHT.size()))
 			_column(font, LEFT, Vector2(16, 34), col_w)
-			_column(font, RIGHT, Vector2(16, 34 + LEFT.size() * ROW_H + 6.0), col_w)
+			_column(font, RIGHT, Vector2(16, 34 + LEFT.size() * _row_h + 4.0), col_w)
+			_row_h = ROW_H
 		else:
 			_column(font, LEFT, Vector2(16, 42), col_w)
 			_column(font, RIGHT, Vector2(40 + col_w, 42), col_w)
 		var count := maxi(int(now.weapon_count), int(after.weapon_count))
-		if count > 1:
+		if count > 1 and not single_column:
 			draw_string(font, Vector2(40 + col_w, 47), "gun rows show WEAPON %d" % (int(now.weapon) + 1), HORIZONTAL_ALIGNMENT_RIGHT, col_w, 12, UI.TEXT_DIM)
 		var m_now: float = now.mobility
 		var m_after: float = after.mobility
@@ -1467,7 +1470,7 @@ class StatSheet extends Control:
 	func _column(font: Font, rows: Array, origin: Vector2, width: float) -> void:
 		var y := origin.y
 		for r: Array in rows:
-			y += ROW_H
+			y += _row_h
 			var key: String = r[1]
 			var a: float = now[key]
 			var b: float = after[key]

@@ -12,8 +12,12 @@ const LAYER_FOR := {   # fitted part id -> its layer on the hull sheet
 	"targeting_computer": "sensor_dish", "advanced_targeting": "sensor_dish", "roll_cage": "roll_cage",
 }
 
+const SILHOUETTE := "shader_type canvas_item;\nuniform vec4 tint : source_color;\nvoid fragment() { COLOR = vec4(tint.rgb, tint.a * texture(TEXTURE, UV).a); }"
+
 var garage: Control
 var _overlay: Sprite2D = null
+var _outline: Array[Sprite2D] = []   # 4 solid copies, 1 texel out, behind the part
+static var _shader: Shader
 var _target: Sprite2D = null
 var _t := 0.0
 
@@ -66,6 +70,21 @@ func _process(delta: float) -> void:
 			_overlay.material = mat
 			_overlay.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 			want.add_child(_overlay)
+			if _shader == null:
+				_shader = Shader.new()
+				_shader.code = SILHOUETTE
+			for d: Vector2 in [Vector2.LEFT, Vector2.RIGHT, Vector2.UP, Vector2.DOWN]:
+				var o := Sprite2D.new()
+				o.name = "FocusOutline"
+				var sm := ShaderMaterial.new()
+				sm.shader = _shader
+				sm.set_shader_parameter("tint", T.COL_ORANGE)
+				o.material = sm
+				o.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+				o.show_behind_parent = true
+				o.position = d
+				want.add_child(o)
+				_outline.append(o)
 	if _overlay != null and is_instance_valid(_target):
 		_overlay.texture = _target.texture
 		_overlay.hframes = _target.hframes
@@ -73,7 +92,14 @@ func _process(delta: float) -> void:
 		_overlay.frame = _target.frame
 		_overlay.centered = _target.centered
 		_overlay.offset = _target.offset
-		_overlay.modulate = Color(T.COL_ORANGE, 0.35 + 0.2 * sin(_t * 5.0))
+		_overlay.modulate = Color(T.COL_ORANGE, 0.3 + 0.15 * sin(_t * 5.0))
+		for o in _outline:
+			o.texture = _target.texture
+			o.hframes = _target.hframes
+			o.vframes = _target.vframes
+			o.frame = _target.frame
+			o.centered = _target.centered
+			o.offset = _target.offset
 	elif _overlay != null:
 		_clear()
 
@@ -81,6 +107,10 @@ func _process(delta: float) -> void:
 func _clear() -> void:
 	if _overlay != null and is_instance_valid(_overlay):
 		_overlay.queue_free()
+	for o in _outline:
+		if is_instance_valid(o):
+			o.queue_free()
+	_outline.clear()
 	_overlay = null
 	_target = null
 

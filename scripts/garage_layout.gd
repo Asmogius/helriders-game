@@ -57,7 +57,7 @@ static func _place(c: Control, r: Rect2) -> void:
 
 
 static func apply(g: Control) -> void:
-	if g.get("_deploy") == null or g.get("_stat_sheet") == null:
+	if g.get("_deploy") == null or g.get("_stat_sheet") == null or g.get("_sheet") == null:
 		return
 	var size: Vector2 = g.size
 	if size.x < 10.0:
@@ -74,8 +74,9 @@ static func apply(g: Control) -> void:
 	# --- left: slot cards, 2 columns, top-down in slot order -----------------
 	var tags: Array = g.get("_tags")
 	var k := 0
-	for tag: Control in tags:
-		if not tag.visible:
+	for i in tags.size():
+		var tag: Control = tags[i]
+		if not g.call("_slot_exists", g.SLOTS[i]):
 			continue
 		tag.set("side", 0)
 		tag.set("compact", true)
@@ -106,6 +107,10 @@ static func apply(g: Control) -> void:
 	if open:
 		rig_area = Rect2(centre.position, Vector2(centre.size.x, centre.size.y - sheet_h - GAP))
 		_place(sheet, Rect2(centre.position.x, centre.end.y - sheet_h, centre.size.x, sheet_h))
+		var title: Label = g.get("_sheet_title")
+		title.clip_text = true
+		title.size = Vector2(centre.size.x - 2.0 * UI.GRID * 2.0, 4.0 * UI.GRID)
+		title.add_theme_font_size_override("font_size", 15)
 	holder.position = Vector2(rig_area.get_center().x, rig_area.position.y + rig_area.size.y * (0.5 if open else RIG_Y))
 	holder.scale = Vector2.ONE * (OPEN_SCALE if open else 1.0)
 	holder.visible = on_garage and g.profile.has_rig()
@@ -122,7 +127,7 @@ static func apply(g: Control) -> void:
 		_place(c, Rect2(centre.position.x, y, centre.size.x, 4.0 * UI.GRID))
 		if c is Label:
 			(c as Label).clip_text = true
-			(c as Label).add_theme_font_size_override("font_size", 16)
+		c.add_theme_font_size_override("font_size", 15)
 		y += 4.0 * UI.GRID
 	(g.get("_crew_line") as Control).visible = not open
 	(g.get("_job") as Control).visible = not open
