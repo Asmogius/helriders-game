@@ -83,5 +83,24 @@ func _run() -> void:
 	v._shoot(v.gun_stats[0], Vector2.ZERO, Vector2.RIGHT)
 	check(bp._count > before and bp.style_of(bp._count - 1) == TS.style_for("rivet_gun"), "rivet gun shots carry the rivet look")
 	check(bp.next_style == -1, "the style is cleared after the shot")
+	# Caching: the style is resolved once per mount (apply_stats) and shots reuse it.
+	var w0: Dictionary = v.gun_stats[0]
+	check(w0.has("_tracer"), "weapon carries its cached tracer style after mounting")
+	check(v.tracer_style_of(w0) == TS.index_for("rivet_gun", false), "player rig reads the cached player style")
+	w0["_tracer"] = Vector2i(TS.index_for("harpoon", false), 1)   # prove _shoot reads the cache, not the table
+	v._shoot(w0, Vector2.ZERO, Vector2.RIGHT)
+	check(bp.style_of(bp._count - 1) == TS.style_for("harpoon"), "shots reuse the cached style (no per-shot lookup)")
+	v.team = BulletPool.TEAM_ENEMY
+	check(v.tracer_style_of(w0) == 1, "enemy team reads the cached enemy index")
+	v.team = BulletPool.TEAM_PLAYER
+	lo2.weapons = ["burst_turret"]
+	v.apply_stats(Loadout.build(lo2))   # re-equip re-resolves
+	check(v.tracer_style_of(v.gun_stats[0]) == TS.index_for("burst_turret", false), "re-equipping re-caches the new weapon's style")
+	for w: Dictionary in v.gun_stats:
+		check((w.get("_tracer", null) as Variant) is Vector2i, "every mounted weapon is cached")
+	# Colours come from tuning.gd (PR #55), not literals.
+	check(TS.style_for("rivet_gun").glow == TS.T.TRACER_RIVET, "rivet glow is T.TRACER_RIVET")
+	check(TS.style_for("harpoon").glow == TS.T.TRACER_HARPOON_CABLE and TS.style_for("harpoon").core == TS.T.TRACER_HARPOON_STEEL, "harpoon colours from tuning")
+	check(TS.DEFAULT_ENEMY.core == TS.T.TRACER_ENEMY_CORE, "enemy core from tuning")
 	print("TRACER STYLES TEST ", "PASSED" if fails == 0 else "FAILED (%d)" % fails)
 	quit(1 if fails else 0)
