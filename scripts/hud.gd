@@ -1014,6 +1014,8 @@ class StatusStrip extends Control:
 	## One thin bar per status that's building, in its colour, with its name;
 	## a status that's on shows full and bright. Hidden when nothing is going.
 	const T := preload("res://scripts/tuning.gd")
+	const UI := preload("res://scripts/ui_theme.gd")
+	var _icons: RefCounted = UI.icons()   # V6.3: holds the shared atlas
 	var build := PackedFloat32Array([0, 0, 0, 0, 0, 0])
 	var left := PackedFloat32Array([0, 0, 0, 0, 0, 0])
 	var showing := false
@@ -1042,8 +1044,12 @@ class StatusStrip extends Control:
 			var fill := 1.0 if on else clampf(build[k] / T.STATUS_BAR, 0.0, 1.0)
 			draw_rect(Rect2(0, y, 70, 7), Color(0, 0, 0, 0.55))
 			draw_rect(Rect2(1, y + 1, 68.0 * fill, 5), c if on else Color(c, 0.75))
-			draw_string(font, Vector2(76, y + 8), str(T.STATUS_NAMES[k]), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, c if on else Color(c, 0.7))
-			y += 11.0
+			# V6.3: the status icon after the bar, then its name.
+			var tx := 76.0
+			if _icons.draw(self, str(UI.STATUS_ICONS[k]), Rect2(74, y - 2, 12, 12), c if on else Color(c, 0.7)):
+				tx = 90.0
+			draw_string(font, Vector2(tx, y + 8), str(T.STATUS_NAMES[k]), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, c if on else Color(c, 0.7))
+			y += 13.0
 
 
 class RigIcon extends Control:

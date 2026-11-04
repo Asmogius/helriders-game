@@ -298,29 +298,45 @@ func _on_hit(_damage: float, impulse: Vector2) -> void:
 # --- V3 style sample (P3): voxel zombie sheets for the Shambler and the Tank.
 # Drawing only: reads kind, rotation, charge state and _flash; never changes
 # stats or AI. Missing atlas or another kind -> the code-drawn body below.
-# The atlas is loaded once and shared (static); no per-zombie art nodes.
+# The atlas is loaded once and shared via a tree-root meta cache (like
+# art_atlas.gd), not static vars, so nothing keeps this script alive past exit.
 const ArtAtlas := preload("res://scripts/art_atlas.gd")   # P0 atlas loader
 const ZOMBIE_ATLAS := "res://art/zombies/zombies"         # .png + .json
-static var _art_meta: Dictionary = {}    # kinds / poses / variants (the JSON's extra keys)
-static var _atlas: RefCounted            # regions "<kind>/<row>/<heading>"
-static var _art_tried := false
+const ART_META := &"zombie_art"   # root meta: {"meta": kinds / poses / variants, "atlas": regions "<kind>/<row>/<heading>"}
 var art_pose_override := ""      # captures and tests: force a pose row (e.g. "lunge_1")
 var _art_t := 0.0                # walk cycle phase, advanced by distance walked
 var _art_last := Vector2.ZERO
 var _art_key := -1
 
 
+static func _art() -> Dictionary:
+	var tree := Engine.get_main_loop() as SceneTree
+	var root: Window = tree.root if tree != null else null
+	if root != null and root.has_meta(ART_META):
+		return root.get_meta(ART_META)
+	var art := {"meta": {}, "atlas": null}
+	var a: RefCounted = ArtAtlas.load_atlas(ZOMBIE_ATLAS)
+	if a.ok():
+		art.atlas = a
+		var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(ZOMBIE_ATLAS + ".json"))
+		if data is Dictionary:
+			data.erase("regions")   # held by the atlas
+			art.meta = data
+	if root != null:
+		root.set_meta(ART_META, art)
+	return art
+
+
+## Kinds / poses / variants from the sheet's JSON ({} without the atlas).
 static func art_atlas() -> Dictionary:
-	if not _art_tried:
-		_art_tried = true
-		var a: RefCounted = ArtAtlas.load_atlas(ZOMBIE_ATLAS)
-		if a.ok():
-			_atlas = a
-			var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(ZOMBIE_ATLAS + ".json"))
-			if data is Dictionary:
-				_art_meta = data
-				_art_meta.erase("regions")   # held by the atlas
-	return _art_meta
+	return _art().meta
+
+
+## Captures and tests: act as if the atlas were missing (code-drawn bodies).
+static func disable_art() -> void:
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree != null and tree.root != null:
+		tree.root.set_meta(ART_META, {"meta": {}, "atlas": null})
 
 
 func has_art() -> bool:
@@ -343,13 +359,13 @@ func art_row() -> String:
 	if art_pose_override != "":
 		pose = art_pose_override
 	if kind == "shambler" and pose != "flash":
-		var info: Dictionary = _art_meta.kinds.shambler
+		var info: Dictionary = art_atlas().kinds.shambler
 		return "v%d_%s" % [get_instance_id() % int(info.variants), pose]   # no RNG: seeded spawns stay put
 	return pose
 
 
 func art_heading() -> int:
-	var n: int = int(_art_meta.get("headings", 16))
+	var n: int = int(art_atlas().get("headings", 16))
 	return posmod(int(round(global_rotation / (TAU / float(n)))), n)
 
 
@@ -367,11 +383,11 @@ func _process(_delta: float) -> void:
 
 
 func _draw_art() -> void:
-	var info: Dictionary = _art_meta.kinds[kind]
+	var info: Dictionary = art_atlas().kinds[kind]
 	var fw: float = info.frame_w
 	var fh: float = info.frame_h
 	draw_set_transform(Vector2.ZERO, -rotation, Vector2.ONE)   # sheets carry the heading; never rotate them
-	_atlas.draw(self, "%s/%s/%d" % [kind, art_row(), art_heading()], Rect2(Vector2(-fw, -fh) * 0.5, Vector2(fw, fh)))
+	(_art().atlas as RefCounted).draw(self, "%s/%s/%d" % [kind, art_row(), art_heading()], Rect2(Vector2(-fw, -fh) * 0.5, Vector2(fw, fh)))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
