@@ -12,6 +12,7 @@ signal crew_wheel_toggled(open: bool)
 signal choice_made(yes: bool)
 
 const T := preload("res://scripts/tuning.gd")
+const UI := preload("res://scripts/ui_theme.gd")
 const ThumbStick := preload("res://scripts/thumb_stick.gd")
 
 var left_stick: ThumbStick
@@ -40,6 +41,7 @@ var _overlay: Control
 var _choice: Control             # the Escort driver's radio call
 var _title: Label
 var _subtitle: Label
+var _finds: VBoxContainer   # results card: new schematics in rarity colour (V1.3)
 var _button: Button
 var _fps_timer := 0.0
 var _alert_t := 0.0
@@ -448,6 +450,8 @@ func show_result(title: String, subtitle: String, button_text: String, accent: C
 	_title.text = title
 	_title.add_theme_color_override("font_color", accent)
 	_subtitle.text = subtitle
+	for c in _finds.get_children():
+		c.queue_free()
 	_button.text = button_text
 	_overlay.visible = true
 	_overlay.modulate.a = 0.0
@@ -539,7 +543,33 @@ func is_result_visible() -> bool:
 
 
 func result_text() -> String:
-	return _title.text + " | " + _subtitle.text
+	var text := _title.text + " | " + _subtitle.text
+	for c in _finds.get_children():
+		if not c.is_queued_for_deletion():
+			text += "\n" + (c as Label).text
+	return text
+
+
+## Results card lines in rarity colour: finds = [[text, rarity], ...]. Epic or
+## better flips in with a glint (V1.3). Call after show_result.
+func show_finds(finds: Array) -> void:
+	var delay := 0.5
+	for f: Array in finds:
+		var r := str(f[1])
+		var l := _label(26, UI.rarity_color(r))
+		l.text = str(f[0])
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_finds.add_child(l)
+		if UI.rarity_tier(r) >= 4:
+			l.pivot_offset = Vector2(360, 16)
+			l.custom_minimum_size = Vector2(720, 32)
+			l.scale = Vector2(0.0, 1.0)
+			var tw := l.create_tween()
+			tw.tween_interval(delay)
+			tw.tween_property(l, "scale:x", 1.0, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			tw.tween_property(l, "modulate", Color(2.0, 2.0, 2.0), 0.08)
+			tw.tween_property(l, "modulate", Color.WHITE, 0.25)
+			delay += 0.35
 
 
 func _build_overlay() -> void:
@@ -569,6 +599,10 @@ func _build_overlay() -> void:
 	_subtitle = _label(26, Color(0.8, 0.78, 0.74))
 	_subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	column.add_child(_subtitle)
+
+	_finds = VBoxContainer.new()
+	_finds.add_theme_constant_override("separation", 4)
+	column.add_child(_finds)
 
 	_button = Button.new()
 	_button.custom_minimum_size = Vector2(340, 84)

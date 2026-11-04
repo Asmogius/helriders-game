@@ -19,19 +19,45 @@ static func make() -> Theme:
 	th.set_color("font_outline_color", "Label", Color(0, 0, 0, 0.8))
 	th.set_constant("outline_size", "Label", 4)
 
-	th.set_stylebox("normal", "Button", box(Color(0.13, 0.13, 0.145), PANEL_EDGE, 2))
-	th.set_stylebox("hover", "Button", box(Color(0.16, 0.16, 0.175), PANEL_EDGE, 2))
-	th.set_stylebox("pressed", "Button", box(Color(0.22, 0.14, 0.08), T.COL_ORANGE, 2))
-	th.set_stylebox("disabled", "Button", box(Color(0.1, 0.1, 0.105), Color(0.18, 0.18, 0.19), 2))
+	th.set_stylebox("normal", "Button", skin("button_normal", box(Color(0.13, 0.13, 0.145), PANEL_EDGE, 2)))
+	th.set_stylebox("hover", "Button", skin("button_hover", box(Color(0.16, 0.16, 0.175), PANEL_EDGE, 2)))
+	th.set_stylebox("pressed", "Button", skin("button_pressed", box(Color(0.22, 0.14, 0.08), T.COL_ORANGE, 2)))
+	th.set_stylebox("disabled", "Button", skin("button_disabled", box(Color(0.1, 0.1, 0.105), Color(0.18, 0.18, 0.19), 2)))
 	th.set_stylebox("focus", "Button", StyleBoxEmpty.new())
 	th.set_color("font_color", "Button", TEXT)
 	th.set_color("font_hover_color", "Button", Color.WHITE)
 	th.set_color("font_pressed_color", "Button", Color.WHITE)
 	th.set_color("font_disabled_color", "Button", Color(0.42, 0.42, 0.42))
 
-	th.set_stylebox("panel", "Panel", box(PANEL, PANEL_EDGE, 2))
-	th.set_stylebox("panel", "PanelContainer", box(PANEL, PANEL_EDGE, 2))
+	th.set_stylebox("panel", "Panel", skin("panel", box(PANEL, PANEL_EDGE, 2)))
+	th.set_stylebox("panel", "PanelContainer", skin("panel", box(PANEL, PANEL_EDGE, 2)))
 	return th
+
+
+# --- Panels and buttons (P7 / V6.2) --------------------------------------------
+# Riveted steel 9-slice textures from tools/art/ui_panels.py. Missing art keeps
+# the flat box (fallback rule).
+const NINE_MARGIN := 12
+
+
+## A 9-slice StyleBoxTexture for art/ui/<name>.png, or `fallback` if it's missing.
+static func skin(name: String, fallback: StyleBox) -> StyleBox:
+	var path := "res://art/ui/%s.png" % name
+	if not ResourceLoader.exists(path):
+		return fallback
+	var sb := StyleBoxTexture.new()
+	sb.texture = load(path)
+	sb.texture_margin_left = NINE_MARGIN
+	sb.texture_margin_right = NINE_MARGIN
+	sb.texture_margin_top = NINE_MARGIN
+	sb.texture_margin_bottom = NINE_MARGIN
+	sb.axis_stretch_horizontal = StyleBoxTexture.AXIS_STRETCH_MODE_TILE_FIT   # grain and edge chips repeat, never smear
+	sb.axis_stretch_vertical = StyleBoxTexture.AXIS_STRETCH_MODE_TILE_FIT
+	sb.content_margin_left = fallback.content_margin_left
+	sb.content_margin_right = fallback.content_margin_right
+	sb.content_margin_top = fallback.content_margin_top
+	sb.content_margin_bottom = fallback.content_margin_bottom
+	return sb
 
 
 static func box(fill: Color, border: Color, width: int) -> StyleBoxFlat:
@@ -111,6 +137,11 @@ static func rarity_frame(control: Control, r: String) -> Control:
 		control.add_child(f)
 	f.set("rarity", r)
 	return f
+
+
+## The rarity a perk tier shows as ("minor", "major", "signature"); Common otherwise.
+static func perk_rarity(tier: String) -> String:
+	return str(T.PERK_TIER_RARITY.get(tier, "Common"))
 
 
 ## BBCode for a RichTextLabel: the name in its rarity colour.

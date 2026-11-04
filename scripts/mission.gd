@@ -10,6 +10,7 @@ extends Node2D
 ## Builds the whole scene in code (see AGENTS.md).
 
 const T := preload("res://scripts/tuning.gd")
+const UI := preload("res://scripts/ui_theme.gd")
 const Parts := preload("res://scripts/parts.gd")
 const Loadout := preload("res://scripts/loadout.gd")
 const Missions := preload("res://scripts/missions.gd")
@@ -1856,9 +1857,17 @@ func _fail(title: String, detail: String) -> void:
 	profile.finish_day()
 	profile.bank_crew(0, _rest_ids(), bool(vehicle.crew_mod("triage")), vehicle.has_sp("sp_clean_bandage"))
 	var lines := detail + "\nKill scrap +%d    Time %s" % [int(scrap), _clock(elapsed)]
-	for id: String in bank_report.unlocked:
-		lines += "\nNew schematic: " + Parts.describe(Parts.get_part(id))
 	hud.show_result(title, lines, "RETURN TO GARAGE", T.COL_ORANGE)
+	hud.show_finds(_schematic_finds())   # V1.3
+
+
+## Results card lines for the schematics banked this run (V1.3).
+func _schematic_finds() -> Array:
+	var finds: Array = []
+	for id: String in bank_report.unlocked:
+		var p := Parts.get_part(id)
+		finds.append(["New schematic: " + Parts.describe(p), str(p.rarity)])
+	return finds
 
 
 # --- HUD -------------------------------------------------------------------------
@@ -2388,7 +2397,7 @@ func _take_salvage(pickup: Pickup) -> void:
 		hud.banner("SCRAP CACHE  +%d" % pickup.scrap_value, T.COL_ORANGE, 2.0)
 	else:
 		salvage.append(pickup.part)
-		hud.banner("SCHEMATIC: " + Parts.describe(pickup.part).to_upper(), Parts.color_of(pickup.part), 3.0)
+		hud.banner("SCHEMATIC: " + Parts.describe(pickup.part).to_upper(), UI.rarity_color(str(pickup.part.rarity)), 3.0)
 	# A Hunt ends when the Elite's drop is in the rig. (Not "when the ground is
 	# empty": a Tank's or escort's cache lying elsewhere mustn't block it.)
 	var elite_drop: bool = elite != null and _rig_crate.get(elite) == pickup
@@ -2452,12 +2461,11 @@ func _succeed(title: String, detail: String, pay_mult: float) -> void:
 	var lines := "Job pay +%d    Kill scrap +%d    Time %s" % [pay, int(scrap), _clock(elapsed)]
 	if detail != "":
 		lines = detail + "\n" + lines
-	for id: String in bank_report.unlocked:
-		lines += "\nNew schematic: " + Parts.describe(Parts.get_part(id))
 	if not crew_lines.is_empty():
 		lines += "\nCrew: " + ";  ".join(crew_lines)
 	Engine.time_scale = 1.0
 	hud.show_result(title, lines, "RETURN TO GARAGE", _type_color())
+	hud.show_finds(_schematic_finds())   # V1.3
 
 
 ## Ids of crew hurt during this run.
