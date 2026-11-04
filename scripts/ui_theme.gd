@@ -234,13 +234,29 @@ static func snap(v: float) -> float:
 	return roundf(v / GRID) * GRID
 
 
+## One Theme from make(), built on first use and reused (bottom bars and any
+## other helper that only needs the look). Kept as meta on the SceneTree root,
+## not in a static var (which would keep this script alive past exit), so it is
+## freed with the tree. Without a tree it falls back to a fresh make().
+const THEME_META := &"ui_shared_theme"
+
+
+static func shared_theme() -> Theme:
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree == null or tree.root == null:
+		return make()
+	if not tree.root.has_meta(THEME_META):
+		tree.root.set_meta(THEME_META, make())
+	return tree.root.get_meta(THEME_META)
+
+
 ## A themed action bar anchored to the bottom of safe_rect: BAR_H tall, GAP
 ## between buttons, every Button child at least MIN_TOUCH tall. Assumes the
 ## parent covers the viewport (a full-screen root Control), like every screen.
 static func bottom_bar(parent: Control) -> HBoxContainer:
 	var bar := HBoxContainer.new()
 	bar.name = "BottomBar"
-	bar.theme = make()
+	bar.theme = shared_theme()
 	bar.add_theme_constant_override("separation", int(GAP))
 	bar.alignment = BoxContainer.ALIGNMENT_CENTER
 	bar.custom_minimum_size = Vector2(0.0, BAR_H)

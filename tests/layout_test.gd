@@ -13,6 +13,9 @@ var frame := 0
 
 
 func _initialize() -> void:
+	var profile: Node = root.get_node("Profile")
+	profile.persist = false   # never touch a real save
+	profile.new_game()
 	screen = Control.new()
 	screen.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.add_child(screen)
@@ -38,6 +41,8 @@ func _process(_delta: float) -> bool:
 	_check(is_equal_approx(br.size.y, UI.BAR_H), "bottom_bar is BAR_H tall (%s)" % br.size.y)
 	_check(is_equal_approx(br.end.y, r.end.y) and r.encloses(br), "bottom_bar sits at the bottom of safe_rect")
 	_check(bar.get_theme_constant("separation") == int(UI.GAP), "bottom_bar uses GAP")
+	var second := UI.bottom_bar(screen)
+	_check(second.theme == bar.theme and bar.theme == UI.shared_theme(), "bottom_bar reuses one cached theme")
 	for c: Node in bar.get_children():
 		_check((c as Button).size.y >= UI.MIN_TOUCH, "button at least MIN_TOUCH tall")
 	if failures.is_empty():
