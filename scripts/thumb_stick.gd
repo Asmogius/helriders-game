@@ -12,6 +12,8 @@ var radius := 100.0
 var deadzone := 0.12
 var output := Vector2.ZERO
 var blockers: Array[Control] = []  # buttons inside our zone that own their touches
+var gauges: Array[Dictionary] = []  # fire stick: a ring per weapon with ammo or heat
+var _gauge_key := ""
 var enabled := true:
 	set(value):
 		enabled = value
@@ -86,6 +88,38 @@ func _release() -> void:
 	queue_redraw()
 
 
+## Ammo and heat rings (§14), one per weapon that has either. Redraws only
+## when a ring visibly changes.
+func set_gauges(list: Array[Dictionary]) -> void:
+	var key := ""
+	for g in list:
+		key += "%s%d%s%s|" % [str(g.kind), roundi(float(g.fill) * 40.0), "r" if bool(g.reloading) else "", "h" if bool(g.hot) else ""]
+	if key == _gauge_key:
+		return
+	_gauge_key = key
+	gauges = list
+	queue_redraw()
+
+
+func _draw_gauges(at: Vector2) -> void:
+	for i in gauges.size():
+		var g: Dictionary = gauges[i]
+		var r := radius + 9.0 + 8.0 * i
+		var fill := float(g.fill)
+		draw_arc(at, r, 0.0, TAU, 48, Color(0.0, 0.0, 0.0, 0.35), 5.0)
+		if fill <= 0.01:
+			continue
+		var col := Color(0.95, 0.92, 0.85, 0.8)
+		if str(g.kind) == "heat":
+			col = Color(1.0, 0.55, 0.15, 0.85).lerp(Color(1.0, 0.15, 0.1, 0.95), fill)
+			if bool(g.hot):
+				col = Color(1.0, 0.15, 0.1, 0.95)
+		elif bool(g.reloading):
+			col = Color(0.6, 0.6, 0.6, 0.6)   # filling back up
+		# Clockwise from the top.
+		draw_arc(at, r, -PI * 0.5, -PI * 0.5 + TAU * fill, maxi(4, roundi(48.0 * fill)), col, 4.0)
+
+
 func _draw() -> void:
 	var size := get_viewport_rect().size
 	var accent := T.COL_CYAN if left_side else T.COL_ORANGE
@@ -95,8 +129,10 @@ func _draw() -> void:
 		var rest := Vector2(170.0, size.y - 160.0) if left_side else Vector2(size.x - 170.0, size.y - 160.0)
 		draw_arc(rest, radius, 0.0, TAU, 48, Color(accent, 0.22), 3.0)
 		draw_circle(rest, 34.0, Color(accent, 0.12))
+		_draw_gauges(rest)
 		return
 	draw_circle(_base, radius, Color(0.0, 0.0, 0.0, 0.25))
+	_draw_gauges(_base)
 	draw_arc(_base, radius, 0.0, TAU, 48, Color(accent, 0.6), 3.0)
 	var knob := _base + (_knob - _base).limit_length(radius)
 	draw_circle(knob, 38.0, Color(accent, 0.55))

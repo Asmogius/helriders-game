@@ -168,6 +168,8 @@ var _burst_left: Array[int] = []     # rounds still to go in each gun's burst
 var _burst_gap: Array[float] = []
 var _ammo: Array[int] = []          # rounds left in each magazine weapon
 var _reload_left: Array[float] = [] # its reload, while it's reloading
+var _heat: Array[float] = []        # heat guns: 0 cold, 1 overheated
+var _overheated: Array[bool] = []   # locked until the bar drains to empty
 var _cable: CableLine               # draws the Harpoon spear and cable
 var _fire_cooldown := 0.0
 var _flash := 0.0
@@ -241,12 +243,16 @@ func apply_stats(s: Dictionary) -> void:
 	_burst_gap.clear()
 	_ammo.clear()
 	_reload_left.clear()
+	_heat.clear()
+	_overheated.clear()
 	for w in gun_stats:
 		_cooldowns.append(0.0)
 		_burst_left.append(0)
 		_burst_gap.append(0.0)
 		_ammo.append(int(w.get("mag", 0)))
 		_reload_left.append(0.0)
+		_heat.append(0.0)
+		_overheated.append(false)
 	release_tether()
 	abilities.clear()
 	for a: Dictionary in s.get("abilities", []):
@@ -874,8 +880,9 @@ func _weapons(delta: float) -> void:
 				wants_fire = absf(forward.angle_to(lock_target.global_position - global_position)) < 0.2
 			# Twin fixed guns alternate barrels.
 			muzzle += forward.orthogonal() * 9.0 * _barrel_side
-		if not has_round(i):
+		if not has_round(i) or _overheated[i]:
 			wants_fire = false
+		_cool(i, w, delta, wants_fire)
 		var burst := int(w.get("burst", 1))
 		if burst > 1:
 			# Burst guns: one pull fires `burst` rounds a beat apart; the burst
@@ -888,6 +895,7 @@ func _weapons(delta: float) -> void:
 					_shoot(w, muzzle, direction)
 			elif wants_fire and _cooldowns[i] <= 0.0:
 				_cooldowns[i] = 1.0 / (float(w.fire_rate) * crew_fire)
+				_spend(i)
 				_burst_left[i] = burst - 1
 				_burst_gap[i] = 1.0 / maxf(float(w.burst_rate), 1.0)
 				_shoot(w, muzzle, direction)
@@ -895,7 +903,7 @@ func _weapons(delta: float) -> void:
 			_cooldowns[i] = 1.0 / (float(w.fire_rate) * crew_fire)
 			if turret == null:
 				_barrel_side = -_barrel_side
-			_use_round(i)
+			_spend(i)
 			if str(w.get("kind", "")) == "harpoon":
 				_fire_harpoon(w, global_position, forward)   # from the hull: zombies on the nose get it too
 			else:
@@ -910,6 +918,57 @@ func has_round(i: int) -> bool:
 ## Rounds left in weapon `i`'s magazine (-1 if it has none).
 func ammo_left(i: int) -> int:
 	return _ammo[i] if int(gun_stats[i].get("mag", 0)) > 0 else -1
+
+
+## One shot (or one burst): a round out of the magazine and/or heat in.
+func _spend(i: int) -> void:
+	_use_round(i)
+	var heat_time := float(gun_stats[i].get("heat_time", 0.0))
+	if heat_time > 0.0:
+		# Firing nonstop fills the bar in heat_time seconds, whatever the fire rate.
+		_heat[i] += _cooldowns[i] / heat_time
+		if _heat[i] >= 1.0:
+			_heat[i] = 1.0
+			_overheated[i] = true
+
+
+## Heat guns cool while they aren't firing; an overheated one is locked
+## until the bar drains to empty over its lockout.
+func _cool(i: int, w: Dictionary, delta: float, firing: bool) -> void:
+	if float(w.get("heat_time", 0.0)) <= 0.0 or _heat[i] <= 0.0:
+		return
+	if _overheated[i]:
+		_heat[i] -= delta / maxf(float(w.get("lockout", 1.0)), 0.1)
+		if _heat[i] <= 0.0:
+			_heat[i] = 0.0
+			_overheated[i] = false
+	elif not firing:
+		_heat[i] = maxf(_heat[i] - float(w.get("cool", 0.25)) * delta, 0.0)
+
+
+func is_overheated(i: int) -> bool:
+	return i < _overheated.size() and _overheated[i]
+
+
+func heat_of(i: int) -> float:
+	return _heat[i] if i < _heat.size() else 0.0
+
+
+## What the HUD's ring around the fire stick shows, one entry per weapon
+## that has a magazine or heat: kind ("mag" / "heat"), fill 0-1, and whether
+## it's reloading or locked hot.
+func weapon_gauges() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for i in gun_stats.size():
+		var w := gun_stats[i]
+		var mag := int(w.get("mag", 0))
+		if mag > 0:
+			var reloading := _reload_left[i] > 0.0
+			var fill := 1.0 - _reload_left[i] / maxf(float(w.get("reload", 1.0)), 0.01) if reloading else float(_ammo[i]) / mag
+			out.append({"kind": "mag", "fill": clampf(fill, 0.0, 1.0), "reloading": reloading, "hot": false})
+		elif float(w.get("heat_time", 0.0)) > 0.0:
+			out.append({"kind": "heat", "fill": _heat[i], "reloading": false, "hot": _overheated[i]})
+	return out
 
 
 func _use_round(i: int) -> void:

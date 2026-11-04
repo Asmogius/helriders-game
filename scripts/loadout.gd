@@ -36,15 +36,20 @@ static func mobility(stats: Dictionary) -> float:
 	return maxf(power * weight, T.OVERLOAD_MIN_MOBILITY)
 
 
-## Damage per second of every weapon in a stats dictionary.
+## Sustained damage per second of every weapon in a stats dictionary
+## (magazines count their reload, heat guns their lockout).
 static func total_dps(stats: Dictionary) -> float:
 	var dps := 0.0
 	for w: Dictionary in stats.get("weapons", []):
 		var per_shot := float(w.bullet_damage) * int(w.get("pellets", 1)) * int(w.get("burst", 1))
 		var mag := int(w.get("mag", 0))
+		var heat := float(w.get("heat_time", 0.0))
 		if mag > 0 and float(w.fire_rate) > 0.0:
 			# A magazine: fire it dry, then reload (the reload starts on the last round).
 			dps += per_shot * mag / ((mag - 1) / float(w.fire_rate) + float(w.get("reload", 0.0)))
+		elif heat > 0.0:
+			# Heat: fire until it overheats, then sit out the lockout.
+			dps += float(w.fire_rate) * per_shot * heat / (heat + float(w.get("lockout", 0.0)))
 		else:
 			dps += float(w.fire_rate) * per_shot
 	return dps
@@ -122,7 +127,7 @@ static func build(loadout: Dictionary, levels: Dictionary = {}) -> Dictionary:
 			"reload": float(part.get("reload", 0.0)),
 		}
 		# Special weapons carry their own numbers (Harpoon, Mortar).
-		for key: String in ["range", "cable", "pierce", "blast", "min_range", "max_range", "flight"]:
+		for key: String in ["range", "cable", "pierce", "blast", "min_range", "max_range", "flight", "heat_time", "lockout", "cool"]:
 			if part.has(key):
 				w[key] = part[key]
 		if part.has("zombie_damage"):

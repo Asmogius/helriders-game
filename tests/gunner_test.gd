@@ -154,7 +154,7 @@ func _check_part() -> void:
 	_check(part.rarity == "Uncommon" and int(part.cost) == 110 and float(part.power) == 40.0 and float(part.weight) == 15.0 and float(part.lock_range) == 600.0,
 		"Burst Turret: Uncommon, 110 scrap, 40 power, 15 weight, lock 600")
 	var stats := Loadout.build(BURST_BUILD)
-	_check(absf(Loadout.total_dps(stats) - 62.2) < 0.5, "Burst Turret: about 62 DPS (%.1f)" % Loadout.total_dps(stats))
+	_check(absf(Loadout.total_dps(stats) - 50.1) < 0.5, "Burst Turret: about 62 DPS firing, 50 sustained with its 6-burst magazine (%.1f)" % Loadout.total_dps(stats))
 	_check(int((stats.weapons as Array)[0].burst) == 4, "the loadout carries the burst")
 	var g_dps := float(T.GUNNER.fire_rate) * float(T.GUNNER.bullet_damage) * int(T.GUNNER.burst)
 	_check(absf(g_dps - 20.0) < 0.5, "Gunner Rig: about 20 damage/s (%.1f)" % g_dps)

@@ -180,6 +180,47 @@ func _process(_delta: float) -> bool:
 				_check(gb > 50.0 or (g.get("status") as StatusBars).active(StatusBars.SHOCK), "rigs in range take the shock too (%.0f)" % gb)
 				_check(float((far.get("status") as StatusBars).build[StatusBars.SHOCK]) == 0.0, "nothing past 180 px")
 				_check(not main.use_ability(0), "then an 18 s cooldown")
+				_next()
+		3:  # Ammo: the Pintle's magazine, the Twin Guns' heat, the fire-stick rings
+			if frame == 1:
+				main.zombies.clear_all()
+				var b: Dictionary = BASE.duplicate()
+				b.chassis = "bulwark_frame"   # two hardpoints
+				b.engine = "diesel_block"
+				b.weapons = ["pintle_turret", "outrider_twin_guns"]
+				b.internal = ["targeting_computer"]
+				b.utility = []
+				main.apply_rig(Loadout.build(b))
+				rig.armor_max = 100000.0
+				rig.armor = rig.armor_max
+				_park(SPOT)
+				mark.shots = main.bullets.shots_fired
+				main.hud.right_stick.output = Vector2.UP   # away from the twin guns' nose: only the turret aims...
+				rig.fire_trigger = false
+			if frame == 2:
+				var g := rig.weapon_gauges()
+				_check(g.size() == 2 and str(g[0].kind) == "mag" and str(g[1].kind) == "heat", "the fire stick gets a ring per gun: magazine, then heat")
+			if frame == 3 + 240:
+				_check(rig.is_overheated(1) == false and rig.heat_of(1) > 0.5, "the Twin Guns heat up while firing (%.0f%%)" % (rig.heat_of(1) * 100.0))
+			if frame == 3 + 290:
+				_check(rig.ammo_left(0) == 0 and bool(rig.weapon_gauges()[0].reloading), "the Pintle runs its 28 rounds dry, then reloads")
+			if frame == 3 + 420:
+				_check(rig.ammo_left(0) > 0 and not bool(rig.weapon_gauges()[0].reloading), "2 s later it's firing again (%d left)" % rig.ammo_left(0))
+				_check(rig.is_overheated(1), "after 6 s nonstop the Twin Guns overheat")
+				mark.locked_at = main.bullets.shots_fired
+			if frame == 3 + 420 + 60:
+				_check(rig.is_overheated(1), "and stay locked while the bar drains")
+			if frame == 3 + 420 + 200:
+				_check(not rig.is_overheated(1) and rig.heat_of(1) < 0.2, "after the 3 s lockout they fire again")
+				main.hud.right_stick.output = Vector2.ZERO
+			if frame == 3 + 420 + 230:
+				mark.heat = rig.heat_of(1)
+			if frame == 3 + 420 + 290:
+				_check(rig.heat_of(1) <= float(mark.heat) - 0.2 or rig.heat_of(1) == 0.0, "idle guns cool off (25%/s)")
+				var dps := Loadout.total_dps(_build(["pintle_turret"], []))
+				_check(absf(dps - 63.0 * 28.0 / 7.0 / (27.0 / 7.0 + 2.0)) < 0.5, "sustained DPS counts the reload (Pintle %.0f)" % dps)
+				var twin := Loadout.total_dps(_build(["outrider_twin_guns"], []))
+				_check(absf(twin - 48.0 * 6.0 / 9.0) < 0.5, "and the heat lockout (Twin Guns %.0f)" % twin)
 				_finish()
 	return false
 
