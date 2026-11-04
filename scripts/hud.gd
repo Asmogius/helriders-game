@@ -421,6 +421,9 @@ func _process(delta: float) -> void:
 
 
 func show_result(title: String, subtitle: String, button_text: String, accent: Color) -> void:
+	var music := get_node_or_null("/root/MusicManager")
+	if music != null:
+		music.play_sfx("results")
 	left_stick.enabled = false
 	right_stick.enabled = false
 	_lock_button.visible = false

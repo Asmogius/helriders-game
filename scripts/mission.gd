@@ -147,6 +147,7 @@ var _events: Array = []          # [seconds, kind, kills that also trigger it (-
 
 func _ready() -> void:
 	profile = get_node("/root/Profile")
+	_music_start.call_deferred()
 	tutorial = profile.tutorial_active or bool(mission_override.get("tutorial", false))
 	if tutorial:
 		spec = Missions.make("clear", 1, 1)
@@ -535,6 +536,7 @@ func _physics_process(delta: float) -> void:
 
 func _process(_delta: float) -> void:
 	_refresh_hud()
+	_music_tick(_delta)
 	hud.right_stick.set_gauges(vehicle.weapon_gauges())
 	bullets.big_game = float(vehicle.crew_mod("big_game"))
 
@@ -1101,8 +1103,10 @@ func reach_checkpoint() -> void:
 	if checkpoint_index >= checkpoints.size():
 		var tier := courier_tier()
 		var title := "DELIVERED  -  %s" % tier.to_upper() if tier != "late" else "DELIVERED LATE"
+		_sfx("courier_complete")
 		_succeed(title, "Time %s" % _clock(elapsed), float(T.COURIER_TIER_PAY[tier]))
 	else:
+		_sfx("courier_checkpoint")
 		hud.banner("CHECKPOINT %d / %d" % [checkpoint_index, checkpoints.size()], T.COL_CYAN, 1.2)
 
 
@@ -1321,6 +1325,8 @@ func _fail(title: String, detail: String) -> void:
 	get_tree().paused = false
 	Engine.time_scale = 1.0
 	state = State.FAILED
+	if _music != null:
+		_music.end_combat()
 	for p in pickups.get_children():
 		_take_salvage(p as Pickup)
 	bank_report = profile.bank_run(int(scrap), _pending_ids())
@@ -1717,6 +1723,8 @@ func _succeed(title: String, detail: String, pay_mult: float) -> void:
 	hud.close_crew_wheel(false)
 	Engine.time_scale = 1.0
 	state = State.CLEARED
+	if _music != null:
+		_music.end_combat()
 	# The job's done: anything still on the ground gets hauled home.
 	for p in pickups.get_children():
 		_take_salvage(p as Pickup)
@@ -1768,6 +1776,8 @@ func _on_wrecked() -> void:
 	hud.close_crew_wheel(false)
 	Engine.time_scale = 1.0
 	state = State.WRECKED
+	if _music != null:
+		_music.play_wreck()
 	camera.shake(1.0)
 	var aboard: Array[String] = []
 	for m in profile.seated_crew():
@@ -1893,3 +1903,34 @@ class CourierMarkers extends Node2D:
 			else:
 				draw_arc(p, r * 0.7, 0.0, TAU, 40, Color(c, 0.35), 2.0)
 			draw_string(font, p + Vector2(-30, 10), str(i + 1), HORIZONTAL_ALIGNMENT_CENTER, 60, 30, Color(c, 0.95 if i == index else 0.4))
+
+
+# --- Music and effects (MusicManager autoload) ------------------------------------
+
+var _music: Node = null
+var _music_wait := 0.0
+
+
+func _music_start() -> void:
+	_music = get_node_or_null("/root/MusicManager")
+	if _music != null:
+		_music.start_combat(mission_type == "courier")
+
+
+## A few times a second: enemy rigs and zombies alive pick the combat layer.
+## TODO(audio): weigh in boss/elite fights, Survive's last wave, low armor.
+func _music_tick(delta: float) -> void:
+	if _music == null or state != State.RUNNING:
+		return
+	_music_wait -= delta
+	if _music_wait > 0.0:
+		return
+	_music_wait = T.MUSIC_CHECK_EVERY
+	_music.set_intensity(_music.intensity_for(active_rig_count(), zombies.active_count()))
+
+
+func _sfx(id: String) -> void:
+	if _music != null:
+		_music.play_sfx(id)
+# TODO(audio): "rig_wrecked" on enemy rig wrecks (_on_*_wrecked handlers) and
+# "courier_warning" when the Courier clock passes a par tier, once agreed.

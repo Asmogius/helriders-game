@@ -799,3 +799,15 @@ const BULWARK := {
 	"turret_turn_rate": 0.0,
 	"lock_range": 0.0,
 }
+
+# --- Audio (DESIGN "Audio / Soundtrack"; first pass, not yet agreed) ----------------
+const MUSIC_FADE := 1.5             # seconds for a scene change (garage <-> fight)
+const MUSIC_LAYER_FADE := 2.0       # seconds for a combat layer to cross in or out
+const MUSIC_SILENT_DB := -60.0      # a layer that is "off" (kept playing so it stays in sync)
+const MUSIC_INTENSITY_HOLD := 4.0   # seconds before intensity may drop again
+const MUSIC_CHECK_EVERY := 0.5      # seconds between intensity checks in the fight
+# Intensity 1 (Contact) / 2 (Crossfire): enemy rigs alive OR zombies alive at or above.
+const MUSIC_MID_RIGS := 1
+const MUSIC_MID_ZOMBIES := 10
+const MUSIC_HIGH_RIGS := 2
+const MUSIC_HIGH_ZOMBIES := 22

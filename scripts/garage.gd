@@ -94,6 +94,9 @@ var _crew_line: Button
 
 func _ready() -> void:
 	profile = get_node("/root/Profile")
+	var music := get_node_or_null("/root/MusicManager")
+	if music != null:
+		music.play_garage()
 	if auto_resume and profile.resume_job():
 		# Agreed with the owner: a job quit or closed mid-fight starts over.
 		get_tree().change_scene_to_file.call_deferred(MISSION_SCENE)
