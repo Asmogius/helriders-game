@@ -54,7 +54,7 @@ func _process(_delta: float) -> bool:
 				_check(main.barrels.size() == T.BARRELS_PER_JOB, "%d barrels placed for the job" % T.BARRELS_PER_JOB)
 				var on_spots := true
 				for b in main.barrels:
-					on_spots = on_spots and Arena.BARREL_SPOTS.has(b.position) and T.BARREL_TYPES.has(b.kind)
+					on_spots = on_spots and main.arena.barrel_spots.has(b.position) and T.BARREL_TYPES.has(b.kind)
 				_check(on_spots, "barrels sit on the layout's fixed spots, types rolled")
 				# STUNNED: the stick does nothing.
 				rig.fill_status(StatusBars.SHOCK)

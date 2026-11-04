@@ -13,7 +13,11 @@ var astar := AStarGrid2D.new()
 var _ray := PhysicsRayQueryParameters2D.new()
 
 
-func _init() -> void:
+var _arena: Node2D
+
+
+func _init(arena: Node2D = null) -> void:
+	_arena = arena if arena != null else Arena.new()
 	var cells := Vector2i(ceili(T.WORLD_SIZE.x / CELL), ceili(T.WORLD_SIZE.y / CELL))
 	astar.region = Rect2i(Vector2i.ZERO, cells)
 	astar.cell_size = Vector2(CELL, CELL)
@@ -31,10 +35,10 @@ func _blocked(p: Vector2) -> bool:
 	var wall := Arena.WALL + CLEARANCE
 	if p.x < wall or p.y < wall or p.x > T.WORLD_SIZE.x - wall or p.y > T.WORLD_SIZE.y - wall:
 		return true
-	for b: Rect2 in Arena.BUILDINGS:
+	for b: Rect2 in _arena.get("buildings"):
 		if b.grow(CLEARANCE).has_point(p):
 			return true
-	for prop: Array in Arena.PROPS:
+	for prop: Array in _arena.get("props"):
 		var center: Vector2 = prop[0]
 		var size: Vector2 = prop[1]
 		var local := (p - center).rotated(-float(prop[2]))
