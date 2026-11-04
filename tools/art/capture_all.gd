@@ -71,7 +71,7 @@ func _show_rarity() -> void:
 		var l := UI.label(r, 24, UI.rarity_color(r))
 		l.position = Vector2(14, 40)
 		card.add_child(l)
-		UI.rarity_frame(card, r)
+		UI.rarity_frame(card, r).set("t", 1.0)   # shimmer mid-sweep for the shot
 
 
 const SWATCHES := [
