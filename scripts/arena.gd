@@ -37,10 +37,8 @@ var _bake_t0 := 0
 # Last bake, keyed by layout + variation (seed_for) + texture mode; one entry,
 # so RESTART of the same job skips the bake and memory stays bounded. Held in a
 # tree-root meta cache (like zombie.gd's art), not static vars, so nothing keeps
-# this script or the baked textures alive past exit. Its "orphans" are bakes
-# whose arena left the tree mid-bake: never waited on there (a quit must not
-# stall); reaped once their worker finishes, results discarded.
-const MAP_META := &"arena_map_cache"   # root meta: {"key": String, "chunks": Array, "orphans": Array, "style": bool}
+# this script or the baked textures alive past exit.
+const MAP_META := &"arena_map_cache"   # root meta: {"key": String, "chunks": Array, "style": bool}
 
 signal bake_finished
 
@@ -50,7 +48,7 @@ static func _map_cache() -> Dictionary:
 	var root: Window = tree.root if tree != null else null
 	if root != null and root.has_meta(MAP_META):
 		return root.get_meta(MAP_META)
-	var c := {"key": "", "chunks": [], "orphans": [], "style": false}
+	var c := {"key": "", "chunks": [], "style": false}
 	if root != null:
 		root.set_meta(MAP_META, c)
 	return c
@@ -76,14 +74,6 @@ static func clear_cache() -> void:
 ## The cached chunks (tests).
 static func cached_chunks() -> Array:
 	return _map_cache().chunks
-
-
-static func _reap_orphans() -> void:
-	var orphans: Array = _map_cache().orphans
-	for id: int in orphans.duplicate():
-		if WorkerThreadPool.is_task_completed(id):
-			WorkerThreadPool.wait_for_task_completion(id)
-			orphans.erase(id)
 
 
 func _init() -> void:
@@ -128,7 +118,6 @@ func is_styled() -> bool:
 
 
 func _setup_style() -> void:
-	_reap_orphans()
 	_bake_t0 = Time.get_ticks_usec()
 	var single := MapArt.max_texture_size() >= 4096
 	var data := MapArt.snapshot(self)
@@ -177,10 +166,10 @@ func _process(_delta: float) -> void:
 
 
 func _exit_tree() -> void:
-	# Quit mid-bake: don't block on the worker. It only writes into its own
-	# array (not this node), so let it finish; it is reaped later, unused.
+	# Left (or quit) mid-bake: wait for the worker (~200 ms) and drop its
+	# result. A task still running at quit aborts the engine (exit 134).
 	if _task >= 0:
-		(_map_cache().orphans as Array).append(_task)
+		WorkerThreadPool.wait_for_task_completion(_task)
 		_task = -1
 		_task_out = []
 

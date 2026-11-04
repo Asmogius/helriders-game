@@ -62,11 +62,16 @@ func _run() -> void:
 	MapArt.set_max_texture_override(0)
 	if RenderingServer.get_rendering_device() == null:
 		_check(MapArt.max_texture_size() == 0, "no query (Compatibility): size 0, chunks")
-	# Quitting mid-bake must not block on the worker.
+	# Leaving mid-bake waits for the worker (one bake, well under 2 s) and drops it.
 	a = _arena("gas_station", 11)
 	var t0 := Time.get_ticks_usec()
 	a.free()
-	_check(Time.get_ticks_usec() - t0 < 20000, "quit mid-bake returns at once")
+	_check(Time.get_ticks_usec() - t0 < 2000000, "leaving mid-bake waits for the bake, briefly")
+	_check(Arena.cached_chunks().is_empty(), "a bake dropped mid-way is not cached")
+	# Regression: quitting the engine on frame 2 with a bake running used to
+	# abort (exit 134). Run the repro as a child process; it must exit 0.
+	var code := OS.execute(OS.get_executable_path(), ["--headless", "--path", ProjectSettings.globalize_path("res://"), "-s", "res://tests/map_quit_bake.gd"])
+	_check(code == 0, "quit mid-bake exits cleanly (child exit %d)" % code)
 	Arena.clear_cache()
 	_check(Arena.cached_chunks().is_empty(), "clear_cache drops the map")
 	MapArt.set_tiles_path("res://art/map/missing_tiles")
