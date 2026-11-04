@@ -99,7 +99,7 @@ def render_frame(grid, colors, heading_deg, ppv=PX_PER_VOXEL, tilt=TILT_DEG, can
         x, y, z = pts[:, 0] - cx, pts[:, 1] - cy, pts[:, 2]
         wx, wy = x * ca - y * sa, x * sa + y * ca  # world (screen x right, y down)
         px = wx * ppv + W / 2
-        py = (wy * ct - z * st) * ppv + H / 2 + (sz * st * ppv) / 2
+        py = (wy * ct - z * st) * ppv + H / 2   # ground centre = frame centre
         depth = wy * st + z * ct
         ix, iy = np.floor(px).astype(int), np.floor(py).astype(int)
         ok = (ix >= 0) & (ix < W) & (iy >= 0) & (iy < H)
@@ -133,8 +133,9 @@ def outline(img):
 
 
 def _canvas(shape, ppv):
+    # Ground centre sits on the frame centre, so leave room for height above.
     r = math.hypot(shape[0], shape[1]) / 2 + 1
-    c = int(math.ceil(2 * r * ppv + shape[2] * math.sin(math.radians(TILT_DEG)) * ppv)) + 4
+    c = 2 * int(math.ceil((r + shape[2] * math.sin(math.radians(TILT_DEG))) * ppv)) + 4
     return c + c % 2
 
 
@@ -154,7 +155,7 @@ def project_point(pt, shape, heading_deg, ppv=PX_PER_VOXEL, tilt=TILT_DEG):
     a, t = math.radians(heading_deg), math.radians(tilt)
     x, y, z = pt[0] - sx / 2.0, pt[1] - sy / 2.0, pt[2]
     wx, wy = x * math.cos(a) - y * math.sin(a), x * math.sin(a) + y * math.cos(a)
-    return [round(wx * ppv, 2), round((wy * math.cos(t) - z * math.sin(t) + sz * math.sin(t) / 2) * ppv, 2)]
+    return [round(wx * ppv, 2), round((wy * math.cos(t) - z * math.sin(t)) * ppv, 2)]
 
 
 def render_model(name, chunks, colors, outdir, directions=DIRECTIONS, ppv=PX_PER_VOXEL, points=None):
@@ -175,8 +176,9 @@ def render_model(name, chunks, colors, outdir, directions=DIRECTIONS, ppv=PX_PER
     meta = {"sheet": f"{name}.png", "frame_w": canvas, "frame_h": canvas, "columns": cols,
             "directions": directions, "px_per_voxel": ppv, "tilt_deg": TILT_DEG,
             "heading_0": "+x (Vector2.RIGHT), frames turn clockwise",
-            "origin": "frame centre = model footprint centre at ground level",
-            "points": {pn: [project_point(pt, shape, h, ppv) for h in heads] for pn, pt in (points or {}).items()},
+            "anchor": "frame centre = footprint centre at ground level (z = 0) = the rig's collision centre",
+            "points": {pn: [project_point(pt, shape, h, ppv) for h in heads] for pn, pt in
+                       dict(points or {}, ground_centre=(shape[0] / 2.0, shape[1] / 2.0, 0.0)).items()},
             "chunks": {}}
     for cname, g in chunks.items():
         cf = [render_frame(g, colors, h, ppv, canvas=canvas) for h in heads]

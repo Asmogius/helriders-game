@@ -99,6 +99,7 @@ def pintle_turret():
     box(b, 2, 11, 3, 13, 3, 6, "steel")               # gun body
     box(b, 3, 9, 12, 15, 2, 6, "rust")                # ammo box
     box(b, 1, 4, 5, 11, 6, 7, "steel_dark")           # shield lip
+    m.points["muzzle"] = (29.5, 8.0, 5.0)
     g = m.g("barrel")
     box(g, 11, 29, 7, 9, 4, 6, "steel")
     box(g, 11, 20, 6, 10, 3, 7, "steel_dark")         # shroud
@@ -134,8 +135,43 @@ def outrider():
     return m
 
 
+def bulwark_frame():
+    """Bulwark Frame: 76x42, slab sides, two hardpoints (mount_a front, mount_b rear,
+    matching vehicle.gd turret_position for two weapons)."""
+    m = Model((76, 42, 20))
+    w = m.g("wheels")
+    for x0 in (6, 30, 54):                          # six wheels
+        wheel(w, x0, 14, 0, 6, 6, 0)
+        wheel(w, x0, 14, 36, 6, 6, 41)
+    c = m.g("chassis")
+    box(c, 2, 74, 6, 36, 3, 10, "steel_dark")
+    box(c, 3, 70, 5, 37, 10, 12, "steel")
+    box(c, 24, 52, 6, 7, 11, 13, "cyan"); box(c, 24, 52, 35, 36, 11, 13, "cyan")
+    c[2, 8:11, 7:10] = C["orange"]; c[2, 31:34, 7:10] = C["orange"]
+    sk = m.g("skirts")                               # armored side skirts over the wheels
+    box(sk, 8, 68, 4, 6, 6, 14, "steel_dark"); box(sk, 8, 68, 36, 38, 6, 14, "steel_dark")
+    rivets(sk, 8, 68, 4, 6, 13, 5); rivets(sk, 8, 68, 36, 38, 13, 5)
+    cab = m.g("cab")
+    box(cab, 30, 46, 10, 32, 12, 18, "steel")
+    box(cab, 43, 46, 12, 30, 13, 18, "glass")
+    box(cab, 31, 44, 12, 30, 18, 19, "steel_dark")
+    fp = m.g("front_plate")
+    for x in range(68, 76):
+        box(fp, x, x + 1, 4, 38, 3, max(5, 15 - (x - 68)), "rust")
+    rivets(fp, 68, 72, 4, 38, 14, 3)
+    fp[75, 6:9, 4:6] = C["cyan"]; fp[75, 33:36, 4:6] = C["cyan"]
+    rp = m.g("rear_plates")
+    box(rp, 4, 12, 8, 34, 12, 14, "rust")
+    rivets(rp, 4, 12, 8, 34, 14, 4)
+    m.points["mount_a"] = (53.0, 21.0, 12.0)
+    m.points["mount_b"] = (15.0, 21.0, 14.0)
+    m.points["turret_mount"] = (24.0, 21.0, 12.0)
+    return m
+
+
 def ALL():
     col = colors_for()
     return {"scrap_frame": (scrap_frame(), col),
             "pintle_turret": (pintle_turret(), col),
-            "outrider": (outrider(), col)}
+            "outrider": (outrider(), col),
+            "bulwark_frame": (bulwark_frame(), col)}
