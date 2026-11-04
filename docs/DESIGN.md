@@ -275,6 +275,7 @@ Agreed with the owner on 2026-11-03. **Do not implement until the numbers are dr
 - Lost crew return: after 3 days (Uncommon), +1 day per rarity step (Rare 4, Epic 5, Legendary 6, Mythic 7), they enter a rehire pool at level 1 with the same specialty and rarity (perks reset).
 - Saloon rehire section: one extra card a day, drawn at random from the rehire pool. A rehire can be dismissed permanently, which returns them to the general hire pool.
 - Rehire price: 20% below a normal hire of that rarity. Saloon upgrade Old Faces: 3 steps, each a further 10% off (max 50%).
+- **Built (2026-11-04).** Agreed with the owner: lost Commons don't come back (the Saloon always has free ones); Old Faces costs 150 / 350 / 700; Seasoned Hands and House Credit apply to rehires too (House Credit stacks on the rehire discount). Gap-fillers: the return days count from the day after the wreck; the rehire card sits at the end of the Saloon row, marked BACK, with SEND AWAY next to HIRE; hiring or sending away spends the day's card (a new one comes tomorrow if anyone else is waiting); Last Rites survivors aren't lost; the wreck card says who may turn up again and when; the Saloon notes how many lost crew are still on the way. Agreed with the owner: a hire or rehire that starts above level 1 (Seasoned Hands) still leaves every perk pick it skipped to the player; nothing is picked for them.
 
 ## Part Mods: First Draft (test-build parts)
 

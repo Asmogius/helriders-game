@@ -1,5 +1,7 @@
 extends Control
-## The Saloon (DESIGN §5): hire crew. Three paid offers a day (rarity rolled
+## The Saloon (DESIGN §5): hire crew. Crew lost in a wreck turn up again
+## after a few days: one of them sits at the end of the row each day, cheaper
+## than a fresh hire, and can be sent away for good (§14). Three paid offers a day (rarity rolled
 ## by T.SALOON_ODDS, refreshed when the day ends) and a free Common Driver
 ## and Gunner who are always there. A new hire takes an empty seat of their
 ## role if the frame has one, otherwise waits at the Inn.
@@ -11,17 +13,18 @@ const CrewCard := preload("res://scripts/crew_card.gd")
 const ProfileScript := preload("res://scripts/profile.gd")
 const UpgradePanel := preload("res://scripts/upgrade_panel.gd")
 
-const SALOON_UPGRADES := ["back_room", "word_around", "seasoned_hands", "house_credit"]
+const SALOON_UPGRADES := ["back_room", "word_around", "seasoned_hands", "house_credit", "old_faces"]
 
 const FREE_ROLES := ["driver", "gunner"]
 
 var profile: ProfileScript
-var selected := -1        # 0..offers-1 = paid offers, then the free Driver and Gunner
+var selected := -1        # 0..offers-1 = paid offers, then the free Driver and Gunner, then a rehire
 
 var _title: Label
 var _info: Label
 var _cards: HBoxContainer
 var _hire: Button
+var _send_away: Button
 var _note: Label
 var _upgrades: UpgradePanel
 
@@ -56,6 +59,12 @@ func _ready() -> void:
 	up.custom_minimum_size = Vector2(170, 0)
 	up.pressed.connect(open_upgrades)
 	bar.add_child(up)
+	_send_away = Button.new()
+	_send_away.text = "SEND AWAY"
+	_send_away.focus_mode = Control.FOCUS_NONE
+	_send_away.custom_minimum_size = Vector2(170, 0)
+	_send_away.pressed.connect(send_away_selected)
+	bar.add_child(_send_away)
 	_hire = Button.new()
 	_hire.text = "HIRE"
 	_hire.focus_mode = Control.FOCUS_NONE
@@ -107,7 +116,10 @@ func refresh() -> void:
 		card.member = m
 		card.selected = i == selected
 		var price := profile.hire_price(m)
-		if bool(m.get("hired", false)):
+		if bool(m.get("rehire", false)):
+			card.status = "BACK  %d SCRAP" % price
+			card.status_color = T.COL_ORANGE if price <= profile.scrap else UI.BAD
+		elif bool(m.get("hired", false)):
 			card.status = "HIRED"
 			card.status_color = T.COL_CYAN
 			card.dim = true
@@ -122,16 +134,25 @@ func refresh() -> void:
 	var reason := _block(selected)
 	_hire.disabled = reason != ""
 	_hire.text = "HIRE" if selected < 0 or reason == "" else reason
+	_send_away.visible = is_rehire(selected)
+	if not profile.rehire_pool.is_empty() or not profile.lost.is_empty():
+		_note.text += "\nLost crew coming back: %d on the way, %d waiting for their card." % [profile.lost.size(), profile.rehire_pool.size()]
 
 
-## Paid offers first, then the free Driver and Gunner.
+## Paid offers first, then the free Driver and Gunner, then today's rehire.
 func offer_count() -> int:
-	return profile.saloon.size() + FREE_ROLES.size()
+	return profile.saloon.size() + FREE_ROLES.size() + (0 if profile.rehire_offer().is_empty() else 1)
+
+
+func is_rehire(i: int) -> bool:
+	return i >= 0 and i == profile.saloon.size() + FREE_ROLES.size() and not profile.rehire_offer().is_empty()
 
 
 func offer(i: int) -> Dictionary:
 	if i < profile.saloon.size():
 		return profile.saloon[i]
+	if is_rehire(i):
+		return profile.rehire_offer()
 	var role: String = FREE_ROLES[i - profile.saloon.size()]
 	var m := {"id": 0, "name": "Free %s" % Crew.ROLE_NAMES[role], "role": role, "rarity": "Common",
 		"specialty": "", "xp": 0.0, "perks": [], "rest": 0, "seated": false, "price": 0}
@@ -172,6 +193,8 @@ func _upgrade_effect(key: String) -> String:
 			return "Hires start at level %d" % (1 + lv)
 		"house_credit":
 			return "Hire prices %d%% lower" % roundi(float(T.UPGRADES.house_credit.per_level) * lv * 100.0)
+		"old_faces":
+			return "Rehires %d%% below a fresh hire" % roundi((T.REHIRE_DISCOUNT + float(T.UPGRADES.old_faces.per_level) * lv) * 100.0)
 	return ""
 
 
@@ -198,9 +221,22 @@ func hire_selected() -> bool:
 	if _block(selected) != "":
 		return false
 	var ok := false
-	if selected < profile.saloon.size():
+	if is_rehire(selected):
+		selected = -1   # the card goes once hired; refreshes mid-hire mustn't point at it
+		ok = profile.rehire()
+	elif selected < profile.saloon.size():
 		ok = profile.hire_offer(selected)
 	else:
 		ok = profile.hire_basic(FREE_ROLES[selected - profile.saloon.size()])
+	refresh()
+	return ok
+
+
+## Today's rehire goes for good (back to the general hire pool).
+func send_away_selected() -> bool:
+	if not is_rehire(selected):
+		return false
+	var ok := profile.dismiss_rehire()
+	selected = -1
 	refresh()
 	return ok

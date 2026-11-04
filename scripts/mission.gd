@@ -1538,6 +1538,12 @@ func _on_wrecked() -> void:
 		lines += " No crew aboard."
 	elif not lost.is_empty():
 		lines += " Crew lost: %s." % ", ".join(lost)
+		var back: Array[String] = []
+		for m: Dictionary in profile.lost:
+			if lost.has(str(m.name)):
+				back.append("%s in %d day%s" % [str(m.name), int(m.back_in), "" if int(m.back_in) == 1 else "s"])
+		if not back.is_empty():
+			lines += "\nThey may turn up at the Saloon again: %s." % ", ".join(back)
 	if not saved.is_empty():
 		lines += "\nLast Rites: %s pulled through, resting %d days." % [", ".join(saved), T.LAST_RITES_REST]
 	if penalty > 0:

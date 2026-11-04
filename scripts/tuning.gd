@@ -442,6 +442,7 @@ const UPGRADES := {
 	"word_around": {"name": "Word Gets Around", "costs": [200, 450, 900], "per_level": 1},  # odds shift (SALOON_ODDS_STEP)
 	"seasoned_hands": {"name": "Seasoned Hands", "costs": [250, 600], "per_level": 1},   # hires start a level higher
 	"house_credit": {"name": "House Credit", "costs": [120, 300, 600], "per_level": 0.10},  # hire prices -10%
+	"old_faces": {"name": "Old Faces", "costs": [150, 350, 700], "per_level": 0.10},     # rehires a further -10%
 }
 const LAST_RITES_DISTRICT := 2         # Last Rites is for sale once Industrial Spine is open
 const LAST_RITES_REST := 3             # survivors rest this many days
@@ -506,6 +507,14 @@ const SALOON_ODDS := {"Uncommon": 60.0, "Rare": 28.0, "Epic": 9.0, "Legendary": 
 const CREW_WHEEL_SLOWMO := 0.25       # game speed while the crew wheel is open
 const CREW_WHEEL_COOLDOWN := 3.0       # seconds after it closes before it opens again
 const CREW_PRICES := {"Common": 0, "Uncommon": 80, "Rare": 200, "Epic": 450, "Legendary": 900, "Mythic": 1600}
+# Lost crew (§14; agreed with the owner): a crew member lost in a wreck turns
+# up again after 3 days (Uncommon), a day more per rarity step, and joins the
+# rehire pool at level 1 with the same specialty and rarity (perks reset).
+# Commons don't come back (the Saloon always has free ones). The Saloon shows
+# one rehire card a day, 20% below a normal hire (Old Faces: a further 10%
+# per step); House Credit and Seasoned Hands apply too.
+const LOST_RETURN_DAYS := {"Uncommon": 3, "Rare": 4, "Epic": 5, "Legendary": 6, "Mythic": 7}
+const REHIRE_DISCOUNT := 0.20
 
 # --- Rigs ----------------------------------------------------------------------
 # The player's rig is built from parts: see parts.gd (schematics and the

@@ -69,6 +69,9 @@ func _process(_delta: float) -> bool:
 				_check(mission.bulwark.is_inside_tree(), "a 4-skull Hunt brings a Bulwark escort")
 				print("  4-skull Elite armor %d" % roundi(e.armor_max))
 				_check(is_equal_approx(e.armor_max, T.OUTRIDER.armor * 2.1) and e.lock_priority > mission.outrider.lock_priority, "4-skull Elite has 2.1x armor and is first in line for lock")
+				# Back off first, or a drop landing beside you is picked up at once.
+				var away := mission.vehicle.global_position - e.global_position
+				mission.vehicle.global_position = e.global_position + (away.normalized() if away.length() > 1.0 else Vector2.RIGHT) * 500.0
 				e.take_damage(99999.0)
 			if frame == 305:
 				_check(mission.pickups.get_child_count() == 1, "the Elite always drops something")
