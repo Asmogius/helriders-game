@@ -236,6 +236,17 @@ Agreed with the owner on 2026-11-03. **Do not implement until the numbers are dr
 - Crew perks become tiered conditional mods tied to specialty: Minor at picks 3 and 6, Major at 9 and 12, Signature at 15 and 18. The 4 shared perks stay. Each specialty needs about 2 Minor, 2 Major and 2 Signature perks.
 - Keywords connect part mods and crew perks: RAM, DRIFT, BURST, MARKED, STUNNED, OVERLOAD, SLICK, BURNING, CORRODED, GOOPED. Players discover interactions; no named synergies for now.
 - Feedback: no floating text. Each keyword has one symbol, one animation and one fixed color (not reusing threat colors), in combat and on garage cards, throttled on busy screens.
+- **Built (2026-11-04).** The owner approved the bots' numbers and asked for the remaining items with gap-filler definitions:
+  - **DRIFT** is a sideways slide over 160 px/s while rolling over 150 px/s; it counts when the slide dies down, if it lasted 0.4 s.
+  - **OVERLOAD** is a heat gun at 75% or more of its bar, before it locks hot. Enemy heat guns can be OVERLOADed too.
+  - **Now wired:** Hit and Run (+15% damage for 2 s after a DRIFT), Drift Fuel (3 s off the Nitro Bottle), Clean Exit (1 s off Hard Line), Overload Coil (the arc chain hits 2 extra targets), Feedback Loop (Static Burst locks OVERLOADed enemy guns hot), Mobile Workshop (15% HP back the first time HP falls under 30%, once per mission).
+  - **Keyword popups:** one pooled drawer (`keyword_fx.gd`), the symbol over the rig for 0.7 s, at most once per keyword per rig every 0.5 s and 6 on screen. They fire for RAM (yours), DRIFT, BURST (yours), MARKED, OVERLOAD and the six statuses. Garage part cards show a colored chip per keyword mod, 40% while locked.
+  - **Also built:**
+    - the Outrider's heat bar under it (outlined while OVERLOADed);
+    - an Outrider at 25% HP runs to a live Patcher until it's back to 45%, and its break-off turn slides (grip cut to 30% for 0.5 s);
+    - a Bulwark body-blocks for a Gunner Rig or Patcher within 400 px when you're closer to that ally than to it;
+    - barrels you set off during the Demolisher's Cook Off hit 50% harder;
+    - in Retrieve the Sludger arrives with the first danger step that calls a rig, not on a timer.
 
 ## Extract or Push
 

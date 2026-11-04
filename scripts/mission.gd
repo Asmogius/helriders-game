@@ -37,6 +37,7 @@ const Hunter := preload("res://scripts/hunter.gd")
 const BulletPool := preload("res://scripts/bullet_pool.gd")
 const MinePool := preload("res://scripts/mine_pool.gd")
 const ShellPool := preload("res://scripts/shell_pool.gd")
+const KeywordFx := preload("res://scripts/keyword_fx.gd")
 const Fx := preload("res://scripts/fx.gd")
 const Pickup := preload("res://scripts/pickup.gd")
 const LockReticle := preload("res://scripts/lock_reticle.gd")
@@ -120,6 +121,7 @@ var marked: Node2D               # the last target a Spotter marked (tests)
 var bullets: BulletPool
 var mines: MinePool
 var shells: ShellPool             # Mortar shells in flight
+var keywords: KeywordFx           # keyword popups (§14 feedback)
 var fx: Fx
 var pickups: Node2D
 var reticle: LockReticle
@@ -165,6 +167,7 @@ var tutorial := false           # the Training Run (optional, from MENU)
 var tut_step := 0               # 0 drive, 1 shoot, 2 lock, 3 rig, 4 salvage, 5 done
 var _tut_mark := {}
 var _seen_timer := 0.0
+var _sludger_call := false      # Retrieve: the Sludger comes with the next danger rig call
 var _events: Array = []          # [seconds, kind, kills that also trigger it (-1 = none), fired]
 
 
@@ -211,6 +214,7 @@ func _ready() -> void:
 	bullets.z_index = 4
 	mines = MinePool.new()
 	shells = ShellPool.new()
+	keywords = KeywordFx.new()
 	enemy_mines = MinePool.new()
 	enemy_mines.enemy = true
 	fx = Fx.new()
@@ -292,7 +296,7 @@ func _ready() -> void:
 		add_child(truck)
 	for h in hunters:
 		add_child(h)
-	for node: Node in [bullets, shells, fx, reticle, camera, hud]:
+	for node: Node in [bullets, shells, keywords, fx, reticle, camera, hud]:
 		add_child(node)
 
 	camera.set_bounds(Rect2(Vector2.ZERO, T.WORLD_SIZE))
@@ -344,6 +348,9 @@ func _ready() -> void:
 		hud.choice_made.connect(_on_optional_choice)
 	hud.restart_requested.connect(return_to_garage)
 	hud.pause_pressed.connect(open_menu)
+	vehicle.keyword.connect(keywords.pop)
+	for rig in _all_enemy_rigs():
+		rig.keyword.connect(keywords.pop)
 	for b in barrels:
 		b.died.connect(func(_at: Vector2) -> void: profile.discover("hazards", "barrel_" + b.kind))
 		b.died.connect(_chain_reaction)
@@ -517,7 +524,10 @@ func _configure_mission() -> void:
 			if not _swap_event("scrapper" if skulls <= 3 else "outrider", "torcher"):
 				_events.append([75.0, "torcher", -1, false])
 	if not tutorial and Missions.has_sludger(spec):
-		_events.append([90.0, "sludger", -1, false])
+		if mission_type == "retrieve":
+			_sludger_call = true   # it answers the first rig call as the danger rises
+		else:
+			_events.append([90.0, "sludger", -1, false])
 	for i in 1:
 		torchers.append(TorcherRig.new())
 		sludgers.append(SludgerRig.new())
@@ -1450,7 +1460,13 @@ func _set_danger(step: int) -> void:
 	danger = step
 	zombies.cap = mini(_base_cap + step * T.RETRIEVE_CAP_STEP, T.ZOMBIE_CAP)
 	zombies.speed_bonus = 1.0 + step * T.RETRIEVE_SPEED_STEP
-	if rose and T.RETRIEVE_RIG_STEPS.has(step) and _rig_calls_made < _rig_calls:
+	if rose and T.RETRIEVE_RIG_STEPS.has(step) and _sludger_call:
+		# Retrieve's Sludger is called in like the other rigs, on the first
+		# danger step that calls one (or the first step, if none are due).
+		_sludger_call = false
+		_events.append([elapsed, "sludger", -1, false])
+		hud.banner("THE BLOCK IS STIRRING  -  DANGER %d" % step, Color(0.95, 0.8, 0.3), 2.0)
+	elif rose and T.RETRIEVE_RIG_STEPS.has(step) and _rig_calls_made < _rig_calls:
 		_events.append([elapsed, _rig_call_kind(_rig_calls_made), -1, false])
 		_rig_calls_made += 1
 		hud.banner("THE BLOCK IS STIRRING  -  DANGER %d" % step, Color(0.95, 0.8, 0.3), 2.0)

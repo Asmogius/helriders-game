@@ -138,7 +138,7 @@ static func has_sludger(mission: Dictionary) -> bool:
 ## Extract or Push (§14, proposal 01): can this job offer a push once its
 ## objective is done? Seeded (T.PUSH_CHANCE), hidden until then. Never on
 ## Courier, the tutorial or the day after a wreck (the caller checks those
-## two). Retrieve and Escort follow the draft rule, pending the owner.
+## two). Retrieve and Escort follow the rule agreed with the owner.
 static func has_push(mission: Dictionary) -> bool:
 	var type := str(mission.get("type", ""))
 	if T.PUSH_NO_TYPES.has(type):

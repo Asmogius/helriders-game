@@ -598,6 +598,13 @@ const WRECK_SWARM_RANGE := 280.0
 # rolling; it "ends" when the slide dies, if it lasted DRIFT_MIN_TIME.
 # OVERLOAD: a heat gun running at OVERLOAD_HEAT or more of its bar (before it
 # locks hot). Enemy heat guns can be OVERLOADed too.
+const COOK_OFF_BARREL_MULT := 1.5   # Demolisher: barrels set off during Cook Off +50% (proposal 01)
+const OUTRIDER_RETREAT_HP := 0.25      # an Outrider this hurt runs to a Patcher, if one's alive...
+const OUTRIDER_RETREAT_DONE := 0.45    # ...until it's patched back up to this
+const OUTRIDER_DRIFT_KICK := 0.5       # its break-off turn slides: grip cut for this long...
+const OUTRIDER_DRIFT_GRIP := 0.3       # ...to this share
+const BULWARK_SCREEN_RANGE := 400.0    # it body-blocks for a Gunner Rig or Patcher this close
+const BULWARK_SCREEN_GAP := 160.0      # standing this far out from the ally, toward you
 const DRIFT_SIDE_SPEED := 160.0
 const DRIFT_MIN_FWD := 150.0
 const DRIFT_MIN_TIME := 0.4

@@ -19,6 +19,7 @@ var kind := "explosive"
 var hazards: Node2D        # GroundHazards
 var fx: Node2D
 var blasts := 0            # tests
+var blast_mult := 1.0      # Demolisher's Cook Off: barrels you set off with it hit harder
 
 var _shape: CollisionShape2D
 var _query := PhysicsShapeQueryParameters2D.new()
@@ -42,6 +43,7 @@ func place(at: Vector2, barrel_kind: String) -> void:
 	kind = barrel_kind
 	position = at
 	hp = T.BARREL_HP
+	blast_mult = 1.0
 	active = true
 	visible = true
 	lock_priority = 0
@@ -105,11 +107,11 @@ func explode() -> void:
 		var away := (body.global_position - at).normalized()
 		match kind:
 			"explosive":
-				body.call("take_hit", T.BARREL_EXPLOSIVE_DAMAGE, away * T.BARREL_EXPLOSIVE_SHOVE, "blast", "")
+				body.call("take_hit", T.BARREL_EXPLOSIVE_DAMAGE * blast_mult, away * T.BARREL_EXPLOSIVE_SHOVE, "blast", "")
 			"fire":
-				body.call("take_hit", T.BARREL_FIRE_DAMAGE, away * 300.0, "blast", "fire")
+				body.call("take_hit", T.BARREL_FIRE_DAMAGE * blast_mult, away * 300.0, "blast", "fire")
 			"acid":
-				body.call("take_hit", T.BARREL_ACID_DAMAGE, away * 300.0, "blast", "")
+				body.call("take_hit", T.BARREL_ACID_DAMAGE * blast_mult, away * 300.0, "blast", "")
 				if body.has_method("add_buildup"):
 					body.call("add_buildup", StatusBars.ACID, T.BARREL_ACID_BUILDUP)
 			"boomer":

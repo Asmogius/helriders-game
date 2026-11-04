@@ -1015,7 +1015,7 @@ func _drive(delta: float) -> void:
 	else:
 		fwd_speed = move_toward(fwd_speed, 0.0, coast * delta)
 
-	side_speed *= exp(-(grip + crew_grip) * traction * delta)
+	side_speed *= exp(-(grip + crew_grip) * traction * grip_mult * delta)
 	velocity = forward * fwd_speed + side * side_speed
 	_track_drift(delta, side_speed, fwd_speed)
 
@@ -1060,6 +1060,8 @@ func _resolve_collisions(pre_velocity: Vector2) -> void:
 			already_hit.append(other)
 			var weight := T.COUNTERWEIGHT if _active.has("brace") and has_sp("sp_counterweight") else 1.0   # Counterweight
 			other.call("receive_ram", ram_damage * float(crew_mods.ram) * clampf(impact / max_speed, 0.0, 1.2) * weight, global_position)
+			if team == BulletPool.TEAM_PLAYER:
+				keyword_pop("RAM", (other as Node2D).global_position)
 			if weight > 1.0:
 				_perk_fired("sp_counterweight")
 			if _active.has("brace") and has_sp("sp_juggernaut") and other is CharacterBody2D:
@@ -1265,6 +1267,8 @@ func _weapons(delta: float) -> void:
 				_cooldowns[i] = 1.0 / (float(w.fire_rate) * crew_fire)
 				_spend(i)
 				_burst_left[i] = burst - 1
+				if team == BulletPool.TEAM_PLAYER:
+					keyword_pop("BURST")
 				_burst_gap[i] = 1.0 / maxf(float(w.burst_rate), 1.0)
 				_shoot(w, muzzle, direction)
 		elif wants_fire and _cooldowns[i] <= 0.0:
@@ -1294,7 +1298,10 @@ func _spend(i: int) -> void:
 	var heat_time := float(gun_stats[i].get("heat_time", 0.0))
 	if heat_time > 0.0 and not _bottomless():
 		# Firing nonstop fills the bar in heat_time seconds, whatever the fire rate.
+		var was := _heat[i]
 		_heat[i] += _cooldowns[i] / heat_time
+		if was < T.OVERLOAD_HEAT and _heat[i] >= T.OVERLOAD_HEAT:
+			keyword_pop("OVERLOAD")
 		if _heat[i] >= 1.0:
 			_heat[i] = 1.0
 			_overheated[i] = true
@@ -1726,6 +1733,7 @@ func add_buildup(k: int, amount: float) -> void:
 		amount *= 0.5   # Sure Footing
 	if status.add(k, amount, resistance(k), float(T.STATUS_TIME_RIG[k])):
 		status_started.emit(k)
+		keyword_pop(STATUS_KEYWORDS[k])
 		queue_redraw()
 
 
@@ -1735,6 +1743,7 @@ func fill_status(k: int) -> void:
 		return
 	status.trigger(k, float(T.STATUS_TIME_RIG[k]))
 	status_started.emit(k)
+	keyword_pop(STATUS_KEYWORDS[k])
 	queue_redraw()
 
 
@@ -1788,6 +1797,7 @@ func receive_ram(damage: float, from := Vector2.INF) -> void:
 func apply_status(mult: float, _slow: float, seconds: float) -> void:
 	vuln = mult
 	vuln_left = seconds
+	keyword_pop("MARKED")
 	queue_redraw()
 
 
@@ -2307,6 +2317,9 @@ func _is_enemy_rig(o: Object) -> bool:
 
 ## A player bullet about to land on `target`: returns the damage it deals.
 func player_pre_hit(target: Object, dmg: float, _dtype: String, passed: int) -> float:
+	# Demolisher's Cook Off: a barrel you set off with it blows 50% harder.
+	if _active.has("cook_off") and target.has_method("explode"):
+		target.set("blast_mult", float((_active.cook_off as Dictionary).get("barrel_mult", T.COOK_OFF_BARREL_MULT)))
 	var rig := _is_enemy_rig(target)
 	if _active.has("deadeye"):
 		var d: Dictionary = _active.deadeye
@@ -2373,6 +2386,7 @@ func player_post_hit(target: Object, dmg: float, dtype: String, went_through: bo
 ## as a DRIFT when it dies down.
 func _track_drift(delta: float, side_speed: float, fwd_speed: float) -> void:
 	hit_run_left = maxf(hit_run_left - delta, 0.0)
+	_kw_clock += delta
 	var now := absf(side_speed) > T.DRIFT_SIDE_SPEED and absf(fwd_speed) > T.DRIFT_MIN_FWD
 	if now:
 		_drift_time += delta
@@ -2391,6 +2405,7 @@ func is_drifting() -> bool:
 func end_drift() -> void:
 	drifts += 1
 	drift_ended.emit()
+	keyword_pop("DRIFT")
 	if has_mod("hit_and_run"):
 		hit_run_left = T.HIT_AND_RUN_TIME
 		_perk_fired("hit_and_run")
@@ -2417,6 +2432,16 @@ func is_overloaded_gun() -> bool:
 		if _gun_overloaded(i):
 			return true
 	return false
+
+
+## Keyword feedback: ask for a popup of `kw` over this rig (or at `at`), at
+## most once per T.KEYWORD_THROTTLE per keyword.
+func keyword_pop(kw: String, at := Vector2.INF) -> void:
+	var last := float(_kw_last.get(kw, -100.0))
+	if _kw_clock - last < T.KEYWORD_THROTTLE:
+		return
+	_kw_last[kw] = _kw_clock
+	keyword.emit(kw, global_position if at == Vector2.INF else at)
 
 
 ## Feedback Loop: every OVERLOADed heat gun locks hot now. Returns how many.
@@ -2795,12 +2820,17 @@ func _area_hit(at: Vector2, radius: float, damage: float, dtype: String) -> int:
 # Numbers: proposal 01 §3.1 and DESIGN §14 crew perk table (approved). Numbers
 # neither gives are T.* constants in tuning.gd (agreed with the owner).
 
+var grip_mult := 1.0                # an AI driver throwing the rig into a slide
 var drifting := false              # DRIFT keyword: sliding sideways at speed
 var drifts := 0                    # DRIFTs ended (tests, keyword feedback)
 var hit_run_left := 0.0            # Hit and Run: +15% damage while > 0
 var workshop_used := false         # Mobile Workshop: once per mission
 var _drift_time := 0.0
 signal drift_ended
+signal keyword(kw: String, at: Vector2)   # keyword feedback (keyword_fx.gd)
+var _kw_last := {}                 # keyword -> clock of its last popup (throttle)
+var _kw_clock := 0.0
+const STATUS_KEYWORDS := ["STUNNED", "BURNING", "CORRODED", "TOXIC", "SLICK", "GOOPED"]
 var neuro_left := 0.0              # Neurotoxin: -25% speed, half turret turn while > 0
 var slung_left := 0.0              # Slingshot: flung off a chain; a wall crash is a RAM
 var slung_damage := 0.0

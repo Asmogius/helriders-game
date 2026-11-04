@@ -122,6 +122,78 @@ func _process(_delta: float) -> bool:
 	if frame == 20:
 		var n := main.bullets.chained - int(mark.chained)
 		_check(n == T.OVERLOAD_COIL_JUMPS, "Overload Coil: the chain hits 2 extra targets (%d jumps)" % n)
+		main.zombies.clear_all()
+		# Keyword popups: one per keyword per rig every 0.5 s, symbols on screen.
+		var shown: int = main.keywords.shown
+		rig._kw_last = {}   # the DRIFT earlier in this test is still inside its throttle
+		rig.keyword_pop("DRIFT")
+		rig.keyword_pop("DRIFT")
+		_check(main.keywords.shown == shown + 1 and main.keywords.active_count() >= 1, "a DRIFT pops its symbol, once per 0.5 s")
+		rig.fill_status(1)
+		_check(int(main.keywords.counts.get("BURNING", 0)) >= 1, "a status starting pops its symbol (BURNING)")
+		rig.status.reset()
+		for k in 8:
+			main.keywords.pop("RAM", rig.global_position)
+		_check(main.keywords.active_count() <= T.KEYWORD_MAX_ON_SCREEN, "never more than 6 on screen")
+		# Demolisher's Cook Off: barrels you set off with it blow 50% harder.
+		var barrel: Node = main.barrels[0]
+		barrel.call("place", rig.global_position + Vector2(0, -200), "explosive")
+		rig._active["cook_off"] = {"left": 5.0}
+		rig.player_pre_hit(barrel, 10.0, "", 0)
+		_check(is_equal_approx(float(barrel.get("blast_mult")), T.COOK_OFF_BARREL_MULT), "Cook Off: a barrel you shoot blows 50% harder")
+		rig._active.erase("cook_off")
+		barrel.call("deactivate")
+		# Outrider: badly hurt with a Patcher alive, it runs to the Patcher.
+		var p := main.spawn_patcher(rig.global_position + Vector2(-700, -300))
+		var o2: Node2D = (load("res://scripts/enemy_rig.gd") as GDScript).new()   # the job's one pooled Outrider is spent
+		o2.set("player", rig)
+		o2.set("bullets", main.bullets)
+		o2.set("fx", main.fx)
+		o2.position = rig.global_position + Vector2(500, 300)
+		main.rigs.add_child(o2)
+		mark.p = p
+		mark.o2 = o2
+	if frame == 24:
+		var o2: Node = mark.o2
+		o2.set("hp", float(o2.get("hp_max")) * 0.2)
+	if frame == 30:
+		var o2: Node = mark.o2
+		_check(int(o2.get("retreats")) == 1 and int(o2.get("mode")) == 8, "an Outrider at 20% HP runs to the Patcher")
+		# Its break-off turn slides (a DRIFT): grip drops for half a second.
+		o2.set("hp", float(o2.get("hp_max")))
+		o2.set("mode", 3)
+		o2.call("_start_break", (rig.global_position - (o2 as Node2D).global_position), true)
+	if frame == 32:
+		var o2: Node = mark.o2
+		_check(float(o2.get("grip_mult")) < 1.0, "its break-off turn slides (grip cut)")
+		o2.call("take_damage", 1000000.0)
+		(mark.p as Node).call("take_damage", 1000000.0)
+		# Bulwark: screens a Gunner Rig you're closer to.
+		var g := main.spawn_gunner(rig.global_position + Vector2(0, 250))
+		g.set("player", null)
+		g.velocity = Vector2.ZERO
+		var bw := main.spawn_bulwark(rig.global_position + Vector2(0, 600))
+		mark.bw = bw
+	if frame == 40:
+		var bw: Node = mark.bw
+		_check(int(bw.get("screens")) >= 1, "a Bulwark body-blocks for a Gunner Rig you're closer to")
+		# Retrieve: the Sludger answers a danger step's rig call, not a timer.
+		var seed := 0
+		for k in 500:
+			if Missions.has_sludger(Missions.make("retrieve", 5, 300 + k)):
+				seed = 300 + k
+				break
+		main.queue_free()
+		main = (load("res://scenes/mission.tscn") as PackedScene).instantiate() as Mission
+		main.mission_override = Missions.make("retrieve", 5, seed)
+		main.auto_spawn_specials = false
+		root.add_child(main)
+	if frame == 44:
+		var timed := main._events.filter(func(e: Array) -> bool: return str(e[1]) == "sludger")
+		_check(main._sludger_call and timed.is_empty(), "Retrieve: no timed Sludger; it waits for a danger step")
+		main._set_danger(T.RETRIEVE_RIG_STEPS[0])
+		var called := main._events.filter(func(e: Array) -> bool: return str(e[1]) == "sludger")
+		_check(called.size() == 1 and not main._sludger_call, "the first rig call brings it")
 		_finish()
 	return false
 

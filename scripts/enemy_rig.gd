@@ -4,7 +4,7 @@ extends "res://scripts/vehicle.gd"
 ## It makes strafing passes: lines up on you, fires, overshoots, loops back.
 ## It rams zombies in its way and its bullets hit them too.
 
-enum Mode { ATTACK, PASS, UNSTICK, FLANK, BREAK, WINDUP, CHARGE, RECOVER }
+enum Mode { ATTACK, PASS, UNSTICK, FLANK, BREAK, WINDUP, CHARGE, RECOVER, RETREAT }
 
 const FEELER_ANGLE := 0.45   # radians either side of the nose
 const PASS_DISTANCE := 260.0 # start peeling off this close to the player
@@ -250,10 +250,24 @@ func _think_flank(delta: float) -> void:
 		_sees_player = _has_los(player.global_position)
 	if mode == Mode.ATTACK or mode == Mode.PASS:
 		mode = Mode.FLANK
+	# Badly hurt: run to a Patcher, if one's alive, to get patched up.
+	_drift_kick = maxf(_drift_kick - delta, 0.0)
+	grip_mult = T.OUTRIDER_DRIFT_GRIP if _drift_kick > 0.0 else 1.0
+	var medic := _patcher_ally()
+	if mode != Mode.RETREAT and mode != Mode.UNSTICK and medic != null and hp <= hp_max * T.OUTRIDER_RETREAT_HP:
+		mode = Mode.RETREAT
+		retreats += 1
 	var goal := Vector2.ZERO
 	var throttle := 1.0
 	var firing := false
 	match mode:
+		Mode.RETREAT:
+			if medic == null or hp >= hp_max * T.OUTRIDER_RETREAT_DONE:
+				mode = Mode.FLANK
+			else:
+				var to_medic := medic.global_position - global_position
+				goal = to_medic.normalized()
+				throttle = clampf(to_medic.length() / 250.0, 0.2, 1.0)
 		Mode.FLANK:
 			var p_fwd := Vector2.RIGHT.rotated(float(player.get("rotation")))
 			var off := absf(p_fwd.angle_to(-to_player))   # our bearing off the player's nose
@@ -316,8 +330,21 @@ func _think_flank(delta: float) -> void:
 
 
 var _was_firing := false
+var retreats := 0          # times it ran to a Patcher (tests)
+var _drift_kick := 0.0     # its break-off turn slides while > 0
 var _broke_hot := false   # already broke off for this overheat
 var _stripped_seen := 0
+
+
+## A working Patcher on our side, or null.
+func _patcher_ally() -> Node2D:
+	var parent := get_parent()
+	if parent == null:
+		return null
+	for n in parent.get_children():
+		if n != self and n.has_method("pop_hook") and not bool(n.get("is_wrecked")):
+			return n as Node2D
+	return null
 
 
 func _guns_hot() -> bool:
@@ -349,3 +376,4 @@ func _start_break(to_player: Vector2, real := true) -> void:
 	_break_to = player.global_position + away.rotated(randf_range(-0.5, 0.5)) * reach
 	if real:
 		breaks += 1
+		_drift_kick = T.OUTRIDER_DRIFT_KICK   # a DRIFT turn away (proposal 01)
