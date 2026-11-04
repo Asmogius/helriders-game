@@ -9,6 +9,59 @@ Written 2026-11-04 from a full look at the game, for the owner and for any agent
 - Maps are flat grey with lighter squares for buildings.
 - Rarity colour shows on some cards but not everywhere.
 
+## For the bot team: how to split this up
+
+This plan goes to a team of agents with specialists. The work is cut into **packages**, each owned by one specialist. A package owns certain files, so parallel PRs don't collide. Read the whole plan once, then work only in your package.
+
+### Packages and owners
+
+| Package | Specialist | Tasks | Owns (only this package edits these) | Needs first |
+|---|---|---|---|---|
+| **P0 Foundations** | Tools / pipeline lead | V0.1, V1.1, the capture tool, the atlas loader, `rarity_frame.gd` | `scripts/ui_theme.gd` (rarity helpers), `scripts/rarity_frame.gd` (new), `tools/art/capture_all.gd` (new), `scripts/art_atlas.gd` (new) | nothing: **lands first** |
+| **P1 Rarity** | UI specialist | V1.2–V1.4 | rarity use in `garage.gd` cards and tags, `research.gd`, `saloon.gd`, `inn.gd`, `crew_card.gd`, `comms.gd` odds line, `game_menu.gd` Database, `hud.gd` banners, `pickup.gd` beam, `tests/rarity_test.gd` | P0 |
+| **P2 Effects** | VFX specialist | V4.1–V4.8 | `scripts/fx.gd`, `scripts/fx_glow.gd` (new), `scripts/splats.gd`, effect drawing in `bullet_pool.gd` / `shell_pool.gd`, `tools/art/fx_sheet.py`, `art/fx/` | P0 (atlas loader) |
+| **P3 Zombies** | Character artist | V3.1–V3.5 | `tools/art/zombies.py`, `art/zombies/`, zombie drawing in `zombie_director.gd` / `zombie.gd` (`_draw` only, never stats or AI) | P0; uses P2's splat and decal API |
+| **P4 Map looks** | Environment artist | V5.1–V5.6, V7 (props, barrels, hazards) | `scripts/arena.gd` drawing, `tools/art/tiles.py`, `tools/art/buildings.py`, `tools/art/props.py`, `art/map/` | P0 |
+| **P5 Map layouts** | Level designer | V5.7 (V5.8 only after the owner says yes) | `scripts/layouts.gd` (layout data only), `tests/layouts_test.gd` additions | nothing; coordinate prop kinds with P4 |
+| **P6 Garage** | Scene artist plus UI specialist | V2.1–V2.6 | `tools/art/garage_scenes.py`, `tools/art/crew_figures.py`, `art/garage/`, `scripts/garage_ambient.gd` (new), the garage scene layout (backdrops and the pan) | P0, P1 (cards inside scenes use rarity frames) |
+| **P7 Interface** | UI specialist | V6.1–V6.5 | `scripts/ui_theme.gd` styles (not the rarity helpers), `hud.gd` look, fonts and icons in `art/ui/` | P0 |
+
+**Shared files** (`garage.gd`, `hud.gd`, `mission.gd`, `tuning.gd`) are touched by several packages:
+- keep changes there small and in your own clearly marked section;
+- add new code in your own new file and call it from one line in the shared file;
+- **colours go in `tuning.gd` only through P0**: ask the P0 owner to add them.
+
+### Rules for every PR
+
+1. **One task (or one tightly related group) per PR**, branched from the latest `main`, titled with its task id, e.g. "V4.3 Weapon muzzle flashes and tracers".
+2. **Before you push:** run the full test list in `AGENTS.md` (all suites must pass) and `godot --headless --path . --import` (no SCRIPT ERROR).
+3. **The PR body must include:**
+   - before/after screenshots from `tools/art/capture_*.gd`;
+   - the files touched;
+   - a performance note (fight frame time or draw calls on the High preset, where it applies).
+4. **No gameplay changes.** That means no stats, timings, collision shapes, AI or numbers in `tuning.gd` beyond colours and art settings. V0.2 (zoom) and V5.8 (breakable cover) wait for the owner's yes.
+5. **Fallback stays.** If an art file is missing, the code-drawn look must still work, and tests must not depend on art files existing.
+6. **Generated art only.** Generators live in `tools/art/`, write to `art/<area>/` and are committed with their outputs and `.import` files. Log any font or third-party asset and its licence in `docs/ART_CREDITS.md` (create it).
+7. **Style gate.** The first PR of P2, P3, P4 and P6 is a **style sample** (see Order of work). Don't roll a look out to everything until the owner approves its sample.
+8. **Rebase, don't fight.** If `main` moved, rebase onto it. If your PR conflicts with another package's file, stop and leave a note for the file's owner rather than editing their section.
+9. **When a task is done**, tick it in this file (`- [x]`) in the same PR, so the plan shows progress.
+
+### Defaults until the owner answers the open questions
+
+So nobody is blocked, assume these; the owner can overrule any of them:
+1. **Style:** pixel-voxel everywhere, the garage included.
+2. **Garage navigation:** one panning panorama (V2.3).
+3. **Districts:** as written in V5.5; landmarks as listed in V5.7.
+4. **Breakable cover:** not built until the owner says yes.
+5. **Fonts:** a condensed, readable display font with a light stencil feel; numbers in a clean font. Readability on a phone beats grit.
+
+### Definition of done for the whole plan
+
+- Every task box is ticked.
+- `tools/art/capture_all.gd` produces a screenshot set of every screen and fight situation, and the owner has signed it off.
+- All suites pass, and the Android build and Windows build both ship.
+- A 5-minute fight with 3 rigs, 30 zombies and heavy fire holds 60 fps on the High preset and 30+ on Low on the target phone class.
+
 ## Where things stand (what was seen)
 
 | Area | Today | Main gap |
@@ -39,17 +92,17 @@ Written 2026-11-04 from a full look at the game, for the owner and for any agent
 
 ## V0. Quick fixes (do first, small)
 
-- **V0.1 Rig over station screens (bug).** The garage rig preview's sprites draw at z 1–3, so they show over the Research, Saloon, Inn and Comms screens. Fix: hide `_rig_holder` while a station tab is open (or z-index the station screens above it). Done when a screenshot of each station shows no rig.
-- **V0.2 Fight zoom check.** At `base_zoom 1.3` a fight shows mostly bare ground. Try 1.1–1.15 on a phone-size capture and pick with the owner. Changing the zoom is a camera setting, not a balance number, but ask before changing it.
+- [ ] **V0.1 Rig over station screens (bug).** The garage rig preview's sprites draw at z 1–3, so they show over the Research, Saloon, Inn and Comms screens. Fix: hide `_rig_holder` while a station tab is open (or z-index the station screens above it). Done when a screenshot of each station shows no rig.
+- [ ] **V0.2 Fight zoom check.** At `base_zoom 1.3` a fight shows mostly bare ground. Try 1.1–1.15 on a phone-size capture and pick with the owner. Changing the zoom is a camera setting, not a balance number, but ask before changing it.
 
 ## V1. Rarity colours everywhere (explicitly asked)
 
 One rule: **anything that has a rarity shows it in its colour, the same way everywhere.** That covers parts and schematics, crew, loot, perks (by tier), and expedition and Saloon offers.
 
-- **V1.1 One source of truth.** Move the rarity colours into `tuning.gd` as `RARITY_COLORS` with all six: Common, Uncommon, Rare, Epic, Legendary, Mythic. `Parts.RARITY_COLORS` and `Crew.color_of` read it.
+- [ ] **V1.1 One source of truth.** Move the rarity colours into `tuning.gd` as `RARITY_COLORS` with all six: Common, Uncommon, Rare, Epic, Legendary, Mythic. `Parts.RARITY_COLORS` and `Crew.color_of` read it.
   - Add `UI.rarity_color(r)`, `UI.rarity_frame(control, r)` (border plus top strip) and `UI.rarity_text(name, r)`: a BBCode colour tag for RichTextLabels.
   - Done when no other file defines a rarity colour.
-- **V1.2 Rarity tiers look different, not just tinted.**
+- [ ] **V1.2 Rarity tiers look different, not just tinted.**
   - Common: plain grey frame.
   - Uncommon: green frame.
   - Rare: blue frame plus a soft inner glow.
@@ -58,7 +111,7 @@ One rule: **anything that has a rarity shows it in its colour, the same way ever
   - Mythic: animated colour-cycling frame and sparks.
 
   Every frame also shows a small rarity pip row (1–6 pips), so the tier reads without colour (colour-blind players). One shared drawer, `rarity_frame.gd`, draws all of this.
-- **V1.3 Apply it to every screen.**
+- [ ] **V1.3 Apply it to every screen.**
   - **Garage:** slot tags get a frame by the fitted part's rarity; part cards and the stat sheet title already have it.
   - **Research:** list rows get a frame, and the detail panel title takes the colour.
   - **Saloon and Inn:** crew cards already have the strip; upgrade them to V1.2 frames. The rehire card, the perk picker (perk tier colours) and expedition offers and finds get frames too.
@@ -69,7 +122,7 @@ One rule: **anything that has a rarity shows it in its colour, the same way ever
     - the "SCHEMATIC" pickup banner takes the rarity colour.
   - **Database:** entry names in rarity colour (parts and crew).
   - **Toasts and banners** that name a part or crew member colour the name.
-- **V1.4 Test.** Add `tests/rarity_test.gd`, checking:
+- [ ] **V1.4 Test.** Add `tests/rarity_test.gd`, checking:
   - every rarity has a colour;
   - every card type (part, crew, perk, offer, crate) asks `UI.rarity_*` for its colour, not a hard-coded one;
   - a capture shows all six tiers side by side for the owner.
@@ -78,10 +131,10 @@ One rule: **anything that has a rarity shows it in its colour, the same way ever
 
 Make the home base a place with distinct areas you move between: lit, animated and populated by your crew. Tabs stay (they work and tests use them), but each tab opens a **scene**, not a panel.
 
-- **V2.1 Art method: voxel dioramas.** Build each area as a voxel scene in `tools/art/garage_scenes.py`, using the existing voxel renderer at the same 30° tilt. Render it once to a background PNG at 1280x720 (plus a wider version for widescreen).
+- [ ] **V2.1 Art method: voxel dioramas.** Build each area as a voxel scene in `tools/art/garage_scenes.py`, using the existing voxel renderer at the same 30° tilt. Render it once to a background PNG at 1280x720 (plus a wider version for widescreen).
   - Moving things (lights, steam, crew, screens, sparks) go on separate overlay sheets and code-drawn layers.
   - This keeps one consistent style with the rigs and needs no hand painting.
-- **V2.2 The areas.** Each area keeps its current controls, re-skinned to sit inside the scene. The data panels become physical things in the room:
+- [ ] **V2.2 The areas.** Each area keeps its current controls, re-skinned to sit inside the scene. The data panels become physical things in the room:
   - **Workshop bay (GARAGE):**
     - Look: the rig on a hydraulic lift in the middle; tool walls, tyre stacks, a welding station; work lights in cyan and orange; a roll-up door with the street outside.
     - Life: when you fit a part, a spark shower and an arm swing at that slot; the lift turns the rig.
@@ -103,8 +156,8 @@ Make the home base a place with distinct areas you move between: lit, animated a
     - Look: a radio desk with a crackling speaker and a district map on the wall.
     - Panel: today's jobs are pinned cards on a cork board; skulls are drawn on the cards; districts light up on the map as they unlock.
     - Life: taking a job tears the card off the board.
-- **V2.3 Moving between areas.** The tabs pan the camera across one wide yard panorama (about 0.4 s ease), so the areas feel connected (workshop, bench, saloon, inn, comms left to right). L1/R1, the tabs and the phone's back button keep working.
-- **V2.4 Ambient life (cheap, always on):**
+- [ ] **V2.3 Moving between areas.** The tabs pan the camera across one wide yard panorama (about 0.4 s ease), so the areas feel connected (workshop, bench, saloon, inn, comms left to right). L1/R1, the tabs and the phone's back button keep working.
+- [ ] **V2.4 Ambient life (cheap, always on):**
   - flickering fluorescent tubes; dust motes in light shafts; steam from a pipe;
   - rain or ash outside the roll-up door (by district);
   - a radio murmur light on Comms;
@@ -113,36 +166,36 @@ Make the home base a place with distinct areas you move between: lit, animated a
   - the wreck penalty day shows scorch marks and an empty lift.
 
   All of it is one `garage_ambient.gd` drawer. Low quality turns it off.
-- **V2.5 Crew figures.** The crew in the Saloon, Inn and Workshop are small voxel figures, about 16x24 px, from one figure model. Class shows through palette and props: wrench (Mechanic), med bag (Medic), headset (Spotter) and so on. Rarity shows as a coloured armband. Each figure has 2-frame idle animations, generated in `tools/art/crew_figures.py`. They are also usable in the wreck sequence (crew dragged out by name).
-- **V2.6 Done when:** each area has a capture approved by the owner; every existing test still passes (controls unchanged); the garage holds 60 fps with all ambient layers on a High preset capture.
+- [ ] **V2.5 Crew figures.** The crew in the Saloon, Inn and Workshop are small voxel figures, about 16x24 px, from one figure model. Class shows through palette and props: wrench (Mechanic), med bag (Medic), headset (Spotter) and so on. Rarity shows as a coloured armband. Each figure has 2-frame idle animations, generated in `tools/art/crew_figures.py`. They are also usable in the wreck sequence (crew dragged out by name).
+- [ ] **V2.6 Done when:** each area has a capture approved by the owner; every existing test still passes (controls unchanged); the garage holds 60 fps with all ambient layers on a High preset capture.
 
 ## V3. Better zombies (explicitly asked)
 
-- **V3.1 Voxel zombie sheets.** Add `tools/art/zombies.py`: one humanoid voxel model (about 14x10x18 voxels) with parts (head, torso, arms, legs). Render it at **16 headings** with a **4-frame shamble cycle** and a **2-frame lunge/attack**, plus a hit-flash palette. Sheets go into one atlas.
-- **V3.2 The five kinds look like their role:**
+- [ ] **V3.1 Voxel zombie sheets.** Add `tools/art/zombies.py`: one humanoid voxel model (about 14x10x18 voxels) with parts (head, torso, arms, legs). Render it at **16 headings** with a **4-frame shamble cycle** and a **2-frame lunge/attack**, plus a hit-flash palette. Sheets go into one atlas.
+- [ ] **V3.2 The five kinds look like their role:**
   - **Shambler:** ragged clothes in 6 palette variants (random per spawn, so a horde isn't clones); a hunched walk.
   - **Brute:** wide, with scrap plates bolted on (the plates throw grey sparks, as already happens when bullets hit); a heavier walk.
   - **Tank:** huge, about 2x; a roar pose for the wind-up (replaces the red arc), a charge pose and a stumble pose.
   - **Boomer:** bloated, with glowing bile pustules that pulse faster as it nears you; a pop animation.
   - **Slimer:** dripping, translucent green highlights, and a trail that matches the slime decal.
-- **V3.3 Death.** Each kind breaks into 3–5 chunk pieces (the rig wreck chunk pipeline, smaller), flung by the hit direction, plus a blood splat decal that stays (`splats.gd`). A rig running one over flattens it with a different splat.
-- **V3.4 Drawing.** Stay in the single drawer: `zombie_director.gd` draws all zombies from the atlas with `draw_texture_rect_region`, or a MultiMeshInstance2D if profiling says so. No per-zombie nodes for art. Status visuals use the status colours from `tuning.gd`:
+- [ ] **V3.3 Death.** Each kind breaks into 3–5 chunk pieces (the rig wreck chunk pipeline, smaller), flung by the hit direction, plus a blood splat decal that stays (`splats.gd`). A rig running one over flattens it with a different splat.
+- [ ] **V3.4 Drawing.** Stay in the single drawer: `zombie_director.gd` draws all zombies from the atlas with `draw_texture_rect_region`, or a MultiMeshInstance2D if profiling says so. No per-zombie nodes for art. Status visuals use the status colours from `tuning.gd`:
   - BURNING: small flames;
   - SLICK: drips;
   - GOOPED: blob;
   - STUNNED: sparks.
-- **V3.5 Done when:** a capture shows all five kinds walking; 30 zombies hold 60 fps on High; the zombie tests still pass (hit circles unchanged).
+- [ ] **V3.5 Done when:** a capture shows all five kinds walking; 30 zombies hold 60 fps on High; the zombie tests still pass (hit circles unchanged).
 
 ## V4. Better visual effects (explicitly asked)
 
-- **V4.1 Particle atlas.** `tools/art/fx_sheet.py` generates one small atlas with:
+- [ ] **V4.1 Particle atlas.** `tools/art/fx_sheet.py` generates one small atlas with:
   - soft smoke puffs (4 sizes), spark streaks, embers, debris chips (rust, steel);
   - blood splats (6); a scorch decal; a shockwave ring; a muzzle-flash star (3 frames); an electric arc segment;
   - acid and slime and goop blobs; dust kicks.
 
   `fx.gd` keeps its packed arrays and adds a frame index and rotation per particle, drawing regions from the atlas instead of squares.
-- **V4.2 Additive glow layer.** Add a second fx node with `CanvasItemMaterial.BLEND_MODE_ADD` (works in Compatibility) for fire, muzzle flashes, sparks, shock and explosions' cores. That gives glow without lights.
-- **V4.3 Weapons get signature looks:**
+- [ ] **V4.2 Additive glow layer.** Add a second fx node with `CanvasItemMaterial.BLEND_MODE_ADD` (works in Compatibility) for fire, muzzle flashes, sparks, shock and explosions' cores. That gives glow without lights.
+- [ ] **V4.3 Weapons get signature looks:**
   - muzzle flashes sized by weapon;
   - tracers with a short glowing tail (`bullet_pool.gd` draws a streak, not a dot);
   - Scattergun: a cone puff;
@@ -151,39 +204,39 @@ Make the home base a place with distinct areas you move between: lit, animated a
   - Arc Projector: jagged arcs that jump between chain targets;
   - Acid Lobber and Mortar: a shell trail and a splash of the right colour;
   - Harpoon: a cable that sways.
-- **V4.4 Explosions:** in order, a flash frame, a fireball (additive), an expanding shockwave ring, flung debris, then a rising smoke column that drifts. A scorch decal stays. Barrels each get their own colour (fire / acid / toxic / shock / goop).
-- **V4.5 Impacts and feedback:**
+- [ ] **V4.4 Explosions:** in order, a flash frame, a fireball (additive), an expanding shockwave ring, flung debris, then a rising smoke column that drifts. A scorch decal stays. Barrels each get their own colour (fire / acid / toxic / shock / goop).
+- [ ] **V4.5 Impacts and feedback:**
   - bullet hits show sparks on armor, dust on walls, blood on zombies;
   - shield hits flash a hex shimmer on the shield bubble (the rig shield colour);
   - rams throw sparks and debris;
   - a hit-stop of 2–3 frames on rig wrecks and Tank charges (a short pause; not a balance change).
-- **V4.6 Rig damage states:** smoke from the engine under 50% HP, fire under 25%, sparks when a facing breaks (armor plate gone on that side). This applies to enemy rigs too: you can see who is hurt.
-- **V4.7 Ambient fight layer:** drifting ash or embers by district, heat shimmer near fire ground, flickering streetlights. Low quality turns it off.
-- **V4.8 Done when:** captures show each weapon's look, an explosion sequence and the damage states; frame time stays inside budget with 3 rigs, 30 zombies and heavy fire on the High preset.
+- [ ] **V4.6 Rig damage states:** smoke from the engine under 50% HP, fire under 25%, sparks when a facing breaks (armor plate gone on that side). This applies to enemy rigs too: you can see who is hurt.
+- [ ] **V4.7 Ambient fight layer:** drifting ash or embers by district, heat shimmer near fire ground, flickering streetlights. Low quality turns it off.
+- [ ] **V4.8 Done when:** captures show each weapon's look, an explosion sequence and the damage states; frame time stays inside budget with 3 rigs, 30 zombies and heavy fire on the High preset.
 
 ## V5. Better maps: layout and looks (explicitly asked)
 
 **Looks:**
-- **V5.1 Ground from tiles, baked once.** Add `tools/art/tiles.py`: asphalt, cracked concrete, dirt, broken pavement, grass through cracks, road markings, manholes, puddles. Each tile is 64 px with 4 variants. At job start `arena.gd` paints the ground from tiles into one Image, then one texture, so it costs a single draw. Roads get lane lines, crosswalks and potholes.
-- **V5.2 Buildings with height.** Render buildings as voxel blocks at the 30° tilt (`tools/art/buildings.py`): rooftops with clutter, and the south walls visible with windows, doors, signs, fire escapes and a few lit windows. Use modular pieces (roof tiles, wall segments, corners) so each building size in `layouts.gd` can be assembled. Buildings then read as solid blocks instead of lighter squares.
-- **V5.3 Props as voxel sprites:**
+- [ ] **V5.1 Ground from tiles, baked once.** Add `tools/art/tiles.py`: asphalt, cracked concrete, dirt, broken pavement, grass through cracks, road markings, manholes, puddles. Each tile is 64 px with 4 variants. At job start `arena.gd` paints the ground from tiles into one Image, then one texture, so it costs a single draw. Roads get lane lines, crosswalks and potholes.
+- [ ] **V5.2 Buildings with height.** Render buildings as voxel blocks at the 30° tilt (`tools/art/buildings.py`): rooftops with clutter, and the south walls visible with windows, doors, signs, fire escapes and a few lit windows. Use modular pieces (roof tiles, wall segments, corners) so each building size in `layouts.gd` can be assembled. Buildings then read as solid blocks instead of lighter squares.
+- [ ] **V5.3 Props as voxel sprites:**
   - wrecked cars (several models, burnt and rusty);
   - buses, dumpsters, barriers, fences, streetlights (with light pools), burning barrels;
   - bus stops, shipping containers (Rail Yard), parked wrecks (Parking Lots), market stalls (Plaza).
 
   Same collision shapes as now, since the layout data stays the source of truth.
-- **V5.4 Decals:** oil stains, blood trails, scorch marks, graffiti on walls, rubble piles. These are static, painted into the baked ground or a static decal layer.
-- **V5.5 Districts look different:** one tileset and colour grade per district, each with its own ambient particles:
+- [ ] **V5.4 Decals:** oil stains, blood trails, scorch marks, graffiti on walls, rubble piles. These are static, painted into the baked ground or a static decal layer.
+- [ ] **V5.5 Districts look different:** one tileset and colour grade per district, each with its own ambient particles:
   - Outer Blocks: suburban, grass, low houses;
   - Midtown Ruins: collapsed towers, rubble, ash;
   - Industrial Spine: factories, pipes, rail, smoke stacks;
   - Core Collapse: craters, fires, red sky glow.
 
   Jobs already know their district through their skull band; add a `district` field to the board job for the art.
-- **V5.6 Map edges:** a real boundary (barricade walls of cars and containers, a burning wreck line) instead of a flat grey border.
+- [ ] **V5.6 Map edges:** a real boundary (barricade walls of cars and containers, a burning wreck line) instead of a flat grey border.
 
 **Layout:**
-- **V5.7 More and better layouts.**
+- [ ] **V5.7 More and better layouts.**
   - Go from 6 to 12 layouts: 3 per district, each with at least 1 landmark.
   - Landmarks: a gas station, a collapsed overpass, a mall car park, a rail bridge, a stadium gate, a factory yard and so on.
   - Each layout should have:
@@ -193,20 +246,20 @@ Make the home base a place with distinct areas you move between: lit, animated a
     - barrel clusters placed for combos.
   - Keep the seeded variation (mirroring, nudged props, barricades).
   - Every layout must pass `tests/layouts_test.gd` in every variation.
-- **V5.8 Breakable cover.** Fences, barricades and parked cars break when rammed (debris fx, cleared collision, the nav grid cell reopens). This is a small gameplay touch; agree it with the owner first, since it changes routes.
-- **V5.9 Done when:** a capture of every layout in its district style has the owner's OK; the layouts test passes; a fight on each holds the frame budget.
+- [ ] **V5.8 Breakable cover.** Fences, barricades and parked cars break when rammed (debris fx, cleared collision, the nav grid cell reopens). This is a small gameplay touch; agree it with the owner first, since it changes routes.
+- [ ] **V5.9 Done when:** a capture of every layout in its district style has the owner's OK; the layouts test passes; a fight on each holds the frame budget.
 
 ## V6. Interface polish (supports all of the above)
 
-- **V6.1 Fonts.** Pick one display font (condensed, stencil-like) for titles and one clean font for numbers. Both must have open licences; log them like `AUDIO_CREDITS.md`. Swap them in `ui_theme.gd`.
-- **V6.2 Panels and buttons:** riveted steel panels with worn edges (generated 9-slice textures), buttons with pressed and focus states, cyan and orange accent lines. The controller focus ring and the rarity frames sit on top.
-- **V6.3 Icons:** a small generated icon set for stats (HP, armor, shield, speed, power, weight, DPS), statuses, part categories and crew classes. Use it in the stat sheet, cards and HUD instead of words where space is tight.
-- **V6.4 HUD:**
+- [ ] **V6.1 Fonts.** Pick one display font (condensed, stencil-like) for titles and one clean font for numbers. Both must have open licences; log them like `AUDIO_CREDITS.md`. Swap them in `ui_theme.gd`.
+- [ ] **V6.2 Panels and buttons:** riveted steel panels with worn edges (generated 9-slice textures), buttons with pressed and focus states, cyan and orange accent lines. The controller focus ring and the rarity frames sit on top.
+- [ ] **V6.3 Icons:** a small generated icon set for stats (HP, armor, shield, speed, power, weight, DPS), statuses, part categories and crew classes. Use it in the stat sheet, cards and HUD instead of words where space is tight.
+- [ ] **V6.4 HUD:**
   - armor and shield bars styled like gauges;
   - status icons;
   - a cleaner LOCK, crew and utility look (keep the controller and keyboard badges);
   - the touch sticks get a subtle textured look (hidden in mouse-and-keyboard mode on a PC).
-- **V6.5 Transitions:** screen fade or wipe between garage and fight, cards slide in, results counters tick up, a level-up flash on crew cards.
+- [ ] **V6.5 Transitions:** screen fade or wipe between garage and fight, cards slide in, results counters tick up, a level-up flash on crew cards.
 
 ## V7. Remaining code-drawn things to bring to voxel art
 
