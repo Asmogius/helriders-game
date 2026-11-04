@@ -57,6 +57,8 @@ func _process(_delta: float) -> bool:
 				_check_tables()
 				main.zombies.spawn_budget = 0
 				main.zombies.clear_all()
+				for b in main.barrels:
+					b.deactivate()   # this test is about the Gunner Rig, not stray barrels
 				rig.armor_max = 100000.0
 				rig.armor = rig.armor_max
 				main.apply_rig(Loadout.build(BURST_BUILD))

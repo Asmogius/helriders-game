@@ -426,6 +426,8 @@ Finding: today's starter dies in ~5 s standing still at 1 skull (~32 DPS from 8 
 | Reflex Emitter | 45 | 1 s | ~3 s |
 | Capacitor Bank | 75 | 4 s | ~6 s |
 
+**Built (2026-11-04)**, with these agreed gap-fillers: Shock does +50% to shields, Acid +50% to armor plates, Fire +50% to zombies. The player's resistances add up from parts: a base of 30, plus each fitted plate's profile (Low +5, Medium +10, High +15; three Scrap plates = 45), plus any chassis or accessory bonus, capped at 95 (an active shield still adds +15, cap 100). The Cowcatcher Ram uses the Zed Sled's profile. Zombies are neutral (50). Slime, oil and fire ground build 25/s inside; a Boomer's burst fills GOOPED like the Boomer barrel. Burning zombies set off others within 50 px at 50 fire buildup a second. Barrel blasts reach 140 px (Boomer 160 px); the slime pool is 160 px across; a Fire barrel's ground burns ~100 px around it. Seven barrels per job on twelve fixed spots of the current block.
+
 Status bars: always 100 points. Resistance 0-100; buildup taken = hit buildup x (100 - resistance) / 50 (0 = x2, 50 = x1, 100 = immune). Profiles: Low 45, Medium 60, High 75. Active shield +15 (cap 100). Drain 15/s after 1.5 s without buildup; after a trigger, buildup 50% slower for 3 s.
 
 | Status | Lasts | On rigs | On zombies |

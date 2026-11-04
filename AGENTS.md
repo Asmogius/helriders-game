@@ -16,6 +16,8 @@ The owner works from a phone and has no computer, so nobody opens the Godot edit
 
 - Defense layers (§14): every rig has a recharging shield, armor on four facings (`Vehicle.FRONT/LEFT/RIGHT/REAR`) and HP; zero HP wrecks it. Damage goes through `take_damage(amount, from_direction, splash)` (callers pass where the hit came from), repairs through `repair_armor()`. `armor` / `armor_max` remain as computed totals (setting `armor_max` huge makes a rig unkillable in tests). The player's rig has three armor slots (`armor_front`, `armor_sides`, `armor_rear`); `front_only` plates fit the Front only; old saves and old-style loadouts with one `armor` plate get it on all three. Enemy layers live in their stat sheets (`hp`, `front`, `side`, `rear`, optional `shield` from `shield_skulls`).
 
+- Statuses (§14): `status_bars.gd` holds the six bars (shock fire acid toxic slime goop -> STUNNED, BURNING, CORRODED, TOXIC, SLICK, GOOPED) for every rig (`vehicle.status`) and zombie (`zombie.status`). Typed damage passes a `dtype` through `take_hit` / `take_damage` and builds its status; `add_buildup` / `fill_status` for fixed amounts. Rig resistances: enemy sheets give `resist`; the player's come from `Loadout.resistances()` (base 30, plus each plate's profile step, plus chassis/accessory `resist_bonus`; cap 95). Barrels are `barrel.gd`, placed per job at `Arena.BARREL_SPOTS`; fire ground lives in `ground_hazards.gd`.
+
 - `scripts/profile.gd` (autoload `Profile`) is the save game: scrap, schematics, storage, the rig, presets, upgrades. Every change saves to `user://`. Economy rules agreed with the owner are listed at the top of that file; don't change them without asking.
 
 ## Engine rules
@@ -64,6 +66,7 @@ godot --headless --fixed-fps 60 --path . -s res://tests/scrapper_test.gd   # mus
 godot --headless --fixed-fps 60 --path . -s res://tests/convoy_test.gd     # must end "CONVOY TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/jobs_test.gd       # must end "JOBS TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/defense_test.gd    # must end "DEFENSE TEST PASSED"
+godot --headless --fixed-fps 60 --path . -s res://tests/status_test.gd     # must end "STATUS TEST PASSED"
 ```
 
 - Tests must call `Profile.new_game()` with `persist = false` first, so they never touch a real save.

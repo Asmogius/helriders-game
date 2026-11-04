@@ -62,9 +62,10 @@ func _process(_delta: float) -> bool:
 				mark.z = z
 			if frame == 6:
 				_check(bool((mark.z as Node).get("oiled")), "zombies in oil are slowed")
+				main.zombies.clear_all()   # so it can't shove the rig off the oil
 				rig.global_position = SPOT - Vector2.RIGHT.rotated(rig.rotation) * (rig.body_len * 0.5 + 42.0)
-			if frame == 8:
-				_check(is_equal_approx(rig.traction, T.SLIME_GRIP), "your own rig slides on your oil too")
+			if frame == 8 + 250:
+				_check(is_equal_approx(rig.traction, T.SLIME_GRIP), "your own oil builds SLICK on your rig too (until the §14 rework)")
 				main.zombies.clear_all()
 				main.hazards.clear()
 				main.apply_rig(Loadout.build(Parts.STARTER_LOADOUT))

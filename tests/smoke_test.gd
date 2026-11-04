@@ -379,6 +379,14 @@ func _process(_delta: float) -> bool:
 		_check(trailer != null and main.lock_candidates().has(trailer as Node2D), "a Convoy Lead rolls in towing a lockable trailer")
 		semi.take_damage(100000.0)
 		_check(semi.is_wrecked and bool(trailer.get("is_wrecked")) and main.kills == kills_before + 4, "wrecking the Convoy Lead's cab takes the trailer too")
+		# Barrels and statuses (full checks in status_test.gd).
+		var barrel: Node = main.barrels[0]
+		_check(main.barrels.size() == T.BARRELS_PER_JOB and bool(barrel.get("active")), "barrels stand at their spots")
+		barrel.call("take_hit", 100.0, Vector2.ZERO)
+		_check(not bool(barrel.get("active")), "shooting a barrel sets it off")
+		rig.fill_status(1)
+		_check(rig.is_status(1), "statuses start on the rig (BURNING)")
+		rig.status.reset()
 
 	# --- Wreck -------------------------------------------------------------------
 	if frame == 2790:
