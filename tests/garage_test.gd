@@ -123,6 +123,21 @@ func _run_checks() -> void:
 	_check(profile.build_cost(profile.preset(0)) == 0, "switching to a preset of parts you own is free")
 	_check(profile.load_preset(0) and (profile.rig.internal as Array).is_empty(), "loading a preset swaps the rig")
 	garage.close_sheet()
+	# Preset names: NAME opens a text box; DONE saves it, empty goes back to P1.
+	_check(profile.preset_name(0) == "P1", "an unnamed preset shows as P1")
+	garage.open_rename(0)
+	garage._rename_edit.text = "  Brawler build\n"
+	garage.finish_rename(0)
+	_check(profile.preset_name(0) == "Brawler build" and not profile.preset(0).is_empty(), "naming a preset keeps its rig (name trimmed)")
+	_check(ProfileScript.clean_preset_name("A very long preset name indeed").length() == T.PRESET_NAME_MAX, "names stop at %d letters" % T.PRESET_NAME_MAX)
+	profile.save_preset(0)
+	_check(profile.preset_name(0) == "Brawler build", "saving over a preset keeps its name")
+	var snap: Dictionary = JSON.parse_string(JSON.stringify(profile.save_data()))
+	profile.rename_preset(0, "")
+	_check(profile.preset_name(0) == "P1", "an empty name goes back to P1")
+	profile.apply_data(snap)
+	_check(profile.preset_name(0) == "Brawler build", "names round-trip through the save")
+	garage._close_overlay()
 
 	# --- Weight, frames with more slots, two weapons --------------------------------
 	profile.scrap = 1000

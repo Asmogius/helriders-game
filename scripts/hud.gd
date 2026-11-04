@@ -176,6 +176,7 @@ func _ready() -> void:
 	var pad := get_node_or_null("/root/Pad")
 	if pad != null:
 		pad.connect("mode_changed", _pad_badges)
+		pad.connect("map_changed", _pad_badges.bind(false))
 	_pad_badges()
 
 
@@ -369,7 +370,9 @@ func _controls_hint() -> void:
 	var lock := _lock_button.visible
 	var pad := get_node_or_null("/root/Pad")
 	if pad != null and bool(pad.get("active")):
-		_hint.text = "LEFT STICK  DRIVE      RIGHT STICK  AIM      R2  FIRE" + ("      R1  LOCK" if lock else "")
+		var sw := bool(pad.call("sticks_swapped"))
+		_hint.text = "%s STICK  DRIVE      %s STICK  AIM      %s  FIRE" % ["RIGHT" if sw else "LEFT", "LEFT" if sw else "RIGHT", str(pad.call("button_name", "fire"))] \
+			+ ("      %s  LOCK" % str(pad.call("button_name", "lock")) if lock else "")
 	else:
 		_hint.text = "LEFT THUMB  DRIVE      RIGHT THUMB  AIM + FIRE" + ("      LOCK  AUTO-AIM" if lock else "")
 
@@ -1101,9 +1104,9 @@ func _pad_badges(_on := false) -> void:
 	var pad := get_node_or_null("/root/Pad")
 	var on := pad != null and bool(pad.get("active"))
 	for i in _ability_buttons.size():
-		_ability_buttons[i].pad_badge = str(PadGlyph.ABILITY[i]) if on and i < PadGlyph.ABILITY.size() else ""
-	_lock_button.pad_badge = "R1" if on else ""
-	_crew_button.pad_badge = "L1" if on else ""
+		_ability_buttons[i].pad_badge = str(pad.call("badge", "ability_%d" % (i + 1))) if on and i < 3 else ""
+	_lock_button.pad_badge = str(pad.call("badge", "lock")) if on else ""
+	_crew_button.pad_badge = str(pad.call("badge", "crew")) if on else ""
 	_controls_hint()
 
 

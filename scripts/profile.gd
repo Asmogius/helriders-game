@@ -73,6 +73,7 @@ var storage := {}                   # part id -> number of built spares
 var rig := {}                       # the loadout in the garage (may be incomplete)
 var plan := {}                      # the last complete rig, for one-tap rebuild
 var presets: Array = []             # loadout dictionaries or null
+var preset_names: Array = []        # the player's name for each preset ("" = P1, P2...)
 var upgrades := _no_upgrades()
 var levels := {}                    # schematic id -> Research level (absent = 1)
 var research_today := 0             # levels bought today (daily cap)
@@ -129,6 +130,9 @@ func new_game() -> void:
 	plan = rig.duplicate(true)
 	presets = []
 	presets.resize(T.PRESET_COUNT)
+	preset_names = []
+	preset_names.resize(T.PRESET_COUNT)
+	preset_names.fill("")
 	upgrades = _no_upgrades()
 	levels = {}
 	research_today = 0
@@ -1220,6 +1224,29 @@ func preset(index: int) -> Dictionary:
 	return p if p is Dictionary else {}
 
 
+## The preset's name: the player's, or P1 / P2 / P3.
+func preset_name(index: int) -> String:
+	var n := str(preset_names[index]) if index < preset_names.size() else ""
+	return n if n != "" else "P%d" % (index + 1)
+
+
+## Name a preset (empty goes back to P1...). Keeps its loadout.
+func rename_preset(index: int, name: String) -> void:
+	if index < 0 or index >= T.PRESET_COUNT:
+		return
+	if preset_names.size() < T.PRESET_COUNT:
+		preset_names.resize(T.PRESET_COUNT)
+	preset_names[index] = clean_preset_name(name)
+	save_game()
+	changed.emit()
+
+
+## One line, no edge spaces, at most PRESET_NAME_MAX characters.
+static func clean_preset_name(name: String) -> String:
+	var n := name.replace("\n", " ").replace("\t", " ").strip_edges()
+	return n.left(T.PRESET_NAME_MAX).strip_edges()
+
+
 func load_preset(index: int) -> bool:
 	var p := preset(index)
 	return not p.is_empty() and apply_loadout(p)
@@ -1256,6 +1283,7 @@ func save_data() -> Dictionary:
 		"rig": rig,
 		"plan": plan,
 		"presets": presets,
+		"preset_names": preset_names,
 		"upgrades": upgrades,
 		"levels": levels,
 		"research_today": research_today,
@@ -1324,7 +1352,7 @@ static func read_save(path: String) -> Dictionary:
 
 const _SAVE_TYPES := {
 	"version": TYPE_FLOAT, "scrap": TYPE_FLOAT, "schematics": TYPE_ARRAY, "storage": TYPE_DICTIONARY,
-	"rig": TYPE_DICTIONARY, "plan": TYPE_DICTIONARY, "presets": TYPE_ARRAY, "upgrades": TYPE_DICTIONARY,
+	"rig": TYPE_DICTIONARY, "plan": TYPE_DICTIONARY, "presets": TYPE_ARRAY, "preset_names": TYPE_ARRAY, "upgrades": TYPE_DICTIONARY,
 	"levels": TYPE_DICTIONARY, "research_today": TYPE_FLOAT, "record": TYPE_DICTIONARY, "notice": TYPE_STRING,
 	"day": TYPE_FLOAT, "wreck_day": TYPE_FLOAT, "board": TYPE_ARRAY, "active_mission": TYPE_DICTIONARY,
 	"run_active": TYPE_BOOL, "crew": TYPE_ARRAY, "next_crew_id": TYPE_FLOAT, "saloon": TYPE_ARRAY,
@@ -1368,6 +1396,12 @@ func apply_data(data: Dictionary) -> bool:
 	for i in mini(saved_presets.size(), T.PRESET_COUNT):
 		if saved_presets[i] is Dictionary:
 			presets[i] = _clean_loadout(saved_presets[i])
+	preset_names = []
+	preset_names.resize(T.PRESET_COUNT)
+	preset_names.fill("")
+	var saved_names: Array = data.get("preset_names", [])
+	for i in mini(saved_names.size(), T.PRESET_COUNT):
+		preset_names[i] = clean_preset_name(str(saved_names[i]) if saved_names[i] is String else "")
 	var saved_upgrades: Dictionary = data.get("upgrades", {})
 	upgrades = _no_upgrades()
 	for key: String in upgrades:
@@ -1622,6 +1656,18 @@ func load_settings() -> void:
 			settings.shake = bool(cfg.get_value("video", "shake", true))
 			settings.music = clampf(float(cfg.get_value("audio", "music", 0.8)), 0.0, 1.0)
 			settings.effects = clampf(float(cfg.get_value("audio", "effects", 0.8)), 0.0, 1.0)
+			# Controller mapping (pad.gd): action -> button code, and the stick swap.
+			var saved_map: Variant = cfg.get_value("pad", "map", {})
+			if saved_map is Dictionary:
+				var m := {}
+				for a: Variant in saved_map:
+					var code: Variant = saved_map[a]
+					if (code is int or code is float) and int(code) >= 0 and int(code) < 200:
+						m[str(a)] = int(code)
+				if not m.is_empty():
+					settings.pad_map = m
+			var swap: Variant = cfg.get_value("pad", "swap", false)
+			settings.pad_swap = swap is bool and bool(swap)
 	apply_settings()
 
 
@@ -1634,6 +1680,9 @@ func save_settings() -> void:
 	cfg.set_value("video", "shake", settings.shake)
 	cfg.set_value("audio", "music", settings.music)
 	cfg.set_value("audio", "effects", settings.effects)
+	if settings.has("pad_map"):
+		cfg.set_value("pad", "map", settings.pad_map)
+	cfg.set_value("pad", "swap", bool(settings.get("pad_swap", false)))
 	cfg.save(settings_path)
 
 

@@ -793,8 +793,9 @@ const TUT_TIPS := [
 ]
 ## The same tips for a controller (only the ones that differ).
 const TUT_PAD_TIPS := {
-	1: "SHOOT: aim the turret with the RIGHT stick at a zombie and hold R2 to fire.",
-	2: "LOCK: press R1. While it's on, your turret picks targets and fires by itself.",
+	0: "DRIVE: push the %s stick where you want to go. The rig turns to follow. Pull back to reverse.",
+	1: "SHOOT: aim the turret with the %s stick at a zombie and hold %s to fire.",
+	2: "LOCK: press %s. While it's on, your turret picks targets and fires by itself.",
 }
 
 
@@ -805,7 +806,17 @@ func _on_pad_mode(_on: bool) -> void:
 
 
 func _tut_tip(i: int) -> String:
-	return PadScript.hint(TUT_TIPS[i], str(TUT_PAD_TIPS.get(i, TUT_TIPS[i])))
+	var pad := _pad()
+	if pad == null or not bool(pad.get("active")) or not TUT_PAD_TIPS.has(i):
+		return TUT_TIPS[i]
+	var swapped := bool(pad.call("sticks_swapped"))
+	match i:
+		0:
+			return str(TUT_PAD_TIPS[0]) % ("RIGHT" if swapped else "LEFT")
+		1:
+			return str(TUT_PAD_TIPS[1]) % ["LEFT" if swapped else "RIGHT", str(pad.call("button_name", "fire"))]
+		_:
+			return str(TUT_PAD_TIPS[2]) % str(pad.call("button_name", "lock"))
 
 
 func _tutorial_tick() -> void:
@@ -1008,10 +1019,11 @@ func _rig_key(rig: EnemyRig) -> String:
 
 
 # --- Controller (pad.gd) ------------------------------------------------------------
-# Left stick drives, right stick aims and R2 fires (a light push only turns
-# the turret, as on the touch stick). Square / Triangle / Circle fire
-# utilities 1-3, R1 toggles LOCK, L1 opens the crew wheel (point with a
-# stick, Cross picks), Options pauses.
+# By default: left stick drives, right stick aims and R2 fires (a light push
+# only turns the turret, as on the touch stick). Square / Triangle / Circle
+# fire utilities 1-3, R1 toggles LOCK, L1 opens the crew wheel (point with a
+# stick, Cross picks), Options pauses. All rebindable (Pad.binding), and the
+# sticks can swap.
 
 var pad_aim := Vector2.RIGHT   # last aim direction, for R2 with the stick centred
 
@@ -1036,7 +1048,7 @@ func _pad_input() -> void:
 		vehicle.drive_input = drive
 	if aim != Vector2.ZERO:
 		pad_aim = aim.normalized()
-	if bool(pad.call("r2")):
+	if bool(pad.call("fire_held")):
 		# Fire: full push (the Mortar keeps the stick's push for its range).
 		var dir := pad_aim if aim == Vector2.ZERO else aim.normalized()
 		var push := 1.0 if vehicle.has_weapon() and not _has_mortar() else maxf(aim.length(), 0.55)
@@ -1061,34 +1073,37 @@ func pad_wants_focus() -> bool:
 	return menu != null or hud.is_result_visible() or hud.is_choice_open()
 
 
-## A pad button in the fight. Returns true when it was used.
+## A pad button in the fight (bound in Settings > CONTROLLER; pad.gd).
+## Returns true when it was used.
 func pad_button(button: int) -> bool:
+	var pad := _pad()
+	var action := str(pad.call("action_for", button)) if pad != null else ""
 	if menu != null:
-		if button == JOY_BUTTON_START:
+		if action == "pause":
 			menu.resume()
 			return true
 		return false
 	if hud.is_result_visible() or hud.is_choice_open() or state != State.RUNNING:
 		return false
-	match button:
-		JOY_BUTTON_START:
+	if hud.is_crew_wheel_open() and button == JOY_BUTTON_A:
+		hud.pad_wheel_confirm()   # Cross picks in the wheel, whatever it's bound to
+		return true
+	match action:
+		"pause":
 			open_menu()
-		JOY_BUTTON_X:
+		"ability_1":
 			use_ability(0)
-		JOY_BUTTON_Y:
+		"ability_2":
 			use_ability(1)
-		JOY_BUTTON_B:
+		"ability_3":
 			use_ability(2)
-		JOY_BUTTON_RIGHT_SHOULDER:
+		"lock":
 			hud.pad_lock()
-		JOY_BUTTON_LEFT_SHOULDER:
+		"crew":
 			if hud.is_crew_wheel_open():
 				hud.close_crew_wheel()
 			else:
 				hud.open_crew_wheel()
-		JOY_BUTTON_A:
-			if hud.is_crew_wheel_open():
-				hud.pad_wheel_confirm()
 		_:
 			return false
 	return true

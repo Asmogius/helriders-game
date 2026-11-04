@@ -34,7 +34,7 @@ Persistent power: better parts (rarity + level), higher-level crew you protect, 
 
 # 4. Vehicle Customization
 
-Exactly one physical vehicle. Freely editable between missions using owned parts. Presets save full loadouts but only include parts the player currently possesses.
+Exactly one physical vehicle. Freely editable between missions using owned parts. Presets save full loadouts but only include parts the player currently possesses. Each of the three presets can be named (up to 18 characters; empty shows P1 / P2 / P3).
 
 ## Part Categories and Tradeoffs
 
@@ -236,6 +236,7 @@ A PlayStation-style pad (any pad Godot maps) works alongside touch. The first pa
 
 - Fight: left stick drives. Right stick aims; a light push only turns the turret, as on the touch stick. R2 fires (with the stick centred, it fires the last way you aimed; the Mortar keeps the stick's push for range). Square / Triangle / Circle fire utilities 1-3. R1 toggles LOCK. L1 opens the crew wheel: point with a stick, Cross picks. Options pauses and resumes.
 - Menus: every screen (garage, stations, Comms, part cards, Inn, Saloon, pause menu) is driven by D-pad or left stick to move, Cross to press and Circle to back out (closes the part sheet or panel, or returns to the garage from a station). L1 / R1 switch stations. Options opens MENU. A cyan ring marks the focused button. While a panel is open, focus stays inside it.
+- Button mapping (Settings > CONTROLLER BUTTONS): every fight action (fire, utilities 1-3, LOCK, crew wheel, pause) can go on any pad button, L2 or R2. A button already in use swaps over. The sticks can swap (left aims, right drives). RESET TO DEFAULT restores the layout above. Menus keep the D-pad, Cross, Circle and L1 / R1, and Cross always picks in the crew wheel. HUD badges, hints and tutorial tips follow the mapping.
 
 ## Mods and Perks
 

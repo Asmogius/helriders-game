@@ -46,6 +46,14 @@ func _button(b: int) -> void:
 	Input.flush_buffered_events()
 
 
+func _trigger(axis: JoyAxis, value: float) -> void:
+	var e := InputEventJoypadMotion.new()
+	e.axis = axis
+	e.axis_value = value
+	Input.parse_input_event(e)
+	Input.flush_buffered_events()
+
+
 func _action(name: String) -> void:
 	for down: bool in [true, false]:
 		var e := InputEventAction.new()
@@ -187,6 +195,58 @@ func _process(_delta: float) -> bool:
 			_check(not paused and main.menu == null, "Options again resumes")
 		40:
 			_check(_focus() == null, "no menu focus while you drive")
+			# Button mapping: Settings > CONTROLLER BUTTONS.
+			_button(JOY_BUTTON_START)
+			main.menu.show_page("settings")
+			main.menu.show_page("controller")
+			main.menu.rebind("ability_1")
+			_check(str(pad.get("capturing")) == "ability_1", "picking an action waits for a button")
+			_button(JOY_BUTTON_RIGHT_SHOULDER)
+			_check(int(pad.call("binding", "ability_1")) == JOY_BUTTON_RIGHT_SHOULDER and int(pad.call("binding", "lock")) == JOY_BUTTON_X, "the next press binds it; LOCK swaps over to Square")
+			_check(main.menu != null and main.menu.page == "controller", "binding a button keeps you on the page")
+			main.menu.rebind("crew")
+			_trigger(JOY_AXIS_TRIGGER_LEFT, 1.0)
+			_trigger(JOY_AXIS_TRIGGER_LEFT, 0.0)
+			_check(int(pad.call("binding", "crew")) == 100 + JOY_AXIS_TRIGGER_LEFT and str(pad.call("button_name", "crew")) == "L2", "L2 can be bound (CREW WHEEL on L2)")
+			main.menu.rebind("pause")
+			_button(JOY_BUTTON_B)
+			_check(int(pad.call("binding", "pause")) == JOY_BUTTON_B and main.menu != null, "Circle can be bound too, and binding it doesn't close the menu")
+			main.menu.rebind("pause")
+			_button(JOY_BUTTON_START)
+			main.menu.resume()
+		42:
+			var hud: Variant = _hud()
+			_check(hud._ability_buttons[0].pad_badge == "R1" and hud._lock_button.pad_badge == "square" and hud._crew_button.pad_badge == "L2", "HUD badges follow the new buttons")
+			var lock: bool = hud._lock_button.on
+			_button(JOY_BUTTON_X)
+			_check(hud._lock_button.on != lock, "Square now toggles LOCK")
+			_button(JOY_BUTTON_LEFT_SHOULDER)
+			_check(not hud.is_crew_wheel_open(), "L1 no longer opens the wheel")
+			hud.crew_wheel_cooldown = 0.0
+			_trigger(JOY_AXIS_TRIGGER_LEFT, 1.0)
+			_trigger(JOY_AXIS_TRIGGER_LEFT, 0.0)
+			_check(hud.is_crew_wheel_open(), "a pull on L2 opens it")
+			hud.close_crew_wheel(false)
+			pad.call("set_sticks_swapped", true)
+			pad.set("override", {"right": Vector2(0, -1), "left": Vector2(1, 0)})
+		44:
+			_check(main.vehicle.drive_input.distance_to(Vector2(0, -1)) < 0.01, "swapped sticks: the right stick drives")
+			_check(str(_hud()._hint.text).begins_with("RIGHT STICK  DRIVE"), "and the control line says so")
+			pad.set("override", {})
+			# The mapping is saved with the settings.
+			profile.persist = true
+			var old_path: String = profile.settings_path
+			profile.settings_path = "user://helriders_pad_test.cfg"
+			profile.save_settings()
+			profile.settings.erase("pad_map")
+			profile.settings.pad_swap = false
+			profile.load_settings()
+			_check(int(pad.call("binding", "lock")) == JOY_BUTTON_X and bool(pad.call("sticks_swapped")), "the mapping survives a relaunch")
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(profile.settings_path))
+			profile.settings_path = old_path
+			profile.persist = false
+			pad.call("reset_map")
+			_check(int(pad.call("binding", "lock")) == JOY_BUTTON_RIGHT_SHOULDER and int(pad.call("binding", "fire")) == 100 + JOY_AXIS_TRIGGER_RIGHT and not bool(pad.call("sticks_swapped")), "RESET TO DEFAULT puts it all back")
 			_finish()
 	return false
 

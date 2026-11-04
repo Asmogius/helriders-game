@@ -23,6 +23,7 @@ var in_tutorial := false     # the Training Run: LEAVE TUTORIAL instead of a res
 var page := "main"            # main / settings / database
 var category := "parts"       # Database tab
 var restart_armed := false    # RESTART JOB needs a second tap
+var _focus_action := ""       # Controller page: the row last picked
 
 var _panel: PanelContainer
 var _body: VBoxContainer
@@ -38,6 +39,7 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	add_to_group("pad_modal")
 	set_meta("pad_close", back)
+	z_index = 10   # above the garage's rig preview (its sprites draw at z 1-3)
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	theme = UI.make()
 	mouse_filter = Control.MOUSE_FILTER_STOP
@@ -64,7 +66,9 @@ func _ready() -> void:
 
 ## The phone's back button: up a page, or close.
 func back() -> void:
-	if page != "main":
+	if page == "controller":
+		show_page("settings")
+	elif page != "main":
 		show_page("main")
 	elif in_job:
 		resume()
@@ -99,6 +103,9 @@ func quit_game() -> void:
 
 func show_page(which: String) -> void:
 	page = which
+	var pad := _pad()
+	if which != "controller" and pad != null and str(pad.get("capturing")) != "":
+		pad.call("cancel_capture")
 	if _body == null:
 		return   # not on screen yet; _ready shows the main page
 	for c in _body.get_children():
@@ -111,6 +118,8 @@ func show_page(which: String) -> void:
 			_settings_page()
 		"database":
 			_database_page()
+		"controller":
+			_controller_page()
 
 
 func _title(text: String) -> void:
@@ -192,6 +201,7 @@ func _settings_page() -> void:
 		slider.custom_minimum_size = Vector2(0, 48)
 		slider.value_changed.connect(func(v: float) -> void: profile.set_setting(key, v))
 		line.add_child(slider)
+	_button("CONTROLLER BUTTONS", show_page.bind("controller"))
 	var note := UI.label("Lower quality caps the frame rate and draws fewer effects. New settings apply to the next fight; the frame cap applies now.", 18, UI.TEXT_DIM)
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_body.add_child(note)
@@ -206,6 +216,65 @@ func set_quality(q: String) -> void:
 func toggle_shake() -> void:
 	profile.set_setting("shake", not bool(profile.settings.get("shake", true)))
 	show_page("settings")
+
+
+# --- Controller buttons (pad.gd) ---
+
+func _pad() -> Node:
+	return get_node_or_null("/root/Pad")
+
+
+func _controller_page() -> void:
+	_title("CONTROLLER BUTTONS")
+	var pad := _pad()
+	if pad == null:
+		return
+	if not pad.is_connected("map_changed", _on_map_changed):
+		pad.connect("map_changed", _on_map_changed)
+	var grid := GridContainer.new()
+	grid.columns = 4
+	grid.add_theme_constant_override("h_separation", 12)
+	grid.add_theme_constant_override("v_separation", 8)
+	_body.add_child(grid)
+	var waiting := str(pad.get("capturing"))
+	for action: String in PadScript.ACTIONS:
+		var l := UI.label(str(PadScript.ACTION_NAMES[action]), 20)
+		l.custom_minimum_size = Vector2(170, 0)
+		grid.add_child(l)
+		var b := Button.new()
+		b.focus_mode = Control.FOCUS_NONE
+		b.custom_minimum_size = Vector2(300, 54)
+		b.text = "PRESS A BUTTON..." if waiting == action else str(pad.call("button_name", action))
+		if waiting == action:
+			UI.accent(b, T.COL_ORANGE)
+		b.pressed.connect(rebind.bind(action))
+		grid.add_child(b)
+		if action == _focus_action and bool(pad.get("active")):
+			b.focus_mode = Control.FOCUS_ALL   # keep the pad's place on the row just rebound
+			b.grab_focus.call_deferred()
+	var swapped := bool(pad.call("sticks_swapped"))
+	_button("STICKS: %s" % ("LEFT AIMS, RIGHT DRIVES" if swapped else "LEFT DRIVES, RIGHT AIMS"), func() -> void:
+		pad.call("set_sticks_swapped", not swapped))
+	_button("RESET TO DEFAULT", func() -> void: pad.call("reset_map"))
+	var note := UI.label("Pick an action, then press the pad button you want for it (L2 and R2 work too). A button already in use swaps over. Menus always use the D-pad, Cross, Circle and L1 / R1; Cross always picks in the crew wheel.", 18, UI.TEXT_DIM)
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD
+	_body.add_child(note)
+	_button("BACK", show_page.bind("settings"), T.COL_CYAN)
+
+
+## Wait for the next pad press for `action`.
+func rebind(action: String) -> void:
+	var pad := _pad()
+	if pad == null:
+		return
+	_focus_action = action
+	pad.call("start_capture", action)
+	show_page("controller")
+
+
+func _on_map_changed() -> void:
+	if page == "controller" and is_inside_tree():
+		show_page("controller")
 
 
 # --- Database ---
