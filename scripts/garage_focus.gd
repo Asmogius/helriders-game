@@ -104,12 +104,12 @@ func _draw_line() -> void:
 	for k in p.size():
 		p[k] = gt * p[k]
 	var c := Color(T.COL_ORANGE, line_alpha)
-	line.draw_polyline(p, Color(0, 0, 0, 0.6 * line_alpha), 6.0)   # dark edge: reads on any floor
+	line.draw_polyline(p, Color(0, 0, 0, 0.6 * line_alpha), 6.0)   # dark edge: reads on any floor  # TODO: T.COL_GARAGE_FOCUS_EDGE once UI colours PR lands
 	line.draw_polyline(p, c, 3.0)
 	line.draw_circle(p[0], 5.0, c)
 	var end := p[p.size() - 1]
 	var pulse := 10.0 + 2.0 * sin(_t * 5.0)
-	line.draw_arc(end, pulse, 0.0, TAU, 24, Color(0, 0, 0, 0.6 * line_alpha), 5.0)
+	line.draw_arc(end, pulse, 0.0, TAU, 24, Color(0, 0, 0, 0.6 * line_alpha), 5.0)  # TODO: T.COL_GARAGE_FOCUS_EDGE once UI colours PR lands
 	line.draw_arc(end, pulse, 0.0, TAU, 24, c, 2.5)
 var _target: Sprite2D = null
 var _t := 0.0

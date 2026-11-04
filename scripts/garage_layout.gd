@@ -222,7 +222,7 @@ static func warm_hd() -> void:
 	if _warmed:
 		return
 	_warmed = true
-	for f in DirAccess.get_files_at(HD_DIR):
+	for f: String in DirAccess.get_files_at(HD_DIR):
 		if f.ends_with(".json"):
 			DirectionalSprite.read_meta(HD_DIR + f)
 

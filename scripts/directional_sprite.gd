@@ -31,15 +31,21 @@ func _ready() -> void:
 
 
 ## Reads the sheet's .json and loads the composite sheet beside it.
-static var _meta_cache := {}   # path -> parsed sheet json (shared, read-only)
+## Parsed sheet json, shared and read-only, keyed by path. Kept on Engine
+## metadata (plain data) instead of a static var: a static var on this
+## class_name script kept the script alive at exit (leak warning).
+const META_CACHE := &"directional_sprite_meta_cache"
 static func read_meta(path: String) -> Variant:
-	if _meta_cache.has(path):
-		return _meta_cache[path]
+	if not Engine.has_meta(META_CACHE):
+		Engine.set_meta(META_CACHE, {})
+	var cache: Dictionary = Engine.get_meta(META_CACHE)
+	if cache.has(path):
+		return cache[path]
 	var f := FileAccess.open(path, FileAccess.READ)
 	if f == null:
 		return null
 	var d: Variant = JSON.parse_string(f.get_as_text())
-	_meta_cache[path] = d
+	cache[path] = d
 	return d
 
 
