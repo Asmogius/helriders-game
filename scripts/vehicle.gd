@@ -177,7 +177,11 @@ var _flash := 0.0
 const DirectionalSprite := preload("res://scripts/directional_sprite.gd")
 ## Voxel art per chassis id (look.chassis). A chassis without art keeps the
 ## code-drawn hull below.
-const ART_CHASSIS := {"scrap_frame": "res://art/sprites/scrap_frame.json"}
+const ART_CHASSIS := {"scrap_frame": "res://art/sprites/scrap_frame.json", "bulwark_frame": "res://art/sprites/bulwark_frame.json"}
+const ART_DECK_LIFT := 6.0          # px: overlays sit on the deck, which the tilt lifts up the screen
+const WRECK_PIECE_LIFE := 1.4       # s a flung wreck piece lasts (fades over the last half)
+var wreck_pieces: Array[Node2D] = []   # the pieces flung by the last wreck (tests read it)
+var _hull_texture: Texture2D = null
 const ART_TURRETS := {"": "res://art/sprites/pintle_turret.json", "pintle_turret": "res://art/sprites/pintle_turret.json"}
 var _hull_art: Sprite2D = null   # DirectionalSprite, or null when drawing by code
 var _art_overlay: Node2D = null  # rotates with the rig, above the hull art
@@ -312,6 +316,12 @@ func _sync_parts() -> void:
 				ta.z_index = 1
 				sprite.art = ta
 				sprite.add_child(ta)
+				var glow := Node2D.new()   # Overcharge: white-hot muzzle
+				glow.top_level = true
+				glow.z_index = 2
+				glow.draw.connect(func() -> void: glow.draw_rect(Rect2(-3.0, -3.0, 6.0, 6.0), Color(1.0, 0.95, 0.8)))
+				sprite.glow = glow
+				sprite.add_child(glow)
 			else:
 				ta.free()
 		_turrets.append(sprite)
@@ -339,9 +349,11 @@ func _sync_art() -> void:
 		if _hull_art.load_meta(path):
 			_hull_art.meta_path = path
 			_hull_art.top_level = true
+			_hull_texture = _hull_art.texture
 			add_child(_hull_art)
 			move_child(_hull_art, 0)
 			_art_overlay = Node2D.new()
+			_art_overlay.top_level = true
 			_art_overlay.draw.connect(_draw_art_overlay)
 			add_child(_art_overlay)
 			move_child(_art_overlay, 1)
@@ -356,36 +368,170 @@ func _sync_art() -> void:
 ## mount point. Gameplay (bodies, turret pivots, muzzles) is untouched.
 func _update_art() -> void:
 	if _hull_art != null:
-		_hull_art.visible = not is_wrecked and visible
+		_hull_art.visible = visible
 		_hull_art.global_position = global_position
 		_hull_art.heading = global_rotation
-		_hull_art.modulate = Color.WHITE.lerp(Color(1.6, 1.4, 1.2), _flash * 0.6)
-	var single := 0
-	for t in _turrets:
-		if t != null:
-			single += 1
-	for t in _turrets:
+		if is_wrecked:
+			_hull_art.modulate = Color(0.35, 0.32, 0.3)
+		else:
+			_hull_art.modulate = Color.WHITE.lerp(Color(1.6, 1.4, 1.2), _flash * 0.6)
+	if _art_overlay != null:
+		_art_overlay.global_position = global_position + Vector2(0.0, -ART_DECK_LIFT)
+		_art_overlay.global_rotation = global_rotation
+	var total := _turrets.size()
+	for i in total:
+		var t = _turrets[i]
 		if t == null or t.art == null:
 			continue
 		var a: Sprite2D = t.art
 		a.heading = t.global_rotation
-		var base := t.global_position
-		if _hull_art != null and single == 1:
-			base = global_position + _hull_art.point_offset("turret_mount")
+		var base: Vector2 = t.global_position
+		if _hull_art != null:
+			base = global_position + _hull_art.point_offset(art_mount_name(i, total))
 		a.global_position = base - a.point_offset("pivot")
+		if t.glow != null:
+			t.glow.visible = t.hot and t.visible
+			t.glow.global_position = a.global_position + a.point_offset("muzzle")
+
+
+## Which hull point turret `index` of `total` sits on.
+static func art_mount_name(index: int, total: int) -> String:
+	if total >= 2:
+		return "mount_a" if index == 0 else "mount_b"
+	return "turret_mount"
+
+
+## Wreck: every part but the chassis flies off from where it sits at this
+## heading; the chassis stays as the burnt-out hull.
+func _spawn_wreck_pieces() -> void:
+	wreck_pieces.clear()
+	if _hull_art == null or _hull_art.meta.is_empty():
+		return
+	var world := get_parent()
+	if world == null:
+		return
+	var f: int = _hull_art.frame
+	var chunks: Dictionary = _hull_art.meta.chunks
+	for name: String in chunks:
+		if name == "chassis":
+			continue
+		var p := WreckPiece.new()
+		p.texture = _hull_art.chunk_texture(name)
+		p.hframes = _hull_art.hframes
+		p.vframes = _hull_art.vframes
+		p.frame = f
+		p.position = global_position
+		var off: Vector2 = _hull_art.chunk_offset(name)
+		var dir := off.normalized() if off.length() > 0.5 else Vector2.RIGHT.rotated(randf() * TAU)
+		dir = dir.rotated(randf_range(-0.35, 0.35))
+		p.velocity = dir * randf_range(160.0, 300.0) + velocity * 0.4
+		p.spin = randf_range(-7.0, 7.0)
+		p.life = WRECK_PIECE_LIFE
+		p.z_index = 3
+		world.add_child(p)
+		wreck_pieces.append(p)
+	if chunks.has("chassis"):
+		_hull_art.texture = _hull_art.chunk_texture("chassis")
 
 
 func _process(_delta: float) -> void:
 	if _hull_art != null or _turret != null:
 		_update_art()
 	if _art_overlay != null:
-		_art_overlay.visible = not is_wrecked
+		_art_overlay.visible = not is_wrecked and visible
 		_art_overlay.queue_redraw()
+
+
+## Part marks layered on a voxel hull, from the equipped parts (the sheet
+## itself shows the stock Scrap Plating, street wheels and no extras).
+func art_marks() -> Array[String]:
+	var marks: Array[String] = []
+	var drive := str(look.get("drive", ""))
+	if drive in ["half_track", "off_road_tires", "outrider_sport_wheels"]:
+		marks.append(drive)
+	var armor := str(look.get("armor", "scrap_plating"))
+	if armor != "scrap_plating" and armor != "":
+		marks.append("armor:" + armor)
+	for w in gun_stats:
+		if int(w.mount) == Mount.FIXED:
+			marks.append("nose_guns")
+			if _active.has("overcharge") or _active.has("deadeye"):
+				marks.append("nose_guns_hot")
+			break
+	var utils: Array = look.get("utility", [])
+	if utils.has("emergency_patch"):
+		marks.append("patch_kit")
+	if utils.has("mine_dropper"):
+		marks.append("mine_rack")
+	var internal: Array = look.get("internal", [])
+	if internal.has("targeting_computer") or internal.has("advanced_targeting"):
+		marks.append("sensor_dish")
+	if internal.has("roll_cage"):
+		marks.append("roll_cage")
+	return marks
 
 
 ## Readability marks drawn over the voxel hull (rig-local, rotates with it).
 func _draw_art_overlay() -> void:
-	pass
+	var o := _art_overlay
+	var hl := body_len * 0.5
+	var hw := body_wid * 0.5
+	var dark := Color(0.12, 0.12, 0.13)
+	for m in art_marks():
+		match m:
+			"half_track":
+				for sy: float in [-1.0, 1.0]:
+					o.draw_rect(Rect2(Vector2(-hl + 4.0, sy * hw - 4.0), Vector2(body_len * 0.5, 8.0)), Color(0.07, 0.07, 0.075))
+					for k in 6:
+						o.draw_rect(Rect2(Vector2(-hl + 6.0 + k * body_len * 0.08, sy * hw - 3.0), Vector2(2.0, 6.0)), Color(0.2, 0.2, 0.21))
+			"off_road_tires":
+				for sx: float in [-1.0, 1.0]:
+					for sy: float in [-1.0, 1.0]:
+						var c := Vector2(sx * hl * 0.55, sy * (hw + 1.0))
+						o.draw_rect(Rect2(c - Vector2(9.0, 4.0), Vector2(18.0, 8.0)), Color(0.07, 0.07, 0.075))
+						for k in 3:
+							o.draw_rect(Rect2(c + Vector2(-7.0 + k * 6.0, -3.0), Vector2(2.0, 6.0)), Color(0.2, 0.2, 0.21))
+			"outrider_sport_wheels":
+				for sx: float in [-1.0, 1.0]:
+					for sy: float in [-1.0, 1.0]:
+						o.draw_rect(Rect2(Vector2(sx * hl * 0.55, sy * hw) - Vector2(3.0, 2.0), Vector2(6.0, 4.0)), T.COL_ORANGE.darkened(0.2))
+			"armor:riot_plating":
+				o.draw_rect(Rect2(hl - 12.0, -hw + 1.0, 12.0, body_wid - 2.0), Color(0.36, 0.37, 0.38))
+				for k in 3:
+					o.draw_rect(Rect2(hl - 10.0, -hw + 4.0 + k * (body_wid - 8.0) / 3.0, 8.0, 2.0), Color(0.22, 0.22, 0.23))
+			"armor:spiked_ram_plate":
+				for k in 4:
+					var y := -hw + 4.0 + k * (body_wid - 8.0) / 3.0
+					o.draw_colored_polygon(PackedVector2Array([Vector2(hl - 2.0, y - 3.0), Vector2(hl + 8.0, y), Vector2(hl - 2.0, y + 3.0)]), Color(0.75, 0.72, 0.66))
+			"armor:composite_plating":
+				o.draw_rect(Rect2(hl - 11.0, -hw + 2.0, 11.0, body_wid - 4.0), Color(0.24, 0.27, 0.3))
+				o.draw_rect(Rect2(hl - 11.0, -hw + 2.0, 11.0, body_wid - 4.0), T.COL_CYAN.darkened(0.4), false, 1.5)
+			"armor:outrider_light_plating":
+				o.draw_rect(Rect2(hl - 7.0, -hw + 3.0, 7.0, body_wid - 6.0), Color(0.3, 0.2, 0.16))
+				o.draw_rect(Rect2(hl - 7.0, -1.0, 7.0, 2.0), T.COL_ENEMY)
+			"nose_guns":
+				o.draw_rect(Rect2(hl - 14.0, -12.0, 20.0, 4.0), Color(0.15, 0.15, 0.16))
+				o.draw_rect(Rect2(hl - 14.0, 8.0, 20.0, 4.0), Color(0.15, 0.15, 0.16))
+			"nose_guns_hot":
+				o.draw_rect(Rect2(hl + 2.0, -12.0, 4.0, 4.0), Color(1.0, 0.95, 0.8))
+				o.draw_rect(Rect2(hl + 2.0, 8.0, 4.0, 4.0), Color(1.0, 0.95, 0.8))
+			"patch_kit":
+				o.draw_rect(Rect2(-hl + 12.0, hw - 13.0, 8.0, 8.0), Color(0.2, 0.2, 0.21))
+				o.draw_rect(Rect2(-hl + 15.0, hw - 12.0, 2.0, 6.0), Color(0.45, 0.85, 0.5))
+				o.draw_rect(Rect2(-hl + 13.0, hw - 10.0, 6.0, 2.0), Color(0.45, 0.85, 0.5))
+			"mine_rack":
+				o.draw_rect(Rect2(-hl - 3.0, -12.0, 7.0, 24.0), dark)
+				for k in 3:
+					var p := Vector2(-hl + 0.5, -8.0 + k * 8.0)
+					o.draw_circle(p, 3.0, Color(0.3, 0.29, 0.25))
+					o.draw_circle(p, 1.2, T.COL_ENEMY)
+			"sensor_dish":
+				o.draw_rect(Rect2(-hl + 4.0, -5.0, 7.0, 10.0), Color(0.16, 0.17, 0.18))
+				o.draw_circle(Vector2(-hl + 7.5, 0.0), 2.5, T.COL_CYAN)
+			"roll_cage":
+				var cage := Rect2(-2.0, -hw + 7.0, hl * 0.5, body_wid - 14.0)
+				o.draw_rect(cage, dark, false, 2.0)
+				o.draw_line(cage.position, cage.end, dark, 1.5)
 
 
 func can_lock() -> bool:
@@ -1542,6 +1688,9 @@ func _wreck() -> void:
 	for t in _turrets:
 		if t != null:
 			t.visible = false
+			if t.art != null:
+				t.art.visible = false
+	_spawn_wreck_pieces()
 	queue_redraw()
 	if fx != null:
 		fx.explosion(global_position, velocity)
@@ -1563,6 +1712,10 @@ func revive(fraction: float) -> void:
 	for t in _turrets:
 		if t != null:
 			t.visible = true
+			if t.art != null:
+				t.art.visible = true
+	if _hull_art != null and _hull_texture != null:
+		_hull_art.texture = _hull_texture
 	queue_redraw()
 	revived.emit()
 
@@ -1581,8 +1734,8 @@ func _burn(delta: float) -> void:
 # --- Look ----------------------------------------------------------------------
 
 func _draw() -> void:
-	if _hull_art != null and not is_wrecked:
-		return   # the voxel sheet draws the rig
+	if _hull_art != null:
+		return   # the voxel sheet draws the rig (and its burnt-out chassis)
 	var half_l := body_len * 0.5
 	var half_w := body_wid * 0.5
 	var hull := T.COL_STEEL
@@ -1687,12 +1840,33 @@ func _draw() -> void:
 	draw_rect(Rect2(-half_l - 1.0, half_w - 11.0, 3.0, 6.0), T.COL_ORANGE)
 
 
+## A flung wreck piece: drifts out, slows, spins and fades, then frees itself.
+class WreckPiece extends Sprite2D:
+	var velocity := Vector2.ZERO
+	var spin := 0.0
+	var life := 1.4
+	var _age := 0.0
+
+	func _init() -> void:
+		texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+
+	func _process(delta: float) -> void:
+		_age += delta
+		position += velocity * delta
+		velocity *= exp(-2.5 * delta)
+		rotation += spin * delta
+		modulate.a = clampf((life - _age) / (life * 0.5), 0.0, 1.0)
+		if _age >= life:
+			queue_free()
+
+
 class TurretSprite extends Node2D:
 	const T := preload("res://scripts/tuning.gd")
 	var kind := ""   # weapon part id: changes the barrel
 	var hot := false # Overcharge: white-hot muzzle
 	var enemy := false  # enemy turrets wear red
 	var art: Sprite2D = null  # DirectionalSprite when this weapon has voxel art
+	var glow: Node2D = null   # white-hot muzzle over the art (Overcharge)
 
 	func _draw() -> void:
 		if art != null:

@@ -146,7 +146,7 @@ func _draw_art_overlay() -> void:
 func _draw() -> void:
 	var half_l := body_len * 0.5
 	var half_w := body_wid * 0.5
-	if _hull_art != null and not is_wrecked:
+	if _hull_art != null:
 		return   # the voxel sheet draws the rig; marks go in _draw_art_overlay
 
 	var hull := Color(0.3, 0.2, 0.16)
