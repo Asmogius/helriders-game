@@ -495,6 +495,10 @@ func art_layers() -> Array[String]:
 	ids.append(drive if have.has(drive) else "drive:street_wheels")
 	var armor := "armor:" + str(look.get("armor", "scrap_plating"))
 	ids.append(armor if have.has(armor) else "armor:scrap_plating")
+	# Display only: the engine block (slot "engine", so the garage can pick it out).
+	var engine := "engine:" + str(look.get("engine", ""))
+	if have.has(engine):
+		ids.append(engine)
 	for w in gun_stats:
 		if int(w.mount) == Mount.FIXED and art_path(str(w.get("id", ""))) == "":
 			ids.append("nose_guns_hot" if _active.has("overcharge") or _active.has("deadeye") else "nose_guns")
@@ -506,6 +510,9 @@ func art_layers() -> Array[String]:
 		ids.append("patch_kit")
 	if utils.has("mine_dropper"):
 		ids.append("mine_rack")
+	for u: String in ["oil_slick", "spike_strip", "goop_launcher", "nitro_bottle"]:   # display only
+		if utils.has(u):
+			ids.append(u)
 	var internal: Array = look.get("internal", [])
 	if internal.has("targeting_computer") or internal.has("advanced_targeting"):
 		ids.append("sensor_dish")
