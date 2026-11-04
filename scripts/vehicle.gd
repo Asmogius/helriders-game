@@ -177,13 +177,23 @@ var _flash := 0.0
 const DirectionalSprite := preload("res://scripts/directional_sprite.gd")
 ## Voxel art per chassis id (look.chassis). A chassis without art keeps the
 ## code-drawn hull below.
-const ART_CHASSIS := {"scrap_frame": "res://art/sprites/scrap_frame.json", "bulwark_frame": "res://art/sprites/bulwark_frame.json"}
+## Art lookup is by id: a chassis, weapon or enemy rig with id X wears
+## res://art/sprites/X.json when that file exists (see docs/ART_PIPELINE.md).
+const ART_DIR := "res://art/sprites/"
 const WRECK_PIECE_LIFE := 1.4       # s a flung wreck piece lasts (fades over the last half)
 var wreck_pieces: Array[Node2D] = []   # the pieces flung by the last wreck (tests read it)
 var _hull_texture: Texture2D = null
 var _layer_ids: Array[String] = []
 var _layer_sprites: Dictionary = {}   # layer id -> Sprite2D on the hull art
-const ART_TURRETS := {"": "res://art/sprites/pintle_turret.json", "pintle_turret": "res://art/sprites/pintle_turret.json"}
+var _fixed_art: Array[Sprite2D] = []   # art for fixed guns, on the hull's nose_mount
+
+
+## Sheet metadata for an art id, or "" when there is no art for it yet.
+static func art_path(id: String) -> String:
+	if id == "":
+		return ""
+	var path := ART_DIR + id + ".json"
+	return path if FileAccess.file_exists(path) else ""
 var _hull_art: Sprite2D = null   # DirectionalSprite, or null when drawing by code
 var _art_overlay: Node2D = null  # rotates with the rig, above the hull art
 var _reversing := false
@@ -309,10 +319,11 @@ func _sync_parts() -> void:
 		sprite.enemy = team != BulletPool.TEAM_PLAYER
 		sprite.position = turret_position(i, count)
 		add_child(sprite)
-		var tpath := str(ART_TURRETS.get(sprite.kind, ""))
-		if tpath != "" and ResourceLoader.exists(tpath.get_basename() + ".png"):
+		var tpath := art_path(sprite.kind if sprite.kind != "" else "pintle_turret")
+		if tpath != "":
 			var ta: Sprite2D = DirectionalSprite.new()
 			if ta.load_meta(tpath):
+				ta.meta_path = tpath
 				ta.top_level = true   # never rotates; picks its frame from the aim
 				ta.z_index = 1
 				sprite.art = ta
@@ -328,13 +339,38 @@ func _sync_parts() -> void:
 		_turrets.append(sprite)
 		if _turret == null:
 			_turret = sprite
+	_sync_fixed_art()
 	_sync_art()
 	queue_redraw()
 
 
+## Fixed guns with art (Harpoon and friends) get their own sheet, bolted to
+## the hull's nose_mount; guns without art keep the stock nose-guns layer.
+func _sync_fixed_art() -> void:
+	for a in _fixed_art:
+		a.queue_free()
+	_fixed_art.clear()
+	for w in gun_stats:
+		if int(w.mount) != Mount.FIXED:
+			continue
+		var path := art_path(str(w.get("id", "")))
+		if path == "":
+			continue
+		var a: Sprite2D = DirectionalSprite.new()
+		if a.load_meta(path):
+			a.meta_path = path
+			a.top_level = true
+			a.z_index = 1
+			a.set_meta("weapon", str(w.get("id", "")))
+			add_child(a)
+			_fixed_art.append(a)
+		else:
+			a.free()
+
+
 ## Which voxel sheet this rig wears ("" = drawn by code).
 func _art_meta_path() -> String:
-	return str(ART_CHASSIS.get(str(look.get("chassis", "")), ""))
+	return art_path(str(look.get("chassis", "")))
 
 
 func _sync_art() -> void:
@@ -400,6 +436,14 @@ func _update_art() -> void:
 		if t.glow != null:
 			t.glow.visible = t.hot and t.visible
 			t.glow.global_position = a.global_position + a.point_offset("muzzle")
+	for k in _fixed_art.size():
+		var fa := _fixed_art[k]
+		fa.visible = visible and not is_wrecked
+		fa.heading = global_rotation
+		var at := global_position + Vector2(body_len * 0.35, 0.0).rotated(global_rotation)
+		if _hull_art != null and _hull_art.meta.has("points") and _hull_art.meta.points.has("nose_mount"):
+			at = global_position + _hull_art.point_offset("nose_mount")
+		fa.global_position = at - fa.point_offset("pivot")
 
 
 ## Which hull point turret `index` of `total` sits on.
@@ -422,10 +466,12 @@ func art_layers() -> Array[String]:
 	var armor := "armor:" + str(look.get("armor", "scrap_plating"))
 	ids.append(armor if have.has(armor) else "armor:scrap_plating")
 	for w in gun_stats:
-		if int(w.mount) == Mount.FIXED:
+		if int(w.mount) == Mount.FIXED and art_path(str(w.get("id", ""))) == "":
 			ids.append("nose_guns_hot" if _active.has("overcharge") or _active.has("deadeye") else "nose_guns")
 			break
 	var utils: Array = look.get("utility", [])
+	if utils.has("shock_pulse"):
+		ids.append("shock_emitter")
 	if utils.has("emergency_patch"):
 		ids.append("patch_kit")
 	if utils.has("mine_dropper"):
