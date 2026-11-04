@@ -65,6 +65,8 @@ var profile: ProfileScript         # the /root/Profile autoload
 var preview: Vehicle
 
 var _rig_holder: Node2D
+const WorkshopRoom := preload("res://scripts/workshop_room.gd")   # V2 sample (P6)
+var _workshop: Control
 var _rig_touch: Control
 var _stat_sheet: StatSheet
 var _preview := ""                 # part id previewed in the open sheet ("" = empty slot)
@@ -116,6 +118,10 @@ func _ready() -> void:
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg)
 	add_child(FloorGrid.new())
+	# --- V2 style sample (P6): the Workshop bay room behind the GARAGE tab. ---
+	_workshop = WorkshopRoom.new()
+	add_child(_workshop)
+	_workshop.set_open(true, true)
 
 	_build_rig_area()
 	_build_top_bar()
@@ -1122,6 +1128,8 @@ func _upgrade_effect(key: String) -> String:
 
 func _on_tab(tab_name: String) -> void:
 	tab = tab_name
+	if _workshop != null:
+		_workshop.set_open(tab_name == "GARAGE")   # V2 sample: rooms fade (P6)
 	_comms.visible = tab_name == "COMMS"
 	_inn.visible = tab_name == "INN"
 	_saloon.visible = tab_name == "SALOON"
