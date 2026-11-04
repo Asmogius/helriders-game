@@ -203,7 +203,7 @@ func _check_burnt() -> void:
 ## a part without a sheet falls back to the stock one for its slot.
 func _check_layers() -> void:
 	var v := _rig(load("res://scripts/parts.gd").STARTER_LOADOUT)
-	check(str(v.art_layers()) == str(["drive:street_wheels", "armor:scrap_plating"]), "starter layers %s" % [v.art_layers()])
+	check(str(v.art_layers()) == str(["drive:street_wheels", "armor:scrap_plating", "engine:junk_v6"]), "starter layers %s" % [v.art_layers()])
 	v.look = {"chassis": "scrap_frame", "drive": "half_track", "armor": "riot_plating",
 		"utility": ["mine_dropper", "emergency_patch"], "internal": ["roll_cage", "advanced_targeting"]}
 	var m: Array[String] = v.art_layers()

@@ -107,7 +107,8 @@ func _run_checks() -> void:
 	_check(garage.press_card("outrider_sport_wheels") and profile.rig.drive == "outrider_sport_wheels", "second tap fits the part")
 	_check(garage.press_card("street_wheels") == false and garage.press_card("street_wheels") and profile.scrap == 30, "two taps to swap back, still free")
 	garage.close_sheet()
-	_check(not sheet.visible and garage._rig_holder.visible, "closing the sheet brings the rig back")
+	# V2.3 sample: the stats panel stays on the right (whole-rig stats) when the sheet closes.
+	_check(not garage._sheet.visible and sheet.title == "RIG STATS" and garage._rig_holder.visible, "closing the sheet brings the rig back")
 	garage.open_slot(DRIVE)
 
 	# --- Taking a part off frees its slot and power -----------------------------------

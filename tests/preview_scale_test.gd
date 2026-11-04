@@ -33,12 +33,14 @@ func _run() -> void:
 			print("preview_scale_test: no hull art on this rig, scale check skipped")
 		else:
 			v.call("_update_art")
-			check(is_equal_approx(hull.scale.x, sc), "hull art copies the rig scale (%.2f vs %.2f)" % [hull.scale.x, sc])
+			var hp: float = hull.call("ppv") if hull.has_method("ppv") else 1.0
+			check(is_equal_approx(hull.scale.x * hp, sc), "hull art copies the rig scale / px-per-voxel (%.2f x %.1f vs %.2f)" % [hull.scale.x, hp, sc])
 			for t: Node2D in v.get("_turrets"):
 				if t == null:
 					continue
 				var a: Variant = t.get("art")
 				if a != null:
-					check(is_equal_approx(a.scale.x, sc), "turret art copies the rig scale")
+					var tp: float = a.call("ppv") if a.has_method("ppv") else 1.0
+					check(is_equal_approx(a.scale.x * tp, sc), "turret art copies the rig scale / px-per-voxel")
 	print("PREVIEW SCALE TEST ", "PASSED" if fails == 0 else "FAILED (%d)" % fails)
 	quit(1 if fails else 0)

@@ -334,7 +334,7 @@ func _sync_parts() -> void:
 		sprite.enemy = team != BulletPool.TEAM_PLAYER
 		sprite.position = turret_position(i, count)
 		add_child(sprite)
-		var tpath := art_path(str(ART_WEAPON_ALIASES.get(sprite.kind, sprite.kind)))
+		var tpath := _art_for(str(ART_WEAPON_ALIASES.get(sprite.kind, sprite.kind)))
 		if tpath != "":
 			var ta: Sprite2D = DirectionalSprite.new()
 			if ta.load_meta(tpath):
@@ -369,7 +369,7 @@ func _sync_fixed_art() -> void:
 		if int(w.mount) != Mount.FIXED:
 			continue
 		var wid := str(w.get("id", ""))
-		var path := art_path(str(ART_WEAPON_ALIASES.get(wid, wid))) if wid != "" else ""
+		var path := _art_for(str(ART_WEAPON_ALIASES.get(wid, wid))) if wid != "" else ""
 		if path == "":
 			continue
 		var a: Sprite2D = DirectionalSprite.new()
@@ -386,7 +386,16 @@ func _sync_fixed_art() -> void:
 
 ## Which voxel sheet this rig wears ("" = drawn by code).
 func _art_meta_path() -> String:
-	return art_path(str(look.get("chassis", "")))
+	return _art_for(str(look.get("chassis", "")))
+
+
+## V5 garage sample: the garage preview sets art_dir to the HD sheets
+## (art/sprites_hd/, 2 px per voxel); missing there -> the normal sheet.
+var art_dir := ""
+func _art_for(id: String) -> String:
+	if art_dir != "" and id != "" and FileAccess.file_exists(art_dir + id + ".json"):
+		return art_dir + id + ".json"
+	return art_path(id)
 
 
 func _sync_art() -> void:
@@ -399,7 +408,7 @@ func _sync_art() -> void:
 		if _art_overlay != null:
 			_art_overlay.queue_free()
 			_art_overlay = null
-	if path != "" and _hull_art == null and ResourceLoader.exists(path.get_basename() + ".png"):
+	if path != "" and _hull_art == null and (ResourceLoader.exists(path.get_basename() + ".png") or (art_dir != "" and path.begins_with(art_dir))):   # HD sheets have no composite
 		_hull_art = DirectionalSprite.new()
 		if _hull_art.load_meta(path):
 			_hull_art.meta_path = path
@@ -434,7 +443,7 @@ func _update_art() -> void:
 	var sc := absf(global_scale.x)
 	if _hull_art != null:
 		_hull_art.visible = visible
-		_hull_art.scale = Vector2(sc, sc)
+		_hull_art.scale = Vector2(sc, sc) / float(_hull_art.call("ppv"))
 		_hull_art.global_position = global_position
 		_hull_art.heading = global_rotation
 		_hull_art.modulate = Color.WHITE if is_wrecked else Color.WHITE.lerp(Color(1.6, 1.4, 1.2), _flash * 0.6)
@@ -456,7 +465,7 @@ func _update_art() -> void:
 			continue
 		var a: Sprite2D = t.art
 		a.heading = t.global_rotation
-		a.scale = Vector2(sc, sc)
+		a.scale = Vector2(sc, sc) / float(a.call("ppv"))
 		var base: Vector2 = t.global_position
 		if _hull_art != null:
 			base = global_position + _hull_art.point_offset(art_mount_name(i, total)) * sc
@@ -468,7 +477,7 @@ func _update_art() -> void:
 		var fa := _fixed_art[k]
 		fa.visible = visible and not is_wrecked
 		fa.heading = global_rotation
-		fa.scale = Vector2(sc, sc)
+		fa.scale = Vector2(sc, sc) / float(fa.call("ppv"))
 		var at := global_position + Vector2(body_len * 0.35, 0.0).rotated(global_rotation) * sc
 		if _hull_art != null and _hull_art.meta.has("points") and _hull_art.meta.points.has("nose_mount"):
 			at = global_position + _hull_art.point_offset("nose_mount") * sc
@@ -495,6 +504,10 @@ func art_layers() -> Array[String]:
 	ids.append(drive if have.has(drive) else "drive:street_wheels")
 	var armor := "armor:" + str(look.get("armor", "scrap_plating"))
 	ids.append(armor if have.has(armor) else "armor:scrap_plating")
+	# Display only: the engine block (slot "engine", so the garage can pick it out).
+	var engine := "engine:" + str(look.get("engine", ""))
+	if have.has(engine):
+		ids.append(engine)
 	for w in gun_stats:
 		if int(w.mount) == Mount.FIXED and art_path(str(w.get("id", ""))) == "":
 			ids.append("nose_guns_hot" if _active.has("overcharge") or _active.has("deadeye") else "nose_guns")
@@ -506,6 +519,9 @@ func art_layers() -> Array[String]:
 		ids.append("patch_kit")
 	if utils.has("mine_dropper"):
 		ids.append("mine_rack")
+	for u: String in ["oil_slick", "spike_strip", "goop_launcher", "nitro_bottle"]:   # display only
+		if utils.has(u):
+			ids.append(u)
 	var internal: Array = look.get("internal", [])
 	if internal.has("targeting_computer") or internal.has("advanced_targeting"):
 		ids.append("sensor_dish")
