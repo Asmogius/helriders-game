@@ -756,6 +756,84 @@ func leave_tutorial() -> void:
 	get_tree().change_scene_to_file(GARAGE_SCENE)
 
 
+# --- Wreck sequence ------------------------------------------------------------------
+# Agreed with the owner: about 4 s, a tap skips to the card. Slow motion on
+# the final hit, plates and fire, the horde closes in and everyone aboard is
+# dragged out by name.
+
+var wreck_skipped := false
+var _in_wreck := false
+
+
+func _wreck_sequence(aboard: Array[String]) -> void:
+	_in_wreck = true
+	wreck_skipped = false
+	hud.set_tip("")
+	hud.close_choice()
+	hud.hide_controls()
+	var at := vehicle.global_position
+	fx.explosion(at, Vector2.ZERO)
+	fx.blast(at, 120.0)
+	camera.shake(1.0)
+	# The horde smells blood: a ring of them closes on the wreck.
+	for i in T.WRECK_SWARM:
+		zombies.spawn_at(_open_spot(T.WRECK_SWARM_RANGE + 25.0 * i), "shambler")
+	var drag := WreckCrew.new()
+	drag.names = aboard
+	drag.rig = vehicle
+	drag.z_index = 7
+	add_child(drag)
+	Engine.time_scale = T.WRECK_SLOWMO
+	var t := 0.0
+	while t < T.WRECK_TIME and not wreck_skipped:
+		await get_tree().process_frame
+		t += get_process_delta_time() / maxf(Engine.time_scale, 0.01)
+		if t > T.WRECK_SLOWMO_TIME:
+			Engine.time_scale = 1.0
+		if t > 0.9 and fx != null and randf() < 0.3:
+			fx.flame(at + Vector2(randf_range(-26, 26), randf_range(-16, 16)))
+	Engine.time_scale = 1.0
+	_in_wreck = false
+
+
+## A tap during the wreck skips to the card.
+func _input(event: InputEvent) -> void:
+	if not _in_wreck:
+		return
+	if (event is InputEventScreenTouch and (event as InputEventScreenTouch).pressed) or (event is InputEventMouseButton and (event as InputEventMouseButton).pressed):
+		wreck_skipped = true
+
+
+class WreckCrew extends Node2D:
+	## The crew dragged from the wreck into the horde, one by one, names in red.
+	const T := preload("res://scripts/tuning.gd")
+	var names: Array[String] = []
+	var rig: Node2D
+	var _t := 0.0
+
+	func _process(delta: float) -> void:
+		_t += delta / maxf(Engine.time_scale, 0.01)   # real time, through the slow motion
+		queue_redraw()
+
+	func _draw() -> void:
+		if rig == null:
+			return
+		var font := ThemeDB.fallback_font
+		for i in names.size():
+			var k := clampf((_t - 0.6 - 0.7 * i) / 1.3, 0.0, 1.0)
+			if k <= 0.0:
+				continue
+			var dir := Vector2.RIGHT.rotated(-PI * 0.5 + TAU * float(i) / maxf(names.size(), 1.0) + 0.6)
+			var at := to_local(rig.global_position) + dir * (20.0 + 150.0 * k)
+			var fade := 1.0 - clampf((k - 0.8) / 0.2, 0.0, 1.0) * 0.6
+			# Hauled out: a limp figure, a hand on each arm.
+			draw_circle(at, 7.0, Color(0.75, 0.6, 0.5, fade))
+			draw_line(at, at + dir * 14.0, Color(0.3, 0.28, 0.25, fade), 6.0)
+			draw_circle(at + dir * 20.0 + dir.orthogonal() * 8.0, 6.0, Color(0.35, 0.45, 0.3, fade))
+			draw_circle(at + dir * 20.0 - dir.orthogonal() * 8.0, 6.0, Color(0.35, 0.45, 0.3, fade))
+			draw_string(font, at + Vector2(-120.0, -22.0), names[i].to_upper(), HORIZONTAL_ALIGNMENT_CENTER, 240.0, 22, Color(T.COL_ENEMY, fade))
+
+
 ## The Database id of an enemy rig.
 func _rig_key(rig: EnemyRig) -> String:
 	if rig.is_elite():
@@ -1796,9 +1874,7 @@ func _on_wrecked() -> void:
 		if not salvage.is_empty():
 			lines += ", %d schematic%s" % [salvage.size(), "" if salvage.size() == 1 else "s"]
 		lines += "."
-	# Let the wreck burn for a beat before the results card.
-	await get_tree().create_timer(1.6).timeout
-	Engine.time_scale = 1.0
+	await _wreck_sequence(aboard)
 	hud.show_result("WRECKED", lines, "BACK TO THE YARD", T.COL_ORANGE)
 
 

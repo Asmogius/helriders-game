@@ -527,6 +527,13 @@ const TUTORIAL_LOADOUT := {
 }
 const TUTORIAL_PART := "riot_plating"
 
+# Wreck sequence (agreed with the owner: about 4 s, a tap skips it).
+const WRECK_TIME := 4.0          # real seconds before the results card
+const WRECK_SLOWMO := 0.3        # game speed on the final hit...
+const WRECK_SLOWMO_TIME := 0.8   # ...for this long (real seconds)
+const WRECK_SWARM := 6           # zombies that close on the wreck
+const WRECK_SWARM_RANGE := 280.0
+
 const CREW_PRICES := {"Common": 0, "Uncommon": 80, "Rare": 200, "Epic": 450, "Legendary": 900, "Mythic": 1600}
 # Lost crew (§14; agreed with the owner): a crew member lost in a wreck turns
 # up again after 3 days (Uncommon), a day more per rarity step, and joins the

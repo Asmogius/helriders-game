@@ -399,6 +399,17 @@ func _process(_delta: float) -> bool:
 		rig.take_damage(99999.0)
 	if frame == 2800:
 		_check(main.state == Main.State.WRECKED, "wreck ends the run")
+		_check(Engine.time_scale < 1.0, "the final hit plays in slow motion")
+		var dragged := main.get_children().filter(func(n: Node) -> bool: return n is Main.WreckCrew)
+		_check(dragged.size() == 1 and (dragged[0].get("names") as Array).size() >= 1, "the crew are dragged from the wreck by name")
+		_check(main.zombies.active_zombies().size() >= T.WRECK_SWARM, "the horde closes on the wreck")
+		_check(not main.hud.is_result_visible(), "no card yet")
+	if frame == 2840:
+		var tap := InputEventScreenTouch.new()
+		tap.pressed = true
+		main._input(tap)
+	if frame == 2846:
+		_check(main.hud.is_result_visible() and Engine.time_scale == 1.0, "a tap skips to the card")
 	if frame == 2930:
 		_check(main.hud.is_result_visible(), "results card shown")
 		_check(main.hud.result_text().contains("Crew lost"), "results card names the crew lost")
