@@ -18,7 +18,8 @@ const ArtAtlas := preload("res://scripts/art_atlas.gd")
 const STATUS_ICONS := ["shock", "fire", "acid", "toxic", "slime", "goop"]   # T.STATUS_NAMES order
 
 
-## The icon atlas (art_atlas.gd). Drawers load it once and keep it in a
+## The shared icon atlas (art_atlas.gd caches one instance per tree, so
+## icons.json is read once). Drawers keep it in a
 ## member var; `ok()` is false when the art is missing (draw the old way).
 static func icons() -> RefCounted:
 	return ArtAtlas.load_atlas("res://art/ui/icons")
