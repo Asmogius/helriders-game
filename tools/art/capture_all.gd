@@ -35,6 +35,7 @@ func _initialize() -> void:
 		_add("garage_" + t.to_lower(), _show_tab.bind(t))
 	_add("rarity_tiers", _show_rarity)
 	_add("fight", _show_fight)
+	_add("fight_hud", _show_fight_hud)
 
 
 func _add(shot: String, setup: Callable) -> void:
@@ -75,6 +76,15 @@ func _show_rarity() -> void:
 func _show_fight() -> void:
 	_strip.queue_free()
 	change_scene_to_file("res://scenes/mission.tscn")
+
+
+## Every HUD button at once (longest labels), to check nothing is squeezed.
+func _show_fight_hud() -> void:
+	var hud: Node = current_scene.hud
+	hud.set_lock_available(true)
+	var kinds: Array[String] = ["overcharge", "hard_line", "spikes"]
+	hud.set_abilities(kinds)
+	hud.banner("SCHEMATIC: OUTRIDER SPORT WHEELS", T.COL_ORANGE, 3.0)
 
 
 func _process(_delta: float) -> bool:

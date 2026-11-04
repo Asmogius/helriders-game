@@ -268,10 +268,10 @@ class MissionCard extends Button:
 			UI.draw_skull(self, Vector2(26 + i * 26, 100), 10.0, UI.skull_color(level), i < level)
 		_wrapped(font, Missions.brief(mission), Vector2(16, 136), w, 16, UI.TEXT_DIM)
 		# Up to five tighter lines: a 6-skull job lists a lot of trouble.
-		_wrapped(font, Missions.threats_text(mission), Vector2(16, 184), w, 14, UI.TEXT, 5, 4.0)
+		_wrapped(font, Missions.threats_text(mission), Vector2(16, 182), w, 13, UI.TEXT, 5, 3.0)
 		draw_string(font, Vector2(16, size.y - 52), "PAYS %d SCRAP" % int(mission.reward), HORIZONTAL_ALIGNMENT_LEFT, w, 20, T.COL_ORANGE)
 		if schematic_odds != "":
-			draw_string(font, Vector2(16, size.y - 28), "+ " + schematic_odds, HORIZONTAL_ALIGNMENT_LEFT, w, 15, UI.GOOD)
+			UI.draw_fit(self, font, Vector2(16, size.y - 28), "+ " + schematic_odds, HORIZONTAL_ALIGNMENT_LEFT, w, 15, UI.GOOD)
 		if taken:
 			draw_string(font, Vector2(16, size.y - 8), "TAKEN", HORIZONTAL_ALIGNMENT_RIGHT, w, 15, T.COL_CYAN)
 
