@@ -298,7 +298,7 @@ Spiked Ram Plate is renamed Zed Sled (code rename pending). Unlock levels: Minor
 
 Replaces the single armor pool (§4 Armor Sections, §8 Bulwark front rule).
 
-**Built (2026-11-04).** Agreed gap-fillers: the starter carries Scrap Plating on all three slots and the Junk Emitter (100/100 power, 95/100 weight); old saves copy their one plate to all three slots (a front-only ram plate to the front only). Structural Bracing gives +25 max HP (and keeps +15 ram). Cowcatcher Ram: front only, 124 armor, front-slot weight 22. Convoy Lead cab: HP 200, front 250, sides 70, rear 60, shield 30 from 4 skulls; trailer: HP 120, front 50, sides 65, rear 50 (350 in total, not the 300 it had). The salvage truck: HP 120, 70 on every facing. Enemy shields recharge like the Junk Emitter (3 s delay, ~5 s refill). Not yet built: the other shield generators (Capacitor Bank, Flux Coil, Reflex Emitter), which arrive with their drop sources.
+**Built (2026-11-04).** Agreed gap-fillers: the starter carries Scrap Plating on all three slots and the Junk Emitter (100/100 power, 95/100 weight); old saves copy their one plate to all three slots (a front-only ram plate to the front only). Structural Bracing gives +25 max HP (and keeps +15 ram). Cowcatcher Ram: front only, 124 armor, front-slot weight 22. Convoy Lead cab: HP 200, front 250, sides 70, rear 60, shield 30 from 4 skulls; trailer: HP 120, front 50, sides 65, rear 50 (350 in total, not the 300 it had). The salvage truck: HP 120, 70 on every facing. Enemy shields recharge like the Junk Emitter (3 s delay, ~5 s refill). Capacitor Bank and Flux Coil arrived with the Patcher; the Reflex Emitter is not built yet.
 
 - Three layers for player and enemy rigs: shield (recharges) -> armor (directional, never regenerates) -> HP (structure; zero = wreck).
 - HP comes from the chassis, plus some parts that raise max HP (e.g., Structural Bracing).
@@ -450,6 +450,8 @@ Enemy rigs (same total toughness as today). Shields from 4 skulls: Gunner Rigs c
 | Patcher | 80 | 30 | 30 | 30 | 35 | 50 | 50 | 40 | 50 | 50 |
 
 Patcher: speed 540; cable 400 px; repairs 12 armor/s to the ally's most damaged facing; hook range 450 px; re-hook 3 s; revive 4 s to 10% HP; 35 scrap. Never repairs itself (self-repair reserved for possible stronger enemies).
+
+**Patcher built (2026-11-04).** Agreed with the owner: the chance a job brings one rises with skulls (25% at 3, 40% at 4, 55% at 5, 70% at 6; only in jobs with another rig; seeded per job and named on Comms; at most one). It drops the Capacitor Bank, Flux Coil, Emergency Patch or Structural Bracing (or a 35-scrap cache); both shields cost 110 scrap. Gap-fillers: every hook throw has the 3 s wind-up (sight blocked pauses it; drifting well out of reach restarts it); a hard crash is a wall impact over 380 px/s; ramming the cable needs over 300 px/s; a revived rig comes back at 10% of HP and of each facing, shield empty; any damage to the Patcher (not only yours) restarts a revive; it doesn't revive the Convoy Lead or another Patcher; a revived rig wrecked again counts as a kill but pays no more scrap, and drops the crate it took back (if any); it rolls in once another rig is in the fight (or when no more rigs are due, so a Clear can always finish).
 
 Scrapper: speed 580; one hazard every 3 s, alternating oil and spikes; max 6 active (oldest vanish first); oil 90 px wide, 12 s; spike strip 120 px long, 15 s, crossing rigs -30% speed for 3 s; 25 scrap.
 

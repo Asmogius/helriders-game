@@ -306,6 +306,27 @@ const SCRAPPER_SCRAP := 25
 const SCRAPPER_SCRAP_CACHE := 25
 const SCRAPPER_SPAWN_TIME := 60.0   # Clear: seconds in, or...
 const SCRAPPER_SPAWN_KILLS := 20    # ...after this many kills
+# --- Patcher (support enemy rig, §14; agreed with the owner) -----------------
+# Unarmed. Hooks a cable onto an ally and repairs it; the ally can drag it.
+# The hook pops on a big hit to either rig (over 15% of its max in 1 s), a
+# hard crash, or you ramming the cable at speed; re-hooking takes a 3 s
+# wind-up. With no ally alive it revives a wreck to 10% over 4 s (any damage
+# interrupts). From 3 skulls, only alongside another rig; the chance a job
+# brings one rises with skulls (seeded per job, shown on Comms).
+const PATCHER_CHANCE := [0.0, 0.0, 0.25, 0.4, 0.55, 0.7]
+const PATCHER_CABLE := 400.0        # cable length
+const PATCHER_HOOK_RANGE := 450.0   # how far it can throw the hook
+const PATCHER_REPAIR := 12.0        # armor/s to the ally's most damaged facing
+const PATCHER_REHOOK := 3.0         # wind-up before a hook flies
+const PATCHER_POP_HIT := 0.15       # share of a rig's max taken in 1 s that pops it
+const PATCHER_POP_CRASH := 380.0    # wall crash speed that pops it
+const PATCHER_POP_RAM := 300.0      # your speed across the cable that cuts it
+const PATCHER_REVIVE_TIME := 4.0
+const PATCHER_REVIVE_TO := 0.10     # share of max HP and armor a revived rig gets
+const PATCHER_REVIVE_REACH := 140.0 # parks this close to a wreck to revive it
+const PATCHER_KEEP := 260.0         # hangs this far off its ally, away from you
+const PATCHER_SCRAP := 35
+const PATCHER_SCRAP_CACHE := 35
 # --- Convoy Lead (elite enemy rig; agreed with the owner) ---------------------
 # An armored semi with a ram, towing a short trailer with a heavy turret on a
 # hitch. It hunts and rams like a slow Bulwark (the ram takes half damage);
@@ -612,6 +633,28 @@ const SCRAPPER := {
 	"ram_damage": 30.0,
 	"mount": 1,
 	"fire_rate": 0.0,          # unarmed (§14)
+	"bullet_damage": 0.0,
+	"bullet_speed": 1000.0,
+	"spread_deg": 0.0,
+	"turret_turn_rate": 0.0,
+	"lock_range": 0.0,
+}
+
+const PATCHER := {
+	"name": "Patcher",
+	"max_speed": 540.0,
+	"reverse_speed": 250.0,
+	"acceleration": 640.0,
+	"brake": 1500.0,
+	"coast": 280.0,
+	"turn_rate": 3.3,
+	"grip": 6.5,
+	"armor": 170.0,            # total of the layers below (§14 table)
+	"hp": 80.0, "front": 30.0, "side": 30.0, "rear": 30.0,
+	"resist": [35.0, 50.0, 50.0, 40.0, 50.0, 50.0],   # shock fire acid toxic slime goop
+	"ram_damage": 20.0,
+	"mount": 1,
+	"fire_rate": 0.0,          # unarmed
 	"bullet_damage": 0.0,
 	"bullet_speed": 1000.0,
 	"spread_deg": 0.0,

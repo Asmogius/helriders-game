@@ -3,7 +3,7 @@ extends SceneTree
 ## input, and checks each core mechanic in its own short scenario:
 ## driving, lock-on, the Hunter (latch, shoot off, crush), the Outrider
 ## (hunts and shoots you, drops salvage), the Bulwark (charges, rams, armored
-## front, drops salvage), a Brute's armor, the Gunner Rig, Scrapper and Convoy Lead, power and weight overload, two
+## front, drops salvage), a Brute's armor, the Gunner Rig, Scrapper, Convoy Lead and Patcher, power and weight overload, two
 ## weapons with pellets, fixed guns, the utilities, crew (passives, the crew
 ## wheel, Hard Line, Overcharge, big-hit injuries, turret aim rule), and the
 ## wreck.
@@ -379,6 +379,10 @@ func _process(_delta: float) -> bool:
 		_check(trailer != null and main.lock_candidates().has(trailer as Node2D), "a Convoy Lead rolls in towing a lockable trailer")
 		semi.take_damage(100000.0)
 		_check(semi.is_wrecked and bool(trailer.get("is_wrecked")) and main.kills == kills_before + 4, "wrecking the Convoy Lead's cab takes the trailer too")
+		var fixer := main.spawn_patcher(rig.global_position + Vector2(900, 0))
+		_check(fixer != null and not fixer.has_weapon() and fixer.has_method("hook"), "an unarmed Patcher rolls in (§14)")
+		fixer.take_damage(100000.0)
+		_check(fixer.is_wrecked and main.kills == kills_before + 5, "a wrecked Patcher counts as a kill")
 		# Barrels and statuses (full checks in status_test.gd).
 		var barrel: Node = main.barrels[0]
 		_check(main.barrels.size() == T.BARRELS_PER_JOB and bool(barrel.get("active")), "barrels stand at their spots")

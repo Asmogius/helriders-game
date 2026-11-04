@@ -24,6 +24,7 @@ const GunnerRig := preload("res://scripts/gunner_rig.gd")
 const ScrapperRig := preload("res://scripts/scrapper_rig.gd")
 const ScrapperGunnerRig := preload("res://scripts/scrapper_gunner_rig.gd")
 const ConvoyRig := preload("res://scripts/convoy_rig.gd")
+const PatcherRig := preload("res://scripts/patcher_rig.gd")
 const FriendlyTruck := preload("res://scripts/friendly_truck.gd")
 const StatusBars := preload("res://scripts/status_bars.gd")
 const Barrel := preload("res://scripts/barrel.gd")
@@ -80,6 +81,12 @@ var scrapper_gunner: ScrapperGunnerRig       # the first one (tests use it)
 var use_scrapper_gunner := false             # this job's Scrapper is the Gunner variant
 var convoys: Array[EnemyRig] = []     # elite semis with trailers, built up front too
 var convoy: ConvoyRig            # the first Convoy Lead (tests use it)
+var patchers: Array[EnemyRig] = []    # support rigs, built up front too
+var patcher: PatcherRig          # the first Patcher (tests use it)
+var use_patcher := false         # this job brings a Patcher (seeded, on Comms)
+var _rig_crate := {}             # rig -> the crate its wreck dropped
+var _held_crate := {}            # rig -> its uncollected crate, taken back when revived
+var _revived := {}               # rigs a Patcher has brought back (they pay once)
 var enemy_mines: MinePool        # the Scrappers' mines (hurt you and zombies)
 var marked: Node2D               # the last target a Spotter marked (tests)
 var bullets: BulletPool
@@ -254,6 +261,10 @@ func _ready() -> void:
 		rig.wrecked.connect(_on_scrapper_wrecked.bind(rig))
 	for rig in scrapper_gunners:
 		rig.wrecked.connect(_on_scrapper_gunner_wrecked.bind(rig))
+	for rig in patchers:
+		rig.wrecked.connect(_on_patcher_wrecked.bind(rig))
+	for rig in _all_enemy_rigs():
+		rig.revived.connect(_on_rig_revived.bind(rig))
 	for rig in convoys:
 		rig.wrecked.connect(_on_convoy_wrecked.bind(rig))
 		(rig as ConvoyRig).trailer.wrecked.connect(_on_trailer_lost.bind(rig))
@@ -434,6 +445,14 @@ func _configure_mission() -> void:
 	for i in maxi(convoy_count, 1):
 		convoys.append(ConvoyRig.new())
 	convoy = convoys[0] as ConvoyRig
+	# Patcher: one, rolled per job; it waits for an ally to work on.
+	use_patcher = Missions.has_patcher(spec)
+	patchers.append(PatcherRig.new())
+	patcher = patchers[0] as PatcherRig
+	if use_patcher:
+		_events.append([0.0, "patcher", -1, false])
+		if mission_type == "clear":
+			target_kills += 1
 
 
 func _physics_process(delta: float) -> void:
@@ -588,6 +607,9 @@ func _exit_tree() -> void:
 	for rig in _all_enemy_rigs():
 		if not rig.is_inside_tree():
 			rig.free()
+	for crate: Variant in _held_crate.values():
+		if is_instance_valid(crate):
+			(crate as Node).free()
 
 
 func _all_enemy_rigs() -> Array[EnemyRig]:
@@ -597,6 +619,7 @@ func _all_enemy_rigs() -> Array[EnemyRig]:
 	all.append_array(scrappers)
 	all.append_array(scrapper_gunners)
 	all.append_array(convoys)
+	all.append_array(patchers)
 	if elite != null:
 		all.append(elite)
 	return all
@@ -633,6 +656,10 @@ func _run_events() -> void:
 				e[3] = spawn_scrapper(zombies.pick_spawn_point()) != null
 			"convoy":
 				e[3] = spawn_convoy(zombies.pick_spawn_point()) != null
+			"patcher":
+				# Only alongside another rig, unless none are left to come.
+				if _ally_in_fight() or not _rig_events_pending():
+					e[3] = spawn_patcher(zombies.pick_spawn_point()) != null
 			"deep_guard":
 				# A Gunner Rig parked on the deep cache.
 				var post := caches[deep_cache] if deep_cache >= 0 else zombies.pick_spawn_point()
@@ -736,6 +763,36 @@ func spawn_convoy(at: Vector2) -> EnemyRig:
 			hud.banner("CONVOY LEAD INBOUND  -  GET BESIDE IT", T.COL_ENEMY)
 			return rig
 	return null
+
+
+## Sends in the Patcher, if there's room under the rig cap.
+func spawn_patcher(at: Vector2) -> EnemyRig:
+	if active_rig_count() >= T.MAX_ENEMY_RIGS:
+		return null
+	for rig in patchers:
+		if not rig.is_inside_tree():
+			rig.position = at
+			rig.rotation = (vehicle.global_position - at).angle()
+			rigs.add_child(rig)
+			hud.banner("PATCHER INBOUND  -  CUT ITS CABLE", T.COL_ENEMY)
+			return rig
+	return null
+
+
+## A working enemy rig (not a Patcher) is in the fight.
+func _ally_in_fight() -> bool:
+	for rig in rigs.get_children():
+		if not rig.get("is_wrecked") and not rig is PatcherRig:
+			return true
+	return false
+
+
+## Rig events that haven't fired yet (not counting the Patcher's own).
+func _rig_events_pending() -> bool:
+	for e: Array in _events:
+		if not e[3] and str(e[1]) != "patcher" and str(e[1]) != "hunter":
+			return true
+	return mission_type == "retrieve" and _rig_calls_made < _rig_calls
 
 
 ## Enemy rigs in the fight right now (wrecks don't count).
@@ -1237,8 +1294,10 @@ func _pending_ids() -> Array[String]:
 	return ids
 
 
-func _drop(at: Vector2, pool: String, guaranteed: bool, cache: int) -> void:
+func _drop(at: Vector2, pool: String, guaranteed: bool, cache: int, rig: Node = null) -> void:
 	var pickup := Pickup.new()
+	if rig != null:
+		_rig_crate[rig] = pickup
 	var unknown := profile.unknown_schematics(Parts.DROP_POOLS[pool], _pending_ids())
 	var chance := minf(profile.schematic_chance() + float(vehicle.crew_mod("schematic")), 0.95)
 	if not unknown.is_empty() and (guaranteed or always_drop_schematic or randf() < chance):
@@ -1252,7 +1311,9 @@ func _drop(at: Vector2, pool: String, guaranteed: bool, cache: int) -> void:
 
 func _on_outrider_wrecked(rig: EnemyRig) -> void:
 	camera.shake(0.6)
-	_drop(rig.global_position, "outrider", false, T.SCRAP_CACHE)
+	if _wrecked_again(rig):
+		return
+	_drop(rig.global_position, "outrider", false, T.SCRAP_CACHE, rig)
 	hud.banner("RIG DOWN  -  GRAB THE SALVAGE", T.COL_CYAN)
 	_add_kill(T.OUTRIDER_SCRAP, true)
 	_salvage_plating()
@@ -1260,7 +1321,9 @@ func _on_outrider_wrecked(rig: EnemyRig) -> void:
 
 func _on_bulwark_wrecked(rig: EnemyRig) -> void:
 	camera.shake(0.8)
-	_drop(rig.global_position, "bulwark", false, T.BULWARK_SCRAP_CACHE)
+	if _wrecked_again(rig):
+		return
+	_drop(rig.global_position, "bulwark", false, T.BULWARK_SCRAP_CACHE, rig)
 	hud.banner("BULWARK DOWN  -  GRAB THE SALVAGE", T.COL_CYAN)
 	_add_kill(T.BULWARK_SCRAP, true)
 	_salvage_plating()
@@ -1268,7 +1331,9 @@ func _on_bulwark_wrecked(rig: EnemyRig) -> void:
 
 func _on_gunner_wrecked(rig: EnemyRig) -> void:
 	camera.shake(0.7)
-	_drop(rig.global_position, "gunner", false, T.GUNNER_SCRAP_CACHE)
+	if _wrecked_again(rig):
+		return
+	_drop(rig.global_position, "gunner", false, T.GUNNER_SCRAP_CACHE, rig)
 	hud.banner("GUNNER RIG DOWN  -  GRAB THE SALVAGE", T.COL_CYAN)
 	_add_kill(T.GUNNER_SCRAP, true)
 	_salvage_plating()
@@ -1276,7 +1341,9 @@ func _on_gunner_wrecked(rig: EnemyRig) -> void:
 
 func _on_scrapper_wrecked(rig: EnemyRig) -> void:
 	camera.shake(0.5)
-	_drop(rig.global_position, "scrapper", false, T.SCRAPPER_SCRAP_CACHE)
+	if _wrecked_again(rig):
+		return
+	_drop(rig.global_position, "scrapper", false, T.SCRAPPER_SCRAP_CACHE, rig)
 	hud.banner("SCRAPPER DOWN  -  GRAB THE SALVAGE", T.COL_CYAN)
 	_add_kill(T.SCRAPPER_SCRAP, true)
 	_salvage_plating()
@@ -1284,7 +1351,9 @@ func _on_scrapper_wrecked(rig: EnemyRig) -> void:
 
 func _on_scrapper_gunner_wrecked(rig: EnemyRig) -> void:
 	camera.shake(0.55)
-	_drop(rig.global_position, "scrapper", false, T.SCRAPPER_GUNNER_SCRAP_CACHE)
+	if _wrecked_again(rig):
+		return
+	_drop(rig.global_position, "scrapper", false, T.SCRAPPER_GUNNER_SCRAP_CACHE, rig)
 	hud.banner("SCRAPPER GUNNER DOWN  -  GRAB THE SALVAGE", T.COL_CYAN)
 	_add_kill(T.SCRAPPER_GUNNER_SCRAP, true)
 	_salvage_plating()
@@ -1292,10 +1361,50 @@ func _on_scrapper_gunner_wrecked(rig: EnemyRig) -> void:
 
 func _on_convoy_wrecked(rig: EnemyRig) -> void:
 	camera.shake(1.0)
-	_drop(rig.global_position, "convoy", false, T.CONVOY_SCRAP_CACHE)
+	if _wrecked_again(rig):
+		return
+	_drop(rig.global_position, "convoy", false, T.CONVOY_SCRAP_CACHE, rig)
 	hud.banner("CONVOY LEAD DOWN  -  GRAB THE SALVAGE", T.COL_CYAN)
 	_add_kill(T.CONVOY_SCRAP, true)
 	_salvage_plating()
+
+
+func _on_patcher_wrecked(rig: EnemyRig) -> void:
+	camera.shake(0.5)
+	_drop(rig.global_position, "patcher", false, T.PATCHER_SCRAP_CACHE, rig)
+	hud.banner("PATCHER DOWN  -  GRAB THE SALVAGE", T.COL_CYAN)
+	_add_kill(T.PATCHER_SCRAP, true)
+	_salvage_plating()
+
+
+## A Patcher brought a wreck back: it's a live rig again (its kill no longer
+## counts) and its crate, if still on the ground, goes back into it.
+func _on_rig_revived(rig: EnemyRig) -> void:
+	_revived[rig] = true
+	kills -= 1
+	var crate: Variant = _rig_crate.get(rig)
+	if crate != null and is_instance_valid(crate) and (crate as Node).get_parent() == pickups:
+		pickups.remove_child(crate)
+		_held_crate[rig] = crate
+	_rig_crate.erase(rig)
+	hud.banner("A PATCHER BROUGHT A RIG BACK", T.COL_ENEMY)
+
+
+## A revived rig wrecked again: it counts as a kill, but its loot is paid
+## once per job. Its crate drops again if it took one back.
+func _wrecked_again(rig: EnemyRig) -> bool:
+	if not _revived.has(rig):
+		return false
+	var crate: Variant = _held_crate.get(rig)
+	if crate != null:
+		_held_crate.erase(rig)
+		var pickup := crate as Pickup
+		pickup.position = rig.global_position + (vehicle.global_position - rig.global_position).normalized() * 70.0
+		pickups.add_child(pickup)
+		_rig_crate[rig] = pickup
+	hud.banner("RIG DOWN AGAIN", T.COL_CYAN)
+	_add_kill(0, true)
+	return true
 
 
 ## The trailer shot off a running Convoy Lead: a scrap crate where it fell.
@@ -1310,7 +1419,9 @@ func _on_trailer_lost(rig: EnemyRig) -> void:
 
 func _on_elite_wrecked() -> void:
 	camera.shake(0.9)
-	_drop(elite.global_position, "elite", true, T.ELITE_SCRAP_CACHE)
+	if _wrecked_again(elite):
+		return
+	_drop(elite.global_position, "elite", true, T.ELITE_SCRAP_CACHE, elite)
 	hud.banner("%s DOWN  -  GRAB THE SCHEMATIC" % elite.elite_name, T.COL_ELITE, 3.0)
 	_add_kill(T.ELITE_SCRAP, true)
 	_salvage_plating()

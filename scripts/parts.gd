@@ -177,6 +177,14 @@ const CATALOG := {
 		"name": "Junk Emitter", "category": "Internal", "rarity": "Common", "cost": 30, "power": 25.0, "weight": 5.0,
 		"shield": 30.0, "shield_delay": 3.0, "shield_refill": 5.0,
 	},
+	"capacitor_bank": {
+		"name": "Capacitor Bank", "category": "Internal", "rarity": "Uncommon", "cost": 110, "power": 35.0, "weight": 5.0,
+		"shield": 75.0, "shield_delay": 4.0, "shield_refill": 6.0,
+	},
+	"flux_coil": {
+		"name": "Flux Coil", "category": "Internal", "rarity": "Uncommon", "cost": 110, "power": 30.0, "weight": 5.0,
+		"shield": 45.0, "shield_delay": 2.5, "shield_refill": 1.0,
+	},
 	"targeting_computer": {
 		"name": "Targeting Computer", "category": "Internal", "rarity": "Common", "cost": 30, "power": 25.0, "weight": 5.0,
 		"manual_aim": true,
@@ -258,6 +266,7 @@ const DROP_POOLS := {
 	"scrapper": ["oil_slick", "spike_strip", "mine_dropper", "off_road_tires"],   # the Scrapper Gunner shares it
 	"retrieve": ["turbo_four", "off_road_tires", "oil_slick", "mine_dropper"],
 	"escort": ["structural_bracing", "riot_plating", "emergency_patch", "burst_turret"],
+	"patcher": ["capacitor_bank", "flux_coil", "emergency_patch", "structural_bracing"],
 	"convoy": ["heavy_mg_turret", "composite_plating", "diesel_block", "half_track", "cowcatcher_ram", "hood_guns"],
 }
 

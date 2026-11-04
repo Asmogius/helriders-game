@@ -91,6 +91,25 @@ static func has_scrapper_gunner(mission: Dictionary) -> bool:
 	return rng.randf() < T.SCRAPPER_GUNNER_CHANCE
 
 
+## Does this job bring a Patcher? From 3 skulls, only in jobs that bring
+## another rig; the chance rises with skulls (seeded, so Comms and the
+## mission agree).
+static func has_patcher(mission: Dictionary) -> bool:
+	var chance := float(T.PATCHER_CHANCE[skulls(mission) - 1])
+	if chance <= 0.0:
+		return false
+	var type := str(mission.get("type", ""))
+	var rigs := type == "hunt" or type == "retrieve" or has_convoy(mission)
+	for key: String in ["outriders", "escorts", "bulwarks", "bulwark_escorts", "gunners", "gunner_escorts", "scrappers"]:
+		if _count(mission, key) > 0:
+			rigs = true
+	if not rigs:
+		return false
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("helriders-patcher-%d" % int(mission.get("seed", 0)))
+	return rng.randf() < chance
+
+
 ## The mission tests and a fresh mission scene fall back to.
 static func default_mission() -> Dictionary:
 	return make("clear", 3, 1)
@@ -164,6 +183,8 @@ static func threats_text(mission: Dictionary) -> String:
 	if scrappers > 0:
 		var what := "Scrapper Gunner" if has_scrapper_gunner(mission) else "Scrapper"
 		bits.append("%d %s%s" % [scrappers, what, "" if scrappers == 1 else "s"])
+	if has_patcher(mission):
+		bits.append("1 Patcher")
 	var kinds := zombie_kinds_text(mission)
 	if kinds != "":
 		bits.append(kinds)
