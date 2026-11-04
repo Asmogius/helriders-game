@@ -57,7 +57,7 @@ const TAG_COMPACT_H := 56.0        # five tags on one side: shorter, so the shee
 const TAG_COMPACT_TOP := 100.0
 const TAG_COMPACT_GAP := 5.0
 const RIG_SCALE := 3.4
-const FOOTER_H := 72.0
+const FOOTER_H := UI.BAR_H  # shared grid (ui_theme.gd)
 const SHEET_H := 236.0
 
 var selected := -1                 # index into SLOTS of the open sheet, -1 = closed
@@ -1238,8 +1238,8 @@ class SlotTag extends Button:
 		draw_rect(Rect2(size.x - 4.0 if side == 0 else 0.0, 0.0, 4.0, size.y), a)
 		var ys := PackedFloat32Array([17.0, 36.0, 51.0]) if compact else PackedFloat32Array([20.0, 45.0, 63.0])
 		draw_string(font, Vector2(14, ys[0]), slot_label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13 if compact else 14, UI.TEXT_DIM)
-		draw_string(font, Vector2(14, ys[1]), part_name, HORIZONTAL_ALIGNMENT_LEFT, size.x - 26.0, 18 if compact else 21, UI.TEXT_DIM if empty else UI.TEXT)
-		draw_string(font, Vector2(14, ys[2]), detail, HORIZONTAL_ALIGNMENT_LEFT, size.x - 26.0, 13 if compact else 14, Color(a, 0.9))
+		UI.draw_fit(self, font, Vector2(14, ys[1]), part_name, HORIZONTAL_ALIGNMENT_LEFT, size.x - 26.0, 18 if compact else 21, UI.TEXT_DIM if empty else UI.TEXT)
+		UI.draw_fit(self, font, Vector2(14, ys[2]), detail, HORIZONTAL_ALIGNMENT_LEFT, size.x - 26.0, 13 if compact else 14, Color(a, 0.9))
 
 
 class PartCard extends Button:
@@ -1300,7 +1300,7 @@ class PartCard extends Button:
 		var tx := 12.0
 		if category != "" and _icons.draw(self, category, Rect2(12, 14, 20, 20), Color(rarity_color, dim)):
 			tx = 38.0
-		draw_string(font, Vector2(tx, 30), title, HORIZONTAL_ALIGNMENT_LEFT, size.x - tx - 12.0, 19, Color(UI.TEXT, dim))
+		UI.draw_fit(self, font, Vector2(tx, 30), title, HORIZONTAL_ALIGNMENT_LEFT, size.x - tx - 12.0, 19, Color(UI.TEXT, dim))
 		draw_string(font, Vector2(12, 50), subtitle, HORIZONTAL_ALIGNMENT_LEFT, size.x - 24.0, 14, Color(rarity_color, 0.9 * dim))
 		draw_string(font, Vector2(12, 72), headline, HORIZONTAL_ALIGNMENT_LEFT, size.x - 24.0, 14, Color(UI.TEXT_DIM, dim))
 		var y := 94.0
