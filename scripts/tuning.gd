@@ -250,6 +250,23 @@ const OUTRIDER_SCRAP := 25
 # Draft" doc) ---------------------------------------------------------------------
 const BULWARK_FRONT_ARC := 0.785    # its heavy front plate: grey sparks within 45 deg of the nose
 const BULWARK_BACKOFF := 0.5        # seconds it backs off after ramming you
+# Bulwark charge (content proposal 01 §1.2, approved): lined up within 15°
+# at 250-700 px, it winds up 0.5 s (headlight flare telegraph), charges up to
+# 1.5 s at top speed; a miss overshoots into a 1.0 s recovery turn.
+const BULWARK_CHARGE_CONE := deg_to_rad(15.0)
+const BULWARK_CHARGE_RANGE := [250.0, 700.0]
+const BULWARK_WINDUP := 0.5
+const BULWARK_CHARGE_TIME := 1.5
+const BULWARK_RECOVER := 1.0
+# Outrider flank and break (proposal §1.1, approved): orbit 220-350 px into the
+# player's side/rear arcs (outside the front ±45° facing), strafe when within
+# ±10° of its gun line until it overheats, then break 500-700 px away (also
+# when one of its facings is stripped) and re-flank.
+const OUTRIDER_ORBIT := [220.0, 350.0]
+const OUTRIDER_FRONT_ARC := deg_to_rad(45.0)
+const OUTRIDER_STRAFE_CONE := deg_to_rad(10.0)
+const OUTRIDER_BREAK := [500.0, 700.0]
+const OUTRIDER_BREAK_MAX := 3.0      # gap-filler: give up a break after this many s
 const BULWARK_SCRAP := 40
 const BULWARK_SCRAP_CACHE := 40     # dropped instead of a schematic
 const BULWARK_SPAWN_TIME := 60.0    # Clear: seconds in, or...
@@ -342,6 +359,7 @@ const PATCHER_REVIVE_TO := 0.10     # share of max HP and armor a revived rig ge
 const PATCHER_REVIVE_REACH := 140.0 # parks this close to a wreck to revive it
 const PATCHER_KEEP := 260.0         # hangs this far off its ally, away from you
 const PATCHER_SCRAP := 35
+const PATCHER_MAX_REVIVES := 3     # per job (proposal 01, approved 2026-11-03; was unlimited)
 const PATCHER_SCRAP_CACHE := 35
 # --- Convoy Lead (elite enemy rig; agreed with the owner) ---------------------
 # An armored semi with a ram, towing a short trailer with a heavy turret on a
@@ -479,6 +497,47 @@ const EXPEDITION_NAMES := ["Fuel Depot Sweep", "Overpass Salvage", "Rail Yard Ru
 # Levels belong to the schematic: every copy you build has it, and a wreck
 # never takes it away. Build cost and the wreck penalty ignore levels.
 const RESEARCH_MAX_LEVEL := {"Common": 5, "Uncommon": 8, "Rare": 12, "Epic": 16, "Legendary": 20}
+# Part mods (DESIGN §14): the Research level each tier unlocks at.
+# Implement-03: ability numbers from DESIGN §14 (agreed), perk numbers from
+# proposal 01 §3.1. Gap-fillers are marked.
+# Implement-04 perk numbers. Approved (proposal 01 §3.1 / DESIGN §14 table):
+const AFTERBURN_WIDTH := 50.0        # trail width (px)
+const AFTERBURN_TIME := 3.0          # each patch burns 3 s
+const AFTERBURN_BUILDUP := 20.0      # fire buildup/s on contact
+const AFTERGLOW_TIME := 4.0
+const ARC_FEEDBACK_SHOCK := 30.0
+const ARC_FEEDBACK_CD := 0.5
+const BULLDOG_REEL_TO := 120.0
+const CHAIN_REACTION_OIL := 200.0
+const CONTAGION_RADIUS := 120.0
+const CONTAGION_BUILDUP := 40.0
+const COUNTERWEIGHT := 1.25
+const FLASHBANG_STUN := 1.5
+const MAGNESIUM_BUILDUP := 15.0      # fire buildup/s inside the Flare
+const SHRAPNEL_RADIUS := 40.0
+const STRIP_MINE_PER := 40.0         # armor per scrap
+const STRIP_MINE_CAP := 25.0
+const TAIL_SWIPE_SHARE := 0.6
+const RACING_LINE_ADD := 0.5
+# DRAFT (invented, pending review):
+const CLEAR_OUT_PUSH := 2.0          # DRAFT: Shockwave knockback x2 with Clear Out
+const JUGGERNAUT_FLING := 0.8        # DRAFT: the rammed rig is thrown at 1.8x the impact speed
+const SLINGSHOT_SPEED := 250.0       # DRAFT: "at speed" = over 250 px/s when Chain Drag ends
+const SLINGSHOT_FLING := 1.0         # DRAFT: the flung rig gets 100% of your velocity
+const SLINGSHOT_TIME := 1.5          # DRAFT: a wall crash within 1.5 s counts as the RAM
+const TAIL_SWIPE_TIME := 0.6         # DRAFT: "while swinging" = 0.6 s after the Bootleg Turn
+const NEAR_MISS_RANGE := 60.0        # DRAFT: an enemy round within 60 px that flies on
+const RACING_LINE_CAP := 3.0         # DRAFT: at most +3 s per Hard Line
+const SHRAPNEL_DAMAGE := 0.5         # DRAFT: splash = 50% of the round
+const SHRAPNEL_STORM_DAMAGE := 15.0  # DRAFT: per pulled item
+const SHRAPNEL_STORM_RADIUS := 80.0  # DRAFT: around where it lay
+const DRONE_BAIT_ORBIT := 160.0      # DRAFT: Bait Drones hover further out
+const DRONE_ZOMBIE_DPS := 8.0        # DRAFT: a zombie touching a drone (shambler dps)
+const POWER_DIVERT_CAP := 80.0       # +1 shield per unused power point, cap 80
+const DRONE_ORBIT := 70.0            # gap-filler: drones circle this far out
+const DRONE_RANGE := 380.0           # gap-filler: same reach as a 1000 px/s gun
+const SECOND_CHARGE_PAUSE := 0.5     # gap-filler: the second charge needs this long
+const MOD_UNLOCK := {"minor": 3, "major": 7, "signature": 11, "major2": 14, "unique": 18}
 const RESEARCH_GROWTH := 0.04          # each level past 1: +4% to the part's main stats
 # A level costs base x the level you're buying (Common L2 = 30, Rare L12 = 720).
 const RESEARCH_COST_BASE := {"Common": 15, "Uncommon": 30, "Rare": 60, "Epic": 110, "Legendary": 180}
@@ -566,8 +625,9 @@ const COL_SHIELD := Color(0.55, 0.75, 1.0)
 # toxic, slime, goop -> STUNNED, BURNING, CORRODED, TOXIC, SLICK, GOOPED.
 const STATUS_NAMES := ["STUNNED", "BURNING", "CORRODED", "TOXIC", "SLICK", "GOOPED"]
 const STATUS_TYPES := ["shock", "fire", "acid", "toxic", "slime", "goop"]
-const STATUS_COLORS := [Color(0.55, 0.8, 1.0), Color(1.0, 0.45, 0.15), Color(0.6, 0.95, 0.25),
-	Color(0.7, 0.4, 0.9), Color(0.45, 0.85, 0.6), Color(0.85, 0.85, 0.3)]
+# Keyword colors (content proposal 01, approved 2026-11-03): no threat colors.
+const STATUS_COLORS := [Color(0.949, 0.961, 1.000), Color(1.000, 0.353, 0.122), Color(0.600, 0.949, 0.251),
+	Color(0.702, 0.400, 0.902), Color(0.180, 0.769, 0.651), Color(0.878, 0.643, 0.345)]
 const STATUS_BAR := 100.0
 # Buildup taken = hit buildup x (100 - resistance) / 50 (0 = x2, 50 = x1, 100 = immune).
 const STATUS_DRAIN := 15.0            # per second, once nothing's added for...
@@ -635,6 +695,8 @@ const OUTRIDER := {
 	"armor": 260.0,            # total of the layers below (§14 table)
 	"hp": 100.0, "front": 40.0, "side": 40.0, "rear": 40.0,
 	"resist": [45.0, 50.0, 50.0, 50.0, 35.0, 50.0],   # shock fire acid toxic slime goop
+	"shield": 25.0, "shield_skulls": 5, "shield_delay": 3.0, "shield_refill": 5.0,   # proposal 01: from 5 skulls
+	"heat_time": 6.0, "lockout": 3.0, "cool": 0.25,  # proposal 01: the player's Twin Guns heat (~32 sustained)
 	"ram_damage": 40.0,
 	"mount": 1,                # twin guns fixed forward
 	"fire_rate": 8.0,
@@ -665,6 +727,7 @@ const GUNNER := {
 	"burst": 4,                # ...of 4 rounds...
 	"burst_rate": 10.0,
 	"bullet_damage": 7.0,      # ...of 7 damage: about 20 damage/s
+	"mag": 6, "reload": 2.5,   # proposal 01: six bursts, then the turret droops to reload (~17 sustained)
 	"bullet_speed": 1600.0,    # reach ~610 px, past the edge of its standoff ring
 	"spread_deg": 3.0,
 	"turret_turn_rate": 2.5,   # fast sideways driving outruns its aim
@@ -806,3 +869,118 @@ const BULWARK := {
 	"turret_turn_rate": 0.0,
 	"lock_range": 0.0,
 }
+
+
+# --- Content proposal 01 (approved by the owner 2026-11-03) ---------------------
+# Keywords: one symbol, one animation and one fixed color each (no threat
+# colors). The six statuses share STATUS_COLORS. Throttle: one popup per rig
+# every KEYWORD_THROTTLE seconds, at most KEYWORD_MAX_ON_SCREEN at once.
+const KEYWORDS := {
+	"RAM": {"symbol": "chevron", "anim": "punch", "color": Color(0.910, 0.886, 0.816)},
+	"DRIFT": {"symbol": "curve_arrow", "anim": "sweep", "color": Color(0.478, 0.549, 1.000)},
+	"BURST": {"symbol": "three_dots", "anim": "pop_seq", "color": Color(1.000, 0.620, 0.780)},
+	"MARKED": {"symbol": "crosshair_diamond", "anim": "shrink_pulse", "color": Color(1.000, 0.310, 0.847)},
+	"STUNNED": {"symbol": "zigzag", "anim": "jitter", "color": Color(0.949, 0.961, 1.000)},
+	"OVERLOAD": {"symbol": "gauge_needle", "anim": "flick", "color": Color(0.239, 0.482, 1.000)},
+	"SLICK": {"symbol": "skid_drop", "anim": "slide", "color": Color(0.180, 0.769, 0.651)},
+	"BURNING": {"symbol": "flame", "anim": "flicker", "color": Color(1.000, 0.353, 0.122)},
+	"CORRODED": {"symbol": "cracked_plate", "anim": "crack", "color": Color(0.600, 0.949, 0.251)},
+	"GOOPED": {"symbol": "blob_eyes", "anim": "wobble", "color": Color(0.878, 0.643, 0.345)},
+	"TOXIC": {"symbol": "skull_cloud", "anim": "puff", "color": Color(0.702, 0.400, 0.902)},
+}
+const KEYWORD_THROTTLE := 0.5
+const KEYWORD_MAX_ON_SCREEN := 6
+
+# Torcher (fire skirmisher): hoses you from 150-220 px, peels off on lockout.
+# A rear hit of TORCHER_RUPTURE_HIT in 1 s (or its wreck) ruptures the tank:
+# a Fire-barrel blast that hurts everything, other enemy rigs included.
+const TORCHER_CHANCE := {
+	"clear": [0.0, 0.0, 0.30, 0.30, 0.45, 0.45],
+	"survive": [0.0, 0.0, 0.30, 0.30, 0.45, 0.45],
+}
+const TORCHER_RANGE := 220.0
+const TORCHER_KEEP := 150.0
+const TORCHER_RUPTURE_HIT := 40.0
+const TORCHER_SCRAP := 30
+const TORCHER_SCRAP_CACHE := 30
+const TORCHER := {
+	"name": "Torcher",
+	"max_speed": 540.0, "reverse_speed": 250.0, "acceleration": 640.0, "brake": 1500.0, "coast": 280.0,
+	"turn_rate": 3.2, "grip": 6.5,
+	"armor": 250.0,            # total of the layers below
+	"hp": 110.0, "front": 60.0, "side": 45.0, "rear": 35.0,   # the fuel tank on the back
+	"resist": [45.0, 85.0, 45.0, 50.0, 45.0, 50.0],
+	"ram_damage": 35.0,
+	"mount": 1, "gun_id": "torcher", "dtype": "fire",
+	"fire_rate": 10.0, "bullet_damage": 3.0,   # 30 raw, ~18 sustained, + BURNING
+	"bullet_speed": 580.0,     # 580 x 0.38 s = 220 px
+	"spread_deg": 15.0, "pellets": 1, "pierce": 99,
+	"heat_time": 4.0, "lockout": 2.5, "cool": 0.25,
+	"turret_turn_rate": 0.0, "lock_range": 0.0,
+}
+
+# Sludger (acid / goop artillery): parks 500-800 px off behind its allies and
+# lobs shells, alternating acid and goop. Retreats if you close inside 300.
+const SLUDGER_CHANCE := {
+	"survive": [0.0, 0.0, 0.0, 0.30, 0.40, 0.50],
+	"escort": [0.0, 0.0, 0.0, 0.30, 0.40, 0.50],
+	"retrieve": [0.0, 0.0, 0.0, 0.30, 0.40, 0.50],
+}
+const SLUDGER_RANGE_MIN := 500.0
+const SLUDGER_RANGE_MAX := 800.0
+const SLUDGER_FLEE := 300.0
+const SLUDGER_ACID_DAMAGE := 18.0
+const SLUDGER_ACID_RADIUS := 70.0
+const SLUDGER_GOOP_DAMAGE := 8.0
+const SLUDGER_GOOP_RADIUS := 90.0
+const SLUDGER_GOOP_BUILDUP := 60.0
+const SLUDGER_SCRAP := 35
+const SLUDGER_SCRAP_CACHE := 35
+const SLUDGER := {
+	"name": "Sludger",
+	"max_speed": 470.0, "reverse_speed": 230.0, "acceleration": 520.0, "brake": 1400.0, "coast": 290.0,
+	"turn_rate": 2.6, "grip": 7.0,
+	"armor": 305.0,
+	"hp": 130.0, "front": 55.0, "side": 55.0, "rear": 45.0,
+	"resist": [40.0, 45.0, 85.0, 60.0, 60.0, 85.0],
+	"shield": 20.0, "shield_skulls": 4, "shield_delay": 3.0, "shield_refill": 5.0,
+	"ram_damage": 40.0,
+	"mount": 0, "gun_id": "sludger", "kind": "lobber", "dtype": "acid",
+	"fire_rate": 1.25, "bullet_damage": 18.0,   # a shell every 0.8 s
+	"blast": 70.0, "min_range": 300.0, "max_range": 900.0, "flight": 1.1,
+	"mag": 4, "reload": 4.0,
+	"bullet_speed": 1000.0, "spread_deg": 0.0, "turret_turn_rate": 2.5, "lock_range": 0.0,
+}
+const SLUDGER_SHIELD_6 := 35.0       # its shield at 6 skulls
+
+# Acid puddles (Acid Lobber globs, Sludger acid shells): acid ground.
+const ACID_PUDDLE_RADIUS := 30.0     # 60 px across
+const ACID_PUDDLE_TIME := 4.0
+const SLUDGER_PUDDLE_RADIUS := 40.0  # 80 px across
+const SLUDGER_PUDDLE_TIME := 6.0
+const COL_ACID_GROUND := Color(0.6, 0.95, 0.25, 0.3)
+
+# Arc Projector: each hit chains to one more target this close, for this share.
+const COOK_OFF_FIRE_RIDER := 0.5   # Demolisher Cook Off: +50% of hit damage as fire
+const ARC_CHAIN_RANGE := 150.0
+const ARC_CHAIN_SHARE := 0.5
+
+# Nitro Bottle and Goop Launcher (utilities).
+const NITRO_RAM := 0.25              # RAM damage bonus while the nitro burns
+
+# Crew (proposal 01): Wrangler's chain and Jammer's static.
+const WRANGLER_TETHER := 260.0
+
+# Extract or Push (§14; proposal 01 approved 2026-11-03 with 33%).
+const PUSH_CHANCE := 0.33            # share of eligible jobs (seeded per job, hidden until done)
+const PUSH_SECONDS := [60.0, 65.0, 70.0, 75.0, 85.0, 90.0]   # by the job's skulls
+const PUSH_PAY := 1.5                # job pay x this (kill scrap unchanged)
+const PUSH_XP := 1.5                 # crew XP x this
+const PUSH_MARKER_GAP := 600.0       # extract and push markers at least this far apart
+const PUSH_RADIUS := 110.0
+const PUSH_EXTRACT_WINDOW := 20.0    # after the timer: drive in within this, or it ends on its own
+const PUSH_NO_TYPES := ["courier"]   # never offered on these
+# PENDING the owner's confirmation (proposal 01 §3.3): Retrieve offers the push
+# beacon once every non-deep cache is taken; Escort offers it only if the
+# optional site was skipped. Flip to false to keep Push off both job types.
+const PUSH_RETRIEVE_ESCORT_DRAFT := true

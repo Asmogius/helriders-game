@@ -95,12 +95,12 @@ func _think(delta: float) -> void:
 			# way only pauses it).
 			if _has_los(_seek.global_position):
 				wind_left -= delta
-				if wind_left <= 0.0:
+				if wind_left <= 0.0 and shutdown_left <= 0.0:
 					hook(_seek)
 		elif to_ally.length() > T.PATCHER_HOOK_RANGE + 150.0:
 			wind_left = T.PATCHER_REHOOK   # well out of reach: the wind-up starts over
 	else:
-		var wreck := _nearest_wreck()
+		var wreck := _nearest_wreck() if revives < T.PATCHER_MAX_REVIVES else null   # 3 per job
 		if wreck != null:
 			if reviving != wreck:
 				reviving = wreck

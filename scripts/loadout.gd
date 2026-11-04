@@ -90,6 +90,9 @@ static func build(loadout: Dictionary, levels: Dictionary = {}) -> Dictionary:
 	var shield := {}
 	var ram_bonus := 0.0
 	var injury_mult := 1.0
+	var heat_mult := 1.0
+	var cool_mult := 1.0
+	var lockout_mult := 1.0
 	var has_targeting := false
 	var manual_aim := false
 	for part: Dictionary in internal:
@@ -102,6 +105,9 @@ static func build(loadout: Dictionary, levels: Dictionary = {}) -> Dictionary:
 			shield = part   # one shield: the strongest generator fitted counts
 		ram_bonus += float(part.get("ram_bonus", 0.0))
 		injury_mult *= float(part.get("injury_mult", 1.0))
+		heat_mult *= float(part.get("heat_time_mult", 1.0))
+		cool_mult *= float(part.get("cool_mult", 1.0))         # Fins mod
+		lockout_mult *= float(part.get("lockout_mult", 1.0))   # Vent Purge mod
 		has_targeting = has_targeting or bool(part.get("enables_lock", false))
 		manual_aim = manual_aim or bool(part.get("manual_aim", false))
 
@@ -127,9 +133,15 @@ static func build(loadout: Dictionary, levels: Dictionary = {}) -> Dictionary:
 			"reload": float(part.get("reload", 0.0)),
 		}
 		# Special weapons carry their own numbers (Harpoon, Mortar).
-		for key: String in ["range", "cable", "pierce", "blast", "min_range", "max_range", "flight", "heat_time", "lockout", "cool"]:
+		for key: String in ["range", "cable", "pierce", "blast", "min_range", "max_range", "flight", "heat_time", "lockout", "cool", "dtype", "chain", "puddle_add", "reel_speed", "reel_to", "mods"]:
 			if part.has(key):
 				w[key] = part[key]
+		if w.has("heat_time"):
+			w["heat_time"] = float(w.heat_time) * heat_mult   # Ceramic Heat Sink
+			w["lockout"] = float(w.get("lockout", 1.0)) * lockout_mult
+			w["cool"] = float(w.get("cool", 0.25)) * cool_mult
+		if int(w.mount) == 1:
+			w["fire_rate"] = float(w.fire_rate) * float(chassis.get("fixed_fire_mult", 1.0))   # Gun Rack mod
 		if part.has("zombie_damage"):
 			w["zombie_damage"] = float(part.zombie_damage) * damage_mult
 		weapons.append(w)
@@ -211,6 +223,17 @@ static func build(loadout: Dictionary, levels: Dictionary = {}) -> Dictionary:
 		},
 	}
 	out["armor"] = toughness(out)
+	# Unlocked part mods with a rule the game checks (Mods), every fitted part.
+	var mods: Array[String] = []
+	var fitted: Array = [chassis, engine, drive, plates.armor_front, plates.armor_sides, plates.armor_rear]
+	fitted.append_array(weapon_parts)
+	fitted.append_array(utility)
+	fitted.append_array(internal)
+	for part: Dictionary in fitted:
+		for m: String in part.get("mods", []):
+			if not mods.has(m):
+				mods.append(m)
+	out["mods"] = mods
 	return out
 
 

@@ -136,6 +136,7 @@ func _start(m: Dictionary, specials: bool) -> void:
 	mission = (load("res://scenes/mission.tscn") as PackedScene).instantiate() as Mission
 	mission.mission_override = m
 	mission.auto_spawn_specials = specials
+	mission.push_override = 0   # these runs test objectives; push_test covers Extract or Push
 	root.add_child(mission)
 	# Keep the rig alive: these runs test objectives, not survival.
 	mission.vehicle.armor_max = 1000000.0

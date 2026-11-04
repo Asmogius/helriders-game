@@ -14,6 +14,7 @@ const BILE_CAP := 8
 const OIL_CAP := 16
 const FIRE_CAP := 12
 const SPIKE_CAP := 16
+const ACID_CAP := 12
 const NEUTRAL := -1   # a battlefield hazard (barrels, slime): catches everyone
 const REDRAW_EVERY := 0.2   # fading is slow; a few redraws a second is plenty
 
@@ -41,6 +42,11 @@ var _fire_pos := PackedVector2Array()
 var _fire_r := PackedFloat32Array()
 var _fire_life := PackedFloat32Array()
 var _fire_next := 0
+var _acid_pos := PackedVector2Array()
+var _acid_r := PackedFloat32Array()
+var _acid_life := PackedFloat32Array()
+var _acid_team := PackedInt32Array()
+var _acid_next := 0
 var _redraw := 0.0
 
 
@@ -62,6 +68,10 @@ func _ready() -> void:
 	_spike_b.resize(SPIKE_CAP)
 	_spike_life.resize(SPIKE_CAP)
 	_spike_team.resize(SPIKE_CAP)
+	_acid_pos.resize(ACID_CAP)
+	_acid_r.resize(ACID_CAP)
+	_acid_life.resize(ACID_CAP)
+	_acid_team.resize(ACID_CAP)
 	clear()
 
 
@@ -71,6 +81,7 @@ func clear() -> void:
 	_oil_life.fill(0.0)
 	_fire_life.fill(0.0)
 	_spike_life.fill(0.0)
+	_acid_life.fill(0.0)
 	marked = null
 	marked_left = 0.0
 	queue_redraw()
@@ -209,6 +220,32 @@ func fire_count() -> int:
 	return n
 
 
+## Acid ground (proposal 01: Acid Lobber globs, Sludger shells). Anything of
+## the other side standing in it builds CORRODED.
+func add_acid(at: Vector2, radius: float, seconds: float, team := NEUTRAL) -> void:
+	_acid_pos[_acid_next] = at
+	_acid_r[_acid_next] = radius
+	_acid_life[_acid_next] = seconds
+	_acid_team[_acid_next] = team
+	_acid_next = (_acid_next + 1) % ACID_CAP
+	queue_redraw()
+
+
+func acid_at(p: Vector2, victim := NEUTRAL) -> bool:
+	for i in ACID_CAP:
+		if _acid_life[i] > 0.0 and _catches(_acid_team[i], victim) and p.distance_squared_to(_acid_pos[i]) < _acid_r[i] * _acid_r[i]:
+			return true
+	return false
+
+
+func acid_count() -> int:
+	var n := 0
+	for i in ACID_CAP:
+		if _acid_life[i] > 0.0:
+			n += 1
+	return n
+
+
 ## Explosions and fire light oil: every slick touching the circle turns to
 ## burning ground for the rest of its life. Returns how many caught.
 func ignite_oil(at: Vector2, radius: float) -> int:
@@ -289,6 +326,9 @@ func _physics_process(delta: float) -> void:
 	for i in SPIKE_CAP:
 		if _spike_life[i] > 0.0:
 			_spike_life[i] -= delta
+	for i in ACID_CAP:
+		if _acid_life[i] > 0.0:
+			_acid_life[i] -= delta
 	if marked_left > 0.0:
 		marked_left -= delta
 		queue_redraw()   # the ring follows the rig
@@ -311,6 +351,12 @@ func _draw() -> void:
 			for t in teeth + 1:
 				var p := a.lerp(b, float(t) / teeth)
 				draw_line(p - n * 7.0, p + n * 7.0, Color(0.7, 0.7, 0.72, fade), 2.0)
+	for i in ACID_CAP:
+		var life := _acid_life[i]
+		if life > 0.0:
+			var c := T.COL_ACID_GROUND
+			c.a *= clampf(life / 1.5, 0.0, 1.0)
+			draw_circle(_acid_pos[i], _acid_r[i], c)
 	for i in FIRE_CAP:
 		var life := _fire_life[i]
 		if life > 0.0:

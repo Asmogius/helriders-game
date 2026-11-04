@@ -7,9 +7,13 @@ extends Node2D
 
 const T := preload("res://scripts/tuning.gd")
 const BulletPool := preload("res://scripts/bullet_pool.gd")
+const Mods := preload("res://scripts/mods.gd")
 
 var fx: Node2D
+var hazards: Node2D                 # GroundHazards: acid puddles
 var blasts := 0                     # tests
+var cluster_bomblets := 0           # tests
+var etched := 0                     # Etch hits (tests)
 var last_blast := Vector2.INF       # tests
 var aim_at := Vector2.INF           # the player's landing circle (INF = hidden)
 var aim_radius := 90.0
@@ -23,6 +27,8 @@ var _flight := PackedFloat32Array()
 var _dmg := PackedFloat32Array()
 var _radius := PackedFloat32Array()
 var _team := PackedByteArray()
+var _dtype: Array[String] = []      # damage type each shell carries
+var _extra: Array[Dictionary] = []  # fixed buildup / acid puddle (lobbers)
 var _count := 0
 var _query := PhysicsShapeQueryParameters2D.new()
 var _shape := CircleShape2D.new()
@@ -38,12 +44,16 @@ func _ready() -> void:
 	_dmg.resize(T.SHELL_CAP)
 	_radius.resize(T.SHELL_CAP)
 	_team.resize(T.SHELL_CAP)
+	_dtype.resize(T.SHELL_CAP)
+	_extra.resize(T.SHELL_CAP)
 	_query.shape = _shape
 
 
 ## A shell from `from` landing at `to` after `flight` seconds. Returns false
 ## if the pool is full.
-func launch(from: Vector2, to: Vector2, flight: float, damage: float, radius: float, team: int) -> bool:
+## `dtype` and `extra` (proposal 01 lobbers): "buildup_kind"/"buildup" add a
+## fixed status amount to everything caught; "puddle_r"/"puddle_t" leave acid.
+func launch(from: Vector2, to: Vector2, flight: float, damage: float, radius: float, team: int, dtype := "", extra := {}) -> bool:
 	if _count >= T.SHELL_CAP:
 		return false
 	_from[_count] = from
@@ -53,6 +63,8 @@ func launch(from: Vector2, to: Vector2, flight: float, damage: float, radius: fl
 	_dmg[_count] = damage
 	_radius[_count] = radius
 	_team[_count] = team
+	_dtype[_count] = dtype
+	_extra[_count] = extra
 	_count += 1
 	return true
 
@@ -78,22 +90,47 @@ func _physics_process(delta: float) -> void:
 
 
 func _burst(i: int) -> void:
-	var at := _to[i]
-	var r := _radius[i]
+	if bool(_extra[i].get("cluster", false)):
+		# Cluster Shell mod: 3 bomblets 70 px apart, 45 px blast, 40% damage each.
+		var dir := (_to[i] - _from[i]).normalized()
+		if dir == Vector2.ZERO:
+			dir = Vector2.RIGHT
+		var side := dir.orthogonal()
+		var spots := [_to[i] + dir * Mods.CLUSTER_SPACING * 0.577,
+			_to[i] - dir * Mods.CLUSTER_SPACING * 0.289 + side * Mods.CLUSTER_SPACING * 0.5,
+			_to[i] - dir * Mods.CLUSTER_SPACING * 0.289 - side * Mods.CLUSTER_SPACING * 0.5]
+		for at: Vector2 in spots:
+			_blast(at, Mods.CLUSTER_BLAST, _dmg[i] * Mods.CLUSTER_DAMAGE, _team[i], _dtype[i], {})
+		cluster_bomblets += Mods.CLUSTER_COUNT
+		return
+	_blast(_to[i], _radius[i], _dmg[i], _team[i], _dtype[i], _extra[i])
+
+
+func _blast(at: Vector2, r: float, damage: float, team: int, dtype: String, extra: Dictionary) -> void:
 	blasts += 1
 	last_blast = at
 	if fx != null:
 		fx.call("blast", at, r)
 	_shape.radius = r
 	_query.transform = Transform2D(0.0, at)
-	_query.collision_mask = T.LAYER_ZOMBIE | (T.LAYER_ENEMY if _team[i] == BulletPool.TEAM_PLAYER else T.LAYER_VEHICLE)
+	_query.collision_mask = T.LAYER_ZOMBIE | (T.LAYER_ENEMY if team == BulletPool.TEAM_PLAYER else T.LAYER_VEHICLE)
 	for hit: Dictionary in get_world_2d().direct_space_state.intersect_shape(_query, 48):
 		var body := hit.collider as Node2D
 		if body == null or not body.has_method("take_hit"):
 			continue
 		var away := body.global_position - at
 		var falloff := lerpf(1.0, T.MORTAR_EDGE_DAMAGE, clampf(away.length() / r, 0.0, 1.0))
-		body.call("take_hit", _dmg[i] * falloff, away.normalized() * 300.0, "blast", "")
+		var dmg := damage * falloff
+		# Etch mod (Acid Lobber): CORRODED rigs take +20% while they have armor.
+		if bool(extra.get("etch", false)) and body.has_method("is_status") and bool(body.call("is_status", 2)) \
+				and float(body.call("_armor_total")) > 0.0:
+			dmg *= 1.0 + Mods.ETCH_ARMOR
+			etched += 1
+		body.call("take_hit", dmg, away.normalized() * 300.0, "blast", dtype)
+		if extra.has("buildup_kind") and body.has_method("add_buildup"):
+			body.call("add_buildup", int(extra.buildup_kind), float(extra.buildup))
+	if extra.has("puddle_r") and hazards != null:
+		hazards.call("add_acid", at, float(extra.puddle_r), float(extra.puddle_t), team)
 
 
 func _remove(i: int) -> void:
@@ -106,6 +143,8 @@ func _remove(i: int) -> void:
 		_dmg[k] = _dmg[k + 1]
 		_radius[k] = _radius[k + 1]
 		_team[k] = _team[k + 1]
+		_dtype[k] = _dtype[k + 1]
+		_extra[k] = _extra[k + 1]
 
 
 func _draw() -> void:
