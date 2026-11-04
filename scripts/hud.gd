@@ -649,6 +649,7 @@ class LockButton extends Control:
 	signal toggled(on: bool)
 	const T := preload("res://scripts/tuning.gd")
 	const PadGlyph := preload("res://scripts/pad_glyph.gd")
+	const UI := preload("res://scripts/ui_theme.gd")
 	var on := false
 	var pad_badge := "":
 		set(value):
@@ -694,7 +695,7 @@ class LockButton extends Control:
 		if on and has_target:
 			draw_circle(c, 5.0, accent)
 		var font := ThemeDB.fallback_font
-		draw_string(font, Vector2(0.0, size.y + 18.0), "LOCK", HORIZONTAL_ALIGNMENT_CENTER, size.x, 18, Color(accent, 0.9))
+		UI.draw_fit(self, font, Vector2(0.0, size.y + 18.0), "LOCK", HORIZONTAL_ALIGNMENT_CENTER, size.x, 18, Color(accent, 0.9))
 		if pad_badge != "":
 			PadGlyph.draw(self, Vector2(size.x - 8.0, 8.0), pad_badge)
 
@@ -736,6 +737,7 @@ class AbilityButton extends Control:
 	const T := preload("res://scripts/tuning.gd")
 	const LABELS := {"patch": "PATCH", "mines": "MINES", "oil": "OIL", "spikes": "SPIKES", "pulse": "PULSE", "hard_line": "HARD LINE", "overcharge": "OVERCHARGE"}
 	const PadGlyph := preload("res://scripts/pad_glyph.gd")
+	const UI := preload("res://scripts/ui_theme.gd")
 	var kind := ""      # "hard_line", "overcharge", "patch", "mines" or "oil"
 	var pad_badge := "": # controller mode: the face button that fires it
 		set(value):
@@ -833,7 +835,7 @@ class AbilityButton extends Control:
 		var label: String = LABELS.get(kind, kind.to_upper())
 		if disabled:
 			label = "INJURED"
-		draw_string(font, Vector2(-20.0, size.y + 18.0), label, HORIZONTAL_ALIGNMENT_CENTER, size.x + 40.0, 15, Color(tint, 0.9))
+		UI.draw_fit(self, font, Vector2(-8.0, size.y + 18.0), label, HORIZONTAL_ALIGNMENT_CENTER, size.x + 16.0, 15, Color(tint, 0.9))
 		if pad_badge != "":
 			PadGlyph.draw(self, Vector2(size.x - 8.0, 8.0), pad_badge)
 
@@ -844,6 +846,7 @@ class CrewButton extends Control:
 	signal pressed
 	const T := preload("res://scripts/tuning.gd")
 	const PadGlyph := preload("res://scripts/pad_glyph.gd")
+	const UI := preload("res://scripts/ui_theme.gd")
 	var has_ready := false
 	var pad_badge := "":
 		set(value):
@@ -893,7 +896,7 @@ class CrewButton extends Control:
 		if has_ready and cooldown <= 0.0:
 			draw_circle(c + Vector2(r * 0.65, -r * 0.65), 8.0, T.COL_ORANGE)
 		var font := ThemeDB.fallback_font
-		draw_string(font, Vector2(-20.0, size.y + 18.0), "CREW", HORIZONTAL_ALIGNMENT_CENTER, size.x + 40.0, 15, Color(tint, 0.9))
+		UI.draw_fit(self, font, Vector2(-8.0, size.y + 18.0), "CREW", HORIZONTAL_ALIGNMENT_CENTER, size.x + 16.0, 15, Color(tint, 0.9))
 		if pad_badge != "":
 			PadGlyph.draw(self, Vector2(size.x - 8.0, 8.0), pad_badge)
 

@@ -44,6 +44,7 @@ func _initialize() -> void:
 	_add("fight", _show_fight)
 	_add("fight_crates", _show_crates)
 	_add("results_finds", _show_finds)
+	_add("fight_hud", _show_fight_hud)
 
 
 func _add(shot: String, setup: Callable) -> void:
@@ -149,6 +150,15 @@ func _show_finds() -> void:
 	var hud: Node = current_scene.hud
 	hud.show_result("JOB DONE", "Job pay +120    Kill scrap +45    Time 3:12", "RETURN TO GARAGE", T.COL_ORANGE)
 	hud.show_finds([["New schematic: Courier Frame", "Uncommon"], ["New schematic: Bulwark Frame", "Rare"], ["New schematic: Hauler Frame", "Epic"]])
+
+
+## Every HUD button at once (longest labels), to check nothing is squeezed.
+func _show_fight_hud() -> void:
+	var hud: Node = current_scene.hud
+	hud.set_lock_available(true)
+	var kinds: Array[String] = ["overcharge", "hard_line", "spikes"]
+	hud.set_abilities(kinds)
+	hud.banner("SCHEMATIC: OUTRIDER SPORT WHEELS", T.COL_ORANGE, 3.0)
 
 
 func _process(_delta: float) -> bool:

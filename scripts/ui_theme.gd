@@ -12,8 +12,47 @@ const GOOD := Color(0.45, 0.85, 0.5)
 const BAD := Color(0.95, 0.38, 0.3)
 
 
+# --- Fonts (P7 / V6.1) -----------------------------------------------------------
+# Black Ops One (SIL OFL 1.1, see docs/ART_CREDITS.md), the owner's pick for the
+# whole interface. If the file is missing the engine font stays (fallback rule).
+const FONT_PATH := "res://art/ui/fonts/BlackOpsOne-Regular.ttf"
+
+
+## The interface font, or the engine default if the art file is missing.
+static func font() -> Font:
+	if ResourceLoader.exists(FONT_PATH):
+		return load(FONT_PATH)
+	return ThemeDB.fallback_font
+
+
+## Called once at startup (Profile._ready): every Control and every custom
+## _draw that asks ThemeDB.fallback_font gets the interface font.
+static func apply_fonts() -> void:
+	var f := font()
+	ThemeDB.fallback_font = f
+	var project := ThemeDB.get_project_theme()
+	if project != null:
+		project.default_font = f
+	ThemeDB.get_default_theme().default_font = f
+
+
+## Font size that fits `text` in `width` px: `size`, shrunk down to `min_size`.
+## Black Ops One is wide, so fixed-width HUD and card labels use this.
+static func fit_size(f: Font, text: String, width: float, size: int, min_size := 10) -> int:
+	var s := size
+	while s > min_size and f.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, s).x > width:
+		s -= 1
+	return s
+
+
+## draw_string that never spills past `width` (shrinks the font instead).
+static func draw_fit(canvas: CanvasItem, f: Font, at: Vector2, text: String, align: HorizontalAlignment, width: float, size: int, color: Color) -> void:
+	canvas.draw_string(f, at, text, align, width, fit_size(f, text, width, size), color)
+
+
 static func make() -> Theme:
 	var th := Theme.new()
+	th.default_font = font()
 	th.default_font_size = 22
 	th.set_color("font_color", "Label", TEXT)
 	th.set_color("font_outline_color", "Label", Color(0, 0, 0, 0.8))
@@ -121,3 +160,83 @@ static func perk_rarity(tier: String) -> String:
 ## BBCode for a RichTextLabel: the name in its rarity colour.
 static func rarity_text(text: String, r: String) -> String:
 	return "[color=#%s]%s[/color]" % [rarity_color(r).to_html(false), text]
+
+
+# --- Shared layout grid ---------------------------------------------------
+# One grid for every screen: outer margin, gap between cards and panels, a base
+# unit all sizes snap to, the bottom action bar and the phone touch minimum.
+
+const MARGIN := 24.0     # outer screen margin, inside the display safe area
+const GAP := 12.0        # between cards and panels
+const GRID := 8.0        # base unit; sizes are multiples of it
+const BAR_H := 72.0      # bottom action bar height (the garage footer)
+const MIN_TOUCH := 64.0  # minimum button height on phones
+
+
+## The viewport's visible rect inset by the display safe area (notches, rounded
+## corners, gesture bars), mapped from screen pixels to viewport coordinates so
+## it is right under any stretch mode, then inset by MARGIN.
+static func safe_rect(node: Control) -> Rect2:
+	var vp := node.get_viewport()
+	if vp == null:
+		return Rect2()
+	var full: Rect2 = vp.get_visible_rect()
+	var r := full
+	if vp == node.get_tree().root and DisplayServer.get_name() != "headless":
+		var safe := Rect2(DisplayServer.get_display_safe_area())
+		if safe.has_area():
+			var win_pos := Vector2(DisplayServer.window_get_position())
+			safe.position -= win_pos
+			# Window pixels -> viewport (canvas) coordinates.
+			var to_vp: Transform2D = vp.get_final_transform().affine_inverse()
+			var mapped := Rect2(to_vp * safe.position, Vector2.ZERO).expand(to_vp * safe.end)
+			r = full.intersection(mapped)
+			if not r.has_area():
+				r = full
+	r = r.grow(-MARGIN)
+	if r.size.x < 0.0 or r.size.y < 0.0:
+		r = Rect2(full.get_center(), Vector2.ZERO)
+	return r
+
+
+## Rounds a length to the base GRID unit.
+static func snap(v: float) -> float:
+	return roundf(v / GRID) * GRID
+
+
+## A themed action bar anchored to the bottom of safe_rect: BAR_H tall, GAP
+## between buttons, every Button child at least MIN_TOUCH tall. Assumes the
+## parent covers the viewport (a full-screen root Control), like every screen.
+static func bottom_bar(parent: Control) -> HBoxContainer:
+	var bar := HBoxContainer.new()
+	bar.name = "BottomBar"
+	bar.theme = make()
+	bar.add_theme_constant_override("separation", int(GAP))
+	bar.alignment = BoxContainer.ALIGNMENT_CENTER
+	bar.custom_minimum_size = Vector2(0.0, BAR_H)
+	bar.child_entered_tree.connect(func(c: Node) -> void:
+		if c is Button:
+			var b := c as Button
+			b.custom_minimum_size.y = maxf(b.custom_minimum_size.y, MIN_TOUCH)
+			b.size_flags_vertical = Control.SIZE_SHRINK_CENTER)
+	parent.add_child(bar)
+	_place_bottom_bar(bar, parent)
+	if not parent.is_inside_tree():
+		parent.ready.connect(_place_bottom_bar.bind(bar, parent), CONNECT_ONE_SHOT)
+	parent.resized.connect(_place_bottom_bar.bind(bar, parent))
+	return bar
+
+
+static func _place_bottom_bar(bar: HBoxContainer, parent: Control) -> void:
+	if not is_instance_valid(bar) or not parent.is_inside_tree():
+		return
+	var r := safe_rect(parent)
+	var vp_size: Vector2 = parent.get_viewport().get_visible_rect().size
+	bar.anchor_left = 0.0
+	bar.anchor_right = 1.0
+	bar.anchor_top = 1.0
+	bar.anchor_bottom = 1.0
+	bar.offset_left = r.position.x
+	bar.offset_right = r.end.x - vp_size.x
+	bar.offset_bottom = r.end.y - vp_size.y
+	bar.offset_top = bar.offset_bottom - BAR_H
