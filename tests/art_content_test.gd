@@ -28,6 +28,8 @@ func _run() -> void:
 	_check_weapons_in_game()
 	_check_pending_ids()
 	_check_enemy_palette()
+	_check_enemy_rigs()
+	_check_weapon_scale()
 	print("art_content_test: ", "PASS" if fails == 0 else "%d FAILURES" % fails)
 	quit(1 if fails else 0)
 
@@ -126,9 +128,13 @@ func _check_pending_ids() -> void:
 ## Enemy hulls and trims never use cyan, push orange, shield blue or truck green.
 func _check_enemy_palette() -> void:
 	var forbidden := [Color8(64, 209, 224), Color8(237, 122, 43), Color8(140, 191, 255), Color8(115, 217, 128)]
-	for id in ["outrider", "torcher", "sludger"]:
+	for id in ["outrider", "torcher", "sludger", "bulwark", "gunner", "scrapper", "scrapper_gunner", "convoy", "patcher", "convoy_trailer", "gunner_rig", "scrapper_turret", "convoy_turret"]:
 		var m := _meta(id)
-		var sheets: Array = [m.composite, m.layers.elite_trim.sheet]
+		var sheets: Array = [m.get("composite", m.sheet)]
+		if (m.get("layers", {}) as Dictionary).has("elite_trim"):
+			sheets.append(m.layers.elite_trim.sheet)
+		if (m.get("layers", {}) as Dictionary).has("charge_glow"):
+			sheets.append(m.layers.charge_glow.sheet)
 		for sh in sheets:
 			var img: Image = (load("res://art/sprites/" + String(sh)) as Texture2D).get_image()
 			var hits := 0
@@ -140,3 +146,75 @@ func _check_enemy_palette() -> void:
 							if absf(c.r - f.r) < 0.02 and absf(c.g - f.g) < 0.02 and absf(c.b - f.b) < 0.02:
 								hits += 1
 			check(hits == 0, "%s: %s has %d accent-colour pixels" % [id, sh, hits])
+
+
+## Every enemy rig script: its own hull sheet (same body size, collision
+## untouched), ground-centred frames, wreck chunks, the elite trim, turret art.
+const RIGS := {
+	"bulwark": ["res://scripts/bulwark_rig.gd", Vector2(84, 46), ""],
+	"gunner": ["res://scripts/gunner_rig.gd", Vector2(74, 40), "gunner_rig.json"],
+	"scrapper": ["res://scripts/scrapper_rig.gd", Vector2(62, 32), ""],
+	"scrapper_gunner": ["res://scripts/scrapper_gunner_rig.gd", Vector2(64, 34), "scrapper_turret.json"],
+	"convoy": ["res://scripts/convoy_rig.gd", Vector2(96, 46), ""],
+	"patcher": ["res://scripts/patcher_rig.gd", Vector2(66, 34), ""],
+	"convoy_trailer": ["res://scripts/convoy_trailer.gd", Vector2(70, 40), "convoy_turret.json"],
+}
+
+
+func _check_enemy_rigs() -> void:
+	for id: String in RIGS:
+		var spec: Array = RIGS[id]
+		var r: Node2D = (load(spec[0]) as GDScript).new()
+		root.add_child(r)
+		check(r._hull_art != null and String(r._hull_art.meta_path).ends_with("/%s.json" % id), id + ": hull art by id")
+		check(Vector2(r.body_len, r.body_wid) == spec[1], id + ": body size unchanged")
+		var shapes := r.find_children("*", "CollisionShape2D", false, false)
+		if shapes.size() > 0:
+			var cap := (shapes[0] as CollisionShape2D).shape as CapsuleShape2D
+			if cap != null:
+				check(is_equal_approx(cap.height, spec[1].x) or cap.height <= spec[1].x, id + ": collision from body size")
+		var m := _meta(id)
+		check((m.get("chunks", {}) as Dictionary).size() >= 3, id + ": wreck chunks")
+		var gc: Array = m.points.ground_centre[5]
+		check(Vector2(gc[0], gc[1]) == Vector2.ZERO, id + ": frames centred on the ground footprint")
+		if id != "convoy_trailer":
+			check((m.layers as Dictionary).has("elite_trim"), id + ": elite trim layer")
+			r.elite_name = "Test"   # make_elite is Outrider-stats only; the trim keys off is_elite()
+			check(r.art_layers().has("elite_trim"), id + ": elite shows the trim")
+			r._update_art()
+			check(r._layer_sprites.has("elite_trim"), id + ": trim sprite built")
+			r.elite_name = ""
+		if spec[2] != "" and r.has_method("has_weapon") and r.has_weapon():
+			var tu: Node2D = null
+			for t in r._turrets:
+				if t != null:
+					tu = t
+			check(tu != null and tu.art != null and String(tu.art.meta_path).ends_with(spec[2]), id + ": turret art " + spec[2])
+			if tu != null and tu.art != null:
+				r._update_art()
+				var want: Vector2 = r.global_position + r._hull_art.point_offset("turret_mount")
+				check((tu.art.global_position + tu.art.point_offset("pivot")).distance_to(want) < 0.01, id + ": turret on its mount")
+		if id == "bulwark":
+			r.mode = r.Mode.PASS
+			check(not r.art_layers().has("charge_glow"), "bulwark: no glow while backing off")
+			r.mode = r.Mode.ATTACK
+			check(r.art_layers().has("charge_glow"), "bulwark: charge wind-up glow in ATTACK")
+		if id == "patcher":
+			check((m.points as Dictionary).has("winch"), "patcher: winch point for the tow cable")
+		r.queue_free()
+
+
+## Weapon sheets at in-game scale (1 px per voxel, like the hulls): the turret
+## ring is ~21 px across and the muzzle sits where the code-drawn barrel ended.
+func _check_weapon_scale() -> void:
+	var want := {"pintle_turret": 30.5, "burst_turret": 34.0, "gunner_rig": 34.0}
+	for id: String in want:
+		var m := _meta(id)
+		var piv: Array = m.points.pivot[0]
+		var muz: Array = m.points.muzzle[0]
+		var d := Vector2(muz[0] - piv[0], muz[1] - piv[1]).length()
+		check(absf(d - want[id]) <= 1.5, "%s: muzzle %.1f px from pivot (want %.1f)" % [id, d, want[id]])
+	for id in ["mortar", "acid_lobber", "arc_projector", "harpoon", "rivet_gun", "flame_sprayer", "scrapper_turret", "convoy_turret"]:
+		var m := _meta(id)
+		var fw: float = m.frame_w
+		check(fw >= 12 and fw <= 96, "%s: frame %d px wide, at hull scale" % [id, fw])
