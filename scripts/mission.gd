@@ -26,6 +26,7 @@ const ScrapperRig := preload("res://scripts/scrapper_rig.gd")
 const ScrapperGunnerRig := preload("res://scripts/scrapper_gunner_rig.gd")
 const ConvoyRig := preload("res://scripts/convoy_rig.gd")
 const PatcherRig := preload("res://scripts/patcher_rig.gd")
+const Mods := preload("res://scripts/mods.gd")
 const TorcherRig := preload("res://scripts/torcher_rig.gd")
 const SludgerRig := preload("res://scripts/sludger_rig.gd")
 const FriendlyTruck := preload("res://scripts/friendly_truck.gd")
@@ -1563,6 +1564,8 @@ func _add_kill(points: int, rig := false) -> void:
 	var mult := profile.salvage_mult() * float(vehicle.crew_mod("scrap"))
 	if rig:
 		mult *= float(vehicle.crew_mod("rig_scrap"))
+		if vehicle.has_mod("cargo_bay"):
+			mult *= 1.0 + Mods.CARGO_BAY   # Hauler Frame's Cargo Bay mod
 	scrap += points * mult
 	if state == State.RUNNING and mission_type == "clear" and kills >= target_kills and push_state == Push.NONE:
 		_succeed("BLOCK CLEARED", "", 1.0)

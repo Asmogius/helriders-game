@@ -269,8 +269,10 @@ func _process(_delta: float) -> bool:
 		main.apply_rig(Loadout.build(LOCK_BUILD))
 		_reset_rig(OPEN_SPOT, 0.0)
 		main.zombies.clear_all()
-		main.spawn_bulwark(OPEN_SPOT + Vector2(640, 0))
-		mark = OPEN_SPOT + Vector2(640, 0)
+		if is_instance_valid(main.outrider):
+			main.outrider.global_position = OPEN_SPOT + Vector2(0, 900)   # its wreck sat in the charge lane
+		main.spawn_bulwark(OPEN_SPOT + Vector2(560, 0))   # 0.5 s wind-up now comes first (proposal 01 §1.2)
+		mark = OPEN_SPOT + Vector2(560, 0)
 		enemy_damage = 0.0
 		shots_mark = main.bullets.enemy_shots
 	if frame > 2630 and frame < 2750:
@@ -280,7 +282,8 @@ func _process(_delta: float) -> bool:
 		var bw := main.bulwark
 		print("  bulwark traveled %.0f px, rams %d, shots %d, damage dealt %.0f" % [bw.global_position.distance_to(mark), bw.backoffs, main.bullets.enemy_shots - shots_mark, enemy_damage])
 		_check(bw.is_inside_tree() and bw.backoffs >= 1, "the Bulwark drives straight at you and rams")
-		_check(main.bullets.enemy_shots > shots_mark, "its light forward gun fires")
+		# Its gun only fires while lining up (proposal 01 §1.2): from 640 px it
+		# winds up out of gun range and charges, so mods_test checks the gun.
 		_check(enemy_damage > 0.0, "the Bulwark hurts the rig")
 		# Defense layers (§14): a very heavy front plate, a thin rear one.
 		bw.armor = bw.armor_max

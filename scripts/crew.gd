@@ -194,6 +194,111 @@ const PERKS := {
 	"shake_it_off": ["Shake It Off", "Any ram throws off latched Hunters"],
 }
 
+# Tiered specialty perks (DESIGN §14 first-draft table; numbers from content
+# proposal 01 §3.1 / §2.4, approved 2026-11-03). Picks 1-2 are Minor, 3-4
+# Major, 5-6 Signature; each pick offers 3 from that tier's 2 specialty perks
+# plus the 4 shared perks, no repeats. Rarity's level cap decides how many
+# picks a member ever gets (Common Minor 3 only ... Mythic all six).
+# Specialties whose §14 rework isn't built yet (welder, overclocker, tinkerer,
+# combat_medic) keep their class perks.
+const PERK_TIER_OF_PICK := ["minor", "minor", "major", "major", "signature", "signature"]
+const SPECIALTY_PERKS := {
+	"wheelman": {"minor": ["sp_long_line", "sp_sure_footing"], "major": ["sp_clean_exit", "sp_threading"], "signature": ["sp_immovable_line", "sp_racing_line"]},
+	"speedster": {"minor": ["sp_deep_tank", "sp_quick_fuse"], "major": ["sp_battering_speed", "sp_open_road"], "signature": ["sp_afterburn", "sp_clean_run"]},
+	"bootlegger": {"minor": ["sp_tight_swing", "sp_shake_off"], "major": ["sp_tail_swipe", "sp_about_face"], "signature": ["sp_double_back", "sp_oil_spin"]},
+	"gunslinger": {"minor": ["sp_hot_barrels", "sp_quick_draw"], "major": ["sp_bottomless", "sp_red_hot"], "signature": ["sp_siphon", "sp_full_auto"]},
+	"marksman": {"minor": ["sp_steady_aim", "sp_deep_breath"], "major": ["sp_plate_splitter", "sp_called_shot"], "signature": ["sp_opening_shot", "sp_executioner"]},
+	"breacher": {"minor": ["sp_long_burn", "sp_deeper_cuts"], "major": ["sp_overpenetration", "sp_bleed_through"], "signature": ["sp_rail_line", "sp_acid_core"]},
+	"patcher": {"minor": ["sp_spare_parts", "sp_quick_wrench"], "major": ["sp_kickstart", "sp_fresh_weld"], "signature": ["sp_full_rebuild", "sp_hull_patch"]},
+	"marker": {"minor": ["sp_lingering_mark", "sp_quick_spot"], "major": ["sp_exposed", "sp_pass_it_on"], "signature": ["sp_weak_point", "sp_shutdown"]},
+	"scout": {"minor": ["sp_bright_flare", "sp_slow_fade"], "major": ["sp_pinned", "sp_magnesium"], "signature": ["sp_signal_flare", "sp_flashbang"]},
+	"field_medic": {"minor": ["sp_clean_bandage", "sp_quick_kit"], "major": ["sp_back_in_it", "sp_second_kit"], "signature": ["sp_full_recovery", "sp_last_breath"]},
+	"magpie": {"minor": ["sp_wide_pull", "sp_sticky_fingers"], "major": ["sp_scrap_plating", "sp_snatch"], "signature": ["sp_shrapnel_storm", "sp_second_look"]},
+	"salvager": {"minor": ["sp_long_haul", "sp_quick_count"], "major": ["sp_bounty", "sp_strip_mine"], "signature": ["sp_jackpot", "sp_safe_deposit"]},
+	"bracer": {"minor": ["sp_firm_stance", "sp_quick_set"], "major": ["sp_shell", "sp_counterweight"], "signature": ["sp_juggernaut", "sp_absorb"]},
+	"breaker": {"minor": ["sp_wider_blast", "sp_quick_reset"], "major": ["sp_live_wire", "sp_clear_out"], "signature": ["sp_aftershock", "sp_payback"]},
+	"demolisher": {"minor": ["sp_long_fuse", "sp_quick_strike"], "major": ["sp_chain_reaction", "sp_shrapnel"], "signature": ["sp_powder_keg", "sp_fire_discipline"]},
+	"jammer": {"minor": ["sp_wide_band", "sp_quick_tune"], "major": ["sp_lingering_static", "sp_blind_spot"], "signature": ["sp_blackout", "sp_feedback_loop"]},
+	"wrangler": {"minor": ["sp_long_chain", "sp_quick_throw"], "major": ["sp_hogtie", "sp_slingshot"], "signature": ["sp_bulldog", "sp_two_hooks"]},
+}
+# Numeric effects on the ability (applied in ability()): time_add (s),
+# time_mult, cd_mult, or "add": {ability key: amount}. Perks not listed here
+# are rules the game checks with has_perk().
+const SPECIALTY_PERK_FX := {
+	"sp_long_line": {"time_mult": 1.2}, "sp_deep_tank": {"time_mult": 1.2}, "sp_quick_fuse": {"cd_mult": 0.85},
+	"sp_battering_speed": {"add": {"battering": 0.3}},
+	"sp_tight_swing": {"cd_mult": 0.85},
+	"sp_hot_barrels": {"time_add": 1.0}, "sp_quick_draw": {"cd_mult": 0.85}, "sp_red_hot": {"add": {"red_hot": 0.3}},
+	"sp_steady_aim": {"time_add": 1.0}, "sp_deep_breath": {"cd_mult": 0.85},
+	"sp_long_burn": {"time_add": 1.0}, "sp_deeper_cuts": {"add": {"pierce": 1.0}},
+	"sp_spare_parts": {"add_mult": {"heal": 1.2}}, "sp_quick_wrench": {"cd_mult": 0.85},
+	"sp_lingering_mark": {"time_add": 2.0}, "sp_quick_spot": {"cd_mult": 0.85},
+	"sp_bright_flare": {"add": {"radius": 100.0}}, "sp_slow_fade": {"time_add": 2.0},
+	"sp_quick_kit": {"cd_mult": 0.85},
+	"sp_wide_pull": {"add": {"radius": 200.0}}, "sp_sticky_fingers": {"cd_mult": 0.85},
+	"sp_long_haul": {"time_add": 2.0}, "sp_quick_count": {"cd_mult": 0.85},
+	"sp_firm_stance": {"time_add": 1.0}, "sp_quick_set": {"cd_mult": 0.85},
+	"sp_wider_blast": {"add": {"radius": 50.0}}, "sp_quick_reset": {"cd_mult": 0.85},
+	"sp_long_fuse": {"time_add": 1.0}, "sp_quick_strike": {"cd_mult": 0.85},
+	"sp_wide_band": {"add": {"radius": 75.0}}, "sp_quick_tune": {"cd_mult": 0.85}, "sp_lingering_static": {"add": {"jam_add": 2.0}},
+	"sp_long_chain": {"add": {"latch_range": 80.0}}, "sp_quick_throw": {"cd_mult": 0.85},
+}
+const SPECIALTY_PERK_NAMES := {
+	"sp_long_line": ["Long Line", "Hard Line +20% duration"], "sp_sure_footing": ["Sure Footing", "SLICK builds 50% slower during Hard Line"],
+	"sp_clean_exit": ["Clean Exit", "Ending a DRIFT during it takes 1 s off cooldown"], "sp_threading": ["Threading", "Shamblers brushed aside without slowing you"],
+	"sp_immovable_line": ["Immovable Line", "No shoves from Tank or Bulwark during it"], "sp_racing_line": ["Racing Line", "Each near-miss shot extends it 0.5 s"],
+	"sp_deep_tank": ["Deep Tank", "Floor It +20% duration"], "sp_quick_fuse": ["Quick Fuse", "Floor It cooldown -15%"],
+	"sp_battering_speed": ["Battering Speed", "RAMs +30% during Floor It"], "sp_open_road": ["Open Road", "Above 80% top speed, restore 1% max armor/s to the most damaged facing (max 20% per mission)"],
+	"sp_afterburn": ["Afterburn", "Burning trail 50 px wide, 3 s, 20 fire buildup/s"], "sp_clean_run": ["Clean Run", "No HP/armor lost during it: refund 50% of cooldown"],
+	"sp_tight_swing": ["Tight Swing", "Bootleg Turn cooldown -15%"], "sp_shake_off": ["Shake Off", "Throws off a latched Hunter"],
+	"sp_tail_swipe": ["Tail Swipe", "Rear counts as a RAM at 60% of front ram while swinging"], "sp_about_face": ["About Face", "Fixed guns +25% for 2 s after"],
+	"sp_double_back": ["Double Back", "2 charges"], "sp_oil_spin": ["Oil Spin", "Enemy-only oil ring, 120 px, 8 s"],
+	"sp_hot_barrels": ["Hot Barrels", "Overcharge +1 s"], "sp_quick_draw": ["Quick Draw", "Overcharge cooldown -15%"],
+	"sp_bottomless": ["Bottomless", "No ammo use or heat during Overcharge"], "sp_red_hot": ["Red Hot", "During Overcharge, 30% of each shot's damage as fire"],
+	"sp_siphon": ["Siphon", "10% of damage dealt refills shield, max 40 per activation"], "sp_full_auto": ["Full Auto", "Turrets turn 2x fast, no spread"],
+	"sp_steady_aim": ["Steady Aim", "Deadeye +1 s"], "sp_deep_breath": ["Deep Breath", "Deadeye cooldown -15%"],
+	"sp_plate_splitter": ["Plate Splitter", "+30% damage to armor during Deadeye"], "sp_called_shot": ["Called Shot", "+50% vs MARKED"],
+	"sp_opening_shot": ["Opening Shot", "3x on the first shot, once per activation"], "sp_executioner": ["Executioner", "Wrecks rigs below 10% HP on a stripped facing hit"],
+	"sp_long_burn": ["Long Burn", "Piercing Rounds +1 s"], "sp_deeper_cuts": ["Deeper Cuts", "Pierce 4"],
+	"sp_overpenetration": ["Overpenetration", "+10% per target passed"], "sp_bleed_through": ["Bleed-Through", "20% of armor hits go to HP"],
+	"sp_rail_line": ["Rail Line", "Pierces 1 rig"], "sp_acid_core": ["Acid Core", "Pierced targets take acid, build CORRODED"],
+	"sp_spare_parts": ["Spare Parts", "Field Repair +20%"], "sp_quick_wrench": ["Quick Wrench", "Field Repair cooldown -15%"],
+	"sp_kickstart": ["Kickstart", "Skips the shield recharge delay"], "sp_fresh_weld": ["Fresh Weld", "Repaired facing -20% damage for 4 s"],
+	"sp_full_rebuild": ["Full Rebuild", "Once per mission, fully restores a stripped facing"], "sp_hull_patch": ["Hull Patch", "Also restores 5% max HP"],
+	"sp_lingering_mark": ["Lingering Mark", "Mark +2 s"], "sp_quick_spot": ["Quick Spot", "Mark cooldown -15%"],
+	"sp_exposed": ["Exposed", "MARKED shields stop recharging"], "sp_pass_it_on": ["Pass It On", "Mark jumps on kill"],
+	"sp_weak_point": ["Weak Point", "+50% to HP on a MARKED rig's stripped facing"], "sp_shutdown": ["Shutdown", "MARKED rigs can't use abilities for 3 s"],
+	"sp_bright_flare": ["Bright Flare", "Flare +100 px"], "sp_slow_fade": ["Slow Fade", "Flare +2 s"],
+	"sp_pinned": ["Pinned", "Hunters inside can't pounce"], "sp_magnesium": ["Magnesium", "Flare burns: 15 fire buildup/s inside"],
+	"sp_signal_flare": ["Signal Flare", "Rigs inside become MARKED"], "sp_flashbang": ["Flashbang", "Ignition stuns zombies inside 1.5 s"],
+	"sp_clean_bandage": ["Clean Bandage", "Half rest days"], "sp_quick_kit": ["Quick Kit", "Field Dressing cooldown -15%"],
+	"sp_back_in_it": ["Back in It", "Treated crew's ability ready"], "sp_second_kit": ["Second Kit", "2 charges"],
+	"sp_full_recovery": ["Full Recovery", "No rest days"], "sp_last_breath": ["Last Breath", "Once per mission, HP floors at 1, 1 s invulnerable"],
+	"sp_wide_pull": ["Wide Pull", "Magnet +200 px"], "sp_sticky_fingers": ["Sticky Fingers", "Magnet cooldown -15%"],
+	"sp_scrap_plating": ["Scrap Plating", "2 armor per salvage pulled, cap 30 per mission"], "sp_snatch": ["Snatch", "Steals a wreck's crate before a revive"],
+	"sp_shrapnel_storm": ["Shrapnel Storm", "Pulled salvage damages enemies"], "sp_second_look": ["Second Look", "Pulled rig crate rolls twice"],
+	"sp_long_haul": ["Long Haul", "Gold Rush +2 s"], "sp_quick_count": ["Quick Count", "Gold Rush cooldown -15%"],
+	"sp_bounty": ["Bounty", "+10 scrap per rig wreck"], "sp_strip_mine": ["Strip Mine", "1 scrap per 40 armor dealt, cap 25"],
+	"sp_jackpot": ["Jackpot", "Rig wrecks always drop a schematic"], "sp_safe_deposit": ["Safe Deposit", "Gold Rush scrap survives a wreck"],
+	"sp_firm_stance": ["Firm Stance", "Brace +1 s"], "sp_quick_set": ["Quick Set", "Brace cooldown -15%"],
+	"sp_shell": ["Shell", "No splash spill during Brace"], "sp_counterweight": ["Counterweight", "25% heavier in collisions"],
+	"sp_juggernaut": ["Juggernaut", "RAMs don't slow you, rigs go flying"], "sp_absorb": ["Absorb", "Releases 50% of blocked damage as a 150 px shock wave"],
+	"sp_wider_blast": ["Wider Blast", "Shockwave +50 px"], "sp_quick_reset": ["Quick Reset", "Shockwave cooldown -15%"],
+	"sp_live_wire": ["Live Wire", "Shockwave deals shock"], "sp_clear_out": ["Clear Out", "Hurls zombies, throws off a Hunter"],
+	"sp_aftershock": ["Aftershock", "A 50% wave after 1 s"], "sp_payback": ["Payback", "+50% of damage taken in the last 3 s, cap +60"],
+	"sp_long_fuse": ["Long Fuse", "Cook Off +1 s"], "sp_quick_strike": ["Quick Strike", "Cook Off cooldown -15%"],
+	"sp_chain_reaction": ["Chain Reaction", "Barrels set off during it also ignite oil 200 px"], "sp_shrapnel": ["Shrapnel", "BURST weapons' last round splashes 40 px"],
+	"sp_powder_keg": ["Powder Keg", "Wrecks during it explode like a Fire barrel"], "sp_fire_discipline": ["Fire Discipline", "BURNING enemies take +15% from all your hits"],
+	"sp_wide_band": ["Wide Band", "Static Burst +75 px"], "sp_quick_tune": ["Quick Tune", "Static Burst cooldown -15%"],
+	"sp_lingering_static": ["Lingering Static", "Shields stay down +2 s"], "sp_blind_spot": ["Blind Spot", "STUNNED rigs become MARKED 3 s"],
+	"sp_blackout": ["Blackout", "Patcher hooks pop and can't re-hook 5 s"], "sp_feedback_loop": ["Feedback Loop", "OVERLOADed enemy weapons overheat instantly"],
+	"sp_long_chain": ["Long Chain", "Chain Drag +80 px"], "sp_quick_throw": ["Quick Throw", "Chain Drag cooldown -15%"],
+	"sp_hogtie": ["Hogtie", "Dragged rig's turn rate -50%"], "sp_slingshot": ["Slingshot", "Releasing at speed flings it; RAM damage on wall impact"],
+	"sp_bulldog": ["Bulldog", "Drag reels to 120 px, then a free RAM"], "sp_two_hooks": ["Two Hooks", "2 charges"],
+}
+# Specialty perks with a number behind them (proposal §3.1) that the game reads.
+const FIRE_DISCIPLINE := 0.15
+
 const FIRST_NAMES := ["Mae", "Jo", "Rook", "Tess", "Cal", "Dez", "Wren", "Hank", "Ivy", "Bo",
 	"Nash", "Rae", "Cole", "Lux", "Pike", "Sol", "Vera", "Gus", "Juno", "Kit", "Moss", "Dell"]
 const LAST_NAMES := ["Voss", "Kade", "Rusk", "Hale", "Crane", "Mott", "Pryor", "Stack", "Vance", "Dunn",
@@ -340,6 +445,19 @@ static func ability(member: Dictionary) -> Dictionary:
 			out.merge(data.get("fixed", {}))
 			if spec == "patcher":
 				out.epic = r >= 3
+	for p: String in member.get("perks", []):
+		var fx: Dictionary = SPECIALTY_PERK_FX.get(p, {})
+		if fx.is_empty():
+			continue
+		out.time = float(out.get("time", 0.0)) * float(fx.get("time_mult", 1.0)) + float(fx.get("time_add", 0.0))
+		out.cooldown = float(out.cooldown) * float(fx.get("cd_mult", 1.0))
+		var add: Dictionary = fx.get("add", {})
+		for k: String in add:
+			out[k] = float(out.get(k, 0.0)) + float(add[k])
+		var mult: Dictionary = fx.get("add_mult", {})
+		for k: String in mult:
+			if out.has(k):
+				out[k] = float(out[k]) * float(mult[k])
 	if has_perk(member, "quick_hands"):
 		out.cooldown = float(out.cooldown) * 0.8
 	if has_perk(member, "endurance"):
@@ -393,7 +511,42 @@ static func _secs(v: float) -> String:
 static func perk_pool(member: Dictionary) -> Array[String]:
 	var out: Array[String] = []
 	out.append_array(SHARED_PERKS)
+	var tiers: Dictionary = SPECIALTY_PERKS.get(specialty(member), {})
+	if tiers.is_empty():
+		for p: String in CLASS_PERKS.get(str(member.role), []):
+			out.append(p)
+	else:
+		for tier: String in ["minor", "major", "signature"]:
+			for p: String in tiers[tier]:
+				out.append(p)
+	return out
+
+
+## Every perk id a save may hold for this member: the current pool plus the
+## old class perks (picked before perks were tiered; they keep working).
+static func perk_known(member: Dictionary) -> Array[String]:
+	var out := perk_pool(member)
 	for p: String in CLASS_PERKS.get(str(member.role), []):
+		if not out.has(p):
+			out.append(p)
+	return out
+
+
+## The tier of the member's next pick ("minor", "major", "signature").
+static func next_tier(member: Dictionary) -> String:
+	var n := (member.get("perks", []) as Array).size()
+	return str(PERK_TIER_OF_PICK[mini(n, PERK_TIER_OF_PICK.size() - 1)])
+
+
+## What a pick offers before the 3 are drawn: the shared perks plus, for a
+## tiered specialty, that tier's 2 specialty perks.
+static func tier_pool(member: Dictionary) -> Array[String]:
+	var tiers: Dictionary = SPECIALTY_PERKS.get(specialty(member), {})
+	if tiers.is_empty():
+		return perk_pool(member)
+	var out: Array[String] = []
+	out.append_array(SHARED_PERKS)
+	for p: String in tiers[next_tier(member)]:
 		out.append(p)
 	return out
 
@@ -415,7 +568,7 @@ static func roll_perk_offer(member: Dictionary) -> Array[String]:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash("helriders-perk-%d-%d" % [int(member.get("id", 0)), (member.get("perks", []) as Array).size()])
 	var left: Array[String] = []
-	for p in perk_pool(member):
+	for p in tier_pool(member):
 		if not has_perk(member, p):
 			left.append(p)
 	var out: Array[String] = []
@@ -425,11 +578,11 @@ static func roll_perk_offer(member: Dictionary) -> Array[String]:
 
 
 static func perk_name(perk: String) -> String:
-	return str(PERKS.get(perk, [perk, ""])[0])
+	return str(PERKS.get(perk, SPECIALTY_PERK_NAMES.get(perk, [perk, ""]))[0])
 
 
 static func perk_text(perk: String) -> String:
-	return str(PERKS.get(perk, ["", ""])[1])
+	return str(PERKS.get(perk, SPECIALTY_PERK_NAMES.get(perk, ["", ""]))[1])
 
 
 # --- Seats ----------------------------------------------------------------------------
@@ -624,6 +777,7 @@ static func _apply_active(m: Dictionary, active: Dictionary) -> void:
 			"floor_it":
 				m.speed *= 1.0 + float(a.speed)
 				m.accel *= 1.0 + float(a.accel)
+				m.ram *= 1.0 + float(a.get("battering", 0.0))   # Battering Speed perk
 			"overcharge":
 				m.fire *= 1.0 + float(a.fire)
 				m.damage *= 1.0 + float(a.damage)

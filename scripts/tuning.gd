@@ -250,6 +250,23 @@ const OUTRIDER_SCRAP := 25
 # Draft" doc) ---------------------------------------------------------------------
 const BULWARK_FRONT_ARC := 0.785    # its heavy front plate: grey sparks within 45 deg of the nose
 const BULWARK_BACKOFF := 0.5        # seconds it backs off after ramming you
+# Bulwark charge (content proposal 01 §1.2, approved): lined up within 15°
+# at 250-700 px, it winds up 0.5 s (headlight flare telegraph), charges up to
+# 1.5 s at top speed; a miss overshoots into a 1.0 s recovery turn.
+const BULWARK_CHARGE_CONE := deg_to_rad(15.0)
+const BULWARK_CHARGE_RANGE := [250.0, 700.0]
+const BULWARK_WINDUP := 0.5
+const BULWARK_CHARGE_TIME := 1.5
+const BULWARK_RECOVER := 1.0
+# Outrider flank and break (proposal §1.1, approved): orbit 220-350 px into the
+# player's side/rear arcs (outside the front ±45° facing), strafe when within
+# ±10° of its gun line until it overheats, then break 500-700 px away (also
+# when one of its facings is stripped) and re-flank.
+const OUTRIDER_ORBIT := [220.0, 350.0]
+const OUTRIDER_FRONT_ARC := deg_to_rad(45.0)
+const OUTRIDER_STRAFE_CONE := deg_to_rad(10.0)
+const OUTRIDER_BREAK := [500.0, 700.0]
+const OUTRIDER_BREAK_MAX := 3.0      # gap-filler: give up a break after this many s
 const BULWARK_SCRAP := 40
 const BULWARK_SCRAP_CACHE := 40     # dropped instead of a schematic
 const BULWARK_SPAWN_TIME := 60.0    # Clear: seconds in, or...
@@ -480,6 +497,8 @@ const EXPEDITION_NAMES := ["Fuel Depot Sweep", "Overpass Salvage", "Rail Yard Ru
 # Levels belong to the schematic: every copy you build has it, and a wreck
 # never takes it away. Build cost and the wreck penalty ignore levels.
 const RESEARCH_MAX_LEVEL := {"Common": 5, "Uncommon": 8, "Rare": 12, "Epic": 16, "Legendary": 20}
+# Part mods (DESIGN §14): the Research level each tier unlocks at.
+const MOD_UNLOCK := {"minor": 3, "major": 7, "signature": 11, "major2": 14, "unique": 18}
 const RESEARCH_GROWTH := 0.04          # each level past 1: +4% to the part's main stats
 # A level costs base x the level you're buying (Common L2 = 30, Rare L12 = 720).
 const RESEARCH_COST_BASE := {"Common": 15, "Uncommon": 30, "Rare": 60, "Epic": 110, "Legendary": 180}

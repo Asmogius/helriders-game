@@ -163,8 +163,11 @@ func _check_perks() -> void:
 	_check(Crew.perks_due(m) == 1 and offer.size() == 3 and distinct.size() == 3, "level 3: three different perks on offer")
 	var in_pool := true
 	for p in offer:
-		in_pool = in_pool and pool.has(p) and (Crew.SHARED_PERKS.has(p) or (Crew.CLASS_PERKS.spotter as Array).has(p))
-	_check(in_pool and pool.size() == 8, "offers come from the 4 shared perks plus the class's 4")
+		in_pool = in_pool and pool.has(p) and (Crew.SHARED_PERKS.has(p) or (Crew.tier_pool(m) as Array).has(p))
+	# Tiered perks (proposal 01): a tiered specialty's first pick offers its 2
+	# Minor perks plus the 4 shared; others keep the class's 4.
+	var tiered := Crew.SPECIALTY_PERKS.has(Crew.specialty(m))
+	_check(in_pool and Crew.tier_pool(m).size() == 6 if tiered else (in_pool and pool.size() == 8), "offers come from the 4 shared perks plus the specialty's Minor tier (or the class's 4)")
 	_check(str(profile.perk_offer(m)) == str(offer), "the offer stays the same until you pick")
 	_check(not profile.choose_perk(int(m.id), "spikes"), "you can't take a perk that isn't on offer")
 	_check(profile.choose_perk(int(m.id), offer[0]) and Crew.has_perk(m, offer[0]) and Crew.perks_due(m) == 0, "picking a perk keeps it")

@@ -26,6 +26,7 @@ const Loadout := preload("res://scripts/loadout.gd")
 const Crew := preload("res://scripts/crew.gd")
 const StatusBars := preload("res://scripts/status_bars.gd")
 const Tether := preload("res://scripts/tether.gd")
+const Mods := preload("res://scripts/mods.gd")
 
 enum Mount { TURRET, FIXED }
 
@@ -93,6 +94,7 @@ var hp_max := 0.0
 var facing_armor := PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
 var facing_max := PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
 var shield := 0.0
+var mods: Array = []                # unlocked part-mod ids on this build (Mods)
 var shield_max := 0.0
 var shield_delay := T.DEFAULT_SHIELD_DELAY
 var shield_refill := T.DEFAULT_SHIELD_REFILL
@@ -201,6 +203,7 @@ func _init() -> void:
 
 
 func apply_stats(s: Dictionary) -> void:
+	mods = (s.get("mods", []) as Array).duplicate()
 	max_speed = s.max_speed
 	reverse_speed = s.reverse_speed
 	acceleration = s.acceleration
@@ -413,7 +416,7 @@ func use_crew_ability(index: int) -> bool:
 		"shockwave":
 			_shockwave(float(a.damage), float(a.radius))
 		"static_burst":
-			static_burst(float(a.radius), float(a.shock_buildup), float(a.time))
+			static_burst(float(a.radius), float(a.shock_buildup), float(a.time) + float(a.get("jam_add", 0.0)))   # Lingering Static perk
 		"chain_drag":
 			if not chain_drag(float(a.latch_range)):
 				return false
@@ -748,6 +751,8 @@ func _resolve_collisions(pre_velocity: Vector2) -> void:
 				continue
 			already_hit.append(other)
 			other.call("receive_ram", ram_damage * float(crew_mods.ram) * clampf(impact / max_speed, 0.0, 1.2), global_position)
+			if has_mod("molten_skin") and other.has_method("add_buildup"):
+				other.call("add_buildup", StatusBars.FIRE, Mods.MOLTEN_SKIN_BUILDUP)   # Molten Skin mod
 			if bool(crew_mods.shake_off):
 				throw_off_hunters()
 		else:
@@ -1053,7 +1058,7 @@ func _lob(w: Dictionary, from: Vector2, landing: Vector2, flight: float) -> bool
 			extra = {"puddle_r": T.SLUDGER_PUDDLE_RADIUS, "puddle_t": T.SLUDGER_PUDDLE_TIME}
 	elif dtype == "acid":
 		lobs += 1
-		extra = {"puddle_r": T.ACID_PUDDLE_RADIUS, "puddle_t": T.ACID_PUDDLE_TIME}
+		extra = {"puddle_r": T.ACID_PUDDLE_RADIUS, "puddle_t": T.ACID_PUDDLE_TIME + float(w.get("puddle_add", 0.0))}   # Sticky Glob mod
 	return bool(shells.call("launch", from, landing, flight, damage, radius, team, dtype, extra))
 
 
@@ -1095,6 +1100,8 @@ func _fire_harpoon(w: Dictionary, from: Vector2, direction: Vector2) -> void:
 			body.call("take_hit", float(w.bullet_damage) * crew_damage, direction * 200.0, "shot", "")
 			if not bool(body.get("is_wrecked")):
 				tether = Tether.new(self, body as CharacterBody2D, float(w.get("cable", 500.0)))
+				tether.reel_speed = float(w.get("reel_speed", T.HARPOON_REEL_SPEED))   # Power Winch mod
+				tether.reel_to = float(w.get("reel_to", T.HARPOON_REEL_TO))
 			break
 		body.call("take_hit", float(w.get("zombie_damage", w.bullet_damage)) * crew_damage, direction * 250.0, "shot", "")
 		if fx != null:
@@ -1161,6 +1168,8 @@ func _shoot(w: Dictionary, muzzle: Vector2, direction: Vector2) -> void:
 	var dtype := str(w.get("dtype", ""))
 	# Demolisher's Cook Off: hits add 50% of their damage as a fire hit.
 	var rider := float(T.COOK_OFF_FIRE_RIDER) if _active.has("cook_off") else 0.0
+	if _active.has("overcharge"):
+		rider += float((_active.overcharge as Dictionary).get("red_hot", 0.0))   # Red Hot perk
 	var chain := bool(w.get("chain", false))
 	for p in pellets:
 		var dir := direction.rotated(randf_range(-cone, cone))
@@ -1168,6 +1177,10 @@ func _shoot(w: Dictionary, muzzle: Vector2, direction: Vector2) -> void:
 
 
 # --- Utilities ---------------------------------------------------------------------
+
+func has_mod(id: String) -> bool:
+	return mods.has(id)
+
 
 ## Fire utility `index` (its HUD button). Returns false if it's still cooling down.
 func use_ability(index: int) -> bool:
@@ -1227,6 +1240,8 @@ func shock_pulse(radius: float, damage: float, buildup: float) -> int:
 		body.call("take_hit", damage, away * 250.0, "pulse", "")
 		if body.has_method("add_buildup"):
 			body.call("add_buildup", StatusBars.SHOCK, buildup)
+		if has_mod("drain_arc") and body.get("shield") != null:
+			body.set("shield", float(body.get("shield")) * (1.0 - Mods.DRAIN_ARC_SHARE))   # Drain Arc mod
 		n += 1
 	if fx != null:
 		fx.call("blast", global_position, radius)
@@ -1365,7 +1380,7 @@ func _tick_status(delta: float) -> void:
 	if status.active(StatusBars.FIRE):
 		# BURNING: damage across the facings, by the splash rule.
 		_burn_angle += delta * 4.0
-		take_damage(T.BURNING_RIG_DPS * delta, Vector2.RIGHT.rotated(_burn_angle), true)
+		take_damage(T.BURNING_RIG_DPS * delta * (Mods.HEAT_SOAK if has_mod("heat_soak") else 1.0), Vector2.RIGHT.rotated(_burn_angle), true)
 	if status.active(StatusBars.TOXIC) and shield <= 0.0:
 		# TOXIC: straight to HP, never below the floor; a raised shield blocks it.
 		var floor_hp := hp_max * T.TOXIC_FLOOR

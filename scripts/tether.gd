@@ -9,6 +9,8 @@ const T := preload("res://scripts/tuning.gd")
 var a: CharacterBody2D      # the rig that fired it
 var b: CharacterBody2D      # the rig it's stuck in
 var length := 500.0
+var reel_speed := T.HARPOON_REEL_SPEED   # Power Winch mod raises these
+var reel_to := T.HARPOON_REEL_TO
 
 var _hits_a := PackedFloat32Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 var _hits_b := PackedFloat32Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
@@ -49,7 +51,7 @@ func step(delta: float) -> bool:
 		return false
 	if float(a.get("wall_impact")) > T.HARPOON_POP_CRASH or float(b.get("wall_impact")) > T.HARPOON_POP_CRASH:
 		return false
-	length = maxf(T.HARPOON_REEL_TO, length - T.HARPOON_REEL_SPEED * delta)
+	length = maxf(reel_to, length - reel_speed * delta)
 	var gap := b.global_position - a.global_position
 	var dist := gap.length()
 	if dist <= length or dist < 1.0:

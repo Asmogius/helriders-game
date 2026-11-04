@@ -1446,7 +1446,7 @@ static func _clean_member(raw: Variant) -> Dictionary:
 	}
 	# Crew from before specialties keep their ability: Wheelman, Gunslinger.
 	out.specialty = Crew.specialty(out)
-	var pool := Crew.perk_pool(out)
+	var pool := Crew.perk_known(out)
 	for p: Variant in d.get("perks", []):
 		if pool.has(str(p)) and not (out.perks as Array).has(str(p)):
 			(out.perks as Array).append(str(p))

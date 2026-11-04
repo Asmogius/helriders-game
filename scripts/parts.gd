@@ -34,6 +34,7 @@ extends RefCounted
 ## and gets `add` on top once it reaches level `at`.
 
 const T := preload("res://scripts/tuning.gd")
+const Mods := preload("res://scripts/mods.gd")
 
 const RARITY_COLORS := {
 	"Common": Color(0.75, 0.75, 0.72),
@@ -401,7 +402,7 @@ static func at_level(part: Dictionary, level: int) -> Dictionary:
 		var add: Dictionary = bonus.get("add", {})
 		for key: String in add:
 			out[key] = float(out.get(key, 0.0)) + float(add[key])
-	return out
+	return Mods.apply(out, level)
 
 
 ## Whether Research changes anything on this part. (The plain Targeting
