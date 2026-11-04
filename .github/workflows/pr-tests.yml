@@ -1,0 +1,88 @@
+name: PR tests
+
+# Pull requests to main: import the project and run every headless test under
+# tests/. No export, signing or publishing.
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GODOT_VERSION: "4.7.2"
+  GODOT_STATUS: "stable"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      # Separate key from the Android workflow's cache: this one holds only the
+      # editor binary (no export templates), so it must not shadow that cache.
+      - name: Cache Godot
+        id: cache-godot
+        uses: actions/cache@v6
+        with:
+          path: ~/godot
+          key: godot-editor-${{ env.GODOT_VERSION }}-${{ env.GODOT_STATUS }}
+
+      - name: Download Godot
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        run: |
+          TAG="${GODOT_VERSION}-${GODOT_STATUS}"
+          BASE="https://github.com/godotengine/godot/releases/download/${TAG}"
+          mkdir -p ~/godot
+          curl -fsSL -o /tmp/godot.zip "${BASE}/Godot_v${TAG}_linux.x86_64.zip"
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          mv "/tmp/godot/Godot_v${TAG}_linux.x86_64" ~/godot/godot
+
+      - name: Put Godot on PATH
+        run: |
+          chmod +x ~/godot/godot
+          echo "$HOME/godot" >> "$GITHUB_PATH"
+
+      - name: Import project
+        run: |
+          godot --headless --path . --import 2>&1 | tee import.log
+          if grep -qE "SCRIPT ERROR|Parse Error" import.log; then
+            echo "::error::Script errors during import"; exit 1
+          fi
+
+      - name: Run tests
+        run: |
+          shopt -s nullglob
+          tests=(tests/*_test.gd)
+          if [ ${#tests[@]} -eq 0 ]; then
+            echo "::error::No tests found under tests/"; exit 1
+          fi
+          failed=()
+          for t in "${tests[@]}"; do
+            name=$(basename "$t" .gd)
+            echo "::group::$name"
+            set +e
+            godot --headless --fixed-fps 60 --path . -s "res://$t" 2>&1 | tee "$name.log"
+            status=${PIPESTATUS[0]}
+            set -e
+            echo "::endgroup::"
+            if [ "$status" -ne 0 ] || grep -q "SCRIPT ERROR" "$name.log"; then
+              echo "::error::$name failed (exit $status)"
+              failed+=("$name")
+            fi
+          done
+          if [ ${#failed[@]} -ne 0 ]; then
+            echo "::error::Failed tests: ${failed[*]}"; exit 1
+          fi
+          echo "All ${#tests[@]} tests passed."
