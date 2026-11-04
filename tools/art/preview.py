@@ -33,6 +33,8 @@ for f in sorted(os.listdir(SPR)):
     for cn, cd in meta["chunks"].items():
         ch = frame(Image.open(os.path.join(SPR, cd["sheet"])), meta, i)
         ox, oy = cd["offsets"][i]
-        canvas.alpha_composite(ch, (int(fw / 2 + ox * 0.8), int(fw / 2 + oy * 0.8)))
+        d = max(1.0, (ox * ox + oy * oy) ** 0.5)
+        push = 10.0 / d + 0.5   # every piece moves out ~10 px plus half its offset
+        canvas.alpha_composite(ch, (int(fw / 2 + ox * push), int(fw / 2 + oy * push)))
     canvas.resize((fw * 8, fw * 8), Image.NEAREST).save(os.path.join(OUT, f"{name}_chunks_x4.png"))
     print(name)
