@@ -122,7 +122,7 @@ One rule: **anything that has a rarity shows it in its colour, the same way ever
     - the "SCHEMATIC" pickup banner takes the rarity colour.
   - **Database:** entry names in rarity colour (parts and crew).
   - **Toasts and banners** that name a part or crew member colour the name.
-- [ ] **V1.4 Test.** Add `tests/rarity_test.gd`, checking:
+- [x] **V1.4 Test.** Add `tests/rarity_test.gd`, checking:
   - every rarity has a colour;
   - every card type (part, crew, perk, offer, crate) asks `UI.rarity_*` for its colour, not a hard-coded one;
   - a capture shows all six tiers side by side for the owner.
