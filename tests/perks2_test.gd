@@ -224,6 +224,138 @@ func _process(_delta: float) -> bool:
 				_check(int(rig.perk_hits.get("sp_counterweight", 0)) >= 1, "Counterweight: braced RAMs hit 25% harder")
 				_check(int(rig.perk_hits.get("sp_juggernaut", 0)) >= 1 and float(mark.ov) > 100.0, "Juggernaut: the rammed rig goes flying (%.0f px/s)" % float(mark.ov))
 				_park()
+				_next()
+		8:  # Arc Feedback, real rounds: a Gunner Rig shoots your shield during Power Divert
+			if frame == 1:
+				_fresh_rig()
+				_hold(rig)
+				_park()
+				var g := main.spawn_gunner(SPOT + Vector2(450, 0), false)
+				mark.g = g
+			if frame == 3:
+				_check(_use("engineer", "conduit", ["sp_arc_feedback"]) and rig.shield_max > 0.0, "Power Divert fires (shield up)")
+				mark.af = rig.arc_feedbacks
+			if frame > 1 and frame < 400:
+				_hold(rig)
+				rig.shield = rig.shield_max   # every round lands on the shield
+				var g: Node2D = mark.g
+				g.global_position = SPOT + Vector2(450, 0)
+				(g as CharacterBody2D).velocity = Vector2.ZERO
+			if frame == 400:
+				var g: Node = mark.g
+				var n: int = rig.arc_feedbacks - int(mark.af)
+				print("  Arc Feedback: %d shocks, gunner shock %.0f / triggered %s" % [n, float(g.status.build[0]), g.call("is_status", 0)])
+				_check(n >= 1 and (float(g.status.build[0]) > 0.0 or bool(g.call("is_status", 0))), "Arc Feedback: the Gunner Rig's rounds on your shield shock it")
+				_check(n <= int(397.0 / 60.0 / T.ARC_FEEDBACK_CD) + 1, "Arc Feedback: at most once per 0.5 s per attacker")
+				g.get_parent().remove_child(g)   # out of the arena, so later chains can't pick it
+				_next()
+		9:  # Racing Line, real near-misses from enemy rounds
+			if frame == 1:
+				_fresh_rig()
+				_hold(rig)
+				_check(_use("driver", "wheelman", ["sp_racing_line"]), "Hard Line fires")
+				mark.nm = rig.near_misses
+				var side := float(rig.body_wid) * 0.5 + 20.0
+				# One round skims past 20 px off the hull, one goes by 300 px away.
+				main.bullets.fire(SPOT + Vector2(-500, side), Vector2(1500, 0), 1.0, BulletPool.TEAM_ENEMY, 0, "", 2.0)
+				main.bullets.fire(SPOT + Vector2(-500, 300), Vector2(1500, 0), 1.0, BulletPool.TEAM_ENEMY, 0, "", 2.0)
+			if frame > 1:
+				_hold(rig)
+			if frame == 2:
+				mark.left = float(rig._active.hard_line.left)
+			if frame == 40:
+				var gained := float(rig._active.hard_line.left) - (float(mark.left) - 38.0 / 60.0)
+				_check(rig.near_misses == int(mark.nm) + 1 and absf(gained - 0.5) < 0.05, "Racing Line: a round skimming past adds 0.5 s; a distant one doesn't (+%.2f s)" % gained)
+				var side := float(rig.body_wid) * 0.5 + 20.0
+				for k in 10:
+					main.bullets.fire(SPOT + Vector2(-300 - k * 50, side), Vector2(1500, 0), 1.0, BulletPool.TEAM_ENEMY, 0, "", 2.0)
+			if frame == 140:
+				print("  Racing Line: near-misses %d, added %.2f s" % [rig.near_misses - int(mark.nm), rig._racing_added])
+				_check(rig.near_misses == int(mark.nm) + 11 and is_equal_approx(rig._racing_added, T.RACING_LINE_CAP), "Racing Line: 11 near-misses cap at +3 s")
+				_next()
+		10, 11:  # Immovable Line, a real Tank charge: first without the perk (it shoves), then with it
+			var perk := step == 11
+			if frame == 1:
+				_fresh_rig()
+				_hold(rig)
+				main.zombies.clear_all()
+				_check(_use("driver", "wheelman", ["sp_immovable_line"] if perk else []), "Hard Line fires")
+				mark.tank = main.zombies.spawn_at(SPOT + Vector2(300, 0), "tank")
+				mark.shove = 0.0
+			if frame > 1:
+				mark.shove = maxf(float(mark.shove), rig.velocity.length())
+				_hold(rig)
+			var tank: Node = mark.tank
+			if frame > 1 and int(tank.get("charge_hits")) > 0 and not mark.has("hit_at"):
+				mark.hit_at = frame
+			if (mark.has("hit_at") and frame == int(mark.hit_at) + 3) or frame == 300:
+				print("  Tank charge (%s): hits %d, rig speed after %.0f" % ["Immovable Line" if perk else "no perk", int(tank.get("charge_hits")), float(mark.shove)])
+				if perk:
+					_check(int(tank.get("charge_hits")) >= 1 and float(mark.shove) < 100.0, "Immovable Line: a Tank's charge lands but doesn't shove you")
+				else:
+					_check(int(tank.get("charge_hits")) >= 1 and float(mark.shove) > T.TANK_SHOVE * 0.5, "(control) without it, the Tank's charge shoves you")
+				mark.erase("hit_at")
+				main.zombies.clear_all()
+				_next()
+		12:  # Slingshot, a real wall crash: release at speed flings the rig into the west wall
+			if frame == 1:
+				_fresh_rig()
+				# Under the north boundary wall at x 1600 (clear ground; the west edge has props).
+				_hold(rig, Vector2(SPOT.x, 520))
+				var o: CharacterBody2D = _rig_at(Vector2(SPOT.x, 300))
+				o.rotation = -PI / 2.0
+			if frame == 3:
+				_check(_use("bruiser", "wrangler", ["sp_slingshot"]) and rig.tether != null, "Chain Drag hooks the rig")
+				mark.hits = int((mark.r as Node).get("slung_hits"))
+				mark.hp = float((mark.r as Node).get("hp")) + float((mark.r as Node).call("_armor_total"))
+			if frame == 3:
+				# The rig itself is parked (physics off) but its crew and tether run
+				# through the real code, so the chain lets go while it reads 400 px/s.
+				rig.set_physics_process(false)
+			if frame > 3:
+				rig.global_position = Vector2(SPOT.x, 520)
+				rig.velocity = Vector2(0, -400)   # driving hard at the wall when the chain lets go
+				rig.call("_tick_crew", 1.0 / 60.0)
+				rig.call("_tick_perks", 1.0 / 60.0)
+				rig.call("_tick_tether", 1.0 / 60.0)
+				var o: CharacterBody2D = mark.r
+				if rig.ability_active("chain_drag"):
+					o.global_position = Vector2(SPOT.x, 300)   # held on the chain, clear of the wall
+					o.velocity = Vector2.ZERO
+				var pre := o.velocity
+				o.move_and_slide()
+				o.call("_resolve_collisions", pre)
+				o.call("_tick_perks", 1.0 / 60.0)
+			if frame == 3 + 60 * 6:
+				var o: Node = mark.r
+				var lost := float(mark.hp) - float(o.get("hp")) - float(o.call("_armor_total"))
+				print("  Slingshot: wall RAMs %d, damage %.0f" % [int(o.get("slung_hits")) - int(mark.hits), lost])
+				_check(int(o.get("slung_hits")) == int(mark.hits) + 1 and lost > 0.0, "Slingshot: flung at the wall, the crash lands as a RAM")
+				rig.set_physics_process(true)
+				_park()
+				_next()
+		13:  # Copycat: drones fire your gun's damage type
+			if frame == 1:
+				_fresh_rig()
+				_hold(rig)
+				_rig_at(SPOT + Vector2(200, 0))
+				mark.dt = str(rig.gun_stats[0].get("dtype", ""))
+				rig.gun_stats[0].dtype = "acid"
+			if frame == 3:
+				_check(_use("engineer", "tinkerer", ["sp_copycat"]), "Scrap Drones fire")
+				mark.th = main.bullets.typed_hits
+				mark.acid = float((mark.r as Node).status.build[2])
+			if frame > 3:
+				_hold(rig)
+			if frame == 90:
+				var o: Node = mark.r
+				var ok := true
+				for d in rig.drones:
+					ok = ok and is_instance_valid(d) and str(d.dtype) == "acid"
+				print("  Copycat: typed hits +%d, target acid %.1f" % [main.bullets.typed_hits - int(mark.th), float(o.status.build[2])])
+				_check(ok and main.bullets.typed_hits > int(mark.th) and (float(o.status.build[2]) > float(mark.acid) or bool(o.call("is_status", 2))), "Copycat: drones fire acid rounds like your gun, building CORRODED")
+				rig.gun_stats[0].dtype = str(mark.dt)
+				_park()
 				_finish()
 	return false
 
@@ -238,11 +370,6 @@ func _instant_checks() -> void:
 	rig.shield = maxf(rig.shield, 1.0)
 	var base := float(rig.resist[0])
 	_check(is_equal_approx(rig.resistance(0), minf(base + T.STATUS_SHIELD_RESIST * 2.0, 100.0)), "Insulated Feed: the shield's status bonus doubles")
-	# Arc Feedback.
-	var b0 := float(o.status.build[0])
-	rig.shot_by(o, true)
-	rig.shot_by(o, true)
-	_check(rig.arc_feedbacks == 1 and float(o.status.build[0]) > b0, "Arc Feedback: a shield hit shocks the shooter, once per 0.5 s")
 	# Neurotoxin.
 	_seat([_m("medic", "poisoner", ["sp_neurotoxin"])])
 	o.fill_status(3)
@@ -259,17 +386,21 @@ func _instant_checks() -> void:
 	rig.take_damage(10.0, Vector2.RIGHT)
 	var lost := a0 - float(rig.facing_armor[0])
 	_check(lost < 10.0 * float(rig.crew_mod("taken")) * 0.81, "Fresh Weld: it takes -20%% (%.1f of 10)" % lost)
-	# Counterweight / Juggernaut flags on a Brace.
-	_check(_use("bruiser", "bracer", ["sp_counterweight", "sp_juggernaut"]), "Brace fires")
-	# Racing Line.
-	_check(_use("driver", "wheelman", ["sp_racing_line", "sp_immovable_line"]), "Hard Line fires")
-	var left := float(rig._active.hard_line.left)
-	rig.near_miss()
-	_check(is_equal_approx(float(rig._active.hard_line.left), left + 0.5), "Racing Line: a near-miss adds 0.5 s")
-	for k in 10:
-		rig.near_miss()
-	_check(float(rig._active.hard_line.left) <= left + T.RACING_LINE_CAP + 0.01, "Racing Line: capped at +3 s")
-	_check(rig.immovable(), "Immovable Line: no Tank/Bulwark shoves during Hard Line")
+	# Clean Bandage: injured crew rest half the days (rounded up).
+	var pa: Dictionary = profile.call("_add_crew", _m("gunner", "", []))
+	var pb: Dictionary = profile.call("_add_crew", _m("gunner", "", []))
+	for pm: Dictionary in profile.crew:
+		pm.seated = false
+	pa.seated = true
+	profile.call("bank_crew", 1, [int(pa.id)], false, false)
+	pa.seated = false
+	pb.seated = true
+	profile.call("bank_crew", 1, [int(pb.id)], false, true)
+	pb.seated = false
+	print("  rest days: plain %d, Clean Bandage %d" % [int(pa.rest), int(pb.rest)])
+	_check(int(pa.rest) == T.CREW_REST_DAYS and int(pb.rest) == maxi(ceili(T.CREW_REST_DAYS / 2.0), 1), "Clean Bandage: half the rest days")
+	_seat([_m("medic", "field_medic", ["sp_clean_bandage"])])
+	_check(main.vehicle.has_sp("sp_clean_bandage"), "Clean Bandage: the mission passes it to the bank")
 	# Strip Mine.
 	_seat([_m("scavenger", "salvager", ["sp_strip_mine", "sp_safe_deposit"])])
 	var s0: float = main.scrap
@@ -347,6 +478,7 @@ func _rig_at(at: Vector2) -> CharacterBody2D:
 	o.set("hp", float(o.get("hp_max")))
 	o.set("facing_armor", PackedFloat32Array([100000.0, 100000.0, 100000.0, 100000.0]))   # can't wreck mid-test
 	o.status.reset()
+	o.set("slung_left", 0.0)
 	return o
 
 

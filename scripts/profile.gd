@@ -915,7 +915,7 @@ func rehire_done_today() -> bool:
 ## injured goes to the Inn to rest (a day less with Tough, or with a Medic's
 ## Triage on the run). Call after finish_day(), so tonight's rest doesn't
 ## count. Returns lines for the results card.
-func bank_crew(skulls: int, injured_ids: Array, triage := false) -> Array[String]:
+func bank_crew(skulls: int, injured_ids: Array, triage := false, half_rest := false) -> Array[String]:
 	var lines: Array[String] = []
 	var riders := seated_crew()
 	if riders.is_empty():
@@ -936,6 +936,8 @@ func bank_crew(skulls: int, injured_ids: Array, triage := false) -> Array[String
 				days -= 1
 			if triage:
 				days -= 1
+			if half_rest:
+				days = ceili(days / 2.0)   # Clean Bandage (Field Medic): half the rest days, rounded up
 			m.rest = rest_days(days)
 			m.seated = false
 			line += ", injured: resting %d day%s" % [int(m.rest), "" if int(m.rest) == 1 else "s"]

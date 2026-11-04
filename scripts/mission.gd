@@ -1484,7 +1484,7 @@ func _fail(title: String, detail: String) -> void:
 		_take_salvage(p as Pickup)
 	bank_report = profile.bank_run(int(scrap), _pending_ids())
 	profile.finish_day()
-	profile.bank_crew(0, _rest_ids(), bool(vehicle.crew_mod("triage")))
+	profile.bank_crew(0, _rest_ids(), bool(vehicle.crew_mod("triage")), vehicle.has_sp("sp_clean_bandage"))
 	var lines := detail + "\nKill scrap +%d    Time %s" % [int(scrap), _clock(elapsed)]
 	for id: String in bank_report.unlocked:
 		lines += "\nNew schematic: " + Parts.describe(Parts.get_part(id))
@@ -2074,7 +2074,7 @@ func _succeed(title: String, detail: String, pay_mult: float) -> void:
 	bank_report = profile.bank_run(int(scrap) + pay, ids)
 	profile.finish_day()
 	# After the day ends, so tonight doesn't count toward anyone's rest.
-	var crew_lines := profile.bank_crew(roundi(skulls * T.PUSH_XP) if pushed else skulls, _rest_ids(), bool(vehicle.crew_mod("triage")))
+	var crew_lines := profile.bank_crew(roundi(skulls * T.PUSH_XP) if pushed else skulls, _rest_ids(), bool(vehicle.crew_mod("triage")), vehicle.has_sp("sp_clean_bandage"))
 	var lines := "Job pay +%d    Kill scrap +%d    Time %s" % [pay, int(scrap), _clock(elapsed)]
 	if detail != "":
 		lines = detail + "\n" + lines
