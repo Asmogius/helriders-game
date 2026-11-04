@@ -4,6 +4,10 @@ extends RefCounted
 ## map packages to draw regions from one texture in a single drawer.
 ## Missing or broken files give an empty atlas (`ok()` false) so callers keep
 ## their code-drawn fallback (VISUAL_PLAN rule: fallback stays).
+## Loaded atlases are cached per path on the SceneTree root (meta CACHE_META),
+## not in a static var, so they are freed with the tree. An atlas loaded before
+## the tree exists (no main loop / root yet) isn't cached: each such call loads
+## a fresh copy.
 
 var texture: Texture2D
 var regions := {}
