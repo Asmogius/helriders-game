@@ -54,7 +54,9 @@ const COL_OB_MOTE := Color(0.86, 0.82, 0.62, 0.55)      # seed fluff motes (map_
 const COL_FX_HOT := Color(1, 0.851, 0.4)                # fireball core (255,217,102; fx.gd inline 1.0,0.85,0.4)
 const COL_FX_WHITE_HOT := Color(1, 0.949, 0.8)          # flash, tracer core (255,242,204; = palette.py white_hot)
 const COL_FX_EMBER := Color(0.6, 0.18, 0.078)           # cooling fireball edge (153, 46, 20)
-const COL_FX_SCORCH := Color(0.071, 0.063, 0.059)       # scorch decal (18, 16, 15)
+const COL_FX_SCORCH := Color(0.071, 0.063, 0.059)       # scorch decal core (18, 16, 15)
+const COL_FX_SCORCH_EDGE := Color(0.149, 0.133, 0.118)  # scorch decal outer fringe, lighter, half alpha (38, 34, 30; fx_sheet.py scorch())
+const COL_FX_SMOKE := Color(0.349, 0.329, 0.302)        # smoke puffs, mid shade of the ramp (89, 84, 77; fx_sheet.py SMOKE = fx.gd dust 0.35,0.33,0.3)
 
 # P6 Garage: Workshop bay room (V2.1/V2.2; PR #37). Dark, unlit surfaces.
 const COL_GARAGE_FLOOR := Color(0.227, 0.224, 0.216)    # bay slab (58, 57, 55)
@@ -64,6 +66,8 @@ const COL_GARAGE_PEGBOARD := Color(0.29, 0.235, 0.173)  # tool pegboard (74, 60,
 const COL_GARAGE_WALL := Color(0.18, 0.188, 0.204)      # corrugated back wall (46, 48, 52)
 const COL_GARAGE_STREET_NIGHT := Color(0.118, 0.133, 0.173)# street past the roll-up door (30, 34, 44)
 const COL_GARAGE_GAS_RED := Color(0.431, 0.157, 0.133)  # welding gas cylinders (110, 40, 34)
+const COL_GARAGE_DUST := Color(0.9, 0.88, 0.8)          # drifting dust motes, drawn at alpha 0.02-0.18 (230, 224, 204; garage_ambient.gd)
+const COL_GARAGE_SPARK := Color(1.0, 0.85, 0.5)         # weld sparks, alpha fades with life (255, 217, 128; garage_ambient.gd)
 
 # P3 Zombies: Shambler and Tank sheets (V3.1/V3.2; PR #34). Baked by zombies.py.
 # Shambler clothing variants 0-5: shirt / trousers.
