@@ -930,6 +930,8 @@ func _open_overlay(title: String, body: Control) -> void:
 	_close_overlay()
 	close_sheet()
 	_overlay = Control.new()
+	_overlay.add_to_group("pad_modal")   # controller: focus stays in it, Circle closes it
+	_overlay.set_meta("pad_close", _close_overlay)
 	_overlay.anchor_right = 1.0
 	_overlay.anchor_bottom = 1.0
 	_overlay.offset_bottom = -FOOTER_H  # footer stays tappable
@@ -1519,3 +1521,28 @@ func start_tour() -> GarageTour:
 	tour.finished.connect(func() -> void: tour = null)
 	add_child(tour)
 	return tour
+
+
+# --- Controller (pad.gd) ------------------------------------------------------------
+# D-pad / left stick move between buttons, Cross presses, Circle backs out
+# (closes the part sheet, or returns to the garage from a station), L1 / R1
+# switch stations, Options opens MENU.
+
+func pad_button(button: int) -> bool:
+	match button:
+		JOY_BUTTON_START:
+			open_menu()
+		JOY_BUTTON_B:
+			if selected >= 0:
+				close_sheet()
+			elif tab != "GARAGE":
+				show_tab("GARAGE")
+			else:
+				return false
+		JOY_BUTTON_LEFT_SHOULDER, JOY_BUTTON_RIGHT_SHOULDER:
+			var i := TABS.find(tab)
+			var step := -1 if button == JOY_BUTTON_LEFT_SHOULDER else 1
+			show_tab(TABS[wrapi(i + step, 0, TABS.size())])
+		_:
+			return false
+	return true

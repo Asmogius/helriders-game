@@ -230,6 +230,13 @@ This briefing is the source of truth for implementation. Enemy vehicle archetype
 
 Agreed with the owner on 2026-11-03. **Do not implement until the numbers are drafted and approved.** Where this section changes an earlier one, this section wins.
 
+## Controller
+
+A PlayStation-style pad (any pad Godot maps) works alongside touch. The first pad press switches to controller mode; touching the screen switches back.
+
+- Fight: left stick drives. Right stick aims; a light push only turns the turret, as on the touch stick. R2 fires (with the stick centred, it fires the last way you aimed; the Mortar keeps the stick's push for range). Square / Triangle / Circle fire utilities 1-3. R1 toggles LOCK. L1 opens the crew wheel: point with a stick, Cross picks. Options pauses and resumes.
+- Menus: every screen (garage, stations, Comms, part cards, Inn, Saloon, pause menu) is driven by D-pad or left stick to move, Cross to press and Circle to back out (closes the part sheet or panel, or returns to the garage from a station). L1 / R1 switch stations. Options opens MENU. A cyan ring marks the focused button. While a panel is open, focus stays inside it.
+
 ## Mods and Perks
 
 - Part mods: pre-attached per schematic, visible while locked, unlocked by part level. Tier sets the unlock level: Minor 3, Major 7, Signature 11, Unique 18 (Legendary only). Rarity's max level decides which tiers a part can reach: Common Minor; Uncommon + Major; Rare + Signature; Epic + a second Major at 14; Legendary + Unique. The +4% per level stays. Mods belong to the schematic, like levels.

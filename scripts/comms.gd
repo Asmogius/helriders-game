@@ -167,6 +167,8 @@ func _button(text: String, min_width: float) -> Button:
 func _open_upgrades() -> void:
 	_close_upgrades()
 	_upgrades = Control.new()
+	_upgrades.add_to_group("pad_modal")
+	_upgrades.set_meta("pad_close", _close_upgrades)
 	_upgrades.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_upgrades)
 	var dim := ColorRect.new()

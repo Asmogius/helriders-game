@@ -439,6 +439,7 @@ func show_result(title: String, subtitle: String, button_text: String, accent: C
 func show_choice(speaker: String, text: String, yes_text: String, no_text: String) -> void:
 	close_choice()
 	_choice = Control.new()
+	_choice.add_to_group("pad_modal")   # controller: Cross picks, no backing out of the radio call
 	_choice.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_choice.process_mode = Node.PROCESS_MODE_ALWAYS
 	_root.add_child(_choice)
@@ -517,6 +518,7 @@ func result_text() -> String:
 
 func _build_overlay() -> void:
 	_overlay = Control.new()
+	_overlay.add_to_group("pad_modal")   # the results card
 	_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_overlay.visible = false
 	_root.add_child(_overlay)
@@ -823,6 +825,7 @@ class CrewWheel extends Control:
 	const RING := 150.0
 	const SLICE := 50.0
 	var entries: Array[Dictionary] = []
+	var hover := -1      # controller: the slice the stick points at
 	var charges := PackedFloat32Array()
 	var off: Array[bool] = []
 	var notes: Array[String] = []
@@ -860,6 +863,8 @@ class CrewWheel extends Control:
 		draw_arc(c, 40.0, 0.0, TAU, 32, Color(0.8, 0.78, 0.74), 2.5)
 		draw_line(c + Vector2(-12, -12), c + Vector2(12, 12), Color(0.85, 0.83, 0.78), 3.0)
 		draw_line(c + Vector2(-12, 12), c + Vector2(12, -12), Color(0.85, 0.83, 0.78), 3.0)
+		if hover >= 0 and hover < entries.size():
+			draw_arc(slice_pos(hover), SLICE + 6.0, 0.0, TAU, 32, T.COL_CYAN, 4.0)   # controller pick
 		for i in entries.size():
 			var e := entries[i]
 			var p := slice_pos(i)
@@ -1045,3 +1050,36 @@ func hide_controls() -> void:
 	for b in _ability_buttons:
 		b.visible = false
 	set_alert("")
+
+
+# --- Controller (pad.gd) ---------------------------------------------------------
+
+## R1: the LOCK button, if it's showing.
+func pad_lock() -> void:
+	if _lock_button.visible:
+		_lock_button.press()
+
+
+## The stick points at a crew slice while the wheel is open.
+func pad_wheel_point(dir: Vector2) -> void:
+	if not _wheel.visible:
+		return
+	var n := _wheel.entries.size()
+	var want := -1
+	if dir.length() > 0.5 and n > 0:
+		# Slice 0 is at the top, then clockwise.
+		var a := wrapf(dir.angle() + PI / 2.0, 0.0, TAU)
+		want = roundi(a / (TAU / n)) % n
+	if want != _wheel.hover:
+		_wheel.hover = want
+		_wheel.queue_redraw()
+
+
+## Cross in the wheel: fire the highlighted crew member (or close if none).
+func pad_wheel_confirm() -> bool:
+	if not _wheel.visible:
+		return false
+	if _wheel.hover < 0:
+		close_crew_wheel()
+		return false
+	return pick_crew(_wheel.hover)

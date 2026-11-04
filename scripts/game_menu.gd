@@ -35,6 +35,8 @@ func setup(p: ProfileScript, job: bool, tutorial := false) -> void:
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	add_to_group("pad_modal")
+	set_meta("pad_close", back)
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	theme = UI.make()
 	mouse_filter = Control.MOUSE_FILTER_STOP

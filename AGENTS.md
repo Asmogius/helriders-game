@@ -20,6 +20,8 @@ The owner works from a phone and has no computer, so nobody opens the Godot edit
 
 - Pause menu and Database: `game_menu.gd` (one panel: pause, settings, Database; `in_job` decides RESUME / RESTART JOB). Settings live in their own file (`profile.settings`, `T.QUALITY` presets; the mission applies `fx.density`, `splats.density`, `camera.shake_mult`). A job quit or closed mid-fight resumes at relaunch (`profile.resume_job()`, the garage switches straight to the mission). The optional tutorial: `profile.tutorial_active` makes the next mission the Training Run (`mission.tutorial`, `_tutorial_tick`, loaner `T.TUTORIAL_LOADOUT`); afterwards `profile.begin_tour()` / `end_tour()` run `garage_tour.gd` on a snapshot (`save_data()` / `apply_data()`). Keywords: `vehicle.keyword_pop(kw)` asks for a symbol popup (throttled per rig); `keyword_fx.gd` draws them; DRIFT is `vehicle.end_drift()` / `is_drifting()`, OVERLOAD `_gun_overloaded(i)` / `is_overloaded_gun()`. The Database's contents are `codex.gd`; `profile.discover(category, id)` marks what the player has met; call it where something new is met.
 
+- Controller: `pad.gd` (autoload `Pad`). A pad press sets `Pad.active` (a touch clears it). Buttons go to the topmost visible node in group `pad_modal` (Circle calls its `pad_close` meta Callable), then to the current scene's (or newest root child's) `pad_button(button) -> bool`. Pad turns `focus_mode` on only for visible, enabled buttons (inside the open modal, if any) and draws the focus ring. A scene can turn menu focus off with `pad_wants_focus()` (the mission does while you drive). The mission reads `Pad.stick(left)` and `Pad.r2()` in `_pad_input()`; tests set `Pad.override`. A new overlay panel joins `pad_modal`; its clickable things must be `BaseButton`s so the pad can reach them.
+
 - `scripts/profile.gd` (autoload `Profile`) is the save game: scrap, schematics, storage, the rig, presets, upgrades. Every change saves to `user://`. Economy rules agreed with the owner are listed at the top of that file; don't change them without asking.
 
 ## Engine rules
@@ -85,6 +87,7 @@ godot --headless --fixed-fps 60 --path . -s res://tests/art_sheet_test.gd   # mu
 godot --headless --fixed-fps 60 --path . -s res://tests/art_content_test.gd # must end "art_content_test: PASS"
 godot --headless --fixed-fps 60 --path . -s res://tests/audio_test.gd      # must end "AUDIO TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/keywords_test.gd   # must end "KEYWORDS TEST PASSED"
+godot --headless --fixed-fps 60 --path . -s res://tests/pad_test.gd        # must end "PAD TEST PASSED"
 ```
 
 - Tests must call `Profile.new_game()` with `persist = false` first, so they never touch a real save.
