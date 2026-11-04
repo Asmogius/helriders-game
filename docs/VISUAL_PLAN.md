@@ -92,14 +92,14 @@ So nobody is blocked, assume these; the owner can overrule any of them:
 
 ## V0. Quick fixes (do first, small)
 
-- [ ] **V0.1 Rig over station screens (bug).** The garage rig preview's sprites draw at z 1–3, so they show over the Research, Saloon, Inn and Comms screens. Fix: hide `_rig_holder` while a station tab is open (or z-index the station screens above it). Done when a screenshot of each station shows no rig.
+- [x] **V0.1 Rig over station screens (bug).** The garage rig preview's sprites draw at z 1–3, so they show over the Research, Saloon, Inn and Comms screens. Fix: hide `_rig_holder` while a station tab is open (or z-index the station screens above it). Done when a screenshot of each station shows no rig.
 - [ ] **V0.2 Fight zoom check.** At `base_zoom 1.3` a fight shows mostly bare ground. Try 1.1–1.15 on a phone-size capture and pick with the owner. Changing the zoom is a camera setting, not a balance number, but ask before changing it.
 
 ## V1. Rarity colours everywhere (explicitly asked)
 
 One rule: **anything that has a rarity shows it in its colour, the same way everywhere.** That covers parts and schematics, crew, loot, perks (by tier), and expedition and Saloon offers.
 
-- [ ] **V1.1 One source of truth.** Move the rarity colours into `tuning.gd` as `RARITY_COLORS` with all six: Common, Uncommon, Rare, Epic, Legendary, Mythic. `Parts.RARITY_COLORS` and `Crew.color_of` read it.
+- [x] **V1.1 One source of truth.** Move the rarity colours into `tuning.gd` as `RARITY_COLORS` with all six: Common, Uncommon, Rare, Epic, Legendary, Mythic. `Parts.RARITY_COLORS` and `Crew.color_of` read it.
   - Add `UI.rarity_color(r)`, `UI.rarity_frame(control, r)` (border plus top strip) and `UI.rarity_text(name, r)`: a BBCode colour tag for RichTextLabels.
   - Done when no other file defines a rarity colour.
 - [ ] **V1.2 Rarity tiers look different, not just tinted.**
