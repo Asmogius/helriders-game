@@ -11,7 +11,7 @@ extends RefCounted
 const UI := preload("res://scripts/ui_theme.gd")
 const T := preload("res://scripts/tuning.gd")
 
-const SETTLE := 12   # default frames to wait before the shot
+const SETTLE := 30   # default frames to wait before the shot (V6.5: after fades and slides)
 
 var shot := ""   # set by capture_all from the file name (without the number)
 

@@ -11,12 +11,26 @@ const SLIDE_TIME := 0.25
 const SLIDE_PX := 36.0
 const TICK_TIME := 0.7
 
-static var enabled := true   # tests and captures may turn transitions off
+const OFF_META := &"ui_transitions_off"
+
+
+## Tests and captures may turn transitions off. The switch is Engine meta, not
+## a static var: a static var kept this script alive past exit ("resources
+## still in use").
+static func set_enabled(on: bool) -> void:
+	if on:
+		Engine.remove_meta(OFF_META)
+	else:
+		Engine.set_meta(OFF_META, true)
+
+
+static func enabled() -> bool:
+	return not Engine.has_meta(OFF_META)
 
 
 ## A full-screen black layer that fades out over the new scene, then frees.
 static func fade_in(scene: Node) -> void:
-	if not enabled:
+	if not enabled():
 		return
 	var layer := CanvasLayer.new()
 	layer.layer = 100
@@ -35,7 +49,7 @@ static func fade_in(scene: Node) -> void:
 ## Slides `c` in from the right with a fade (fade only inside a container). Draws only; layout is untouched
 ## (it tweens the canvas transform via `position` relative to where it is).
 static func slide_in(c: CanvasItem) -> void:
-	if not enabled or c == null:
+	if not enabled() or c == null:
 		return
 	c.modulate.a = 0.0
 	var tw := c.create_tween().set_parallel()
@@ -52,7 +66,7 @@ static func slide_in(c: CanvasItem) -> void:
 ## Results numbers tick up from 0. `label.text` keeps its final value (tests
 ## and the pad read it); a child copy shows the counting text meanwhile.
 static func tick_numbers(label: Label) -> void:
-	if not enabled or label == null or label.text == "":
+	if not enabled() or label == null or label.text == "":
 		return
 	var final := label.text
 	var ticker: Label = label.get_node_or_null("Ticker")
@@ -81,7 +95,7 @@ static func tick_numbers(label: Label) -> void:
 
 ## A quick white flash on a card (modulate up, then back).
 static func flash(c: CanvasItem) -> void:
-	if not enabled or c == null:
+	if not enabled() or c == null:
 		return
 	var tw := c.create_tween()
 	tw.tween_property(c, "modulate", Color(1.8, 1.8, 1.8), 0.08)
