@@ -66,6 +66,7 @@ func make_elite(title: String, armor_mult: float, damage_mult: float) -> void:
 		lock_radius *= 1.1
 	if is_inside_tree():
 		queue_redraw()
+		_update_art()   # a rig with art picks up the gold trim layer now
 
 
 func is_elite() -> bool:
@@ -163,9 +164,39 @@ func _avoid_walls(goal: Vector2, forward: Vector2) -> Vector2:
 	return forward.rotated(steer * 1.1)
 
 
+## The art id for this rig: the plain Outrider is "outrider"; a subclass
+## returns its own id (e.g. "torcher") and wears art/sprites/<id>.json once it
+## exists. "" keeps the code-drawn look.
+func art_id() -> String:
+	return "outrider" if get_script() == preload("res://scripts/enemy_rig.gd") else ""
+
+
+func _art_meta_path() -> String:
+	return art_path(art_id())
+
+
+## Enemy hulls carry no player parts; a Hunt elite wears the gold trim layer.
+func art_layers() -> Array[String]:
+	var ids: Array[String] = []
+	if _hull_art != null and is_elite() and (_hull_art.meta.get("layers", {}) as Dictionary).has("elite_trim"):
+		ids.append("elite_trim")
+	return ids
+
+
+func _draw_art_overlay() -> void:
+	var o := _art_overlay
+	if vuln_left > 0.0:
+		o.draw_arc(Vector2.ZERO, body_len * 0.5 + 8.0, 0.0, TAU, 28, Color(0.95, 0.3, 0.25, 0.85), 2.5)
+	if is_elite() and not art_layers().has("elite_trim"):
+		o.draw_rect(Rect2(-body_len * 0.5 + 2.0, -2.0, body_len - 14.0, 4.0), T.COL_ELITE)
+
+
 func _draw() -> void:
 	var half_l := body_len * 0.5
 	var half_w := body_wid * 0.5
+	if _hull_art != null:
+		return   # the voxel sheet draws the rig; marks go in _draw_art_overlay
+
 	var hull := Color(0.3, 0.2, 0.16)
 	if is_wrecked:
 		hull = Color(0.1, 0.09, 0.085)

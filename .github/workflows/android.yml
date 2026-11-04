@@ -106,6 +106,20 @@ jobs:
             echo "::error::Script errors during crew test"; exit 1
           fi
 
+      - name: Art sheet test
+        run: |
+          godot --headless --path . -s res://tests/art_sheet_test.gd 2>&1 | tee art.log
+          if grep -q "SCRIPT ERROR" art.log || ! grep -q "art_sheet_test: PASS" art.log; then
+            echo "::error::Art sheet test failed"; exit 1
+          fi
+
+      - name: Content art test
+        run: |
+          godot --headless --path . -s res://tests/art_content_test.gd 2>&1 | tee art_content.log
+          if grep -q "SCRIPT ERROR" art_content.log || ! grep -q "art_content_test: PASS" art_content.log; then
+            echo "::error::Content art test failed"; exit 1
+          fi
+
       - name: Configure Android export
         run: |
           SETTINGS=$(ls ~/.config/godot/editor_settings-*.tres 2>/dev/null | head -n 1)

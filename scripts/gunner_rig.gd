@@ -17,6 +17,11 @@ var _query := PhysicsShapeQueryParameters2D.new()
 var _circle_side := 1.0
 
 
+## Voxel art: art/sprites/gunner.json (see docs/ART_PIPELINE.md).
+func art_id() -> String:
+	return "gunner"
+
+
 func _init() -> void:
 	team = BulletPool.TEAM_ENEMY
 	apply_stats(T.GUNNER)
@@ -151,6 +156,8 @@ func _nearest_threat() -> Node2D:
 
 
 func _draw() -> void:
+	if _hull_art != null:
+		return   # the voxel sheet draws the rig
 	var half_l := body_len * 0.5
 	var half_w := body_wid * 0.5
 	var hull := Color(0.26, 0.24, 0.2)

@@ -5,6 +5,11 @@ extends "res://scripts/scrapper_rig.gd"
 ## strip in turn. From 4 skulls it replaces the Scrapper in half the jobs.
 
 
+## Voxel art: art/sprites/scrapper_gunner.json (see docs/ART_PIPELINE.md).
+func art_id() -> String:
+	return "scrapper_gunner"
+
+
 func _init() -> void:
 	team = BulletPool.TEAM_ENEMY
 	apply_stats(T.SCRAPPER_GUNNER)
@@ -20,6 +25,8 @@ func _init() -> void:
 
 
 func _draw() -> void:
+	if _hull_art != null:
+		return   # the voxel sheet draws the rig
 	super()
 	if is_wrecked:
 		return

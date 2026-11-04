@@ -23,6 +23,64 @@ var windups := 0             # wind-up telegraphs shown (tests)
 var _charge_dir := Vector2.ZERO
 
 
+## Voxel art: art/sprites/bulwark.json (see docs/ART_PIPELINE.md).
+func art_id() -> String:
+	return "bulwark"
+
+
+## Pre-ram wind-up glow (art contract, docs/ART_PIPELINE.md): the plow heats
+## to bright enemy red while the rig winds up, pulsing faster as it nears 1.
+## Read defensively: only if this rig provides is_winding_up() /
+## windup_progress() (Content's wind-up state); the optional windup_started
+## signal restarts the pulse. Without them no glow is shown.
+const WINDUP_LAYER := "windup_glow"
+var _windup_t0 := 0.0
+
+
+func _has_windup_art() -> bool:
+	return _hull_art != null and (_hull_art.meta.get("layers", {}) as Dictionary).has(WINDUP_LAYER)
+
+
+func art_winding_up() -> bool:
+	return not is_wrecked and has_method("is_winding_up") and bool(call("is_winding_up"))
+
+
+func art_windup_progress() -> float:
+	if not art_winding_up():
+		return 0.0
+	if has_method("windup_progress"):
+		return clampf(float(call("windup_progress")), 0.0, 1.0)
+	return 1.0
+
+
+func art_layers() -> Array[String]:
+	var ids := super()
+	if _has_windup_art() and art_winding_up():
+		ids.append(WINDUP_LAYER)
+	return ids
+
+
+func art_layer_modulate(id: String) -> Color:
+	if id != WINDUP_LAYER:
+		return super(id)
+	var p := art_windup_progress()
+	var t := Time.get_ticks_msec() * 0.001 - _windup_t0
+	var pulse := 0.5 + 0.5 * sin(t * TAU * lerpf(2.0, 7.0, p))   # 2 Hz -> 7 Hz
+	var a := clampf(lerpf(0.25, 0.7, p) + lerpf(0.25, 0.3, p) * pulse, 0.0, 1.0)
+	return Color(1.0, 1.0, 1.0, a)
+
+
+func _on_windup_started() -> void:
+	_windup_t0 = Time.get_ticks_msec() * 0.001
+
+
+func _ready() -> void:
+	super()
+	# Once per rig, also for subclasses (the Convoy) that call super().
+	if has_signal("windup_started") and not is_connected("windup_started", _on_windup_started):
+		connect("windup_started", _on_windup_started)
+
+
 func _init() -> void:
 	team = BulletPool.TEAM_ENEMY
 	apply_stats(T.BULWARK)
@@ -163,6 +221,8 @@ func take_hit(damage: float, impulse: Vector2, cause := "shot", dtype := "") -> 
 
 
 func _draw() -> void:
+	if _hull_art != null:
+		return   # the voxel sheet draws the rig
 	var half_l := body_len * 0.5
 	var half_w := body_wid * 0.5
 	var hull := Color(0.2, 0.21, 0.22)
