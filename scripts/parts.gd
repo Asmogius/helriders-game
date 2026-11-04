@@ -140,21 +140,25 @@ const CATALOG := {
 		"name": "Pintle Turret", "category": "Weapon", "rarity": "Common", "cost": 40, "power": 50.0, "weight": 15.0,
 		"mount": 0, "fire_rate": 7.0, "bullet_damage": 9.0, "bullet_speed": 1500.0,
 		"spread_deg": 3.0, "turret_turn_rate": 9.0, "lock_range": 520.0, "pellets": 1,
+		"mag": 28, "reload": 2.0,
 	},
 	"outrider_twin_guns": {
 		"name": "Outrider Twin Guns", "category": "Weapon", "rarity": "Uncommon", "cost": 80, "power": 35.0, "weight": 10.0,
 		"mount": 1, "fire_rate": 8.0, "bullet_damage": 6.0, "bullet_speed": 1200.0,
 		"spread_deg": 4.0, "turret_turn_rate": 0.0, "lock_range": 0.0, "pellets": 1,
+		"heat_time": 6.0, "lockout": 3.0, "cool": 0.25,   # overheats after 6 s nonstop
 	},
 	"scattergun_turret": {
 		"name": "Scattergun Turret", "category": "Weapon", "rarity": "Uncommon", "cost": 90, "power": 45.0, "weight": 15.0,
 		"mount": 0, "fire_rate": 2.5, "bullet_damage": 6.0, "bullet_speed": 1100.0,
 		"spread_deg": 16.0, "turret_turn_rate": 8.0, "lock_range": 380.0, "pellets": 6,
+		"mag": 6, "reload": 2.5,
 	},
 	"heavy_mg_turret": {
 		"name": "Heavy MG Turret", "category": "Weapon", "rarity": "Rare", "cost": 190, "power": 65.0, "weight": 30.0,
 		"mount": 0, "fire_rate": 9.0, "bullet_damage": 11.0, "bullet_speed": 1700.0,
 		"spread_deg": 2.5, "turret_turn_rate": 6.5, "lock_range": 600.0, "pellets": 1,
+		"heat_time": 8.0, "lockout": 4.0, "cool": 0.20,
 	},
 	"harpoon": {
 		"name": "Harpoon", "category": "Weapon", "rarity": "Rare", "cost": 170, "power": 40.0, "weight": 20.0,
@@ -180,6 +184,7 @@ const CATALOG := {
 		"mount": 0, "fire_rate": 1.0 / 0.9, "bullet_damage": 14.0, "bullet_speed": 1800.0,
 		"spread_deg": 1.5, "turret_turn_rate": 8.0, "lock_range": 600.0, "pellets": 1,
 		"burst": 4, "burst_rate": 12.0,
+		"mag": 6, "reload": 2.2,   # six bursts
 	},
 	# --- Internal systems (passive, take internal capacity) -----------------------
 	# Shield generators (§14): a recharging layer in front of the armor.

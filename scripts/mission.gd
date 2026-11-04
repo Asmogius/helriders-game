@@ -485,6 +485,7 @@ func _physics_process(delta: float) -> void:
 
 func _process(_delta: float) -> void:
 	_refresh_hud()
+	hud.right_stick.set_gauges(vehicle.weapon_gauges())
 	bullets.big_game = float(vehicle.crew_mod("big_game"))
 
 
