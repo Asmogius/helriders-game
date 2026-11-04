@@ -5,6 +5,8 @@ extends SceneTree
 ##   garage_<tab>.png for GARAGE, RESEARCH, SALOON, INN, COMMS
 ##   rarity_tiers.png  (all six rarity frames side by side)
 ##   fight.png         (the mission scene after a few seconds)
+##   map_outer_blocks_before.png / _after.png (P4 style sample corner)
+## Optional second arg: only shots whose name starts with it, e.g. "map_".
 ## Uses a throwaway profile (persist = false), so no save is touched.
 ## Packages add their shots as new steps in `_steps()`.
 
@@ -34,7 +36,19 @@ func _initialize() -> void:
 	for t: String in TABS:
 		_add("garage_" + t.to_lower(), _show_tab.bind(t))
 	_add("rarity_tiers", _show_rarity)
+	# --- P4 map corner (VISUAL_PLAN V5.5 style sample) ---
+	_add("map_outer_blocks_before", _show_map_corner.bind(false))
+	_add("map_outer_blocks_after", _show_map_corner.bind(true))
 	_add("fight", _show_fight)
+	if args.size() > 1:
+		var keep_names: Array[String] = []
+		var keep_steps: Array[Callable] = []
+		for i in _names.size():
+			if _names[i].begins_with(args[1]):
+				keep_names.append(_names[i])
+				keep_steps.append(_steps[i])
+		_names = keep_names
+		_steps = keep_steps
 
 
 func _add(shot: String, setup: Callable) -> void:
@@ -72,8 +86,33 @@ func _show_rarity() -> void:
 		UI.rarity_frame(card, r)
 
 
+var _map: Node2D
+
+
+func _show_map_corner(sample: bool) -> void:
+	for n: Node in [_garage, _strip, _map]:
+		if n != null and is_instance_valid(n):
+			n.queue_free()
+	_garage = null
+	_strip = null
+	var Arena := load("res://scripts/arena.gd")
+	Arena.style_sample = sample
+	_map = Node2D.new()
+	root.add_child(_map)
+	var arena: Node2D = Arena.new()
+	_map.add_child(arena)
+	var cam := Camera2D.new()
+	cam.position = Vector2(750, 440)
+	cam.zoom = Vector2(0.84, 0.84)
+	_map.add_child(cam)
+	cam.make_current()
+
+
 func _show_fight() -> void:
-	_strip.queue_free()
+	for n: Node in [_strip, _map]:
+		if n != null and is_instance_valid(n):
+			n.queue_free()
+	load("res://scripts/arena.gd").style_sample = false
 	change_scene_to_file("res://scenes/mission.tscn")
 
 

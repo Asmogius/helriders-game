@@ -37,6 +37,15 @@ const RARITY_COLORS := {
 	"Mythic": Color(1.0, 0.36, 0.42),
 }
 
+# --- P4 Outer Blocks style sample (VISUAL_PLAN V5.5; colours added via P0) ----
+# Art colours only. tools/art/tiles.py and buildings.py read these by name.
+const COL_OB_GRASS := Color(0.27, 0.33, 0.2)        # muted lawn green
+const COL_OB_PAVE := Color(0.36, 0.35, 0.33)        # pale sidewalk slabs
+const COL_OB_SIDING := Color(0.45, 0.43, 0.38)      # faded house siding
+const COL_OB_ROOF := Color(0.3, 0.25, 0.23)         # weathered shingles
+const COL_OB_GRADE := Color(1.0, 0.96, 0.88)        # warm late-afternoon grade (modulate)
+const COL_OB_MOTE := Color(0.86, 0.82, 0.62, 0.55)  # drifting seed fluff (ambient)
+
 # --- Arena ---------------------------------------------------------------------
 const WORLD_SIZE := Vector2(3200, 2400)
 const SPAWN_MIN_DISTANCE := 850.0  # keep spawns off-screen

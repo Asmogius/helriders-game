@@ -48,3 +48,17 @@ def burnt_colors(colors):
         mul = BURNT_LIGHT_MUL if name in EMISSIVE else BURNT_MUL
         out.append(tuple(int(ch * mul) for ch in c[:3]) + (255,))
     return out
+
+
+# --- P4 map art: colours read straight from scripts/tuning.gd ----------------
+# New art colours live in tuning.gd (VISUAL_PLAN rule 3); generators look them
+# up by constant name so the two never drift apart.
+def tuning_color(name):
+    import os, re
+    path = os.path.join(os.path.dirname(__file__), "..", "..", "scripts", "tuning.gd")
+    src = open(path).read()
+    m = re.search(r"const %s := Color\(([^)]*)\)" % re.escape(name), src)
+    if not m:
+        raise KeyError(name)
+    v = [float(x) for x in m.group(1).split(",")]
+    return tuple(int(round(min(1.0, c) * 255)) for c in v[:3])

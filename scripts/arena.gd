@@ -18,6 +18,13 @@ var checkpoints: Array = []    # Courier stops, Retrieve caches, Escort sites
 var barrel_spots: Array = []
 var spawn_points: Array[Vector2] = []
 
+# --- P4 style sample (VISUAL_PLAN V5.5): Outer Blocks corner ------------------
+# Off by default until the owner approves the sample; captures turn it on.
+const MapArt := preload("res://scripts/map_art.gd")
+const MapAmbient := preload("res://scripts/map_ambient.gd")
+static var style_sample := false
+var _corner_tex: Texture2D
+
 
 func _init() -> void:
 	setup(layout)
@@ -52,6 +59,21 @@ func _ready() -> void:
 		_add_box(solid, b.get_center(), b.size, 0.0)
 	for p: Array in props:
 		_add_box(solid, p[0], p[1], p[2])
+	if style_sample:
+		_setup_style_sample()
+
+
+func _setup_style_sample() -> void:
+	_corner_tex = MapArt.bake(self)   # null when art is missing: code-drawn look stays
+	if _corner_tex == null:
+		return
+	var profile := get_node_or_null("/root/Profile")
+	var low := profile != null and profile.has_method("quality") and float(profile.quality().fx) < 0.5
+	if not low:
+		var motes := MapAmbient.new()
+		motes.z_index = 5
+		motes.setup(MapArt.CORNER, 48)
+		add_child(motes)
 
 
 func _add_box(body: StaticBody2D, center: Vector2, size: Vector2, rot: float) -> void:
@@ -113,6 +135,9 @@ func _draw() -> void:
 		draw_rect(Rect2(b.position + Vector2(16, 16), b.size), Color(0, 0, 0, 0.38))
 	for b: Rect2 in buildings:
 		_draw_building(b, rng)
+
+	if _corner_tex != null:   # P4 sample: one baked texture, one draw
+		draw_texture(_corner_tex, MapArt.CORNER.position, T.COL_OB_GRADE)
 
 	for p: Array in props:
 		_draw_prop(p[0], p[1], p[2], p[3])
