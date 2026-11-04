@@ -13,6 +13,7 @@ signal leave_requested
 
 const T := preload("res://scripts/tuning.gd")
 const UI := preload("res://scripts/ui_theme.gd")
+const Parts := preload("res://scripts/parts.gd")
 const Codex := preload("res://scripts/codex.gd")
 const ProfileScript := preload("res://scripts/profile.gd")
 const PadScript := preload("res://scripts/pad.gd")
@@ -333,7 +334,10 @@ func _database_page() -> void:
 	scroll.add_child(list)
 	for e: Array in rows:
 		var known := profile.is_discovered(category, str(e[0]))
-		var name := UI.label(str(e[1]) if known else "? ? ? ? ?", 22, UI.TEXT if known else UI.TEXT_DIM)
+		var name_color := UI.TEXT if known else UI.TEXT_DIM
+		if known and category == "parts":   # V1.3: part names in rarity colour
+			name_color = UI.rarity_color(str(Parts.get_part(str(e[0])).get("rarity", "")))
+		var name := UI.label(str(e[1]) if known else "? ? ? ? ?", 22, name_color)
 		list.add_child(name)
 		var text := UI.label(str(e[2]) if known else "Not met yet.", 18, UI.TEXT_DIM)
 		text.autowrap_mode = TextServer.AUTOWRAP_WORD
