@@ -121,7 +121,7 @@ Every enemy hull has an `elite_trim` layer (gold spine stripe and nose chevron).
 | Rig script | art id | body (px) | notes |
 |---|---|---|---|
 | enemy_rig.gd | outrider | 74x32 | elite_trim when is_elite() |
-| bulwark_rig.gd | bulwark | 84x46 | armored plow; `charge_glow` layer while Mode.ATTACK |
+| bulwark_rig.gd | bulwark | 84x46 | armored plow; `windup_glow` layer before a ram (contract below) |
 | gunner_rig.gd | gunner | 74x40 | turret `gunner_rig` on turret_mount |
 | scrapper_rig.gd | scrapper | 62x32 | dropper tray chunk |
 | scrapper_gunner_rig.gd | scrapper_gunner | 64x34 | turret gun id `scrapper` -> sheet `scrapper_turret` (ART_WEAPON_ALIASES) |
@@ -135,3 +135,24 @@ from body_len/body_wid). Weapons are modelled at 1 px per voxel like the hulls:
 turret rings ~21 px, muzzles where the old code-drawn barrels ended
 (pintle 30.5 px from the pivot, Gunner burst 34 px). Review shot:
 `tools/art/capture_enemies.gd` -> `art/previews/capture_enemies.png`.
+
+
+### Bulwark pre-ram wind-up contract
+
+The art reads these from the Bulwark rig, **only if present** (`has_method` /
+`has_signal`), so the art works with or without Content's wind-up state:
+
+| Member | Type | Meaning |
+|---|---|---|
+| `is_winding_up()` | `-> bool` | true while the rig winds up for a ram; the glow shows only then |
+| `windup_progress()` | `-> float` 0..1 | how far along (clamped; if missing, 1.0 while winding up) |
+| `signal windup_started` | optional | restarts the pulse phase so each wind-up starts the same |
+
+Art side (bulwark_rig.gd): layer `windup_glow` (slot `state`) is the whole plow
+recoloured enemy red with a white-hot leading edge (no reserved colours).
+`art_layer_modulate()` fades it from alpha ~0.25-0.5 at progress 0 to ~1.0 at 1,
+pulsing at 2 Hz -> 7 Hz. Helpers: `art_winding_up()`, `art_windup_progress()`.
+The old always-on attack-mode `charge_glow` was removed: the Bulwark is in
+ATTACK almost all the time, so it would glow constantly and drown out the
+warning. Stub: `tests/stubs/bulwark_windup_stub.gd`. Shot:
+`tools/art/capture_windup.gd` -> `art/previews/capture_bulwark_windup.png`.

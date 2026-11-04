@@ -405,6 +405,11 @@ func _sync_art() -> void:
 	_update_art()
 
 
+## Per-layer tint/alpha (state layers that fade or pulse override this).
+func art_layer_modulate(_id: String) -> Color:
+	return Color.WHITE
+
+
 ## Art follows the rig: the hull sheet picks the frame for the rig's heading,
 ## part layers ride on it with the same frame, each turret sheet picks the
 ## frame for its own aim, placed on the hull's projected mount point.
@@ -422,6 +427,7 @@ func _update_art() -> void:
 			var ls: Sprite2D = _layer_sprites[id]
 			ls.frame = _hull_art.frame
 			ls.visible = not is_wrecked
+			ls.modulate = art_layer_modulate(id)
 	if _art_overlay != null:
 		_art_overlay.global_position = global_position
 		_art_overlay.global_rotation = global_rotation

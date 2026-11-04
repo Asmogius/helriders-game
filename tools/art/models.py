@@ -522,7 +522,7 @@ def _red_lights(c, L, W, z):
 def bulwark_enemy():
     """Enemy Bulwark (bulwark_rig.gd, 84x46): slab hull, armor bands, six heavy
     wheels, a wide spiked plow (the armored front, its own wreck chunk), a light
-    nose gun, red lights. Layer charge_glow lights the plow while it charges."""
+    nose gun, red lights. Layer windup_glow heats the plow before a ram."""
     L, W = 84, 46
     m = Model((L, W, 20))
     _wheels(m, (8, 35, 62), 16, W, 7, 7)
@@ -547,11 +547,13 @@ def bulwark_enemy():
             box(plow, 81 + j, 82 + j, y - 1 + j // 2, y + 2 - j // 2, 6, 8, "bone")
     gun = m.g("gun")
     box(gun, 58, 84, 21, 25, 13, 16, "steel_dark")
-    glow = m.layer("charge_glow", "state")                   # wind-up: the plow seams glow red
-    for x in range(71, 80, 3):
-        flare = (x - 70) // 3
-        box(glow, x, x + 1, 1 + flare, W - 1 - flare, max(6, 15 - (x - 70) // 2), max(7, 16 - (x - 70) // 2), "enemy_red")
-    box(glow, 2, 3, 8, W - 8, 5, 11, "enemy_red")
+    # Pre-ram wind-up: the whole plow heats. A recoloured copy of the plow
+    # (layers override the core voxels they cover): plates go enemy red, the
+    # leading edge and spike roots white-hot. Driven by windup_progress().
+    glow = m.layer("windup_glow", "state")
+    pz = np.nonzero(plow)
+    for x, y, z in zip(*pz):
+        glow[x, y, z] = C["white_hot"] if x >= 80 or (plow[x, y, z] == C["bone"] and x <= 82) else C["enemy_red"]
     m.points["nose_mount"] = (66.0, W / 2.0, 13.0)
     elite_trim(m)
     return m
