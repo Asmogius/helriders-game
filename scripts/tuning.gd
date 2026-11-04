@@ -37,6 +37,54 @@ const RARITY_COLORS := {
 	"Mythic": Color(1.0, 0.36, 0.42),
 }
 
+# --- Art colours (VISUAL_PLAN rule 3; added through P0) -----------------------
+# Art-only colours for the style samples. No gameplay reads these. Generators in
+# tools/art/ may read them by name (palette.tuning_color, which expects the
+# `const NAME := Color(...)` form used here). Grouped by package / feature.
+
+# P4 Maps: Outer Blocks district style (V5.1/V5.2/V5.5; PR #38).
+const COL_OB_GRASS := Color(0.27, 0.33, 0.2)            # lawn (tiles.py)
+const COL_OB_PAVE := Color(0.36, 0.35, 0.33)            # sidewalk slabs (tiles.py)
+const COL_OB_SIDING := Color(0.45, 0.43, 0.38)          # house siding (buildings.py)
+const COL_OB_ROOF := Color(0.3, 0.25, 0.23)             # shingles (buildings.py)
+const COL_OB_GRADE := Color(1.0, 0.96, 0.88)            # warm colour grade, a modulate (arena.gd)
+const COL_OB_MOTE := Color(0.86, 0.82, 0.62, 0.55)      # seed fluff motes (map_ambient.gd)
+
+# P2 Effects: explosions and tracers (V4.3/V4.4; PR #33). Additive lights.
+const COL_FX_HOT := Color(1, 0.851, 0.4)                # fireball core (255,217,102; fx.gd inline 1.0,0.85,0.4)
+const COL_FX_WHITE_HOT := Color(1, 0.949, 0.8)          # flash, tracer core (255,242,204; = palette.py white_hot)
+const COL_FX_EMBER := Color(0.6, 0.18, 0.078)           # cooling fireball edge (153, 46, 20)
+const COL_FX_SCORCH := Color(0.071, 0.063, 0.059)       # scorch decal (18, 16, 15)
+
+# P6 Garage: Workshop bay room (V2.1/V2.2; PR #37). Dark, unlit surfaces.
+const COL_GARAGE_FLOOR := Color(0.227, 0.224, 0.216)    # bay slab (58, 57, 55)
+const COL_GARAGE_FLOOR_LINE := Color(0.471, 0.408, 0.235)# painted bay lines (120, 104, 60)
+const COL_GARAGE_OIL := Color(0.094, 0.09, 0.094)       # oil stains on the slab (24, 23, 24)
+const COL_GARAGE_PEGBOARD := Color(0.29, 0.235, 0.173)  # tool pegboard (74, 60, 44)
+const COL_GARAGE_WALL := Color(0.18, 0.188, 0.204)      # corrugated back wall (46, 48, 52)
+const COL_GARAGE_STREET_NIGHT := Color(0.118, 0.133, 0.173)# street past the roll-up door (30, 34, 44)
+const COL_GARAGE_GAS_RED := Color(0.431, 0.157, 0.133)  # welding gas cylinders (110, 40, 34)
+
+# P3 Zombies: Shambler and Tank sheets (V3.1/V3.2; PR #34). Baked by zombies.py.
+# Shambler clothing variants 0-5: shirt / trousers.
+const COL_ZOMBIE_SHIRT_0 := Color(0.439, 0.353, 0.275)  # brown jacket (112, 90, 70)
+const COL_ZOMBIE_PANTS_0 := Color(0.247, 0.239, 0.275)  # grey jeans (63, 61, 70)
+const COL_ZOMBIE_SHIRT_1 := Color(0.353, 0.4, 0.467)    # faded denim (90, 102, 119)
+const COL_ZOMBIE_PANTS_1 := Color(0.286, 0.247, 0.208)  # brown trousers (73, 63, 53)
+const COL_ZOMBIE_SHIRT_2 := Color(0.525, 0.494, 0.439)  # dirty off-white (134, 126, 112)
+const COL_ZOMBIE_PANTS_2 := Color(0.22, 0.227, 0.247)   # dark trousers (56, 58, 63)
+const COL_ZOMBIE_SHIRT_3 := Color(0.42, 0.275, 0.255)   # oxblood hoodie (107, 70, 65)
+const COL_ZOMBIE_PANTS_3 := Color(0.314, 0.306, 0.275)  # khaki (80, 78, 70)
+const COL_ZOMBIE_SHIRT_4 := Color(0.333, 0.38, 0.294)   # olive work shirt (85, 97, 75)
+const COL_ZOMBIE_PANTS_4 := Color(0.239, 0.208, 0.188)  # dark brown (61, 53, 48)
+const COL_ZOMBIE_SHIRT_5 := Color(0.459, 0.42, 0.333)   # tan coat (117, 107, 85)
+const COL_ZOMBIE_PANTS_5 := Color(0.275, 0.306, 0.353)  # slate (70, 78, 90)
+const COL_ZOMBIE_EYE := Color(0.745, 0.235, 0.157)      # dull red eyes, no glow (190, 60, 40)
+const COL_ZOMBIE_FLASH := Color(0.941, 0.91, 0.839)     # hit flash (240, 232, 214)
+const COL_TANK_SHIRT := Color(0.275, 0.235, 0.204)      # Tank clothes, top (70, 60, 52)
+const COL_TANK_PANTS := Color(0.188, 0.173, 0.157)      # Tank clothes, bottom (48, 44, 40)
+const COL_TANK_SKIN := Color(0.329, 0.212, 0.196)       # Tank dark skin (darker than COL_TANK) (84, 54, 50)
+
 # --- Arena ---------------------------------------------------------------------
 const WORLD_SIZE := Vector2(3200, 2400)
 const SPAWN_MIN_DISTANCE := 850.0  # keep spawns off-screen
