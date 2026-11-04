@@ -73,6 +73,7 @@ func activate(at: Vector2, as_kind := "shambler") -> void:
 	_circle.radius = radius
 	speed = float(_stats.speed) * randf_range(0.8, 1.2)
 	lock_priority = 2 if kind == "tank" else 1
+	_art_cache = _art()
 	lock_radius = radius + 5.0
 	velocity = Vector2.ZERO
 	_knock = Vector2.ZERO
@@ -307,6 +308,7 @@ var art_pose_override := ""      # captures and tests: force a pose row (e.g. "l
 var _art_t := 0.0                # walk cycle phase, advanced by distance walked
 var _art_last := Vector2.ZERO
 var _art_key := -1
+var _art_cache: Dictionary = {}   # the root-meta art dict, cached on tree entry / activate (no per-frame meta lookups)
 
 
 static func _art() -> Dictionary:
@@ -336,11 +338,27 @@ static func art_atlas() -> Dictionary:
 static func disable_art() -> void:
 	var tree := Engine.get_main_loop() as SceneTree
 	if tree != null and tree.root != null:
-		tree.root.set_meta(ART_META, {"meta": {}, "atlas": null})
+		if tree.root.has_meta(ART_META):   # mutate in place so zombies' cached refs see it too
+			var art: Dictionary = tree.root.get_meta(ART_META)
+			art.meta = {}
+			art.atlas = null
+		else:
+			tree.root.set_meta(ART_META, {"meta": {}, "atlas": null})
+
+
+func _enter_tree() -> void:
+	_art_cache = _art()
+
+
+## This zombie's cached art dict (filled lazily if it was never cached).
+func _zart() -> Dictionary:
+	if _art_cache.is_empty():
+		_art_cache = _art()
+	return _art_cache
 
 
 func has_art() -> bool:
-	return (art_atlas().get("kinds", {}) as Dictionary).has(kind)
+	return (_zart().meta.get("kinds", {}) as Dictionary).has(kind)
 
 
 ## The pose row this zombie shows now (Shambler rows carry a variant prefix).
@@ -359,13 +377,13 @@ func art_row() -> String:
 	if art_pose_override != "":
 		pose = art_pose_override
 	if kind == "shambler" and pose != "flash":
-		var info: Dictionary = art_atlas().kinds.shambler
+		var info: Dictionary = _zart().meta.kinds.shambler
 		return "v%d_%s" % [get_instance_id() % int(info.variants), pose]   # no RNG: seeded spawns stay put
 	return pose
 
 
 func art_heading() -> int:
-	var n: int = int(art_atlas().get("headings", 16))
+	var n: int = int(_zart().meta.get("headings", 16))
 	return posmod(int(round(global_rotation / (TAU / float(n)))), n)
 
 
@@ -383,11 +401,11 @@ func _process(_delta: float) -> void:
 
 
 func _draw_art() -> void:
-	var info: Dictionary = art_atlas().kinds[kind]
+	var info: Dictionary = _zart().meta.kinds[kind]
 	var fw: float = info.frame_w
 	var fh: float = info.frame_h
 	draw_set_transform(Vector2.ZERO, -rotation, Vector2.ONE)   # sheets carry the heading; never rotate them
-	(_art().atlas as RefCounted).draw(self, "%s/%s/%d" % [kind, art_row(), art_heading()], Rect2(Vector2(-fw, -fh) * 0.5, Vector2(fw, fh)))
+	(_zart().atlas as RefCounted).draw(self, "%s/%s/%d" % [kind, art_row(), art_heading()], Rect2(Vector2(-fw, -fh) * 0.5, Vector2(fw, fh)))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
