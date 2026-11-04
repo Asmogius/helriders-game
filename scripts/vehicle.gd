@@ -16,6 +16,7 @@ signal crew_injured(index: int)
 signal crew_healed(index: int)
 signal crew_ability_used(kind: String, ability: Dictionary)   # Mark, Flare, Magnet: the mission acts
 signal status_started(kind: int)   # a status bar filled (StatusBars index)
+signal revived                     # a Patcher brought this wreck back
 
 const T := preload("res://scripts/tuning.gd")
 const Hostile := preload("res://scripts/hostile.gd")
@@ -1207,6 +1208,25 @@ func _wreck() -> void:
 	if fx != null:
 		fx.explosion(global_position, velocity)
 	wrecked.emit()
+
+
+## Back from a wreck (a Patcher's revive): HP and each facing at `fraction`
+## of max, shield empty, guns back on.
+func revive(fraction: float) -> void:
+	if not is_wrecked:
+		return
+	is_wrecked = false
+	hp = hp_max * fraction
+	for i in 4:
+		facing_armor[i] = facing_max[i] * fraction
+	shield = 0.0
+	_shield_wait = shield_delay
+	_burn_left = 0.0
+	for t in _turrets:
+		if t != null:
+			t.visible = true
+	queue_redraw()
+	revived.emit()
 
 
 func _burn(delta: float) -> void:
