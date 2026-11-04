@@ -11,3 +11,10 @@ func run(cap: SceneTree) -> void:
 	m.hud.set_abilities(kinds)
 	m.hud.set_armor(0.62)
 	m.hud.set_defense(0.4, PackedFloat32Array([0.8, 0.5, 0.6, 0.3]), 0.9)
+
+
+## Let the fight run again for the shots after this one.
+func after(cap: SceneTree) -> void:
+	var m: Node = cap.current_scene
+	m.set_process(true)
+	m.set_physics_process(true)
