@@ -4,7 +4,9 @@ extends RefCounted
 ## parts combine.
 ##
 ## A loadout looks like Parts.STARTER_LOADOUT:
-##   chassis / engine / drive / armor: one part id each
+##   chassis / engine / drive: one part id each
+##   armor_front / armor_sides / armor_rear: one armor part each (§14); the
+##     Sides part covers both flanks, `front_only` plates fit the Front only
 ##   weapons / utility / internal: arrays of part ids, limited by the chassis
 ##
 ## `levels` maps part id -> Research level (Profile.levels); parts not in it
@@ -15,6 +17,8 @@ extends RefCounted
 
 const Parts := preload("res://scripts/parts.gd")
 const T := preload("res://scripts/tuning.gd")
+
+const ARMOR_SLOTS := ["armor_front", "armor_sides", "armor_rear"]
 
 
 ## Speed/acceleration multiplier for `used` against a budget of `limit`
@@ -44,7 +48,19 @@ static func build(loadout: Dictionary, levels: Dictionary = {}) -> Dictionary:
 	var chassis := _part(str(loadout.get("chassis", "")), levels)
 	var engine := _part(str(loadout.get("engine", "")), levels)
 	var drive := _part(str(loadout.get("drive", "")), levels)
-	var armor := _part(str(loadout.get("armor", "")), levels)
+	var plates := {}
+	# An old-style loadout with one "armor" plate: it goes on all three slots
+	# (a front-only plate on the front only), as in old saves.
+	var legacy := str(loadout.get("armor", "")) if not loadout.has("armor_front") else ""
+	for slot: String in ARMOR_SLOTS:
+		var p := _part(str(loadout.get(slot, legacy)), levels)
+		if legacy != "" and slot != "armor_front" and bool(p.get("front_only", false)):
+			p = {}
+		if not p.is_empty() and (p.category != "Armor" or (slot != "armor_front" and bool(p.get("front_only", false)))):
+			push_warning("Loadout: %s can't go in %s" % [p.id, slot])
+			p = {}
+		plates[slot] = p
+	var front: Dictionary = plates.armor_front
 
 	# Slotted parts: keep what fits the chassis, report what didn't.
 	var dropped: Array[String] = []
@@ -59,7 +75,8 @@ static func build(loadout: Dictionary, levels: Dictionary = {}) -> Dictionary:
 	var damage_mult := 1.0
 	var lock_mult := 1.0
 	var aim_mult := 1.0
-	var armor_bonus := 0.0
+	var hp_bonus := 0.0
+	var shield := {}
 	var ram_bonus := 0.0
 	var injury_mult := 1.0
 	var has_targeting := false
@@ -69,7 +86,9 @@ static func build(loadout: Dictionary, levels: Dictionary = {}) -> Dictionary:
 		damage_mult *= float(part.get("damage_mult", 1.0))
 		lock_mult *= float(part.get("lock_range_mult", 1.0))
 		aim_mult *= float(part.get("turret_aim_mult", 1.0))
-		armor_bonus += float(part.get("armor_bonus", 0.0))
+		hp_bonus += float(part.get("hp_bonus", 0.0))
+		if float(part.get("shield", 0.0)) > float(shield.get("shield", 0.0)):
+			shield = part   # one shield: the strongest generator fitted counts
 		ram_bonus += float(part.get("ram_bonus", 0.0))
 		injury_mult *= float(part.get("injury_mult", 1.0))
 		has_targeting = has_targeting or bool(part.get("enables_lock", false))
@@ -107,16 +126,21 @@ static func build(loadout: Dictionary, levels: Dictionary = {}) -> Dictionary:
 
 	var draw := 0.0
 	var weight := 0.0
-	for part: Dictionary in [chassis, engine, drive, armor]:
+	for part: Dictionary in [chassis, engine, drive]:
 		draw += float(part.get("power", 0.0))
 		weight += float(part.get("weight", 0.0))
+	for slot: String in ARMOR_SLOTS:
+		var plate: Dictionary = plates[slot]
+		var sides := slot == "armor_sides"
+		draw += float(plate.get("power_sides" if sides else "power", plate.get("power", 0.0)))
+		weight += float(plate.get("weight_sides" if sides else "weight", plate.get("weight", 0.0)))
 	for list: Array in [weapon_parts, utility, internal]:
 		for part: Dictionary in list:
 			draw += float(part.get("power", 0.0))
 			weight += float(part.get("weight", 0.0))
 
 	var body: Array = chassis.get("body", [64.0, 36.0])
-	return {
+	var out := {
 		"name": chassis.get("name", "Rig"),
 		"max_speed": float(chassis.get("max_speed", 400.0)) * float(drive.get("speed_mult", 1.0)),
 		"reverse_speed": float(chassis.get("reverse_speed", 200.0)),
@@ -125,8 +149,15 @@ static func build(loadout: Dictionary, levels: Dictionary = {}) -> Dictionary:
 		"coast": float(chassis.get("coast", 280.0)),
 		"turn_rate": float(chassis.get("turn_rate", 3.0)) * float(drive.get("turn_mult", 1.0)),
 		"grip": float(drive.get("grip", 5.0)),
-		"armor": float(chassis.get("armor", 0.0)) + float(armor.get("armor", 0.0)) + armor_bonus,
-		"ram_damage": float(armor.get("ram_damage", 30.0)) + ram_bonus,
+		"hp": float(chassis.get("hp", 0.0)) + hp_bonus,
+		"front": float(front.get("armor", 0.0)),
+		"side": float((plates.armor_sides as Dictionary).get("armor", 0.0)),
+		"rear": float((plates.armor_rear as Dictionary).get("armor", 0.0)),
+		"shield": float(shield.get("shield", 0.0)),
+		"shield_delay": float(shield.get("shield_delay", T.DEFAULT_SHIELD_DELAY)),
+		"shield_refill": float(shield.get("shield_refill", T.DEFAULT_SHIELD_REFILL)),
+		"ram_damage": float(front.get("ram_damage", 30.0)) + ram_bonus,
+		"resist": resistances(plates, chassis, internal),
 		"mount": int(first.get("mount", 0)),
 		"fire_rate": float(first.get("fire_rate", 0.0)),
 		"bullet_damage": float(first.get("bullet_damage", 0.0)),
@@ -150,13 +181,46 @@ static func build(loadout: Dictionary, levels: Dictionary = {}) -> Dictionary:
 		"look": {
 			"chassis": chassis.get("id", ""),
 			"drive": drive.get("id", ""),
-			"armor": armor.get("id", ""),
+			"armor": front.get("id", ""),
+			"armor_sides": (plates.armor_sides as Dictionary).get("id", ""),
+			"armor_rear": (plates.armor_rear as Dictionary).get("id", ""),
 			"weapon": first.get("id", ""),
 			"weapons": weapons.map(func(w: Dictionary) -> String: return str(w.id)),
 			"internal": internal.map(func(p: Dictionary) -> String: return str(p.id)),
 			"utility": utility.map(func(p: Dictionary) -> String: return str(p.id)),
 		},
 	}
+	out["armor"] = toughness(out)
+	return out
+
+
+## Status resistances (§14), shock fire acid toxic slime goop. The rig starts
+## at T.STATUS_RESIST_BASE; every fitted plate adds its profile's step, and the
+## chassis and internals add any `resist_bonus` they carry (agreed with the
+## owner: all of it adds up). Capped at T.STATUS_RESIST_CAP.
+static func resistances(plates: Dictionary, chassis: Dictionary, internal: Array[Dictionary]) -> Array:
+	var out: Array = []
+	for k in 6:
+		out.append(T.STATUS_RESIST_BASE)
+	for slot: String in ARMOR_SLOTS:
+		var profile: Array = (plates[slot] as Dictionary).get("resist", [])
+		for k in mini(profile.size(), 6):
+			out[k] = float(out[k]) + float(T.STATUS_RESIST_STEP.get(str(profile[k]), 0.0))
+	var extras: Array[Dictionary] = [chassis]
+	extras.append_array(internal)
+	for part: Dictionary in extras:
+		var bonus: Array = part.get("resist_bonus", [])
+		for k in mini(bonus.size(), 6):
+			out[k] = float(out[k]) + float(bonus[k])
+	for k in 6:
+		out[k] = minf(float(out[k]), T.STATUS_RESIST_CAP)
+	return out
+
+
+## Everything that has to come off before the rig is wrecked: HP plus every
+## facing's armor (both flanks count). The shield, which recharges, is extra.
+static func toughness(stats: Dictionary) -> float:
+	return float(stats.get("hp", 0.0)) + float(stats.get("front", 0.0)) + 2.0 * float(stats.get("side", 0.0)) + float(stats.get("rear", 0.0))
 
 
 ## A part at its Research level, or {} if unknown.

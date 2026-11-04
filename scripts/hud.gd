@@ -8,6 +8,7 @@ signal lock_toggled(on: bool)
 signal ability_pressed(index: int)
 signal crew_picked(index: int)
 signal crew_wheel_toggled(open: bool)
+signal choice_made(yes: bool)
 
 const T := preload("res://scripts/tuning.gd")
 const ThumbStick := preload("res://scripts/thumb_stick.gd")
@@ -17,6 +18,8 @@ var right_stick: ThumbStick
 
 var _root: Control
 var _armor_bar: ArmorBar
+var _rig_icon: RigIcon
+var _status_strip: StatusStrip
 var _power_bar: PowerBar
 var _arrows: ThreatArrows
 var _lock_button: LockButton
@@ -31,6 +34,7 @@ var _banner: Label
 var _banner_tween: Tween
 var _alert: Label
 var _overlay: Control
+var _choice: Control             # the Escort driver's radio call
 var _title: Label
 var _subtitle: Label
 var _button: Button
@@ -45,18 +49,28 @@ func _ready() -> void:
 	_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_root)
 
+	_rig_icon = RigIcon.new()
+	_rig_icon.position = Vector2(20, 10)
+	_rig_icon.size = Vector2(64, 76)
+	_root.add_child(_rig_icon)
+
+	_status_strip = StatusStrip.new()
+	_status_strip.position = Vector2(20, 90)
+	_status_strip.size = Vector2(150, 70)
+	_root.add_child(_status_strip)
+
 	_armor_bar = ArmorBar.new()
-	_armor_bar.position = Vector2(24, 18)
+	_armor_bar.position = Vector2(94, 18)
 	_armor_bar.size = Vector2(300, 16)
 	_root.add_child(_armor_bar)
 
 	_power_bar = PowerBar.new()
-	_power_bar.position = Vector2(24, 38)
+	_power_bar.position = Vector2(94, 38)
 	_power_bar.size = Vector2(300, 8)
 	_root.add_child(_power_bar)
 
 	_status = _label(24, Color(0.85, 0.83, 0.78))
-	_status.position = Vector2(24, 52)
+	_status.position = Vector2(94, 52)
 	_root.add_child(_status)
 
 	_fps = _label(20, Color(0.6, 0.6, 0.58))
@@ -286,6 +300,26 @@ func set_armor(ratio: float) -> void:
 	_armor_bar.set_ratio(ratio)
 
 
+## The rig icon (§14): shield ring, each facing's plate, the HP block. All
+## 0..1; a facing with no armor fitted is -1 (drawn empty).
+func set_defense(shield_ratio: float, facings: PackedFloat32Array, hp_ratio: float) -> void:
+	_rig_icon.set_values(shield_ratio, facings, hp_ratio)
+
+
+## Status buildup (0..100 per bar) and seconds left on each active status
+## (§14), shown under the rig icon only while something's building or on.
+func set_statuses(build: PackedFloat32Array, left: PackedFloat32Array) -> void:
+	_status_strip.set_values(build, left)
+
+
+func status_strip_visible() -> bool:
+	return _status_strip.showing
+
+
+func defense_icon_values() -> Dictionary:
+	return {"shield": _rig_icon.shield, "facings": _rig_icon.facings, "hp": _rig_icon.hp}
+
+
 ## Power in use vs the engine's budget, and weight vs the chassis's capacity.
 ## Over either budget shows as an overload.
 func set_power(used: float, output: float, weight := 0.0, capacity := 0.0) -> void:
@@ -376,6 +410,79 @@ func show_result(title: String, subtitle: String, button_text: String, accent: C
 	_overlay.visible = true
 	_overlay.modulate.a = 0.0
 	create_tween().tween_property(_overlay, "modulate:a", 1.0, 0.35)
+
+
+## A paused, two-way choice (the Escort driver's radio call). The mission
+## pauses the game while it's open; this panel keeps running.
+func show_choice(speaker: String, text: String, yes_text: String, no_text: String) -> void:
+	close_choice()
+	_choice = Control.new()
+	_choice.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_choice.process_mode = Node.PROCESS_MODE_ALWAYS
+	_root.add_child(_choice)
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.55)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_choice.add_child(dim)
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_choice.add_child(center)
+	var panel := PanelContainer.new()
+	var box := StyleBoxFlat.new()
+	box.bg_color = Color(0.08, 0.085, 0.09, 0.97)
+	box.border_color = T.COL_TRUCK
+	box.set_border_width_all(3)
+	box.content_margin_left = 24
+	box.content_margin_right = 24
+	box.content_margin_top = 18
+	box.content_margin_bottom = 18
+	panel.add_theme_stylebox_override("panel", box)
+	panel.custom_minimum_size = Vector2(720, 0)
+	center.add_child(panel)
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 14)
+	panel.add_child(column)
+	var who := Label.new()
+	who.text = speaker
+	who.add_theme_font_size_override("font_size", 22)
+	who.add_theme_color_override("font_color", T.COL_TRUCK)
+	column.add_child(who)
+	var said := Label.new()
+	said.text = text
+	said.autowrap_mode = TextServer.AUTOWRAP_WORD
+	said.custom_minimum_size = Vector2(670, 0)
+	said.add_theme_font_size_override("font_size", 24)
+	column.add_child(said)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 16)
+	column.add_child(row)
+	for pick: Array in [[yes_text, true, T.COL_ORANGE], [no_text, false, Color(0.75, 0.75, 0.72)]]:
+		var b := Button.new()
+		b.text = str(pick[0])
+		b.focus_mode = Control.FOCUS_NONE
+		b.custom_minimum_size = Vector2(320, 64)
+		b.add_theme_font_size_override("font_size", 22)
+		b.add_theme_color_override("font_color", pick[2])
+		b.pressed.connect(pick_choice.bind(bool(pick[1])))
+		row.add_child(b)
+
+
+func is_choice_open() -> bool:
+	return _choice != null
+
+
+## Answer the open choice (its buttons call this; tests can too).
+func pick_choice(yes: bool) -> void:
+	if _choice == null:
+		return
+	close_choice()
+	choice_made.emit(yes)
+
+
+func close_choice() -> void:
+	if _choice != null:
+		_choice.queue_free()
+		_choice = null
 
 
 func is_result_visible() -> bool:
@@ -536,8 +643,8 @@ class AbilityButton extends Control:
 	## the right stick ignores this area.
 	signal pressed
 	const T := preload("res://scripts/tuning.gd")
-	const LABELS := {"patch": "PATCH", "mines": "MINES", "hard_line": "HARD LINE", "overcharge": "OVERCHARGE"}
-	var kind := ""      # "hard_line", "overcharge", "patch" or "mines"
+	const LABELS := {"patch": "PATCH", "mines": "MINES", "oil": "OIL", "spikes": "SPIKES", "hard_line": "HARD LINE", "overcharge": "OVERCHARGE"}
+	var kind := ""      # "hard_line", "overcharge", "patch", "mines" or "oil"
 	var charge := 0.0   # 0 ready, 1 just used
 	var disabled := false
 
@@ -598,6 +705,17 @@ class AbilityButton extends Control:
 					var p := c + Vector2(-16.0 + k * 16.0, 0.0)
 					draw_circle(p, 6.0, tint)
 					draw_circle(p, 2.0, Color(0, 0, 0, 0.7))
+			"spikes":
+				# A strip of teeth.
+				draw_line(c + Vector2(-18, 4), c + Vector2(18, 4), tint, 4.0)
+				for k in 5:
+					var x := c.x - 16.0 + k * 8.0
+					draw_colored_polygon(PackedVector2Array([Vector2(x - 3.0, c.y + 2.0), Vector2(x, c.y - 10.0), Vector2(x + 3.0, c.y + 2.0)]), tint)
+			"oil":
+				# A drop over a puddle.
+				draw_colored_polygon(PackedVector2Array([c + Vector2(0, -18), c + Vector2(8, -2), c + Vector2(-8, -2)]), tint)
+				draw_circle(c + Vector2(0, -2), 8.0, tint)
+				draw_arc(c + Vector2(0, 14), 14.0, PI + 0.4, TAU - 0.4, 12, tint, 3.0)
 			"hard_line":
 				# Two chevrons: a sharp line through the turn.
 				for k in 2:
@@ -775,6 +893,91 @@ class PowerBar extends Control:
 		if over or heavy:
 			text += "  OVERLOAD"
 		draw_string(font, Vector2(size.x + 10.0, size.y + 1.0), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, color)
+
+
+class StatusStrip extends Control:
+	## One thin bar per status that's building, in its colour, with its name;
+	## a status that's on shows full and bright. Hidden when nothing is going.
+	const T := preload("res://scripts/tuning.gd")
+	var build := PackedFloat32Array([0, 0, 0, 0, 0, 0])
+	var left := PackedFloat32Array([0, 0, 0, 0, 0, 0])
+	var showing := false
+
+	func set_values(new_build: PackedFloat32Array, new_left: PackedFloat32Array) -> void:
+		var changed := false
+		for k in 6:
+			changed = changed or absf(new_build[k] - build[k]) > 0.5 or (new_left[k] > 0.0) != (left[k] > 0.0)
+		if not changed:
+			return
+		build = new_build.duplicate()
+		left = new_left.duplicate()
+		showing = false
+		for k in 6:
+			showing = showing or build[k] > 0.0 or left[k] > 0.0
+		queue_redraw()
+
+	func _draw() -> void:
+		var font := get_theme_default_font()
+		var y := 0.0
+		for k in 6:
+			var on := left[k] > 0.0
+			if not on and build[k] <= 0.0:
+				continue
+			var c: Color = T.STATUS_COLORS[k]
+			var fill := 1.0 if on else clampf(build[k] / T.STATUS_BAR, 0.0, 1.0)
+			draw_rect(Rect2(0, y, 70, 7), Color(0, 0, 0, 0.55))
+			draw_rect(Rect2(1, y + 1, 68.0 * fill, 5), c if on else Color(c, 0.75))
+			draw_string(font, Vector2(76, y + 8), str(T.STATUS_NAMES[k]), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, c if on else Color(c, 0.7))
+			y += 11.0
+
+
+class RigIcon extends Control:
+	## A small top-down rig (pointing up): four plates for the facings, a ring
+	## for the shield, the body block drains as HP drops. Redraws on change.
+	const T := preload("res://scripts/tuning.gd")
+	var shield := -1.0
+	var facings := PackedFloat32Array([1.0, 1.0, 1.0, 1.0])
+	var hp := 1.0
+
+	func set_values(shield_ratio: float, new_facings: PackedFloat32Array, hp_ratio: float) -> void:
+		var changed := absf(shield_ratio - shield) > 0.01 or absf(hp_ratio - hp) > 0.01
+		for i in 4:
+			changed = changed or absf(new_facings[i] - facings[i]) > 0.01
+		if not changed:
+			return
+		shield = shield_ratio
+		facings = new_facings.duplicate()
+		hp = hp_ratio
+		queue_redraw()
+
+	func _plate_color(v: float) -> Color:
+		if v < 0.0:
+			return Color(0.25, 0.25, 0.27, 0.6)   # nothing fitted
+		if v <= 0.0:
+			return Color(0.45, 0.12, 0.1)          # stripped
+		return T.COL_ORANGE.lerp(T.COL_CYAN, clampf(v * 1.4 - 0.2, 0.0, 1.0)).darkened(0.35 * (1.0 - v))
+
+	func _draw() -> void:
+		var c := size * 0.5
+		var bw := 20.0
+		var bh := 34.0
+		var body := Rect2(c - Vector2(bw, bh) * 0.5, Vector2(bw, bh))
+		# Shield ring.
+		if shield >= 0.0:
+			draw_arc(c, 34.0, 0.0, TAU, 40, Color(T.COL_SHIELD, 0.18), 4.0)
+			if shield > 0.0:
+				draw_arc(c, 34.0, -PI / 2.0, -PI / 2.0 + TAU * shield, 40, Color(T.COL_SHIELD, 0.9), 4.0)
+		# HP: the body block drains from the top.
+		draw_rect(body, Color(0.08, 0.08, 0.09, 0.9))
+		var fill := clampf(hp, 0.0, 1.0)
+		var hp_col := Color(0.85, 0.83, 0.78) if fill > 0.35 else T.COL_ENEMY
+		draw_rect(Rect2(body.position + Vector2(0, bh * (1.0 - fill)), Vector2(bw, bh * fill)), Color(hp_col, 0.85))
+		# Plates: front (top), left, right, rear (bottom).
+		draw_rect(Rect2(body.position + Vector2(-2, -9), Vector2(bw + 4, 6)), _plate_color(facings[0]))
+		draw_rect(Rect2(body.position + Vector2(-9, 2), Vector2(6, bh - 4)), _plate_color(facings[1]))
+		draw_rect(Rect2(body.position + Vector2(bw + 3, 2), Vector2(6, bh - 4)), _plate_color(facings[2]))
+		draw_rect(Rect2(body.position + Vector2(-2, bh + 3), Vector2(bw + 4, 6)), _plate_color(facings[3]))
+		draw_rect(body, Color(0.5, 0.5, 0.5, 0.6), false, 1.0)
 
 
 class ArmorBar extends Control:

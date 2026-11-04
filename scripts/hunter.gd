@@ -217,7 +217,7 @@ func _hold_on(delta: float) -> void:
 		_knock_off(Vector2.RIGHT.rotated(randf() * TAU))
 		return
 	_follow_rig()
-	target.take_damage(T.HUNTER_DPS * delta * float(target.get("latch_mult")))
+	target.take_damage(T.HUNTER_DPS * delta * float(target.get("latch_mult")), global_position - target.global_position)
 
 	# The rig ran this tick already, so its wall contact is current.
 	if target.touching_wall:

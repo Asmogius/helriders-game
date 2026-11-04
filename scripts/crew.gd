@@ -645,7 +645,10 @@ static func apply_passives(stats: Dictionary, members: Array) -> Dictionary:
 	out.grip = float(out.grip) + float(mods.grip)
 	out.max_speed = float(out.max_speed) * float(mods.speed)
 	out.acceleration = float(out.acceleration) * float(mods.accel)
-	out.armor = float(out.armor) * float(mods.armor)
+	# Max armor (Reinforced) scales every facing; HP and shield stay.
+	for k: String in ["front", "side", "rear"]:
+		out[k] = float(out.get(k, 0.0)) * float(mods.armor)
+	out.armor = float(out.get("hp", 0.0)) + float(out.front) + 2.0 * float(out.side) + float(out.rear)
 	out.ram_damage = float(out.ram_damage) * float(mods.ram)
 	out.lock_range = float(out.lock_range) * float(mods.lock)
 	out.power_output = float(out.power_output) * float(mods.power)

@@ -276,9 +276,9 @@ func _fill_detail() -> void:
 static func stat_rows(now: Dictionary, next: Dictionary) -> Array:
 	var rows: Array = []
 	var flat := [
-		["armor", "ARMOR"], ["weight_capacity", "WEIGHT CAP"], ["power_output", "POWER OUTPUT"],
+		["hp", "HP"], ["armor", "ARMOR / FACING"], ["weight_capacity", "WEIGHT CAP"], ["power_output", "POWER OUTPUT"],
 		["acceleration", "ACCEL"], ["grip", "GRIP"], ["bullet_damage", "DAMAGE"],
-		["armor_bonus", "ARMOR BONUS"], ["ram_bonus", "RAM BONUS"],
+		["hp_bonus", "HP BONUS"], ["ram_bonus", "RAM BONUS"], ["shield", "SHIELD"],
 	]
 	for f: Array in flat:
 		if now.has(f[0]):

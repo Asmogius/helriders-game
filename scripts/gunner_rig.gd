@@ -9,6 +9,7 @@ extends "res://scripts/enemy_rig.gd"
 
 var guard_point := Vector2.INF   # Courier: the checkpoint it covers
 var shooting_at: Node2D          # what the turret is on (tests)
+var self_defense := true         # turn the turret on zombies at the door
 
 var _threat: Node2D
 var _threat_timer := 0.0
@@ -27,6 +28,11 @@ func _init() -> void:
 	shape.radius = T.GUNNER_SELF_DEFENSE
 	_query.shape = shape
 	_query.collision_mask = T.LAYER_ZOMBIE
+
+
+## Pick a side when it rolls in, not when it's built: rigs are built up front,
+## and rolling dice then would shift every other random spawn in the job.
+func _enter_tree() -> void:
 	_circle_side = 1.0 if randf() < 0.5 else -1.0
 
 
@@ -46,12 +52,37 @@ func _think(delta: float) -> void:
 		_sight_timer = 0.2
 		_sees_player = _has_los(player.global_position)
 
-	# --- Driving: hold the ring around the player (or the guard post) ---------------
-	var goal := Vector2.ZERO
-	var throttle := 1.0
 	var engaging := not player_down
 	if is_guarding() and player.global_position.distance_to(guard_point) > T.GUNNER_GUARD_LEASH:
 		engaging = false
+	var goal := _steer(delta, engaging, to_player, forward)
+	var throttle := goal.length()
+	if goal != Vector2.ZERO:
+		goal = goal.normalized()
+	if mode != Mode.UNSTICK and goal != Vector2.ZERO:
+		goal = _avoid_walls(goal, forward)
+	drive_input = goal * throttle
+
+	# Wedged against something: back out, and circle the other way after.
+	if mode != Mode.UNSTICK and goal != Vector2.ZERO and get_real_velocity().length() < 40.0:
+		_stuck_time += delta
+		if _stuck_time > 0.8:
+			mode = Mode.UNSTICK
+			_mode_time = 0.9
+			_side = 1.0 if randf() < 0.5 else -1.0
+			_circle_side = -_circle_side
+			_stuck_time = 0.0
+	else:
+		_stuck_time = 0.0
+	_aim(delta, engaging, dist)
+
+
+## The stick this tick: direction times throttle. Override for other drivers.
+## Holds the ring around the player (or the guard post).
+func _steer(_delta: float, engaging: bool, to_player: Vector2, forward: Vector2) -> Vector2:
+	var dist := to_player.length()
+	var goal := Vector2.ZERO
+	var throttle := 1.0
 	match mode:
 		Mode.UNSTICK:
 			goal = -forward.rotated(_side * 0.6)
@@ -76,27 +107,15 @@ func _think(delta: float) -> void:
 			if is_guarding() and engaging and global_position.distance_to(guard_point) > T.GUNNER_GUARD_RADIUS:
 				goal = (guard_point - global_position).normalized()
 				throttle = 0.8
-	if mode != Mode.UNSTICK and goal != Vector2.ZERO:
-		goal = _avoid_walls(goal, forward)
-	drive_input = goal * throttle
+	return goal * throttle
 
-	# Wedged against something: back out, and circle the other way after.
-	if mode != Mode.UNSTICK and goal != Vector2.ZERO and get_real_velocity().length() < 40.0:
-		_stuck_time += delta
-		if _stuck_time > 0.8:
-			mode = Mode.UNSTICK
-			_mode_time = 0.9
-			_side = 1.0 if randf() < 0.5 else -1.0
-			_circle_side = -_circle_side
-			_stuck_time = 0.0
-	else:
-		_stuck_time = 0.0
 
-	# --- Turret: zombies at the door first, then the player ------------------------------
+## Turret: zombies at the door first (if self_defense), then the player.
+func _aim(delta: float, engaging: bool, dist: float) -> void:
 	_threat_timer -= delta
 	if _threat_timer <= 0.0:
 		_threat_timer = 0.25
-		_threat = _nearest_threat()
+		_threat = _nearest_threat() if self_defense else null
 	var target: Node2D = null
 	if _threat != null and bool(_threat.call("is_targetable")):
 		target = _threat

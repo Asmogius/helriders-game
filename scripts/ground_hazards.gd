@@ -1,5 +1,7 @@
 extends Node2D
-## Slime and bile on the ground, all in one node (packed arrays, one _draw).
+## Slime, bile and oil on the ground, all in one node (packed arrays, one
+## _draw). Oil comes from Scrappers and the Oil Slick utility: rigs on it slide
+## like on slime, zombies in it slow down.
 ## Slimers drop slime blobs as they walk and a puddle where they die; rigs on
 ## slime lose grip. Boomers burst into bile pools; zombies in a pool frenzy.
 ## Fixed capacity: the oldest blob is overwritten when the pool is full.
@@ -9,6 +11,10 @@ const T := preload("res://scripts/tuning.gd")
 
 const SLIME_CAP := 192
 const BILE_CAP := 8
+const OIL_CAP := 16
+const FIRE_CAP := 12
+const SPIKE_CAP := 16
+const NEUTRAL := -1   # a battlefield hazard (barrels, slime): catches everyone
 const REDRAW_EVERY := 0.2   # fading is slow; a few redraws a second is plenty
 
 var marked: Node2D           # the rig wearing bile, if any (mission sets it)
@@ -20,6 +26,21 @@ var _slime_life := PackedFloat32Array()
 var _slime_next := 0
 var _bile_pos := PackedVector2Array()
 var _bile_life := PackedFloat32Array()
+var _oil_pos := PackedVector2Array()
+var _oil_r := PackedFloat32Array()
+var _oil_life := PackedFloat32Array()
+var _oil_next := 0
+var _oil_team := PackedInt32Array()
+var _fire_team := PackedInt32Array()
+var _spike_a := PackedVector2Array()
+var _spike_b := PackedVector2Array()
+var _spike_life := PackedFloat32Array()
+var _spike_team := PackedInt32Array()
+var _spike_next := 0
+var _fire_pos := PackedVector2Array()
+var _fire_r := PackedFloat32Array()
+var _fire_life := PackedFloat32Array()
+var _fire_next := 0
 var _redraw := 0.0
 
 
@@ -29,12 +50,27 @@ func _ready() -> void:
 	_slime_life.resize(SLIME_CAP)
 	_bile_pos.resize(BILE_CAP)
 	_bile_life.resize(BILE_CAP)
+	_oil_pos.resize(OIL_CAP)
+	_oil_r.resize(OIL_CAP)
+	_oil_life.resize(OIL_CAP)
+	_fire_pos.resize(FIRE_CAP)
+	_fire_r.resize(FIRE_CAP)
+	_fire_life.resize(FIRE_CAP)
+	_oil_team.resize(OIL_CAP)
+	_fire_team.resize(FIRE_CAP)
+	_spike_a.resize(SPIKE_CAP)
+	_spike_b.resize(SPIKE_CAP)
+	_spike_life.resize(SPIKE_CAP)
+	_spike_team.resize(SPIKE_CAP)
 	clear()
 
 
 func clear() -> void:
 	_slime_life.fill(0.0)
 	_bile_life.fill(0.0)
+	_oil_life.fill(0.0)
+	_fire_life.fill(0.0)
+	_spike_life.fill(0.0)
 	marked = null
 	marked_left = 0.0
 	queue_redraw()
@@ -59,6 +95,142 @@ func add_bile(at: Vector2) -> void:
 	_bile_pos[slot] = at
 	_bile_life[slot] = T.BOOMER_POOL_TIME
 	queue_redraw()
+
+
+## Hazards remember whose they are (`team`, a BulletPool team, or NEUTRAL):
+## they never catch rigs of that same team (§14: your hazards never hurt you).
+## Zombies (victim team NEUTRAL) are caught by everything. Returns the slot.
+func add_oil(at: Vector2, radius: float, seconds: float, team := NEUTRAL) -> int:
+	var slot := _oil_next
+	_oil_pos[slot] = at
+	_oil_r[slot] = radius
+	_oil_life[slot] = seconds
+	_oil_team[slot] = team
+	_oil_next = (_oil_next + 1) % OIL_CAP
+	queue_redraw()
+	return slot
+
+
+## Oil that catches a victim of `victim` team (NEUTRAL = zombies: any oil).
+func oil_at(p: Vector2, victim := NEUTRAL) -> bool:
+	for i in OIL_CAP:
+		if _oil_life[i] > 0.0 and _catches(_oil_team[i], victim) and p.distance_squared_to(_oil_pos[i]) < _oil_r[i] * _oil_r[i]:
+			return true
+	return false
+
+
+static func _catches(owner: int, victim: int) -> bool:
+	return owner == NEUTRAL or victim == NEUTRAL or owner != victim
+
+
+## Lay a spike strip from `a` to `b`. Returns the slot.
+func add_spike(a: Vector2, b: Vector2, seconds: float, team := NEUTRAL) -> int:
+	var slot := _spike_next
+	_spike_a[slot] = a
+	_spike_b[slot] = b
+	_spike_life[slot] = seconds
+	_spike_team[slot] = team
+	_spike_next = (_spike_next + 1) % SPIKE_CAP
+	queue_redraw()
+	return slot
+
+
+func spike_at(p: Vector2, victim := NEUTRAL) -> bool:
+	for i in SPIKE_CAP:
+		if _spike_life[i] > 0.0 and _catches(_spike_team[i], victim):
+			var closest := Geometry2D.get_closest_point_to_segment(p, _spike_a[i], _spike_b[i])
+			if p.distance_squared_to(closest) < T.SPIKE_HALF_WIDTH * T.SPIKE_HALF_WIDTH:
+				return true
+	return false
+
+
+func spike_count() -> int:
+	var n := 0
+	for i in SPIKE_CAP:
+		if _spike_life[i] > 0.0:
+			n += 1
+	return n
+
+
+## Clear one hazard early ("oil", "spike", "fire" and its slot): a Scrapper
+## keeps only its newest few.
+func expire(kind: String, slot: int) -> void:
+	match kind:
+		"oil":
+			_oil_life[slot] = 0.0
+		"spike":
+			_spike_life[slot] = 0.0
+		"fire":
+			_fire_life[slot] = 0.0
+	queue_redraw()
+
+
+func is_live(kind: String, slot: int) -> bool:
+	match kind:
+		"oil":
+			return _oil_life[slot] > 0.0
+		"spike":
+			return _spike_life[slot] > 0.0
+	return false
+
+
+func oil_count() -> int:
+	var n := 0
+	for i in OIL_CAP:
+		if _oil_life[i] > 0.0:
+			n += 1
+	return n
+
+
+## Burning ground (§14): a Fire barrel's blast, or oil set alight. Anything
+## standing in it builds BURNING (the mission and director add it).
+func add_fire(at: Vector2, radius: float, seconds: float, team := NEUTRAL) -> void:
+	_fire_pos[_fire_next] = at
+	_fire_r[_fire_next] = radius
+	_fire_life[_fire_next] = seconds
+	_fire_team[_fire_next] = team
+	_fire_next = (_fire_next + 1) % FIRE_CAP
+	ignite_oil(at, radius)
+	queue_redraw()
+
+
+func fire_at(p: Vector2, victim := NEUTRAL) -> bool:
+	for i in FIRE_CAP:
+		if _fire_life[i] > 0.0 and _catches(_fire_team[i], victim) and p.distance_squared_to(_fire_pos[i]) < _fire_r[i] * _fire_r[i]:
+			return true
+	return false
+
+
+func fire_count() -> int:
+	var n := 0
+	for i in FIRE_CAP:
+		if _fire_life[i] > 0.0:
+			n += 1
+	return n
+
+
+## Explosions and fire light oil: every slick touching the circle turns to
+## burning ground for the rest of its life. Returns how many caught.
+func ignite_oil(at: Vector2, radius: float) -> int:
+	var lit := 0
+	for i in OIL_CAP:
+		if _oil_life[i] > 0.0 and at.distance_to(_oil_pos[i]) < radius + _oil_r[i]:
+			var life := _oil_life[i]
+			_oil_life[i] = 0.0
+			lit += 1
+			_fire_pos[_fire_next] = _oil_pos[i]
+			_fire_r[_fire_next] = _oil_r[i]
+			_fire_life[_fire_next] = life
+			_fire_team[_fire_next] = _oil_team[i]   # burning enemy oil still hurts you; yours never does
+			_fire_next = (_fire_next + 1) % FIRE_CAP
+	if lit > 0:
+		queue_redraw()
+	return lit
+
+
+## Slime or (someone else's) oil: a rig here builds SLICK.
+func slick_at(p: Vector2, victim := NEUTRAL) -> bool:
+	return slime_at(p) or oil_at(p, victim)
 
 
 func slime_at(p: Vector2) -> bool:
@@ -108,6 +280,15 @@ func _physics_process(delta: float) -> void:
 	for i in BILE_CAP:
 		if _bile_life[i] > 0.0:
 			_bile_life[i] -= delta
+	for i in OIL_CAP:
+		if _oil_life[i] > 0.0:
+			_oil_life[i] -= delta
+	for i in FIRE_CAP:
+		if _fire_life[i] > 0.0:
+			_fire_life[i] -= delta
+	for i in SPIKE_CAP:
+		if _spike_life[i] > 0.0:
+			_spike_life[i] -= delta
 	if marked_left > 0.0:
 		marked_left -= delta
 		queue_redraw()   # the ring follows the rig
@@ -118,6 +299,35 @@ func _physics_process(delta: float) -> void:
 
 
 func _draw() -> void:
+	for i in SPIKE_CAP:
+		var life := _spike_life[i]
+		if life > 0.0:
+			var a := _spike_a[i]
+			var b := _spike_b[i]
+			var fade := clampf(life / 1.5, 0.0, 1.0)
+			draw_line(a, b, Color(0.2, 0.2, 0.22, 0.9 * fade), 6.0)
+			var n := (b - a).normalized().orthogonal()
+			var teeth := 8
+			for t in teeth + 1:
+				var p := a.lerp(b, float(t) / teeth)
+				draw_line(p - n * 7.0, p + n * 7.0, Color(0.7, 0.7, 0.72, fade), 2.0)
+	for i in FIRE_CAP:
+		var life := _fire_life[i]
+		if life > 0.0:
+			var c := T.COL_FIRE_GROUND
+			c.a *= clampf(life / 1.5, 0.0, 1.0)
+			var flick := 0.85 + 0.15 * sin(float(Time.get_ticks_msec()) * 0.02 + i)
+			draw_circle(_fire_pos[i], _fire_r[i] * flick, c)
+			draw_circle(_fire_pos[i], _fire_r[i] * 0.55 * flick, Color(1.0, 0.75, 0.3, c.a))
+	for i in OIL_CAP:
+		var life := _oil_life[i]
+		if life > 0.0:
+			var c := T.COL_OIL
+			c.a *= clampf(life / 2.0, 0.0, 1.0)
+			draw_circle(_oil_pos[i], _oil_r[i], c)
+			# A rainbow-ish sheen so it reads as oil, not a shadow.
+			draw_arc(_oil_pos[i] + Vector2(-8, -6), _oil_r[i] * 0.55, 0.4, 2.2, 12, Color(0.4, 0.3, 0.6, c.a * 0.6), 3.0)
+			draw_arc(_oil_pos[i] + Vector2(6, 4), _oil_r[i] * 0.4, 3.5, 5.3, 10, Color(0.3, 0.55, 0.5, c.a * 0.6), 3.0)
 	for i in SLIME_CAP:
 		var life := _slime_life[i]
 		if life > 0.0:

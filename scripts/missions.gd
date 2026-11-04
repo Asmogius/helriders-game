@@ -12,7 +12,7 @@ extends RefCounted
 
 const T := preload("res://scripts/tuning.gd")
 
-const TYPES := ["clear", "survive", "hunt", "courier"]
+const TYPES := ["clear", "survive", "hunt", "courier", "retrieve", "escort"]
 
 
 ## Today's board: `count` missions, covering as many types as fit, skulls
@@ -67,6 +67,30 @@ static func make(type: String, level: int, mission_seed: int, quality := 0, day 
 	}
 
 
+## Does this job bring a Convoy Lead? Rolled from the job's seed, so the
+## Comms card and the mission agree. It takes an Outrider's place.
+static func has_convoy(mission: Dictionary) -> bool:
+	var chances: Array = T.CONVOY_CHANCE.get(str(mission.get("type", "")), [])
+	if chances.is_empty():
+		return false
+	var chance := float(chances[skulls(mission) - 1])
+	if chance <= 0.0:
+		return false
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("helriders-convoy-%d" % int(mission.get("seed", 0)))
+	return rng.randf() < chance
+
+
+## From 4 skulls, half the jobs that bring a Scrapper bring the Scrapper
+## Gunner instead (seeded, so the Comms card and the mission agree).
+static func has_scrapper_gunner(mission: Dictionary) -> bool:
+	if skulls(mission) < T.SCRAPPER_GUNNER_SKULLS or _count(mission, "scrappers") <= 0:
+		return false
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("helriders-scrapper-gunner-%d" % int(mission.get("seed", 0)))
+	return rng.randf() < T.SCRAPPER_GUNNER_CHANCE
+
+
 ## The mission tests and a fresh mission scene fall back to.
 static func default_mission() -> Dictionary:
 	return make("clear", 3, 1)
@@ -112,18 +136,34 @@ static func threats_text(mission: Dictionary) -> String:
 			bits.append("Elite rig, armor x%.1f" % float(stat(mission, "elite_armor")))
 		"courier":
 			bits.append("%d checkpoints" % int(stat(mission, "checkpoints")))
+		"retrieve":
+			bits.append("%d caches (1 deep, guarded by a Gunner Rig)" % int(stat(mission, "caches")))
+			var calls := int(stat(mission, "rig_calls"))
+			if calls > 0:
+				bits.append("up to %d rig%s called in as it heats up" % [calls, "" if calls == 1 else "s"])
+		"escort":
+			bits.append("%d salvage sites, maybe a risky extra" % int(stat(mission, "sites")))
 	var hunters := _count(mission, "hunters")
 	var rigs := _count(mission, "outriders") + _count(mission, "escorts")
+	var convoy := has_convoy(mission)
+	if convoy:
+		rigs = maxi(rigs - 1, 0)   # the Convoy Lead takes an Outrider's place
 	var heavies := _count(mission, "bulwarks") + _count(mission, "bulwark_escorts")
 	var gunners := _count(mission, "gunners") + _count(mission, "gunner_escorts")
+	var scrappers := _count(mission, "scrappers")
 	if hunters > 0:
 		bits.append("%d Hunter%s" % [hunters, "" if hunters == 1 else "s"])
 	if rigs > 0:
 		bits.append("%d Outrider%s" % [rigs, "" if rigs == 1 else "s"])
 	if heavies > 0:
 		bits.append("%d Bulwark%s" % [heavies, "" if heavies == 1 else "s"])
+	if convoy:
+		bits.append("1 Convoy Lead")
 	if gunners > 0:
 		bits.append("%d Gunner Rig%s" % [gunners, "" if gunners == 1 else "s"])
+	if scrappers > 0:
+		var what := "Scrapper Gunner" if has_scrapper_gunner(mission) else "Scrapper"
+		bits.append("%d %s%s" % [scrappers, what, "" if scrappers == 1 else "s"])
 	var kinds := zombie_kinds_text(mission)
 	if kinds != "":
 		bits.append(kinds)
@@ -146,10 +186,10 @@ static func zombie_kinds_text(mission: Dictionary) -> String:
 
 
 static func _count(mission: Dictionary, key: String) -> int:
-	if str(mission.type) == "survive":
+	if has_stat(mission, "events"):
 		var n := 0
 		for e: Array in stat(mission, "events"):
-			if (key == "hunters" and e[1] == "hunter") or (key == "outriders" and e[1] == "outrider") or (key == "bulwarks" and e[1] == "bulwark") or (key == "gunners" and e[1] == "gunner"):
+			if (key == "hunters" and e[1] == "hunter") or (key == "outriders" and e[1] == "outrider") or (key == "bulwarks" and e[1] == "bulwark") or (key == "gunners" and e[1] == "gunner") or (key == "scrappers" and e[1] == "scrapper"):
 				n += 1
 		return n
 	return int(stat(mission, key)) if has_stat(mission, key) else 0

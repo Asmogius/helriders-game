@@ -28,7 +28,9 @@ const SLOTS := [
 	{"key": "chassis", "index": 0, "label": "CHASSIS", "category": "Chassis", "anchor": Vector2(-6, 15), "side": 0},
 	{"key": "engine", "index": 0, "label": "ENGINE", "category": "Engine", "anchor": Vector2(-25, 0), "side": 0},
 	{"key": "drive", "index": 0, "label": "DRIVE", "category": "Drive", "anchor": Vector2(-17, 18), "side": 0},
-	{"key": "armor", "index": 0, "label": "ARMOR", "category": "Armor", "anchor": Vector2(28, 0), "side": 0},
+	{"key": "armor_front", "index": 0, "label": "ARMOR FRONT", "category": "Armor", "anchor": Vector2(28, 0), "side": 0},
+	{"key": "armor_sides", "index": 0, "label": "ARMOR SIDES", "category": "Armor", "anchor": Vector2(4, 17), "side": 0},
+	{"key": "armor_rear", "index": 0, "label": "ARMOR REAR", "category": "Armor", "anchor": Vector2(-30, 0), "side": 0},
 	{"key": "weapons", "index": 0, "label": "WEAPON 1", "category": "Weapon", "anchor": Vector2(-4, 0), "side": 1},
 	{"key": "weapons", "index": 1, "label": "WEAPON 2", "category": "Weapon", "anchor": Vector2(-20, 0), "side": 1},
 	{"key": "internal", "index": 0, "label": "INTERNAL 1", "category": "Internal", "anchor": Vector2(-27, -6), "side": 1},
@@ -624,8 +626,9 @@ func _stats_line(s: Dictionary, complete: bool) -> String:
 		return "Needs " + ", ".join(missing) + " to deploy"
 	var m := Loadout.mobility(s)
 	var lock := "LOCK %d" % int(s.lock_range) if float(s.lock_range) > 0.0 else "NO LOCK"
-	var line := "ARMOR %d    SPEED %d    ACCEL %d    GRIP %.1f    DPS %d    %s" % [
-		int(s.armor), roundi(float(s.max_speed) * m), roundi(float(s.acceleration) * m), float(s.grip), roundi(Loadout.total_dps(s)), lock]
+	var line := "HP %d   ARMOR %d/%d/%d   SHIELD %d    SPEED %d    ACCEL %d    DPS %d    %s" % [
+		int(s.get("hp", 0.0)), int(s.get("front", 0.0)), int(s.get("side", 0.0)), int(s.get("rear", 0.0)), int(s.get("shield", 0.0)),
+		roundi(float(s.max_speed) * m), roundi(float(s.acceleration) * m), roundi(Loadout.total_dps(s)), lock]
 	var over := StatSheet.overload_cause(s)
 	if over != "":
 		line += "    " + over
@@ -654,6 +657,9 @@ func _refresh_tags() -> void:
 				tag.detail = "%s    OUTPUT %d    WT %d" % [part.rarity, int(part.power_output), int(part.weight)]
 			elif part.has("weight_capacity"):
 				tag.detail = "%s    PWR %d    CAP %d" % [part.rarity, int(part.power), int(part.weight_capacity)]
+			elif part.category == "Armor":
+				var sides := str(slot.key) == "armor_sides"
+				tag.detail = "%s    %d / FACING    WT %d" % [part.rarity, int(part.armor), int(part.get("weight_sides" if sides else "weight", part.weight))]
 			else:
 				tag.detail = "%s    PWR %d    WT %d" % [part.rarity, int(part.power), int(part.get("weight", 0))]
 		tag.queue_redraw()
@@ -685,7 +691,8 @@ func _fill_sheet() -> void:
 
 	var ids: Array[String] = []
 	for id in profile.schematics:
-		if Parts.get_part(id).category == slot.category:
+		var p := Parts.get_part(id)
+		if p.category == slot.category and not (bool(p.get("front_only", false)) and slot.key != "armor_front"):
 			ids.append(id)
 	ids.sort_custom(func(a: String, b: String) -> bool:
 		return (a == current and b != current) or (a != current and b != current and int(Parts.get_part(a).cost) < int(Parts.get_part(b).cost)))
@@ -772,13 +779,14 @@ func _style_card(card: PartCard) -> void:
 func _headline(part: Dictionary) -> String:
 	match str(part.category):
 		"Chassis":
-			return "W/I/U %d/%d/%d  CAP %d  ARMOR %d" % [int(part.hardpoints), int(part.internal_slots), int(part.utility_slots), int(part.weight_capacity), int(part.armor)]
+			return "W/I/U %d/%d/%d  CAP %d  HP %d" % [int(part.hardpoints), int(part.internal_slots), int(part.utility_slots), int(part.weight_capacity), int(part.hp)]
 		"Engine":
 			return "OUTPUT %d  ACCEL %d  WT %d" % [int(part.power_output), int(part.acceleration), int(part.weight)]
 		"Drive":
 			return "PWR %d  WT %d  GRIP %.1f  SPD x%.2f" % [int(part.power), int(part.weight), float(part.grip), float(part.speed_mult)]
 		"Armor":
-			return "ARMOR +%d  RAM %d  WT %d" % [int(part.armor), int(part.ram_damage), int(part.weight)]
+			var where := "FRONT ONLY" if bool(part.get("front_only", false)) else "WT %d/%d" % [int(part.weight), int(part.get("weight_sides", part.weight))]
+			return "%d / FACING  RAM %d  %s" % [int(part.armor), int(part.ram_damage), where]
 		"Weapon":
 			var dps := float(part.fire_rate) * float(part.bullet_damage) * int(part.get("pellets", 1)) * int(part.get("burst", 1))
 			var burst := "  x%d BURST" % int(part.burst) if int(part.get("burst", 1)) > 1 else ""
@@ -803,8 +811,10 @@ static func effect_text(part: Dictionary) -> String:
 	for key: String in labels:
 		if part.has(key):
 			bits.append("%s +%d%%" % [str(labels[key]), roundi((float(part[key]) - 1.0) * 100.0)])
-	if part.has("armor_bonus"):
-		bits.append("ARMOR +%d" % int(part.armor_bonus))
+	if part.has("hp_bonus"):
+		bits.append("HP +%d" % int(part.hp_bonus))
+	if part.has("shield"):
+		bits.append("SHIELD %d" % int(part.shield))
 	if part.has("ram_bonus"):
 		bits.append("RAM +%d" % int(part.ram_bonus))
 	match str(part.get("ability", "")):
@@ -812,6 +822,10 @@ static func effect_text(part: Dictionary) -> String:
 			bits.append("REPAIR %d" % int(part.heal))
 		"mines":
 			bits.append("%d MINES x%d" % [int(part.mines), int(part.mine_damage)])
+		"oil":
+			bits.append("SLICK %d WIDE, %dS, ENEMIES ONLY" % [int(float(part.oil_radius) * 2.0), int(part.oil_time)])
+		"spikes":
+			bits.append("STRIP %d LONG, %dS" % [int(part.spike_length), int(part.spike_time)])
 	return "  ".join(bits)
 
 
@@ -825,6 +839,7 @@ func _deltas(now_stats: Dictionary, after_stats: Dictionary) -> Array:
 		["PWR", "load", false, 0],
 		["WT", "weight", false, 0],
 		["ARMOR", "armor", true, 0],
+		["SHIELD", "shield", true, 0],
 		["SPD", "speed", true, 0],
 		["ACCEL", "accel", true, 0],
 		["GRIP", "grip", true, 1],
@@ -929,7 +944,7 @@ func _open_presets() -> void:
 
 func _summary(loadout: Dictionary) -> String:
 	var names: Array[String] = []
-	for key: String in ["weapons", "drive", "armor", "internal", "utility"]:
+	for key: String in ["weapons", "drive", "armor_front", "internal", "utility"]:
 		var value: Variant = loadout.get(key, "")
 		var ids: Array = value if value is Array else [value]
 		for id: Variant in ids:
@@ -1154,17 +1169,19 @@ class StatSheet extends Control:
 	const UI := preload("res://scripts/ui_theme.gd")
 	const Loadout := preload("res://scripts/loadout.gd")
 	const BulletPool := preload("res://scripts/bullet_pool.gd")
-	const ROW_H := 29.0
+	const ROW_H := 26.0
 	# [label, key, higher is better, decimals, suffix]
 	const LEFT := [
 		["TOP SPEED", "speed", true, 0, ""],
 		["ACCELERATION", "accel", true, 0, ""],
 		["TURN RATE", "turn", true, 0, " DEG/S"],
 		["GRIP", "grip", true, 1, ""],
-		["BRAKING", "brake", true, 0, ""],
-		["ARMOR", "armor", true, 0, ""],
 		["RAM DAMAGE", "ram", true, 0, ""],
-		["POWER LOAD", "load", false, 0, ""],
+		["HP", "hp", true, 0, ""],
+		["FRONT ARMOR", "front", true, 0, ""],
+		["SIDE ARMOR", "side", true, 0, " EACH"],
+		["REAR ARMOR", "rear", true, 0, ""],
+		["SHIELD", "shield", true, 0, ""],
 	]
 	const RIGHT := [
 		["DPS (ALL GUNS)", "dps", true, 0, ""],
@@ -1174,6 +1191,8 @@ class StatSheet extends Control:
 		["SPREAD", "spread", false, 1, " DEG"],
 		["TURRET AIM", "aim", true, 0, " DEG/S"],
 		["LOCK RANGE", "lock", true, 0, ""],
+		["BRAKING", "brake", true, 0, ""],
+		["POWER LOAD", "load", false, 0, ""],
 		["WEIGHT LOAD", "weight", false, 0, ""],
 	]
 	# Rows shown as "used / limit": compared by headroom, not the raw load.
@@ -1201,6 +1220,11 @@ class StatSheet extends Control:
 			"grip": float(s.grip),
 			"brake": float(s.brake),
 			"armor": float(s.armor),
+			"hp": float(s.get("hp", 0.0)),
+			"front": float(s.get("front", 0.0)),
+			"side": float(s.get("side", 0.0)),
+			"rear": float(s.get("rear", 0.0)),
+			"shield": float(s.get("shield", 0.0)),
 			"ram": float(s.ram_damage),
 			"output": float(s.power_output),
 			"dps": Loadout.total_dps(s),

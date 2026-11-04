@@ -12,16 +12,20 @@ const T := preload("res://scripts/tuning.gd")
 const Zombie := preload("res://scripts/zombie.gd")
 const NavGrid := preload("res://scripts/nav_grid.gd")
 const GroundHazards := preload("res://scripts/ground_hazards.gd")
+const StatusBars := preload("res://scripts/status_bars.gd")
 
 var target: Node2D
 var nav: NavGrid
 var hazards: GroundHazards
 var mix := {}                            # kind -> share of each pack (set_mix)
 var tanks_left := 0                      # Tanks still to come this job
+var alt_target: Node2D                   # Escort: the truck; each zombie goes for the nearer one
+var speed_bonus := 1.0                   # Retrieve: the horde speeds up as the danger climbs
 var spawn_points: Array[Vector2] = []
 var spawn_budget := T.CLEAR_SHAMBLERS   # shamblers left to spawn this mission
 # Crowd shape; the mission sets these before the director enters the tree.
-var cap := T.ZOMBIE_CAP                  # most alive at once (pool size)
+var cap := T.ZOMBIE_CAP                  # most alive at once (can rise mid-job up to pool_size)
+var pool_size := 0                       # zombies built up front; 0 = cap
 var start_count := T.ZOMBIE_START        # alive at the start
 var ramp_seconds := T.ZOMBIE_RAMP_SECONDS  # +1 allowed alive every N seconds
 
@@ -32,7 +36,7 @@ var _spawn_timer := 0.0
 
 
 func _ready() -> void:
-	for i in cap:
+	for i in maxi(pool_size, cap):
 		var zombie := Zombie.new()
 		add_child(zombie)
 		zombie.died.connect(_on_zombie_died.bind(zombie))
@@ -114,7 +118,8 @@ func _physics_process(delta: float) -> void:
 func _steer(delta: float) -> void:
 	if target == null:
 		return
-	var goal := target.position
+	var player_goal := target.position
+	var alt := alt_target != null and alt_target.is_inside_tree() and not bool(alt_target.get("is_wrecked"))
 	var space := get_world_2d().direct_space_state
 	var sep_dist := T.SHAMBLER_SEPARATION
 	var sep_dist2 := sep_dist * sep_dist
@@ -123,6 +128,10 @@ func _steer(delta: float) -> void:
 	var count := _active.size()
 	for a in count:
 		var zombie := _active[a]
+		var chase: Node2D = target
+		if alt and zombie.position.distance_squared_to(alt_target.position) < zombie.position.distance_squared_to(player_goal):
+			chase = alt_target
+		var goal := chase.position
 		# Re-plan a few times a second (staggered): straight at the target when
 		# it's in sight, otherwise along the nav grid around buildings.
 		zombie.nav_timer -= delta
@@ -139,6 +148,8 @@ func _steer(delta: float) -> void:
 			desired = to_goal.normalized() * zombie.speed
 		# Cheap O(n^2) separation; n is capped at ~28, so ~800 checks a tick.
 		var push := Vector2.ZERO
+		var burning := zombie.status.active(StatusBars.FIRE)
+		var touch2 := T.BURNING_TOUCH * T.BURNING_TOUCH
 		for b in count:
 			if a == b:
 				continue
@@ -146,20 +157,33 @@ func _steer(delta: float) -> void:
 			var d2 := away.length_squared()
 			if d2 < sep_dist2 and d2 > 0.01:
 				push += away * ((sep_dist2 - d2) / sep_dist2) / sqrt(d2)
+			if burning and d2 < touch2:
+				_active[b].add_buildup(StatusBars.FIRE, T.BURNING_SPREAD * delta)   # BURNING spreads on touch
 		desired += push * zombie.speed * 0.9
 		if hazards != null:
-			zombie.frenzy = (marked and zombie.position.distance_squared_to(goal) < mark_range2) or hazards.bile_at(zombie.position)
+			zombie.frenzy = (marked and zombie.position.distance_squared_to(player_goal) < mark_range2) or hazards.bile_at(zombie.position)
+			zombie.oiled = hazards.oil_at(zombie.position)
+			if hazards.fire_at(zombie.position):
+				zombie.add_buildup(StatusBars.FIRE, T.STATUS_POOL_BUILDUP * delta)
+			zombie.spiked = hazards.spike_at(zombie.position)
+			if zombie.kind != "slimer" and hazards.slime_at(zombie.position):
+				zombie.add_buildup(StatusBars.SLIME, T.STATUS_POOL_BUILDUP * delta)
 			if zombie.kind == "slimer":
 				zombie.slime_timer -= delta
 				if zombie.slime_timer <= 0.0:
 					zombie.slime_timer = T.SLIME_DROP_EVERY
 					hazards.add_slime(zombie.position, T.SLIME_RADIUS)
-		zombie.step(delta, desired, target)
-	# Boomers that reached the rig pop now, outside the loop over _active.
+		zombie.step(delta, desired * speed_bonus, chase)
+	# Boomers that reached the rig pop now, and burning / toxic damage lands,
+	# outside the loop over _active (a death there would shift the list).
 	for i in range(_active.size() - 1, -1, -1):
 		var zombie := _active[i]
 		if zombie.burst:
 			zombie.take_hit(zombie.hp + 1.0, Vector2.ZERO, "burst")
+		elif zombie.pending_damage >= 3.0:
+			var dmg := zombie.pending_damage
+			zombie.pending_damage = 0.0
+			zombie.take_hit(dmg, Vector2.ZERO, "status")
 
 
 ## Spawns a pack at one off-screen point so they arrive as a mob, without
@@ -218,7 +242,7 @@ func _on_zombie_died(at: Vector2, zombie: Zombie) -> void:
 			"boomer":
 				hazards.add_bile(at)
 				if target != null and target.global_position.distance_to(at) < T.BOOMER_POOL_RADIUS + 32.0:
-					hazards.mark(target)
+					target.call("fill_status", StatusBars.GOOP)   # GOOPED: the mission marks the rig
 			"slimer":
 				hazards.add_slime(at, T.SLIME_PUDDLE_RADIUS)
 	zombie_killed.emit(at, zombie.kind)

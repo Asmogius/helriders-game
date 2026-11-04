@@ -143,17 +143,20 @@ func _process(_delta: float) -> bool:
 				z.take_hit(1000.0, Vector2.ZERO)
 				_check(main.hazards.slime_at(at + Vector2(T.SLIME_PUDDLE_RADIUS - 5.0, 0)), "Slimer: dies into a puddle")
 				rig.global_position = at
-			if frame == 93:
-				_check(is_equal_approx(rig.traction, T.SLIME_GRIP), "on slime the rig keeps %d%% of its grip" % roundi(T.SLIME_GRIP * 100.0))
+				rig.velocity = Vector2.ZERO
+			# Slime builds SLICK (§14): ~5 s on it with the shield up (+15 resist), then the tyres slide.
+			if frame == 93 + 360:
+				_check(is_equal_approx(rig.traction, T.SLIME_GRIP), "sitting on slime builds SLICK: the rig keeps %d%% of its grip" % roundi(T.SLIME_GRIP * 100.0))
 				rig.global_position = SPOT + Vector2(0, 500)
-			if frame == 93 + roundi(T.SLIME_LINGER * 60.0) - 6:
-				_check(is_equal_approx(rig.traction, T.SLIME_GRIP), "slick for a moment after leaving the slime")
-			if frame == 93 + roundi(T.SLIME_LINGER * 60.0) + 4:
+			if frame == 93 + 360 + 60:
+				_check(is_equal_approx(rig.traction, T.SLIME_GRIP), "still slick after leaving the slime (SLICK lasts %d s)" % int(T.STATUS_TIME_RIG[4]))
+			if frame == 93 + 360 + roundi(T.STATUS_TIME_RIG[4] * 60.0) + 10:
 				_check(is_equal_approx(rig.traction, 1.0), "then the tyres grip again")
 				var enemy := main.spawn_outrider(SPOT + Vector2(-600, 0))
-				main.hazards.add_slime(enemy.global_position, 80.0)
+				enemy.player = null   # parked: no one to chase, so it sits in the slime
+				main.hazards.add_slime(enemy.global_position, 200.0)
 				mark.enemy = enemy
-			if frame == 93 + roundi(T.SLIME_LINGER * 60.0) + 6:
+			if frame == 93 + 360 + roundi(T.STATUS_TIME_RIG[4] * 60.0) + 10 + 240:
 				_check(is_equal_approx((mark.enemy as Node).get("traction"), T.SLIME_GRIP), "enemy rigs slide on slime too")
 				for i in 400:
 					main.hazards.add_slime(SPOT + Vector2(i, 0), 10.0)

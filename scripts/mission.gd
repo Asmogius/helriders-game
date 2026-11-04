@@ -21,6 +21,12 @@ const Vehicle := preload("res://scripts/vehicle.gd")
 const EnemyRig := preload("res://scripts/enemy_rig.gd")
 const BulwarkRig := preload("res://scripts/bulwark_rig.gd")
 const GunnerRig := preload("res://scripts/gunner_rig.gd")
+const ScrapperRig := preload("res://scripts/scrapper_rig.gd")
+const ScrapperGunnerRig := preload("res://scripts/scrapper_gunner_rig.gd")
+const ConvoyRig := preload("res://scripts/convoy_rig.gd")
+const FriendlyTruck := preload("res://scripts/friendly_truck.gd")
+const StatusBars := preload("res://scripts/status_bars.gd")
+const Barrel := preload("res://scripts/barrel.gd")
 const Crew := preload("res://scripts/crew.gd")
 const Hunter := preload("res://scripts/hunter.gd")
 const BulletPool := preload("res://scripts/bullet_pool.gd")
@@ -35,7 +41,7 @@ const ProfileScript := preload("res://scripts/profile.gd")
 const GARAGE_SCENE := "res://scenes/garage.tscn"
 const HUNTER_POOL := 2
 
-enum State { RUNNING, WRECKED, CLEARED }
+enum State { RUNNING, WRECKED, CLEARED, FAILED }
 
 ## Off for tests that want to place the Hunter and Outriders themselves.
 var auto_spawn_specials := true
@@ -53,6 +59,8 @@ var skulls := 3                  # difficulty, 1 to 6
 var arena: Arena
 var splats: Splats
 var hazards: GroundHazards
+var barrels: Array[Barrel] = []
+var barrel_layer: Node2D
 var zombies: ZombieDirector
 var vehicle: Vehicle
 var rigs: Node2D                 # enemy rigs live here
@@ -65,6 +73,14 @@ var bulwarks: Array[EnemyRig] = []    # heavy rammers, built up front like Outri
 var bulwark: BulwarkRig          # the first Bulwark (tests use it)
 var gunners: Array[EnemyRig] = []     # standoff turret rigs, built up front too
 var gunner: GunnerRig            # the first Gunner Rig (tests use it)
+var scrappers: Array[EnemyRig] = []   # trap layers, built up front too
+var scrapper: ScrapperRig        # the first Scrapper (tests use it)
+var scrapper_gunners: Array[EnemyRig] = []   # the harder variant, built up front too
+var scrapper_gunner: ScrapperGunnerRig       # the first one (tests use it)
+var use_scrapper_gunner := false             # this job's Scrapper is the Gunner variant
+var convoys: Array[EnemyRig] = []     # elite semis with trailers, built up front too
+var convoy: ConvoyRig            # the first Convoy Lead (tests use it)
+var enemy_mines: MinePool        # the Scrappers' mines (hurt you and zombies)
 var marked: Node2D               # the last target a Spotter marked (tests)
 var bullets: BulletPool
 var mines: MinePool
@@ -89,6 +105,24 @@ var bank_report := {}
 var checkpoints := PackedVector2Array()
 var checkpoint_index := 0
 var par := {}                    # "gold" / "silver" / "bronze" seconds
+# Retrieve: caches around the block, an extraction point, rising danger.
+var caches := PackedVector2Array()
+var cache_taken: Array[bool] = []
+var deep_cache := -1             # index of the guarded, double-value cache
+var extract_at := Vector2.ZERO
+var extract_armed := false       # left the zone once, so driving back in counts
+var danger := 0                  # caches grabbed + one per RETRIEVE_STEP_SECONDS
+var _base_cap := 0
+var _rig_calls := 0              # rigs the job may still call in as danger climbs
+var _rig_calls_made := 0
+var _empty_warned := false
+# Escort: the salvage truck, its sites and the driver's optional detour.
+var truck: FriendlyTruck
+var optional_site := Vector2.INF
+var optional_offered := false
+var optional_taken := false
+var optional_index := -1
+var optional_name := ""
 
 var _events: Array = []          # [seconds, kind, kills that also trigger it (-1 = none), fired]
 
@@ -107,6 +141,13 @@ func _ready() -> void:
 	arena = Arena.new()
 	splats = Splats.new()
 	hazards = GroundHazards.new()
+	barrel_layer = Node2D.new()
+	for i in T.BARRELS_PER_JOB:
+		var b := Barrel.new()
+		b.hazards = hazards
+		barrels.append(b)
+		barrel_layer.add_child(b)
+	_place_barrels()
 	splats.z_index = -5
 	zombies = ZombieDirector.new()
 	vehicle = Vehicle.new()
@@ -117,6 +158,8 @@ func _ready() -> void:
 	bullets = BulletPool.new()
 	bullets.z_index = 4
 	mines = MinePool.new()
+	enemy_mines = MinePool.new()
+	enemy_mines.enemy = true
 	fx = Fx.new()
 	fx.z_index = 5
 	pickups = Node2D.new()
@@ -140,12 +183,24 @@ func _ready() -> void:
 	vehicle.rotation = -PI / 2.0
 	vehicle.bullets = bullets
 	vehicle.mines = mines
+	vehicle.hazards = hazards
 	vehicle.fx = fx
 	vehicle.lock_candidates = lock_candidates
 	for rig: EnemyRig in _all_enemy_rigs():
 		rig.player = vehicle
 		rig.bullets = bullets
 		rig.fx = fx
+		rig.arm_for_skulls(skulls)   # Gunner Rigs and the Convoy cab carry a shield from 4 skulls
+	if truck != null:
+		# Escort: the truck rolls out behind you, and the zombies and enemy
+		# rigs go for it.
+		truck.position = Arena.PLAYER_START + Vector2(0, 110)
+		truck.rotation = -PI / 2.0
+		truck.bullets = bullets
+		truck.fx = fx
+		zombies.alt_target = truck
+		for rig: EnemyRig in _all_enemy_rigs():
+			rig.player = truck
 	for h in hunters:
 		h.target = vehicle
 		h.nav = nav
@@ -153,6 +208,9 @@ func _ready() -> void:
 	zombies.hazards = hazards
 	bullets.fx = fx
 	mines.fx = fx
+	for b in barrels:
+		b.fx = fx
+	enemy_mines.fx = fx
 	zombies.target = vehicle
 	zombies.spawn_points = arena.spawn_points
 	camera.target = vehicle
@@ -162,8 +220,10 @@ func _ready() -> void:
 	# Tree order is also physics order:
 	# inputs (here) -> zombies -> player rig -> enemy rigs -> hunters -> bullets.
 	# Hunters run after the rig so they see this tick's wall contact.
-	for node: Node in [arena, splats, hazards, markers, mines, pickups, zombies, vehicle, rigs]:
+	for node: Node in [arena, splats, hazards, markers, mines, enemy_mines, barrel_layer, pickups, zombies, vehicle, rigs]:
 		add_child(node)
+	if truck != null:
+		add_child(truck)
 	for h in hunters:
 		add_child(h)
 	for node: Node in [bullets, fx, reticle, camera, hud]:
@@ -175,6 +235,7 @@ func _ready() -> void:
 
 	zombies.zombie_killed.connect(_on_zombie_killed)
 	vehicle.wrecked.connect(_on_wrecked)
+	vehicle.status_started.connect(_on_status_started)
 	vehicle.crew_injured.connect(_on_crew_injured)
 	vehicle.crew_healed.connect(_on_crew_healed)
 	vehicle.crew_ability_used.connect(_on_crew_ability)
@@ -189,8 +250,20 @@ func _ready() -> void:
 		rig.wrecked.connect(_on_bulwark_wrecked.bind(rig))
 	for rig in gunners:
 		rig.wrecked.connect(_on_gunner_wrecked.bind(rig))
+	for rig in scrappers:
+		rig.wrecked.connect(_on_scrapper_wrecked.bind(rig))
+	for rig in scrapper_gunners:
+		rig.wrecked.connect(_on_scrapper_gunner_wrecked.bind(rig))
+	for rig in convoys:
+		rig.wrecked.connect(_on_convoy_wrecked.bind(rig))
+		(rig as ConvoyRig).trailer.wrecked.connect(_on_trailer_lost.bind(rig))
 	if elite != null:
 		elite.wrecked.connect(_on_elite_wrecked)
+	if truck != null:
+		truck.wrecked.connect(_on_truck_lost)
+		truck.site_reached.connect(_on_site_reached)
+		truck.site_done.connect(_on_site_done)
+		hud.choice_made.connect(_on_optional_choice)
 	hud.restart_requested.connect(return_to_garage)
 	hud.lock_toggled.connect(func(on: bool) -> void: vehicle.lock_enabled = on)
 	hud.ability_pressed.connect(use_ability)
@@ -209,6 +282,8 @@ func _configure_mission() -> void:
 	var outrider_count := 0
 	var bulwark_count := 0
 	var gunner_count := 0
+	var scrapper_count := 0
+	var convoy_count := 0
 	match mission_type:
 		"clear":
 			var shamblers: int = Missions.stat(spec, "shamblers")
@@ -216,9 +291,16 @@ func _configure_mission() -> void:
 			outrider_count = Missions.stat(spec, "outriders")
 			bulwark_count = Missions.stat(spec, "bulwarks")
 			gunner_count = Missions.stat(spec, "gunners")
+			scrapper_count = Missions.stat(spec, "scrappers")
+			if Missions.has_convoy(spec):
+				convoy_count = 1
+				outrider_count = maxi(outrider_count - 1, 0)
+				_events.append([T.OUTRIDER_SPAWN_TIME, "convoy", T.OUTRIDER_SPAWN_KILLS, false])
 			zombies.spawn_budget = shamblers
 			zombies.start_count = mini(T.ZOMBIE_START, cap)
-			target_kills = shamblers + hunter_count + outrider_count + bulwark_count + gunner_count
+			target_kills = shamblers + hunter_count + outrider_count + bulwark_count + gunner_count + scrapper_count + convoy_count
+			for i in scrapper_count:
+				_events.append([T.SCRAPPER_SPAWN_TIME + 40.0 * i, "scrapper", T.SCRAPPER_SPAWN_KILLS if i == 0 else -1, false])
 			for i in gunner_count:
 				_events.append([T.GUNNER_SPAWN_TIME + 40.0 * i, "gunner", T.GUNNER_SPAWN_KILLS if i == 0 else -1, false])
 			for i in bulwark_count:
@@ -231,14 +313,22 @@ func _configure_mission() -> void:
 			zombies.spawn_budget = 1000000
 			zombies.start_count = 10
 			zombies.ramp_seconds = Missions.stat(spec, "ramp")
+			var swap := Missions.has_convoy(spec)
 			for e: Array in Missions.stat(spec, "events"):
-				_events.append([float(e[0]), str(e[1]), -1, false])
-				if e[1] == "outrider":
+				var kind := str(e[1])
+				if swap and kind == "outrider":
+					kind = "convoy"   # the Convoy Lead takes the first Outrider's slot
+					swap = false
+					convoy_count += 1
+				_events.append([float(e[0]), kind, -1, false])
+				if kind == "outrider":
 					outrider_count += 1
 				elif e[1] == "bulwark":
 					bulwark_count += 1
 				elif e[1] == "gunner":
 					gunner_count += 1
+				elif e[1] == "scrapper":
+					scrapper_count += 1
 		"hunt":
 			zombies.spawn_budget = 1000000
 			zombies.start_count = mini(8, cap)
@@ -246,6 +336,10 @@ func _configure_mission() -> void:
 			elite.make_elite(str(spec.name).to_upper(), Missions.stat(spec, "elite_armor"), Missions.stat(spec, "elite_damage"))
 			_events.append([3.0, "elite", -1, false])
 			outrider_count = Missions.stat(spec, "escorts")
+			if Missions.has_convoy(spec):
+				convoy_count = 1
+				outrider_count = maxi(outrider_count - 1, 0)
+				_events.append([3.0, "convoy_escort", -1, false])
 			for i in outrider_count:
 				_events.append([3.0, "escort", -1, false])
 			bulwark_count = Missions.stat(spec, "bulwark_escorts")
@@ -269,6 +363,53 @@ func _configure_mission() -> void:
 			gunner_count = Missions.stat(spec, "gunners")
 			for i in gunner_count:
 				_events.append([3.0, "gunner_guard", -1, false])
+			scrapper_count = Missions.stat(spec, "scrappers")
+			for i in scrapper_count:
+				_events.append([20.0, "scrapper", -1, false])
+	match mission_type:
+		"retrieve":
+			zombies.spawn_budget = 1000000
+			zombies.pool_size = T.ZOMBIE_CAP
+			zombies.start_count = mini(8, cap)
+			_base_cap = cap
+			extract_at = Arena.PLAYER_START
+			_plan_caches(int(Missions.stat(spec, "caches")))
+			for i in int(Missions.stat(spec, "hunters")):
+				_events.append([50.0 + 45.0 * i, "hunter", -1, false])
+			_rig_calls = int(Missions.stat(spec, "rig_calls"))
+			for i in _rig_calls:
+				match _rig_call_kind(i):
+					"scrapper":
+						scrapper_count += 1
+					"outrider":
+						outrider_count += 1
+					_:
+						gunner_count += 1
+			gunner_count += 1   # the deep cache's guard
+			_events.append([1.0, "deep_guard", -1, false])
+		"escort":
+			zombies.spawn_budget = 1000000
+			zombies.pool_size = T.ZOMBIE_CAP
+			zombies.start_count = mini(8, cap)
+			zombies.ramp_seconds = Missions.stat(spec, "ramp")
+			for e: Array in Missions.stat(spec, "events"):
+				var kind := str(e[1])
+				_events.append([float(e[0]), kind, -1, false])
+				match kind:
+					"outrider":
+						outrider_count += 1
+					"bulwark":
+						bulwark_count += 1
+					"gunner":
+						gunner_count += 1
+					"scrapper":
+						scrapper_count += 1
+			outrider_count += 1   # the optional site may call one in
+			for i in int(Missions.stat(spec, "hunters")):
+				_events.append([60.0 + 45.0 * i, "hunter", -1, false])
+			truck = FriendlyTruck.new()
+			truck.nav = nav
+			_plan_sites(int(Missions.stat(spec, "sites")))
 	# Always keep one Outrider ready (tests spawn one by hand); never more
 	# rigs than the design's cap of three.
 	var room := T.MAX_ENEMY_RIGS - (1 if elite != null else 0)
@@ -283,6 +424,16 @@ func _configure_mission() -> void:
 	for i in maxi(gunner_count, 1):
 		gunners.append(GunnerRig.new())
 	gunner = gunners[0] as GunnerRig
+	use_scrapper_gunner = Missions.has_scrapper_gunner(spec)
+	for i in (1 if use_scrapper_gunner else maxi(scrapper_count, 1)):
+		scrappers.append(ScrapperRig.new())
+	scrapper = scrappers[0] as ScrapperRig
+	for i in (maxi(scrapper_count, 1) if use_scrapper_gunner else 1):
+		scrapper_gunners.append(ScrapperGunnerRig.new())
+	scrapper_gunner = scrapper_gunners[0] as ScrapperGunnerRig
+	for i in maxi(convoy_count, 1):
+		convoys.append(ConvoyRig.new())
+	convoy = convoys[0] as ConvoyRig
 
 
 func _physics_process(delta: float) -> void:
@@ -304,6 +455,8 @@ func _physics_process(delta: float) -> void:
 		"courier":
 			if checkpoint_index < checkpoints.size() and vehicle.global_position.distance_to(checkpoints[checkpoint_index]) < T.COURIER_RADIUS:
 				reach_checkpoint()
+		"retrieve":
+			_update_retrieve()
 
 
 func _process(_delta: float) -> void:
@@ -429,6 +582,8 @@ func return_to_garage() -> void:
 
 func _exit_tree() -> void:
 	Engine.time_scale = 1.0
+	if is_inside_tree():
+		get_tree().paused = false
 	# Rigs are built up front; free any that never made it into the fight.
 	for rig in _all_enemy_rigs():
 		if not rig.is_inside_tree():
@@ -439,6 +594,9 @@ func _all_enemy_rigs() -> Array[EnemyRig]:
 	var all: Array[EnemyRig] = outriders.duplicate()
 	all.append_array(bulwarks)
 	all.append_array(gunners)
+	all.append_array(scrappers)
+	all.append_array(scrapper_gunners)
+	all.append_array(convoys)
 	if elite != null:
 		all.append(elite)
 	return all
@@ -471,6 +629,20 @@ func _run_events() -> void:
 				e[3] = spawn_bulwark(near) != null
 			"gunner":
 				e[3] = spawn_gunner(zombies.pick_spawn_point()) != null
+			"scrapper":
+				e[3] = spawn_scrapper(zombies.pick_spawn_point()) != null
+			"convoy":
+				e[3] = spawn_convoy(zombies.pick_spawn_point()) != null
+			"deep_guard":
+				# A Gunner Rig parked on the deep cache.
+				var post := caches[deep_cache] if deep_cache >= 0 else zombies.pick_spawn_point()
+				var guard := spawn_gunner(post + Vector2(randf_range(-110, 110), randf_range(-110, 110)), false)
+				if guard != null:
+					(guard as GunnerRig).guard_point = post
+				e[3] = guard != null
+			"convoy_escort":
+				var near: Vector2 = elite.global_position + Vector2(randf_range(-180, 180), randf_range(-180, 180)) if elite.is_inside_tree() else zombies.pick_spawn_point()
+				e[3] = spawn_convoy(near) != null
 			"gunner_escort":
 				var near: Vector2 = elite.global_position + Vector2(randf_range(-160, 160), randf_range(-160, 160)) if elite.is_inside_tree() else zombies.pick_spawn_point()
 				e[3] = spawn_gunner(near) != null
@@ -533,6 +705,39 @@ func spawn_gunner(at: Vector2, announce := true) -> EnemyRig:
 	return null
 
 
+## Sends in the next Scrapper (this job's variant), if there's room under the
+## rig cap. `gunner` forces the Scrapper Gunner (tests).
+func spawn_scrapper(at: Vector2, gunner := false) -> EnemyRig:
+	if active_rig_count() >= T.MAX_ENEMY_RIGS:
+		return null
+	var pool := scrapper_gunners if (gunner or use_scrapper_gunner) else scrappers
+	for rig in pool:
+		if not rig.is_inside_tree():
+			var s := rig as ScrapperRig
+			s.enemy_mines = enemy_mines
+			s.hazards = hazards
+			rig.position = at
+			rig.rotation = (vehicle.global_position - at).angle()
+			rigs.add_child(rig)
+			hud.banner(("SCRAPPER GUNNER" if rig is ScrapperGunnerRig else "SCRAPPER") + " INBOUND  -  WATCH FOR TRAPS", T.COL_ENEMY)
+			return rig
+	return null
+
+
+## Sends in the next Convoy Lead (cab and trailer, one rig toward the cap).
+func spawn_convoy(at: Vector2) -> EnemyRig:
+	if active_rig_count() >= T.MAX_ENEMY_RIGS:
+		return null
+	for rig in convoys:
+		if not rig.is_inside_tree():
+			rig.position = at
+			rig.rotation = (vehicle.global_position - at).angle()
+			rigs.add_child(rig)
+			hud.banner("CONVOY LEAD INBOUND  -  GET BESIDE IT", T.COL_ENEMY)
+			return rig
+	return null
+
+
 ## Enemy rigs in the fight right now (wrecks don't count).
 func active_rig_count() -> int:
 	var n := 0
@@ -562,6 +767,9 @@ func lock_candidates() -> Array[Node2D]:
 	for rig in rigs.get_children():
 		if not rig.get("is_wrecked"):
 			out.append(rig as Node2D)
+		var trailer: Variant = rig.get("trailer")
+		if trailer is Node2D and not (trailer as Node2D).get("is_wrecked"):
+			out.append(trailer as Node2D)
 	return out
 
 
@@ -617,10 +825,234 @@ func courier_tier() -> String:
 	return "late"
 
 
+# --- Retrieve ----------------------------------------------------------------------
+
+## Spread the caches over the block, away from the extraction point; the
+## farthest one is the deep cache.
+func _plan_caches(count: int) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = int(spec.seed)
+	var pool: Array = Arena.CHECKPOINTS.filter(func(p: Vector2) -> bool: return p.distance_to(extract_at) >= 500.0)
+	_shuffle(pool, rng)
+	caches = PackedVector2Array()
+	for p: Vector2 in pool:
+		if caches.size() >= count:
+			break
+		# Not two caches on the same corner.
+		var crowded := false
+		for c in caches:
+			crowded = crowded or c.distance_to(p) < 450.0
+		if not crowded:
+			caches.append(p)
+	for p: Vector2 in pool:
+		if caches.size() >= count:
+			break
+		if not caches.has(p):
+			caches.append(p)
+	cache_taken.clear()
+	deep_cache = -1
+	var far := -1.0
+	for i in caches.size():
+		cache_taken.append(false)
+		var d := caches[i].distance_to(extract_at)
+		if d > far:
+			far = d
+			deep_cache = i
+
+
+static func _shuffle(list: Array, rng: RandomNumberGenerator) -> void:
+	for i in range(list.size() - 1, 0, -1):
+		var j := rng.randi_range(0, i)
+		var tmp: Variant = list[i]
+		list[i] = list[j]
+		list[j] = tmp
+
+
+## The rigs a Retrieve calls in as danger climbs, in order.
+static func _rig_call_kind(i: int) -> String:
+	return ["scrapper", "outrider", "gunner"][i % 3]
+
+
+func caches_grabbed() -> int:
+	return cache_taken.count(true)
+
+
+func _update_retrieve() -> void:
+	var at := vehicle.global_position
+	for i in caches.size():
+		if not cache_taken[i] and at.distance_to(caches[i]) < T.CACHE_RADIUS:
+			take_cache(i)
+	var step := caches_grabbed() + int(elapsed / T.RETRIEVE_STEP_SECONDS)
+	if step != danger:
+		_set_danger(step)
+	var d := at.distance_to(extract_at)
+	if not extract_armed:
+		extract_armed = d > T.EXTRACT_ARM_DISTANCE
+	elif d < T.EXTRACT_RADIUS:
+		if caches_grabbed() > 0:
+			_succeed("EXTRACTED", "Caches %d / %d%s" % [caches_grabbed(), caches.size(), ", deep cache too" if cache_taken[deep_cache] else ""], retrieve_pay_mult())
+		elif not _empty_warned:
+			_empty_warned = true
+			hud.banner("NOTHING TO EXTRACT YET  -  GRAB A CACHE", Color(0.95, 0.8, 0.3), 2.0)
+	elif d > T.EXTRACT_RADIUS * 2.0:
+		_empty_warned = false
+
+
+## Grab cache `i` (driving over it does this). The deep cache carries a sure
+## schematic, which rides with the rest of the salvage.
+func take_cache(i: int) -> void:
+	if i < 0 or i >= caches.size() or cache_taken[i]:
+		return
+	cache_taken[i] = true
+	if i == deep_cache:
+		var unknown := profile.unknown_schematics(Parts.DROP_POOLS.retrieve, _pending_ids())
+		if unknown.is_empty():
+			hud.banner("DEEP CACHE  -  DOUBLE PAY", T.COL_ELITE, 2.5)
+		else:
+			var part := Parts.get_part(unknown.pick_random())
+			salvage.append(part)
+			hud.banner("DEEP CACHE  -  SCHEMATIC: " + Parts.describe(part).to_upper(), T.COL_ELITE, 3.0)
+	else:
+		hud.banner("CACHE %d / %d" % [caches_grabbed(), caches.size()], Color(0.95, 0.8, 0.3), 1.6)
+
+
+func _set_danger(step: int) -> void:
+	var rose := step > danger
+	danger = step
+	zombies.cap = mini(_base_cap + step * T.RETRIEVE_CAP_STEP, T.ZOMBIE_CAP)
+	zombies.speed_bonus = 1.0 + step * T.RETRIEVE_SPEED_STEP
+	if rose and T.RETRIEVE_RIG_STEPS.has(step) and _rig_calls_made < _rig_calls:
+		_events.append([elapsed, _rig_call_kind(_rig_calls_made), -1, false])
+		_rig_calls_made += 1
+		hud.banner("THE BLOCK IS STIRRING  -  DANGER %d" % step, Color(0.95, 0.8, 0.3), 2.0)
+
+
+## Pay share for what you bring out: 30% for getting out, the rest by caches
+## (the deep cache counts double).
+func retrieve_pay_mult() -> float:
+	var total := float(caches.size() - 1) + T.RETRIEVE_DEEP_MULT
+	var got := 0.0
+	for i in caches.size():
+		if cache_taken[i]:
+			got += T.RETRIEVE_DEEP_MULT if i == deep_cache else 1.0
+	return T.RETRIEVE_BASE_SHARE + (1.0 - T.RETRIEVE_BASE_SHARE) * got / maxf(total, 1.0)
+
+
+# --- Escort -------------------------------------------------------------------------
+
+## The truck's salvage sites, chained across the block, plus the optional one
+## the driver may offer (well away from the route).
+func _plan_sites(count: int) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = int(spec.seed)
+	var pool: Array = Arena.CHECKPOINTS.duplicate()
+	var at := Arena.PLAYER_START
+	for i in count:
+		var options: Array = pool.filter(func(p: Vector2) -> bool:
+			var d := at.distance_to(p)
+			return d >= 450.0 and d <= 1300.0)
+		if options.is_empty():
+			options = pool
+		var next: Vector2 = options[rng.randi_range(0, options.size() - 1)]
+		pool.erase(next)
+		truck.sites.append(next)
+		truck.site_times.append(T.ESCORT_SALVAGE_TIME)
+		at = next
+	var risky: Array = pool.filter(func(p: Vector2) -> bool:
+		for s in truck.sites:
+			if s.distance_to(p) < 500.0:
+				return false
+		return true)
+	if risky.is_empty():
+		risky = pool
+	if not risky.is_empty():
+		optional_site = risky[rng.randi_range(0, risky.size() - 1)]
+	var names := ["an overturned tanker", "a collapsed parts depot", "a burned-out wrecker yard", "a stalled freight train"]
+	optional_name = str(names[rng.randi_range(0, names.size() - 1)])
+
+
+func _on_site_reached(i: int) -> void:
+	if optional_taken and i == optional_index:
+		# They heard the crane: a big wave and a rig converge on the site.
+		zombies.cap = mini(zombies.cap + T.ESCORT_OPTIONAL_WAVE, T.ZOMBIE_CAP)
+		for k in T.ESCORT_OPTIONAL_WAVE:
+			var p := zombies.pick_spawn_point()
+			zombies.spawn_at(p + Vector2(randf_range(-20, 20), randf_range(-20, 20)), zombies.roll_kind())
+		_events.append([elapsed, "outrider", -1, false])
+		hud.banner("THEY HEARD THE CRANE  -  HOLD THEM OFF", T.COL_ENEMY, 2.5)
+	else:
+		hud.banner("TRUCK ON SITE  -  KEEP THEM OFF IT", T.COL_TRUCK, 1.8)
+
+
+func _on_site_done(i: int) -> void:
+	if state != State.RUNNING:
+		return
+	if optional_taken and i == optional_index:
+		zombies.cap = maxi(zombies.cap - T.ESCORT_OPTIONAL_WAVE, int(Missions.stat(spec, "cap")))
+	if truck.is_done():
+		var detail := "All %d sites salvaged%s" % [truck.sites.size(), ", including the risky one" if optional_taken else ""]
+		_succeed("SALVAGE RUN DONE", detail, T.ESCORT_OPTIONAL_PAY if optional_taken else 1.0)
+		return
+	hud.banner("SITE DONE  -  MOVING ON", T.COL_TRUCK, 1.6)
+	if i == 0 and not optional_offered and optional_site != Vector2.INF:
+		_offer_optional()
+
+
+## The driver radios about the risky site; the game waits for your answer.
+func _offer_optional() -> void:
+	optional_offered = true
+	get_tree().paused = true
+	hud.show_choice("SALVAGE TRUCK DRIVER",
+		"\"There's %s a few blocks over. Loaded with parts, but crawling with them, and it's slow work. Could be worth it. Your call.\"" % optional_name,
+		"TAKE THE RISK  (+60% PAY, SCHEMATIC)",
+		"STICK TO THE PLAN")
+
+
+func _on_optional_choice(yes: bool) -> void:
+	get_tree().paused = false
+	if not yes or truck == null or truck.is_wrecked:
+		hud.banner("STICKING TO THE PLAN", T.COL_TRUCK, 1.6)
+		return
+	optional_taken = true
+	optional_index = truck.site_index
+	truck.insert_site(optional_site, T.ESCORT_OPTIONAL_TIME)
+	hud.banner("DETOUR  -  THE TRUCK'S HEADING FOR IT", T.COL_ORANGE, 2.0)
+
+
+func _on_truck_lost() -> void:
+	if state != State.RUNNING:
+		return
+	_fail("TRUCK LOST", "The salvage truck was wrecked. No job pay.")
+
+
+## The job failed but your rig made it home: the day passes, you keep what
+## you picked up, no job pay and no wreck penalty.
+func _fail(title: String, detail: String) -> void:
+	hud.close_crew_wheel(false)
+	hud.close_choice()
+	get_tree().paused = false
+	Engine.time_scale = 1.0
+	state = State.FAILED
+	for p in pickups.get_children():
+		_take_salvage(p as Pickup)
+	bank_report = profile.bank_run(int(scrap), _pending_ids())
+	profile.finish_day()
+	profile.bank_crew(0, injured_crew_ids(), bool(vehicle.crew_mod("triage")))
+	var lines := detail + "\nKill scrap +%d    Time %s" % [int(scrap), _clock(elapsed)]
+	for id: String in bank_report.unlocked:
+		lines += "\nNew schematic: " + Parts.describe(Parts.get_part(id))
+	hud.show_result(title, lines, "RETURN TO GARAGE", T.COL_ORANGE)
+
+
 # --- HUD -------------------------------------------------------------------------
 
 func _refresh_hud() -> void:
 	hud.set_armor(vehicle.armor / vehicle.armor_max)
+	var plates := PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
+	for i in 4:
+		plates[i] = vehicle.facing_armor[i] / vehicle.facing_max[i] if vehicle.facing_max[i] > 0.0 else -1.0
+	hud.set_defense(vehicle.shield / vehicle.shield_max if vehicle.shield_max > 0.0 else -1.0, plates, vehicle.hp / maxf(vehicle.hp_max, 1.0))
+	hud.set_statuses(vehicle.status.build, vehicle.status.left)
 	hud.set_power(vehicle.power_load(), vehicle.power_capacity(), vehicle.weight_load, vehicle.weight_limit())
 	for i in vehicle.crew.size():
 		_crew_state(i)
@@ -648,6 +1080,17 @@ func _refresh_hud() -> void:
 		if mission_type == "courier" and checkpoint_index < checkpoints.size():
 			points.append(to_screen * checkpoints[checkpoint_index])
 			colors.append(T.COL_CYAN)
+		if mission_type == "retrieve":
+			for i in caches.size():
+				if not cache_taken[i]:
+					points.append(to_screen * caches[i])
+					colors.append(T.COL_ELITE if i == deep_cache else Color(0.95, 0.8, 0.3))
+			if caches_grabbed() > 0:
+				points.append(to_screen * extract_at)
+				colors.append(T.COL_CYAN)
+		if mission_type == "escort" and truck != null and not truck.is_wrecked:
+			points.append(to_screen * truck.global_position)
+			colors.append(T.COL_TRUCK)
 		if mission_type == "clear" and zombies.remaining() <= T.STRAGGLER_ARROWS:
 			for p in zombies.active_positions():
 				points.append(to_screen * p)
@@ -670,6 +1113,15 @@ func _status_line() -> String:
 			var tier := courier_tier()
 			var goal := ("%s %s" % [tier.to_upper(), _clock(float(par[tier]))]) if tier != "late" else "LATE"
 			return "COURIER  %d / %d   %s   %s" % [checkpoint_index, checkpoints.size(), _clock(elapsed), goal] + tail
+		"retrieve":
+			var out := "EXTRACT OPEN" if caches_grabbed() > 0 else "GRAB A CACHE"
+			return "RETRIEVE  %d / %d   DANGER %d   %s" % [caches_grabbed(), caches.size(), danger, out] + tail
+		"escort":
+			if truck == null:
+				return "ESCORT" + tail
+			var hp := roundi(truck.armor / truck.armor_max * 100.0)
+			var site := "SALVAGING %ds" % ceili(truck.work_left) if truck.working else "DRIVING"
+			return "ESCORT  SITE %d / %d   %s   TRUCK %d%%" % [mini(truck.site_index + 1, truck.sites.size()), truck.sites.size(), site, hp] + tail
 	return "CLEAR  %d / %d" % [kills, target_kills] + tail
 
 
@@ -685,6 +1137,10 @@ func _type_color() -> Color:
 			return T.COL_ELITE
 		"courier":
 			return Color(0.45, 0.85, 0.5)
+		"retrieve":
+			return Color(0.95, 0.8, 0.3)
+		"escort":
+			return Color(0.4, 0.8, 0.75)
 	return T.COL_CYAN
 
 
@@ -714,12 +1170,40 @@ func _on_zombie_killed(at: Vector2, kind: String) -> void:
 				hud.banner("BILE!  THE HORDE IS COMING", T.COL_BOOMER, 2.0)
 
 
-## Every rig on slime loses grip (the player's and the enemy rigs alike).
+## Barrels at fixed spots, their types rolled from the job's seed (§14).
+func _place_barrels() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("helriders-barrels-%d" % int(spec.seed))
+	var spots: Array = Arena.BARREL_SPOTS.duplicate()
+	_shuffle(spots, rng)
+	for i in barrels.size():
+		var kind: String = T.BARREL_TYPES[rng.randi_range(0, T.BARREL_TYPES.size() - 1)]
+		barrels[i].place(spots[i], kind)
+
+
+## Ground hazards on every rig (yours, the enemies', an Escort's truck):
+## slime and oil build SLICK, burning ground builds BURNING (§14).
 func _apply_slime(delta: float) -> void:
-	vehicle.set_on_slime(hazards.slime_at(vehicle.global_position), delta)
+	_ground_on(vehicle, delta)
 	for rig in rigs.get_children():
-		if rig.has_method("set_on_slime"):
-			rig.call("set_on_slime", hazards.slime_at((rig as Node2D).global_position), delta)
+		_ground_on(rig as Vehicle, delta)
+	if truck != null:
+		_ground_on(truck, delta)
+
+
+func _ground_on(rig: Vehicle, delta: float) -> void:
+	if rig == null or rig.is_wrecked:
+		return
+	rig.set_on_slime(hazards.slick_at(rig.global_position, rig.team), delta)
+	rig.set_on_spikes(hazards.spike_at(rig.global_position, rig.team), delta)
+	if hazards.fire_at(rig.global_position, rig.team):
+		rig.add_buildup(StatusBars.FIRE, T.STATUS_POOL_BUILDUP * delta)
+
+
+## A status started on your rig. GOOPED marks it for the horde.
+func _on_status_started(k: int) -> void:
+	if k == StatusBars.GOOP:
+		hazards.mark(vehicle)
 
 
 ## A scrap crate at `at` (a Tank's), scaled like other caches.
@@ -790,6 +1274,40 @@ func _on_gunner_wrecked(rig: EnemyRig) -> void:
 	_salvage_plating()
 
 
+func _on_scrapper_wrecked(rig: EnemyRig) -> void:
+	camera.shake(0.5)
+	_drop(rig.global_position, "scrapper", false, T.SCRAPPER_SCRAP_CACHE)
+	hud.banner("SCRAPPER DOWN  -  GRAB THE SALVAGE", T.COL_CYAN)
+	_add_kill(T.SCRAPPER_SCRAP, true)
+	_salvage_plating()
+
+
+func _on_scrapper_gunner_wrecked(rig: EnemyRig) -> void:
+	camera.shake(0.55)
+	_drop(rig.global_position, "scrapper", false, T.SCRAPPER_GUNNER_SCRAP_CACHE)
+	hud.banner("SCRAPPER GUNNER DOWN  -  GRAB THE SALVAGE", T.COL_CYAN)
+	_add_kill(T.SCRAPPER_GUNNER_SCRAP, true)
+	_salvage_plating()
+
+
+func _on_convoy_wrecked(rig: EnemyRig) -> void:
+	camera.shake(1.0)
+	_drop(rig.global_position, "convoy", false, T.CONVOY_SCRAP_CACHE)
+	hud.banner("CONVOY LEAD DOWN  -  GRAB THE SALVAGE", T.COL_CYAN)
+	_add_kill(T.CONVOY_SCRAP, true)
+	_salvage_plating()
+
+
+## The trailer shot off a running Convoy Lead: a scrap crate where it fell.
+func _on_trailer_lost(rig: EnemyRig) -> void:
+	if rig.is_wrecked:
+		return   # wrecking the cab took it; that payout covers both
+	var trailer := (rig as ConvoyRig).trailer
+	camera.shake(0.5)
+	drop_cache(trailer.global_position, T.CONVOY_TRAILER_CRATE)
+	hud.banner("TRAILER DOWN  -  THE CAB'S STILL COMING", T.COL_CYAN)
+
+
 func _on_elite_wrecked() -> void:
 	camera.shake(0.9)
 	_drop(elite.global_position, "elite", true, T.ELITE_SCRAP_CACHE)
@@ -801,7 +1319,7 @@ func _on_elite_wrecked() -> void:
 ## Mechanic perk: each enemy rig wreck restores some armor.
 func _salvage_plating() -> void:
 	if bool(vehicle.crew_mod("salvage_plating")) and not vehicle.is_wrecked:
-		vehicle.armor = minf(vehicle.armor + 15.0 * float(vehicle.crew_mod("repair")), vehicle.armor_max)
+		vehicle.repair_armor(15.0 * float(vehicle.crew_mod("repair")))
 
 
 func _collect_pickups() -> void:
@@ -878,7 +1396,8 @@ func _mission_reward_schematic(pay_mult: float) -> String:
 		return ""
 	var pool: Array = Parts.DROP_POOLS.get(mission_type, [])
 	var unknown := profile.unknown_schematics(pool, _pending_ids())
-	if unknown.is_empty() or randf() >= Missions.schematic_chance(spec):
+	var sure := mission_type == "escort" and optional_taken   # the risky site pays a schematic
+	if unknown.is_empty() or (not sure and randf() >= Missions.schematic_chance(spec)):
 		return ""
 	return unknown.pick_random()
 
@@ -918,20 +1437,33 @@ func _on_wrecked() -> void:
 
 
 class CourierMarkers extends Node2D:
-	## The Courier route on the ground: the next checkpoint pulses, the one
-	## after it is a faint ring, so you can line up the turn.
+	## Objectives on the ground. Courier: the next checkpoint pulses, the one
+	## after it is a faint ring, so you can line up the turn. Retrieve: crates
+	## for the caches (gold for the deep one) and the extraction zone. Escort:
+	## the truck's next site with its work ring, and the risky site once taken.
 	const T := preload("res://scripts/tuning.gd")
 	var mission: Node2D
 	var _t := 0.0
 
 	func _process(delta: float) -> void:
 		_t += delta
-		if mission != null and str(mission.get("mission_type")) == "courier":
+		if mission != null and str(mission.get("mission_type")) in ["courier", "retrieve", "escort"]:
 			queue_redraw()
 
 	func _draw() -> void:
-		if mission == null or str(mission.get("mission_type")) != "courier":
+		if mission == null:
 			return
+		match str(mission.get("mission_type")):
+			"retrieve":
+				_draw_retrieve()
+				return
+			"escort":
+				_draw_escort()
+				return
+			"courier":
+				pass
+			_:
+				return
 		var points: PackedVector2Array = mission.get("checkpoints")
 		var index: int = mission.get("checkpoint_index")
 		var font := ThemeDB.fallback_font
@@ -947,3 +1479,51 @@ class CourierMarkers extends Node2D:
 			else:
 				draw_arc(p, r * 0.7, 0.0, TAU, 40, Color(green, 0.35), 2.0)
 			draw_string(font, p + Vector2(-30, 10), str(i + 1), HORIZONTAL_ALIGNMENT_CENTER, 60, 30, Color(green, 0.95 if i == index else 0.4))
+
+	func _draw_retrieve() -> void:
+		var pulse := 0.5 + 0.5 * sin(_t * 4.0)
+		var font := ThemeDB.fallback_font
+		var caches: PackedVector2Array = mission.get("caches")
+		var taken: Array = mission.get("cache_taken")
+		var deep: int = mission.get("deep_cache")
+		var gold := Color(0.95, 0.8, 0.3)
+		for i in caches.size():
+			if bool(taken[i]):
+				continue
+			var p := caches[i]
+			var c := T.COL_ELITE if i == deep else gold
+			draw_arc(p, T.CACHE_RADIUS + 4.0 * pulse, 0.0, TAU, 32, Color(c, 0.5), 2.0)
+			draw_rect(Rect2(p - Vector2(14, 11), Vector2(28, 22)), c.darkened(0.45))
+			draw_rect(Rect2(p - Vector2(14, 11), Vector2(28, 22)), c, false, 3.0)
+			draw_line(p - Vector2(14, 0), p + Vector2(14, 0), c, 2.0)
+			if i == deep:
+				draw_string(font, p + Vector2(-40, -24), "DEEP", HORIZONTAL_ALIGNMENT_CENTER, 80, 18, c)
+		var out: Vector2 = mission.get("extract_at")
+		var open := int(mission.call("caches_grabbed")) > 0
+		var cyan := Color(T.COL_CYAN, 0.9 if open else 0.35)
+		draw_circle(out, T.EXTRACT_RADIUS, Color(T.COL_CYAN, (0.08 + 0.06 * pulse) if open else 0.04))
+		draw_arc(out, T.EXTRACT_RADIUS, 0.0, TAU, 48, cyan, 4.0 if open else 2.0)
+		draw_string(font, out + Vector2(-60, 8), "EXTRACT", HORIZONTAL_ALIGNMENT_CENTER, 120, 22, cyan)
+
+	func _draw_escort() -> void:
+		var truck: Node2D = mission.get("truck")
+		if truck == null:
+			return
+		var sites: PackedVector2Array = truck.get("sites")
+		var index: int = truck.get("site_index")
+		var teal := Color(0.4, 0.8, 0.75)
+		var font := ThemeDB.fallback_font
+		var risky_at: int = mission.get("optional_index") if bool(mission.get("optional_taken")) else -1
+		for i in range(index, sites.size()):
+			var p := sites[i]
+			var c := T.COL_ORANGE if i == risky_at else teal
+			var r := T.ESCORT_SITE_RADIUS
+			if i == index:
+				draw_circle(p, r, Color(c, 0.08))
+				draw_arc(p, r, 0.0, TAU, 48, Color(c, 0.85), 3.0)
+				var done := float(truck.call("work_progress"))
+				if done > 0.0:
+					draw_arc(p, r + 10.0, -PI / 2.0, -PI / 2.0 + TAU * done, 48, c, 8.0)
+			else:
+				draw_arc(p, r * 0.7, 0.0, TAU, 40, Color(c, 0.35), 2.0)
+			draw_string(font, p + Vector2(-30, 10), str(i + 1), HORIZONTAL_ALIGNMENT_CENTER, 60, 30, Color(c, 0.95 if i == index else 0.4))

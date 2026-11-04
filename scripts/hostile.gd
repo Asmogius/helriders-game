@@ -22,7 +22,8 @@ func is_targetable() -> bool:
 	return active
 
 
-func take_hit(damage: float, impulse: Vector2, cause := "shot") -> void:
+## `dtype` is the damage type ("" or "kinetic", "shock", "fire", "acid", "toxic", ...).
+func take_hit(damage: float, impulse: Vector2, cause := "shot", _dtype := "") -> void:
 	if not active:
 		return
 	if status_left > 0.0:

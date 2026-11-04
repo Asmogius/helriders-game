@@ -4,7 +4,8 @@ extends "res://scripts/enemy_rig.gd"
 ## where you're heading, never telegraphs, and turns slowly, so you beat it by
 ## out-turning it and shooting its sides. After ramming you it backs off for a
 ## moment, then comes again. A light gun fixed forward plinks you while it
-## lines up. Hits on its armored front quarter do half damage.
+## lines up. Its front plate is very heavy (§14 defense layers; it used to
+## halve hits on the front), and bullets on it throw grey sparks.
 
 const BACKOFF_STEER := 0.5   # radians off straight back while reversing
 
@@ -97,23 +98,16 @@ func is_front(from: Vector2) -> bool:
 
 
 ## Bullets hitting the armored front throw grey sparks (bullet_pool.gd).
+## (While the front plate holds.)
 func deflects(at: Vector2) -> bool:
-	return not is_wrecked and is_front(at)
+	return not is_wrecked and is_front(at) and facing_armor[FRONT] > 0.0
 
 
-func take_hit(damage: float, impulse: Vector2, cause := "shot") -> void:
+func take_hit(damage: float, impulse: Vector2, cause := "shot", dtype := "") -> void:
 	# The impulse points the way the hit travels, so it came from behind it.
 	if impulse != Vector2.ZERO and is_front(global_position - impulse.normalized() * 100.0):
-		damage *= T.BULWARK_FRONT_MULT
 		front_hits += 1
-	super(damage, impulse, cause)
-
-
-func receive_ram(damage: float) -> void:
-	if player != null and is_front(player.global_position):
-		damage *= T.BULWARK_FRONT_MULT
-		front_hits += 1
-	super(damage)
+	super(damage, impulse, cause, dtype)
 
 
 func _draw() -> void:

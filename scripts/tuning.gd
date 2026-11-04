@@ -53,6 +53,7 @@ const MISSIONS := {
 		"outriders": [0, 0, 0, 1, 2, 2],
 		"bulwarks": [0, 0, 1, 1, 1, 1],
 		"gunners": [0, 0, 1, 1, 1, 1],
+		"scrappers": [0, 1, 1, 1, 1, 1],
 		"cap": [24, 26, 27, 28, 28, 28],
 	},
 	"survive": {
@@ -65,10 +66,10 @@ const MISSIONS := {
 		"events": [
 			[[60, "hunter"]],
 			[[55, "hunter"], [105, "hunter"]],
-			[[45, "hunter"], [90, "bulwark"]],
-			[[45, "hunter"], [90, "outrider"], [100, "gunner"], [110, "hunter"], [130, "bulwark"]],
-			[[35, "hunter"], [70, "outrider"], [85, "gunner"], [100, "hunter"], [120, "bulwark"], [140, "hunter"]],
-			[[30, "hunter"], [60, "outrider"], [80, "gunner"], [95, "hunter"], [120, "outrider"], [150, "bulwark"]],
+			[[45, "hunter"], [70, "scrapper"], [90, "bulwark"]],
+			[[45, "hunter"], [65, "scrapper"], [90, "outrider"], [100, "gunner"], [110, "hunter"], [130, "bulwark"]],
+			[[35, "hunter"], [55, "scrapper"], [70, "outrider"], [85, "gunner"], [100, "hunter"], [120, "bulwark"], [140, "hunter"]],
+			[[30, "hunter"], [50, "scrapper"], [60, "outrider"], [80, "gunner"], [95, "hunter"], [120, "outrider"], [150, "bulwark"]],
 		],
 	},
 	"hunt": {
@@ -90,6 +91,40 @@ const MISSIONS := {
 		"hunters": [0, 0, 1, 1, 1, 1],
 		"outriders": [0, 0, 0, 0, 1, 1],
 		"gunners": [0, 0, 0, 1, 1, 1],          # parks by a checkpoint and covers it
+		"scrappers": [0, 1, 1, 1, 1, 1],        # lays traps along your route
+	},
+	# Retrieve-and-extract (agreed with the owner): grab caches around the
+	# block, leave through the extraction point whenever you like. Every cache
+	# grabbed and every RETRIEVE_STEP_SECONDS raise the danger a step. One
+	# "deep" cache sits far out under a Gunner Rig's guard: worth double, and a
+	# sure schematic. Pay = reward x (30% + 70% x the cache share brought out).
+	"retrieve": {
+		"label": "RETRIEVE", "brief": "Grab the caches, then get out. Every cache stirs the block up.",
+		"reward": [78, 94, 109, 127, 148, 169],   # ~1.3x a Clear with every cache
+		"caches": [3, 3, 4, 4, 5, 5],              # including the deep cache
+		"cap": [14, 16, 18, 20, 22, 24],           # crowd at step 0; +RETRIEVE_CAP_STEP a step
+		"hunters": [0, 1, 1, 1, 2, 2],
+		"rig_calls": [0, 1, 1, 2, 2, 3],           # rigs called in as the danger climbs
+	},
+	# Escort (agreed with the owner): a friendly salvage truck drives to sites
+	# and works each one while you keep zombies and rigs off it. After the
+	# first site the driver radios about an optional, nastier site.
+	"escort": {
+		"label": "ESCORT", "brief": "Keep the salvage truck alive while it works each site.",
+		"reward": [70, 82, 94, 108, 124, 140],
+		"sites": [2, 2, 3, 3, 3, 3],
+		"cap": [16, 18, 20, 22, 24, 26],
+		"ramp": [3.0, 2.8, 2.6, 2.4, 2.2, 2.0],
+		"hunters": [0, 1, 1, 1, 2, 2],
+		# [seconds into the run, what arrives]
+		"events": [
+			[],
+			[[70, "scrapper"]],
+			[[60, "scrapper"], [110, "outrider"]],
+			[[50, "outrider"], [90, "scrapper"], [130, "bulwark"]],
+			[[45, "outrider"], [80, "scrapper"], [115, "gunner"], [150, "bulwark"]],
+			[[40, "outrider"], [70, "scrapper"], [100, "gunner"], [130, "outrider"], [160, "bulwark"]],
+		],
 	},
 }
 const MISSION_NAMES := {
@@ -97,6 +132,8 @@ const MISSION_NAMES := {
 	"survive": ["Hold the Overpass", "Pharmacy Siege", "Gas Station Stand", "Rooftop Relay", "Tow Yard"],
 	"hunt": ["Rustjaw", "Widowmaker", "Gutter King", "Red Mare", "Sawtooth"],
 	"courier": ["Medicine Run", "Battery Drop", "Signal Parts", "Ammo Relay", "Water Filters"],
+	"retrieve": ["Dead Drop", "Lost Shipment", "Abandoned Depot", "Scattered Cargo", "Black Boxes"],
+	"escort": ["Salvage Crew", "Wrecker Run", "Scrap Haul", "Parts Pull", "Copper Strip"],
 }
 # Chance a job pays a schematic from its type's pool, by skulls 1-6. Courier
 # only pays one on a gold time; a Hunt Elite always drops one.
@@ -180,7 +217,6 @@ const SLIME_RADIUS := 22.0
 const SLIME_TIME := 10.0
 const SLIME_PUDDLE_RADIUS := 60.0      # left where a Slimer dies
 const SLIME_GRIP := 0.35               # rig grip on slime...
-const SLIME_LINGER := 0.5              # ...and for this long after
 const COL_BRUTE := Color(0.42, 0.4, 0.36)
 const COL_TANK := Color(0.5, 0.33, 0.3)
 const COL_BOOMER := Color(0.66, 0.7, 0.3)
@@ -212,8 +248,7 @@ const OUTRIDER_SCRAP := 25
 
 # --- Bulwark (enemy rig: heavy rammer; approved in the "Helriders: Bulwark
 # Draft" doc) ---------------------------------------------------------------------
-const BULWARK_FRONT_MULT := 0.5     # damage from hits on its armored front...
-const BULWARK_FRONT_ARC := 0.785    # ...within 45 degrees either side of the nose
+const BULWARK_FRONT_ARC := 0.785    # its heavy front plate: grey sparks within 45 deg of the nose
 const BULWARK_BACKOFF := 0.5        # seconds it backs off after ramming you
 const BULWARK_SCRAP := 40
 const BULWARK_SCRAP_CACHE := 40     # dropped instead of a schematic
@@ -233,6 +268,111 @@ const GUNNER_SCRAP := 30
 const GUNNER_SCRAP_CACHE := 30      # dropped instead of a schematic
 const GUNNER_SPAWN_TIME := 75.0     # Clear: seconds in, or...
 const GUNNER_SPAWN_KILLS := 30      # ...after this many kills
+
+# --- Scrapper (enemy rig: hazard layer; §14, agreed with the owner) -----------
+# Fast, light and unarmed. Cuts across your path 250-400 px out and every 3 s
+# lays a hazard behind it, alternating oil and a spike strip; at most 6 of its
+# hazards at once (the oldest go first). Drops hazard utilities and grip parts.
+const SCRAPPER_RANGE_MIN := 250.0
+const SCRAPPER_RANGE_MAX := 400.0
+const SCRAPPER_TRAP_EVERY := 3.0
+const SCRAPPER_MAX_HAZARDS := 6
+const SCRAPPER_OIL_RADIUS := 45.0   # 90 px wide...
+const SCRAPPER_OIL_TIME := 12.0     # ...for 12 s
+# The Scrapper Gunner (agreed with the owner): the original Scrapper, a little
+# harder. Tougher, with a weak turret, and every 4 s it lays a mine, oil or a
+# spike strip in turn. From 4 skulls, half the jobs that bring a Scrapper
+# bring one of these instead (seeded per job, shown on Comms).
+const SCRAPPER_GUNNER_TRAP_EVERY := 4.0
+const SCRAPPER_GUNNER_SKULLS := 4
+const SCRAPPER_GUNNER_CHANCE := 0.5
+const SCRAPPER_GUNNER_SCRAP := 35
+const SCRAPPER_GUNNER_SCRAP_CACHE := 35
+# Spike strips (Scrapper and the Spike Strip Dropper): a strip laid across the
+# road behind the rig. Rigs crossing it (of the other side) drive 30% slower
+# for 3 s; zombies on it take 10 damage a second and move at half speed.
+const SPIKE_LENGTH := 120.0
+const SPIKE_TIME := 15.0
+const SPIKE_HALF_WIDTH := 14.0      # how close to the strip counts as on it
+const SPIKE_RIG_SPEED := 0.7
+const SPIKE_RIG_TIME := 3.0
+const SPIKE_ZOMBIE_DPS := 10.0
+const SPIKE_ZOMBIE_SPEED := 0.5
+const SCRAPPER_MINE_DAMAGE := 40.0
+const SCRAPPER_MINE_RADIUS := 70.0
+const SCRAPPER_MINE_ARM := 0.6
+const SCRAPPER_MINE_LIFE := 25.0
+const SCRAPPER_SCRAP := 25
+const SCRAPPER_SCRAP_CACHE := 25
+const SCRAPPER_SPAWN_TIME := 60.0   # Clear: seconds in, or...
+const SCRAPPER_SPAWN_KILLS := 20    # ...after this many kills
+# --- Convoy Lead (elite enemy rig; agreed with the owner) ---------------------
+# An armored semi with a ram, towing a short trailer with a heavy turret on a
+# hitch. It hunts and rams like a slow Bulwark (the ram takes half damage);
+# two small fixed guns on the nose cover the front, because the trailer turret
+# can't fire forward through the cab. The trailer has its own armor: shoot it
+# off and the cab drives on lighter, or wreck the cab to finish both.
+# Chance a job brings one (seeded per job, shown on Comms), by skulls 1-6. It
+# takes an Outrider's place.
+const CONVOY_CHANCE := {
+	"clear": [0.0, 0.0, 0.0, 0.35, 0.35, 0.5],
+	"survive": [0.0, 0.0, 0.0, 0.35, 0.35, 0.5],
+	"hunt": [0.0, 0.0, 0.0, 0.0, 0.35, 0.5],
+}
+const CONVOY_TURRET_BLOCK := 0.785  # trailer turret can't fire within 45 deg of the cab
+const CONVOY_HITCH_GAP := 8.0
+const CONVOY_MAX_JACKKNIFE := 1.4   # radians (80 deg): the hitch won't fold further
+const CONVOY_UNHITCHED_SPEED := 1.15  # the cab without its trailer: faster...
+const CONVOY_UNHITCHED_ACCEL := 1.2   # ...quicker off the line...
+const CONVOY_UNHITCHED_TURN := 1.15   # ...and a little nimbler
+const CONVOY_SCRAP := 60
+const CONVOY_SCRAP_CACHE := 60
+const CONVOY_TRAILER_CRATE := 30      # dropped when the trailer is shot off
+
+# --- Retrieve and Escort jobs ---------------------------------------------------
+const RETRIEVE_STEP_SECONDS := 40.0   # the danger also climbs a step every this long
+const RETRIEVE_CAP_STEP := 2          # +zombies allowed alive per step (up to ZOMBIE_CAP)
+const RETRIEVE_SPEED_STEP := 0.05     # +zombie speed per step
+const RETRIEVE_RIG_STEPS := [2, 4, 6] # steps that call in a rig (up to the job's rig_calls)
+const RETRIEVE_DEEP_MULT := 2.0       # the deep cache counts double toward pay
+const RETRIEVE_BASE_SHARE := 0.3      # paid for getting out at all (with at least one cache)
+const CACHE_RADIUS := 60.0            # drive this close to grab a cache
+const EXTRACT_RADIUS := 110.0
+const EXTRACT_ARM_DISTANCE := 300.0   # leave the zone once before it counts
+const ESCORT_SALVAGE_TIME := 20.0
+const ESCORT_OPTIONAL_TIME := 30.0
+const ESCORT_OPTIONAL_PAY := 1.6      # with the optional site
+const ESCORT_OPTIONAL_WAVE := 10      # extra zombies the optional site wakes
+const ESCORT_SITE_RADIUS := 90.0
+const TRUCK := {
+	"name": "Salvage Truck",
+	"max_speed": 260.0,
+	"reverse_speed": 150.0,
+	"acceleration": 300.0,
+	"brake": 1300.0,
+	"coast": 300.0,
+	"turn_rate": 2.0,
+	"grip": 8.0,
+	"armor": 400.0,            # total of the layers below
+	"hp": 120.0, "front": 70.0, "side": 70.0, "rear": 70.0,
+	"resist": [45.0, 45.0, 45.0, 45.0, 45.0, 45.0],   # shock fire acid toxic slime goop
+	"ram_damage": 40.0,
+	"mount": 1,
+	"fire_rate": 0.0,          # no guns: that's your job
+	"bullet_damage": 0.0,
+	"bullet_speed": 1000.0,
+	"spread_deg": 0.0,
+	"turret_turn_rate": 0.0,
+	"lock_range": 0.0,
+}
+const COL_TRUCK := Color(0.45, 0.85, 0.5)
+
+# Oil (the Scrapper's slicks and your Oil Slick utility): rigs on it keep
+# SLIME_GRIP, zombies in it move at OIL_ZOMBIE_SPEED.
+const OIL_RADIUS := 70.0            # 140 wide
+const OIL_TIME_SCRAPPER := 15.0
+const OIL_ZOMBIE_SPEED := 0.5
+const COL_OIL := Color(0.05, 0.05, 0.06, 0.6)
 
 # --- Economy (scrap is the only currency) --------------------------------------
 const START_SCRAP := 60
@@ -308,7 +448,7 @@ const RESEARCH_DAILY_CAP := 3          # levels you can buy per day (Second Shif
 # Which stats grow, by category. Power draw and weight never change.
 # Internal parts grow their modifier instead (see Parts.at_level).
 const RESEARCH_STATS := {
-	"Chassis": ["armor", "weight_capacity"],
+	"Chassis": ["hp", "weight_capacity"],
 	"Engine": ["power_output", "acceleration"],
 	"Drive": ["turn_mult", "grip"],
 	"Armor": ["armor"],
@@ -334,13 +474,80 @@ const CREW_PRICES := {"Common": 0, "Uncommon": 80, "Rare": 200, "Epic": 450, "Le
 # The player's rig is built from parts: see parts.gd (schematics and the
 # starter loadout) and loadout.gd (how parts combine into these stats).
 
+# --- Defense layers (§14; agreed with the owner) --------------------------------
+# Every rig: shield (recharges) -> armor per facing (never regenerates
+# mid-run) -> HP (zero = wreck). Facings are four 90-degree arcs: front, left,
+# right, rear. A hit drains its arc's armor; a stripped facing passes hits to
+# HP. Explosions hit the nearest facing in full and each adjacent one at
+# SPLASH_ADJACENT, and never reduce HP while any armor remains. Repairs go
+# to the most damaged facing (never past its max; the rest is lost).
+const SPLASH_ADJACENT := 0.25
+const DEFAULT_SHIELD_DELAY := 3.0
+const DEFAULT_SHIELD_REFILL := 5.0
+const COL_SHIELD := Color(0.55, 0.75, 1.0)
+
+# --- Statuses and damage types (§14; agreed with the owner) ----------------------
+# Every status uses buildup: typed hits fill a 100-point bar that drains over
+# time; a full bar triggers the status. Order everywhere: shock, fire, acid,
+# toxic, slime, goop -> STUNNED, BURNING, CORRODED, TOXIC, SLICK, GOOPED.
+const STATUS_NAMES := ["STUNNED", "BURNING", "CORRODED", "TOXIC", "SLICK", "GOOPED"]
+const STATUS_TYPES := ["shock", "fire", "acid", "toxic", "slime", "goop"]
+const STATUS_COLORS := [Color(0.55, 0.8, 1.0), Color(1.0, 0.45, 0.15), Color(0.6, 0.95, 0.25),
+	Color(0.7, 0.4, 0.9), Color(0.45, 0.85, 0.6), Color(0.85, 0.85, 0.3)]
+const STATUS_BAR := 100.0
+# Buildup taken = hit buildup x (100 - resistance) / 50 (0 = x2, 50 = x1, 100 = immune).
+const STATUS_DRAIN := 15.0            # per second, once nothing's added for...
+const STATUS_DRAIN_DELAY := 1.5       # ...this long
+const STATUS_AFTERGLOW := 3.0         # after a trigger, buildup runs at half speed this long
+const STATUS_HIT_BUILDUP := 2.0       # a typed hit adds this x its damage as buildup
+const STATUS_POOL_BUILDUP := 25.0     # per second inside slime, oil, fire ground (and Miasma)
+const STATUS_SHIELD_RESIST := 15.0    # an active shield adds this to every resistance (cap 100)
+const STATUS_RESIST_BASE := 30.0      # the player's rig before parts (agreed with the owner)...
+const STATUS_RESIST_STEP := {"low": 5.0, "medium": 10.0, "high": 15.0}   # ...plus each plate's profile
+const STATUS_RESIST_CAP := 95.0       # parts alone never make you immune
+const ZOMBIE_RESIST := 50.0           # zombies are neutral to everything
+# How long each lasts, on rigs and on zombies (seconds).
+const STATUS_TIME_RIG := [1.2, 5.0, 6.0, 8.0, 3.0, 6.0]
+const STATUS_TIME_ZOMBIE := [2.0, 5.0, 6.0, 8.0, 3.0, 6.0]
+const BURNING_RIG_DPS := 6.0          # across the facings, by the splash rule
+const BURNING_ZOMBIE_DPS := 15.0      # and it spreads to zombies it touches...
+const BURNING_SPREAD := 50.0          # ...as this much fire buildup a second (2 s of contact)
+const BURNING_TOUCH := 50.0           # "touching": centres this close
+const CORRODED_TAKEN := 1.25          # +25% damage taken
+const TOXIC_DPS := 4.0                # straight to HP (rigs: blocked by a raised shield)...
+const TOXIC_FLOOR := 0.1              # ...and never below 10% of max HP
+const SLICK_ZOMBIE_SPEED := 0.5
+# Damage types: Kinetic (bullets, rams) all-round; the rest get a bonus.
+const SHOCK_VS_SHIELD := 1.5
+const ACID_VS_ARMOR := 1.5
+const FIRE_VS_ZOMBIES := 1.5
+
+# Barrels (§14): battlefield hazards, so they hurt everyone, the player
+# included. Shot or rammed; blasts chain. Fixed spots per layout; the type is
+# rolled per job.
+const BARREL_HP := 20.0
+const BARREL_TYPES := ["explosive", "fire", "acid", "slime", "boomer"]
+const BARREL_RADIUS := 140.0          # blast reach (Explosive, Fire, Acid)
+const BARREL_EXPLOSIVE_DAMAGE := 60.0
+const BARREL_EXPLOSIVE_SHOVE := 4000.0
+const BARREL_FIRE_DAMAGE := 25.0
+const BARREL_FIRE_GROUND_TIME := 6.0
+const BARREL_ACID_DAMAGE := 20.0
+const BARREL_ACID_BUILDUP := 80.0
+const BARREL_SLIME_POOL := 80.0       # radius (a 160 px pool)...
+const BARREL_SLIME_TIME := 10.0       # ...for this long
+const BARREL_BOOMER_RADIUS := 160.0   # fills the GOOPED bar of everything this close
+const BARRELS_PER_JOB := 7
+const COL_FIRE_GROUND := Color(1.0, 0.45, 0.1, 0.35)
+
 # Overload (DESIGN §4: overload reduces mobility). Power drawn over the
 # engine's output, or weight over the chassis's capacity, scales acceleration
 # and top speed by (limit / load) ^ exponent. Both together multiply.
 const OVERLOAD_EXPONENT := 1.5
 const OVERLOAD_MIN_MOBILITY := 0.5   # never worse than this
 
-# Enemy rigs still use one flat stat dictionary each.
+# Enemy rigs still use one flat stat dictionary each. `hp`, `front`, `side`
+# and `rear` are their defense layers (§14); `armor` is their total.
 # mount: 0 = turret (aims independently), 1 = fixed (aims with the vehicle).
 const OUTRIDER := {
 	"name": "Outrider",
@@ -351,7 +558,9 @@ const OUTRIDER := {
 	"coast": 280.0,
 	"turn_rate": 3.6,
 	"grip": 6.5,
-	"armor": 260.0,
+	"armor": 260.0,            # total of the layers below (§14 table)
+	"hp": 100.0, "front": 40.0, "side": 40.0, "rear": 40.0,
+	"resist": [45.0, 50.0, 50.0, 50.0, 35.0, 50.0],   # shock fire acid toxic slime goop
 	"ram_damage": 40.0,
 	"mount": 1,                # twin guns fixed forward
 	"fire_rate": 8.0,
@@ -371,7 +580,10 @@ const GUNNER := {
 	"coast": 280.0,
 	"turn_rate": 3.0,
 	"grip": 7.0,
-	"armor": 340.0,
+	"armor": 345.0,            # total of the layers below (§14 table; was 340)
+	"hp": 120.0, "front": 60.0, "side": 55.0, "rear": 55.0,
+	"resist": [35.0, 55.0, 50.0, 50.0, 55.0, 50.0],   # shock fire acid toxic slime goop
+	"shield": 30.0, "shield_skulls": 4, "shield_delay": 3.0, "shield_refill": 5.0,   # a shield from 4 skulls
 	"ram_damage": 40.0,
 	"mount": 0,                # turret on top
 	"gun_id": "gunner_rig",
@@ -385,6 +597,98 @@ const GUNNER := {
 	"lock_range": 0.0,
 }
 
+const SCRAPPER := {
+	"name": "Scrapper",
+	"max_speed": 580.0,
+	"reverse_speed": 260.0,
+	"acceleration": 680.0,
+	"brake": 1500.0,
+	"coast": 280.0,
+	"turn_rate": 3.5,
+	"grip": 6.5,
+	"armor": 230.0,            # total of the layers below (§14 table; was 200)
+	"hp": 90.0, "front": 35.0, "side": 35.0, "rear": 35.0,
+	"resist": [50.0, 30.0, 50.0, 50.0, 90.0, 50.0],   # shock fire acid toxic slime goop
+	"ram_damage": 30.0,
+	"mount": 1,
+	"fire_rate": 0.0,          # unarmed (§14)
+	"bullet_damage": 0.0,
+	"bullet_speed": 1000.0,
+	"spread_deg": 0.0,
+	"turret_turn_rate": 0.0,
+	"lock_range": 0.0,
+}
+
+const SCRAPPER_GUNNER := {
+	"name": "Scrapper Gunner",
+	"max_speed": 580.0,
+	"reverse_speed": 260.0,
+	"acceleration": 680.0,
+	"brake": 1500.0,
+	"coast": 280.0,
+	"turn_rate": 3.5,
+	"grip": 6.5,
+	"armor": 290.0,            # total of the layers below
+	"hp": 110.0, "front": 45.0, "side": 45.0, "rear": 45.0,
+	"resist": [50.0, 30.0, 50.0, 50.0, 90.0, 50.0],   # as the Scrapper
+	"ram_damage": 30.0,
+	"mount": 0,                # one weak turret
+	"gun_id": "scrapper",
+	"fire_rate": 2.0,
+	"bullet_damage": 5.0,      # about 10 damage/s
+	"bullet_speed": 1400.0,    # reach ~530 px
+	"spread_deg": 4.0,
+	"turret_turn_rate": 3.0,
+	"lock_range": 0.0,
+}
+
+const CONVOY := {
+	"name": "Convoy Lead",
+	"max_speed": 420.0,
+	"reverse_speed": 180.0,
+	"acceleration": 380.0,
+	"brake": 1300.0,
+	"coast": 300.0,
+	"turn_rate": 1.5,          # a wide circle: get beside or behind it
+	"grip": 8.0,
+	"armor": 650.0,            # total of the layers below (agreed with the owner)
+	"hp": 200.0, "front": 250.0, "side": 70.0, "rear": 60.0,   # the plow is a very heavy front plate
+	"resist": [60.0, 60.0, 35.0, 55.0, 70.0, 50.0],   # shock fire acid toxic slime goop
+	"shield": 30.0, "shield_skulls": 4, "shield_delay": 3.0, "shield_refill": 5.0,   # cab only, from 4 skulls
+	"ram_damage": 120.0,
+	"mount": 1,                # two small guns fixed on the nose, alternating
+	"gun_id": "convoy_nose",
+	"fire_rate": 8.0,          # 4 a second each...
+	"bullet_damage": 4.0,      # ...of 4: ~32 damage/s, straight ahead only
+	"bullet_speed": 1300.0,
+	"spread_deg": 4.0,
+	"turret_turn_rate": 0.0,
+	"lock_range": 0.0,
+}
+
+const CONVOY_TRAILER := {
+	"name": "Convoy Trailer",
+	"max_speed": 420.0,
+	"reverse_speed": 180.0,
+	"acceleration": 380.0,
+	"brake": 1300.0,
+	"coast": 300.0,
+	"turn_rate": 1.5,
+	"grip": 8.0,
+	"armor": 350.0,            # total of the layers below (agreed with the owner; was 300)
+	"hp": 120.0, "front": 50.0, "side": 65.0, "rear": 50.0,
+	"resist": [60.0, 60.0, 35.0, 55.0, 70.0, 50.0],   # shock fire acid toxic slime goop
+	"ram_damage": 60.0,
+	"mount": 0,                # the heavy turret
+	"gun_id": "convoy_turret",
+	"fire_rate": 5.0,
+	"bullet_damage": 6.0,      # ~30 damage/s
+	"bullet_speed": 1500.0,
+	"spread_deg": 3.0,
+	"turret_turn_rate": 2.0,
+	"lock_range": 0.0,
+}
+
 const BULWARK := {
 	"name": "Bulwark",
 	"max_speed": 430.0,        # slower than you: out-run it, out-turn it
@@ -394,7 +698,9 @@ const BULWARK := {
 	"coast": 300.0,
 	"turn_rate": 1.9,          # 109 deg/s
 	"grip": 8.0,
-	"armor": 520.0,            # front quarter takes half (BULWARK_FRONT_MULT)
+	"armor": 520.0,            # total of the layers below (§14 table)
+	"hp": 180.0, "front": 180.0, "side": 55.0, "rear": 50.0,   # a very heavy front plate
+	"resist": [60.0, 60.0, 35.0, 55.0, 70.0, 50.0],   # shock fire acid toxic slime goop
 	"ram_damage": 80.0,
 	"mount": 1,                # one light gun fixed forward
 	"fire_rate": 3.0,

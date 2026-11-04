@@ -13,6 +13,7 @@ extends "res://scripts/hostile.gd"
 ## cheap separation pass), but they do block the rig, which is what clogs
 ## movement in a crowd.
 
+const StatusBars := preload("res://scripts/status_bars.gd")
 const CONTACT_DISTANCE := 40.0
 const KINDS := ["shambler", "brute", "tank", "boomer", "slimer"]
 enum Charge { WALK, WINDUP, CHARGE, STUMBLE }
@@ -23,6 +24,10 @@ var radius := T.SHAMBLER_RADIUS
 var frenzy := false          # set by the director: bile pool or a marked rig nearby
 var slime_timer := 0.0       # Slimer: seconds to the next trail blob (director)
 var burst := false           # Boomer reached the rig: the director pops it after the loop
+var oiled := false           # set by the director: wading through oil
+var status := StatusBars.new()  # §14 statuses; zombies are neutral (T.ZOMBIE_RESIST)
+var pending_damage := 0.0    # burning / toxic / spike damage the director applies after its loop
+var spiked := false          # set by the director: on a spike strip
 
 # Path following, driven by the director.
 var nav_timer := 0.0
@@ -76,6 +81,10 @@ func activate(at: Vector2, as_kind := "shambler") -> void:
 	nav_timer = 0.0
 	nav_direct = true
 	frenzy = false
+	oiled = false
+	status.reset()
+	pending_damage = 0.0
+	spiked = false
 	burst = false
 	slime_timer = randf() * T.SLIME_DROP_EVERY
 	charge = Charge.WALK
@@ -105,11 +114,31 @@ func is_armored() -> bool:
 	return float(_stats.bullet) < 1.0
 
 
-## Bullets do the kind's share; rams, mines and bursts do full damage.
-func take_hit(damage: float, impulse: Vector2, cause := "shot") -> void:
+## Bullets do the kind's share; rams, mines and bursts do full damage. Fire
+## does extra to zombies; a typed hit builds its status; CORRODED takes more.
+func take_hit(damage: float, impulse: Vector2, cause := "shot", dtype := "") -> void:
+	if not active:
+		return
 	if cause == "shot":
 		damage *= float(_stats.bullet)
-	super.take_hit(damage, impulse, cause)
+	var k := StatusBars.kind_of(dtype)
+	if k >= 0:
+		add_buildup(k, damage * T.STATUS_HIT_BUILDUP)
+	if dtype == "fire":
+		damage *= T.FIRE_VS_ZOMBIES
+	if status.active(StatusBars.ACID):
+		damage *= T.CORRODED_TAKEN
+	super.take_hit(damage, impulse, cause, dtype)
+
+
+func add_buildup(k: int, amount: float) -> void:
+	if active and status.add(k, amount, T.ZOMBIE_RESIST, float(T.STATUS_TIME_ZOMBIE[k])):
+		queue_redraw()
+
+
+func fill_status(k: int) -> void:
+	status.trigger(k, float(T.STATUS_TIME_ZOMBIE[k]))
+	queue_redraw()
 
 
 ## Armored kinds throw grey sparks at bullets (bullet_pool.gd).
@@ -118,14 +147,32 @@ func deflects(_at: Vector2) -> bool:
 
 
 ## Called by the director once per physics tick with the steering it wants.
-## `target` is the player rig (duck-typed: take_damage(amount), velocity).
+## `target` is the player rig (duck-typed: take_damage(amount, from), velocity).
 func step(delta: float, desired: Vector2, target: Node2D) -> void:
 	_knock = _knock.move_toward(Vector2.ZERO, 900.0 * delta)
 	if tick_status(delta):
 		queue_redraw()
+	var had := status.any_active()
+	status.tick(delta)
+	if had != status.any_active():
+		queue_redraw()
+	if status.active(StatusBars.FIRE):
+		pending_damage += T.BURNING_ZOMBIE_DPS * delta
+	if status.active(StatusBars.TOXIC):
+		pending_damage += T.TOXIC_DPS * delta
+	if spiked:
+		pending_damage += T.SPIKE_ZOMBIE_DPS * delta
 	desired *= speed_mult()
-	if frenzy:
+	if status.active(StatusBars.SHOCK):
+		desired = Vector2.ZERO   # STUNNED: frozen
+	if status.active(StatusBars.SLIME):
+		desired *= T.SLICK_ZOMBIE_SPEED
+	if spiked:
+		desired *= T.SPIKE_ZOMBIE_SPEED
+	if frenzy or status.active(StatusBars.GOOP):
 		desired *= T.BILE_FRENZY
+	if oiled:
+		desired *= T.OIL_ZOMBIE_SPEED
 	# Walking around a building: hold a wall-following direction for a while.
 	if _detour_time > 0.0:
 		_detour_time -= delta
@@ -161,13 +208,13 @@ func step(delta: float, desired: Vector2, target: Node2D) -> void:
 	else:
 		_stuck_time = 0.0
 
-	if target != null:
+	if target != null and not status.active(StatusBars.SHOCK):
 		var reach := CONTACT_DISTANCE + (radius - T.SHAMBLER_RADIUS)
 		if touching or position.distance_to(target.position) < reach:
 			if kind == "boomer":
 				burst = true
 				return
-			target.call("take_damage", float(_stats.dps) * delta)
+			target.call("take_damage", float(_stats.dps) * delta, position - target.position)
 			if kind == "brute" or kind == "tank":
 				var push := (target.position - position).normalized() * T.BRUTE_SHOVE * delta
 				target.set("velocity", (target.get("velocity") as Vector2) + push)
@@ -215,7 +262,7 @@ func _charge_contact(target: Node2D, touching: bool, wall_normal: Vector2) -> vo
 	var hit := target != null and (touching or position.distance_to(target.position) < radius + 40.0)
 	if hit:
 		charge_hits += 1
-		target.call("take_damage", T.TANK_CHARGE_DAMAGE)
+		target.call("take_damage", T.TANK_CHARGE_DAMAGE, position - target.position)
 		target.set("velocity", (target.get("velocity") as Vector2) + charge_dir * T.TANK_SHOVE)
 		target.rotation += randf_range(0.2, 0.4) * (1.0 if randf() < 0.5 else -1.0)
 		charge = Charge.WALK
@@ -272,6 +319,11 @@ func _draw() -> void:
 		_:
 			_draw_body(1.0, T.COL_ZOMBIE, T.COL_ZOMBIE_DARK)
 	draw_status(radius + 4.0)
+	# §14 statuses: a ring in the status's colour (the strongest-showing one).
+	for k in [StatusBars.FIRE, StatusBars.SHOCK, StatusBars.ACID, StatusBars.TOXIC, StatusBars.GOOP, StatusBars.SLIME]:
+		if status.active(k):
+			draw_arc(Vector2.ZERO, radius + 7.0, 0.0, TAU, 16, Color(T.STATUS_COLORS[k], 0.85), 3.0)
+			break
 
 
 func _draw_body(s: float, color: Color, dark: Color) -> void:
