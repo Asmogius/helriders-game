@@ -811,3 +811,11 @@ const MUSIC_MID_RIGS := 1
 const MUSIC_MID_ZOMBIES := 10
 const MUSIC_HIGH_RIGS := 2
 const MUSIC_HIGH_ZOMBIES := 22
+# Boosts: each adds steps on top of the count (result capped at 2, Crossfire).
+const MUSIC_ELITE_BOOST := 1           # Hunt's Elite or a Convoy Lead alive
+const MUSIC_LOW_ARMOR := 0.3           # player's rig at or under this share of armor
+const MUSIC_LOW_ARMOR_BOOST := 1
+const MUSIC_SURVIVE_FINAL_SECONDS := 30.0   # Survive's last stretch (the final wave)
+const MUSIC_SURVIVE_FINAL_BOOST := 2
+const MUSIC_PAUSE_DUCK_DB := -12.0     # music under the pause menu / radio call
+const MUSIC_DUCK_FADE := 0.3

@@ -1909,16 +1909,21 @@ class CourierMarkers extends Node2D:
 
 var _music: Node = null
 var _music_wait := 0.0
+var _courier_tier := "gold"
 
 
 func _music_start() -> void:
 	_music = get_node_or_null("/root/MusicManager")
-	if _music != null:
-		_music.start_combat(mission_type == "courier")
+	if _music == null:
+		return
+	_music.start_combat(mission_type == "courier")
+	for rig in _all_enemy_rigs():
+		rig.wrecked.connect(_sfx.bind("rig_wrecked"))
 
 
-## A few times a second: enemy rigs and zombies alive pick the combat layer.
-## TODO(audio): weigh in boss/elite fights, Survive's last wave, low armor.
+## A few times a second: what's in the fight picks the combat layer. Rigs and
+## zombies alive set the base; an elite alive, the player's rig low on armor
+## and the last stretch of a Survive each push it up a step (tuning.gd).
 func _music_tick(delta: float) -> void:
 	if _music == null or state != State.RUNNING:
 		return
@@ -1926,11 +1931,35 @@ func _music_tick(delta: float) -> void:
 	if _music_wait > 0.0:
 		return
 	_music_wait = T.MUSIC_CHECK_EVERY
-	_music.set_intensity(_music.intensity_for(active_rig_count(), zombies.active_count()))
+	_music.set_intensity(_music.intensity_for(active_rig_count(), zombies.active_count(), music_boosts()))
+	if mission_type == "courier":
+		var tier := courier_tier()
+		if tier != _courier_tier:
+			_courier_tier = tier
+			_sfx("courier_warning")   # a par tier just slipped away
+
+
+## Steps the music goes up on top of the rig/zombie count.
+func music_boosts() -> int:
+	var n := 0
+	if _elite_alive():
+		n += T.MUSIC_ELITE_BOOST
+	if vehicle != null and vehicle.armor_max > 0.0 and vehicle.armor / vehicle.armor_max <= T.MUSIC_LOW_ARMOR:
+		n += T.MUSIC_LOW_ARMOR_BOOST
+	if mission_type == "survive" and float(Missions.stat(spec, "seconds")) - elapsed <= T.MUSIC_SURVIVE_FINAL_SECONDS:
+		n += T.MUSIC_SURVIVE_FINAL_BOOST
+	return n
+
+
+func _elite_alive() -> bool:
+	if elite != null and not elite.is_wrecked:
+		return true
+	for rig in convoys:
+		if not rig.is_wrecked:
+			return true
+	return false
 
 
 func _sfx(id: String) -> void:
 	if _music != null:
 		_music.play_sfx(id)
-# TODO(audio): "rig_wrecked" on enemy rig wrecks (_on_*_wrecked handlers) and
-# "courier_warning" when the Courier clock passes a par tier, once agreed.

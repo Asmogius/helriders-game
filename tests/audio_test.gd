@@ -2,7 +2,8 @@ extends SceneTree
 ## Headless test for audio: the Music and Effects buses exist and take the
 ## volume settings (0 mutes), every audio file loads, the MusicManager plays
 ## Yard Idle, starts three combat layers together and crossfades them by
-## intensity, swaps in the Courier pulse, and plays wreck and results cues.
+## intensity (with boosts), swaps in the Courier pulse, ducks under a pause,
+## and plays wreck and results cues.
 ##
 ## Run:  godot --headless --fixed-fps 60 --path . -s res://tests/audio_test.gd
 
@@ -24,6 +25,14 @@ func _process(_delta: float) -> bool:
 	if frame == 2:
 		_run()
 	elif frame == 4:
+		paused = true
+	elif frame == 40:
+		var duck: AudioEffectAmplify = root.get_node("MusicManager")._duck
+		_check(duck != null and duck.volume_db < T.MUSIC_PAUSE_DUCK_DB * 0.5, "music ducks while the game is paused")
+		paused = false
+	elif frame == 80:
+		var duck: AudioEffectAmplify = root.get_node("MusicManager")._duck
+		_check(duck.volume_db > -0.5, "music comes back after the pause")
 		_finish()
 	return false
 
@@ -57,6 +66,7 @@ func _run() -> void:
 	music.set_intensity(0)
 	_check(music.intensity == 2, "intensity holds before dropping")
 	_check(MM.intensity_for(0, 0) == 0 and MM.intensity_for(T.MUSIC_MID_RIGS, 0) == 1 and MM.intensity_for(T.MUSIC_HIGH_RIGS, 0) == 2, "intensity follows rigs alive")
+	_check(MM.intensity_for(0, 0, 1) == 1 and MM.intensity_for(1, 0, 1) == 2 and MM.intensity_for(2, 30, 3) == 2, "boosts (elite, low armor, Survive's end) add steps, capped at Crossfire")
 	music.start_combat(true)
 	_check(str(music._layers[1].stream.resource_path) == MM.COURIER_MID, "Courier swaps in the tighter pulse")
 	music.play_wreck()

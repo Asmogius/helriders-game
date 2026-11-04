@@ -38,6 +38,7 @@ var _next_voice := 0
 var _tweens := {}                   # player -> Tween
 var _sfx_cache := {}
 var _last_raise := -100.0
+var _duck: AudioEffectAmplify       # on the Music bus; dips while the tree is paused
 ## Headless runs (tests, CI) set everything up but don't start playback: the
 ## dummy audio driver otherwise keeps playbacks alive past quit and Godot
 ## reports leaked resources.
@@ -46,12 +47,25 @@ var silent := DisplayServer.get_name() == "headless"
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS   # keep playing under the pause menu
+	var bus := AudioServer.get_bus_index("Music")
+	if bus >= 0:
+		_duck = AudioEffectAmplify.new()
+		AudioServer.add_bus_effect(bus, _duck)
 	_yard = _player("Music")
 	for i in 3:
 		_layers.append(_player("Music"))
 	_wreck = _player("Music")
 	for i in SFX_VOICES:
 		_voices.append(_player("Effects"))
+
+
+## Music dips under the pause menu and the driver's radio call (any pause),
+## so the settings volume stays the player's own.
+func _process(delta: float) -> void:
+	if _duck == null:
+		return
+	var target := T.MUSIC_PAUSE_DUCK_DB if get_tree().paused else 0.0
+	_duck.volume_db = move_toward(_duck.volume_db, target, absf(T.MUSIC_PAUSE_DUCK_DB) * delta / T.MUSIC_DUCK_FADE)
 
 
 func _player(bus: String) -> AudioStreamPlayer:
@@ -133,12 +147,14 @@ func set_intensity(level: int, force := false) -> void:
 
 
 ## Intensity from what's in the fight right now (numbers in tuning.gd).
-static func intensity_for(rigs: int, zombies: int) -> int:
+## `boosts` are extra steps (elite alive, low armor, Survive's last stretch).
+static func intensity_for(rigs: int, zombies: int, boosts := 0) -> int:
+	var base := 0
 	if rigs >= T.MUSIC_HIGH_RIGS or zombies >= T.MUSIC_HIGH_ZOMBIES:
-		return 2
-	if rigs >= T.MUSIC_MID_RIGS or zombies >= T.MUSIC_MID_ZOMBIES:
-		return 1
-	return 0
+		base = 2
+	elif rigs >= T.MUSIC_MID_RIGS or zombies >= T.MUSIC_MID_ZOMBIES:
+		base = 1
+	return clampi(base + boosts, 0, 2)
 
 
 ## The player's rig is wrecked: hit, then near-silence and a drone.

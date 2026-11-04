@@ -48,6 +48,7 @@ func _process(_delta: float) -> bool:
 				mark = {"scrap": profile.scrap, "day": profile.day, "known": profile.schematics.size()}
 				mission.elapsed = 118.5
 				mission.vehicle.injure_crew(1)  # the Gunner
+				_check(mission.music_boosts() >= T.MUSIC_SURVIVE_FINAL_BOOST, "Survive's last stretch pushes the music up")
 			if frame == 120:
 				_check(mission.state == Mission.State.CLEARED and mission.hud.result_text().contains("HELD THE BLOCK"), "Survive ends when the timer runs out")
 				_check(profile.scrap >= int(mark.scrap) + int(Missions.make("survive", 1, 7).reward), "Survive pays the job's reward")
@@ -66,6 +67,7 @@ func _process(_delta: float) -> bool:
 			if frame == 300:
 				var e := mission.elite
 				_check(e != null and e.is_inside_tree() and e.is_elite(), "Hunt: the Elite rolls in")
+				_check(mission.music_boosts() >= T.MUSIC_ELITE_BOOST, "an Elite alive pushes the music up")
 				_check(mission.bulwark.is_inside_tree(), "a 4-skull Hunt brings a Bulwark escort")
 				print("  4-skull Elite armor %d" % roundi(e.armor_max))
 				_check(is_equal_approx(e.armor_max, T.OUTRIDER.armor * 2.1) and e.lock_priority > mission.outrider.lock_priority, "4-skull Elite has 2.1x armor and is first in line for lock")
