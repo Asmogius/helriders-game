@@ -125,6 +125,18 @@ def chassis_layers(m, L, W, wheels_x, wheel_len, deck_z, cab, nose_x):
             box(g, nose_x - 8, L - 1, y0, y0 + 4, deck_z, deck_z + 3, "steel")
             box(g, nose_x - 8, nose_x - 2, y0, y0 + 4, deck_z + 3, deck_z + 4, "steel_dark")
             box(g, L - 1, L, y0 + 1, y0 + 3, deck_z + 1, deck_z + 2, tip)
+    g = m.layer("shock_emitter", "extra")   # Shock Pulse: coil dome on the rear deck
+    ex, ey = 22, W // 2
+    for x in range(ex - 3, ex + 4):
+        for y in range(ey - 3, ey + 4):
+            if (x - ex) ** 2 + (y - ey) ** 2 <= 10:
+                g[x, y, deck_z:deck_z + 2] = C["steel_dark"]
+                if (x - ex) ** 2 + (y - ey) ** 2 <= 4:
+                    g[x, y, deck_z + 2:deck_z + 4] = C["bone"]
+    for k in range(3):
+        g[ex, ey, deck_z + 4 + k] = C["steel"]
+    g[ex, ey, deck_z + 7] = C["white_hot"]
+    m.points["nose_mount"] = (float(nose_x - 6), W / 2.0, float(deck_z))
     g = m.layer("patch_kit", "extra")
     box(g, 8, 16, W - 12, W - 5, deck_z + 1, deck_z + 5, "steel_dark")
     box(g, 11, 13, W - 11, W - 6, deck_z + 5, deck_z + 6, "patch_green")
@@ -206,6 +218,228 @@ def bulwark_frame():
     return m
 
 
+def courier_frame():
+    """Courier Frame: 66x32 small fast courier van, 1 hardpoint, cyan stripe."""
+    m = Model((66, 32, 24))
+    c = m.g("chassis")
+    box(c, 2, 64, 6, 26, 3, 9, "steel_dark")
+    box(c, 3, 62, 5, 27, 9, 11, "steel")
+    box(c, 2, 5, 8, 24, 6, 11, "steel_dark")
+    c[2, 8:11, 8:10] = C["orange"]; c[2, 21:24, 8:10] = C["orange"]
+    cargo = m.g("cargo_box")                          # tall van body at the back
+    box(cargo, 4, 40, 6, 26, 11, 21, "steel")
+    box(cargo, 5, 39, 7, 25, 21, 22, "steel_dark")
+    box(cargo, 4, 40, 15, 17, 21, 22, "cyan")        # roof racing stripe
+    box(cargo, 4, 5, 8, 24, 12, 20, "steel_dark")    # rear doors
+    box(cargo, 10, 34, 6, 7, 15, 17, "rust"); box(cargo, 10, 34, 25, 26, 15, 17, "rust")  # side rails
+    cab = m.g("cab")
+    box(cab, 40, 54, 7, 25, 11, 18, "steel")
+    box(cab, 50, 54, 8, 24, 13, 18, "glass")
+    box(cab, 41, 50, 8, 24, 18, 19, "steel_dark")
+    chassis_layers(m, 66, 32, (6, 44), 13, 11, (40, 54, 7, 25, 11, 19), 58)
+    m.points["turret_mount"] = (22.0, 16.0, 22.0)   # on the cargo roof
+    return m
+
+
+def _wheels(m, xs, length, W, width=5, radius=5):
+    for i, x0 in enumerate(xs):
+        wheel(m.g(f"wheel_{i}_l"), x0, length, 0, width, radius, 0)
+        wheel(m.g(f"wheel_{i}_r"), x0, length, W - width, width, radius, W - 1)
+
+
+def torcher():
+    """Enemy Torcher: medium-light fire skirmisher, big rear fuel tank (weak spot,
+    its own wreck chunk), fixed flame nozzle on the nose. Enemy red, no cyan/orange."""
+    L, W = 60, 30
+    m = Model((L, W, 18))
+    _wheels(m, (6, 42), 12, W)
+    c = m.g("chassis")
+    box(c, 2, 58, 5, 25, 2, 7, "steel_dark")
+    box(c, 22, 56, 5, 25, 7, 9, "rust")
+    for x in range(48, 58):                           # short wedge nose
+        inset = (x - 48) // 2
+        box(c, x, x + 1, 5 + inset, 25 - inset, 7, 9, "rust")
+    c[2, 6:9, 4:6] = C["enemy_red"]; c[2, 21:24, 4:6] = C["enemy_red"]
+    box(c, 22, 46, 5, 6, 8, 9, "enemy_red"); box(c, 22, 46, 24, 25, 8, 9, "enemy_red")
+    ck = m.g("cab")
+    box(ck, 28, 42, 8, 22, 9, 13, "steel")
+    box(ck, 39, 42, 9, 21, 10, 13, "glass")
+    tank = m.g("fuel_tank")                           # big cylinder across the back
+    for x in range(3, 21):
+        for y in range(4, 26):
+            for z in range(7, 17):
+                if ((y - 14.5) / 10.5) ** 2 + ((z - 12) / 5) ** 2 <= 1:
+                    tank[x, y, z] = C["rust"] if (x // 3) % 2 else C["steel_dark"]
+    box(tank, 3, 21, 13, 16, 16, 17, "enemy_red")     # hazard stripe
+    box(tank, 10, 13, 14, 15, 17, 18, "steel")        # filler cap
+    nz = m.g("nozzle")
+    box(nz, 46, 60, 13, 17, 8, 11, "steel")
+    box(nz, 44, 50, 12, 18, 9, 12, "steel_dark")
+    box(nz, 58, 60, 12, 18, 8, 12, "steel_dark")
+    nz[59, 14:16, 9:11] = C["white_hot"]             # pilot light
+    m.points["muzzle"] = (59.5, 15.0, 9.5)
+    m.points["weak_spot"] = (12.0, 15.0, 12.0)
+    m.points["turret_mount"] = (34.0, 15.0, 13.0)
+    elite_trim(m)
+    return m
+
+
+def sludger():
+    """Enemy Sludger: tank truck carrying acid and goop, lobber turret on the tank."""
+    L, W = 72, 34
+    m = Model((L, W, 22))
+    _wheels(m, (6, 22, 54), 12, W, 6, 6)
+    c = m.g("chassis")
+    box(c, 2, 70, 6, 28, 3, 9, "steel_dark")
+    box(c, 2, 70, 5, 29, 9, 10, "steel")
+    c[2, 7:10, 6:8] = C["enemy_red"]; c[2, 24:27, 6:8] = C["enemy_red"]
+    cab = m.g("cab")
+    box(cab, 52, 70, 7, 27, 10, 18, "steel")
+    box(cab, 66, 70, 9, 25, 12, 18, "glass")
+    box(cab, 53, 66, 8, 26, 18, 19, "steel_dark")
+    cab[69, 8:11, 10:12] = C["enemy_red"]; cab[69, 23:26, 10:12] = C["enemy_red"]
+    tank = m.g("tank")
+    for x in range(4, 50):
+        for y in range(5, 29):
+            for z in range(9, 21):
+                if ((y - 16.5) / 11.5) ** 2 + ((z - 15) / 6) ** 2 <= 1:
+                    tank[x, y, z] = C["steel_dark"]
+    for x0 in (8, 20, 32, 44):                         # straps
+        box(tank, x0, x0 + 2, 5, 29, 9, 21, "rust")
+    for x0, col in ((12, "acid"), (26, "goop"), (38, "acid")):   # spills down the sides
+        box(tank, x0, x0 + 3, 5, 6, 10, 17, col); box(tank, x0 + 1, x0 + 4, 28, 29, 11, 16, col)
+    box(tank, 6, 48, 16, 18, 20, 21, "enemy_red")
+    m.points["turret_mount"] = (28.0, 17.0, 21.0)
+    elite_trim(m)
+    return m
+
+
+def elite_trim(m):
+    """Hunt elite: gold spine stripe and nose chevron, one voxel above the top
+    surface, as a layer that stacks on the hull sheet by heading."""
+    full = None
+    for g in m.chunks.values():
+        full = g.copy() if full is None else np.where(g > 0, g, full)
+    sx, sy, sz = full.shape
+    tops = np.where((full > 0).any(2), sz - 1 - np.argmax((full > 0)[:, :, ::-1], axis=2), -1)
+    g = m.layer("elite_trim", "elite")
+    cy = sy // 2
+    for x in range(3, sx - 12):
+        for y in (cy - 1, cy):
+            z = tops[x, y] + 1
+            if 0 < z < sz:
+                g[x, y, z] = C["elite_gold"]
+    for k in range(6):                                 # chevron pointing forward
+        x = sx - 12 + k
+        for y in (cy - 6 + k, cy + 5 - k):
+            if 0 <= y < sy and tops[x, y] >= 0 and tops[x, y] + 1 < sz:
+                g[x, y, tops[x, y] + 1] = C["elite_gold"]
+
+
+# --- weapons: fixed guns have a rear "pivot" (where they bolt onto the nose
+# mount) and a "muzzle"; turrets have a ring "pivot" and a "muzzle". ---
+def harpoon():
+    m = Model((26, 10, 8))
+    m.points["pivot"] = (2.0, 5.0, 0.0); m.points["muzzle"] = (25.5, 5.0, 4.5)
+    b = m.g("launcher")
+    box(b, 0, 16, 2, 8, 0, 6, "steel_dark")
+    box(b, 2, 14, 3, 7, 6, 7, "steel")
+    box(b, 0, 4, 1, 9, 1, 5, "rust")                  # cable reel
+    s = m.g("spear")
+    box(s, 16, 23, 4, 6, 4, 5, "bone")
+    box(s, 23, 26, 3, 7, 3, 6, "steel")               # barbed head
+    s[25, 4:6, 4] = C["white_hot"]
+    return m
+
+
+def mortar():
+    m = Model((22, 16, 14))
+    m.points["pivot"] = (8.0, 8.0, 0.0); m.points["muzzle"] = (20.5, 8.0, 12.5)
+    b = m.g("mount")
+    for x in range(0, 16):
+        for y in range(0, 16):
+            if (x - 8) ** 2 + (y - 7.5) ** 2 <= 49:
+                b[x, y, 0:3] = C["steel_dark"]
+    box(b, 3, 13, 3, 13, 3, 6, "steel")
+    box(b, 4, 12, 13, 15, 2, 5, "rust")               # shell rack
+    t = m.g("tube")
+    for k in range(6):                                 # fat tube tilted up and forward
+        box(t, 8 + k * 2, 12 + k * 2, 5, 11, 5 + k, 8 + k, "steel")
+    box(t, 18, 22, 5, 11, 11, 14, "steel_dark")
+    t[21, 7:9, 12:14] = C["bone"]
+    return m
+
+
+def rivet_gun():
+    m = Model((22, 10, 8))
+    m.points["pivot"] = (1.0, 5.0, 0.0); m.points["muzzle"] = (21.5, 5.0, 3.5)
+    b = m.g("body")
+    box(b, 0, 12, 2, 8, 0, 6, "steel")
+    for x in range(2, 9):                              # drum magazine on top
+        for y in range(2, 8):
+            if (x - 5) ** 2 + (y - 4.5) ** 2 <= 9:
+                b[x, y, 6:8] = C["rust"]
+    box(b, 12, 22, 4, 6, 2, 5, "steel_dark")          # barrel
+    box(b, 20, 22, 3, 7, 2, 5, "steel")               # muzzle brake
+    return m
+
+
+def flame_sprayer():
+    m = Model((22, 12, 9))
+    m.points["pivot"] = (1.0, 6.0, 0.0); m.points["muzzle"] = (21.5, 6.0, 4.5)
+    b = m.g("tank")
+    for x in range(0, 9):
+        for y in range(1, 11):
+            for z in range(0, 8):
+                if ((y - 5.5) / 5) ** 2 + ((z - 4) / 4) ** 2 <= 1:
+                    b[x, y, z] = C["rust"]
+    box(b, 0, 9, 5, 7, 7, 8, "enemy_red")
+    n = m.g("nozzle")
+    box(n, 9, 19, 5, 7, 3, 6, "steel")
+    box(n, 18, 22, 4, 8, 2, 7, "steel_dark")          # flared tip
+    n[21, 5:7, 4] = C["white_hot"]                    # pilot light
+    return m
+
+
+def acid_lobber():
+    m = Model((24, 16, 14))
+    m.points["pivot"] = (8.0, 8.0, 0.0); m.points["muzzle"] = (22.5, 8.0, 10.5)
+    b = m.g("mount")
+    for x in range(0, 16):
+        for y in range(0, 16):
+            if (x - 8) ** 2 + (y - 7.5) ** 2 <= 49:
+                b[x, y, 0:3] = C["steel_dark"]
+    for x in range(2, 12):                              # acid canister
+        for y in range(3, 13):
+            for z in range(3, 12):
+                if ((x - 6.5) / 5) ** 2 + ((y - 7.5) / 5) ** 2 + ((z - 7) / 4.5) ** 2 <= 1:
+                    b[x, y, z] = C["acid"] if z > 8 else C["steel"]
+    t = m.g("tube")
+    for k in range(5):
+        box(t, 11 + k * 2, 15 + k * 2, 6, 10, 6 + k, 9 + k, "steel")
+    t[22, 7:9, 10:12] = C["goop"]
+    return m
+
+
+def arc_projector():
+    m = Model((24, 16, 12))
+    m.points["pivot"] = (7.0, 8.0, 0.0); m.points["muzzle"] = (23.5, 8.0, 7.5)
+    b = m.g("mount")
+    for x in range(0, 14):
+        for y in range(1, 15):
+            if (x - 7) ** 2 + (y - 7.5) ** 2 <= 42:
+                b[x, y, 0:3] = C["steel_dark"]
+    box(b, 2, 12, 4, 12, 3, 8, "steel")
+    for x in range(3, 11, 2):                          # coil rings
+        box(b, x, x + 1, 3, 13, 4, 9, "bone")
+    p = m.g("prongs")
+    for y0 in (4, 10):
+        box(p, 12, 23, y0, y0 + 2, 6, 9, "steel")
+        p[23, y0:y0 + 2, 7] = C["white_hot"]
+    box(p, 18, 20, 6, 10, 7, 8, "white_hot")          # arc between the prongs
+    return m
+
+
 def pintle_turret():
     m = Model((30, 16, 10))
     m.points["pivot"] = (6.5, 8.0, 0.0)
@@ -249,6 +483,7 @@ def outrider():
         box(gn, 44, 67, y0, y0 + 4, 7, 10, "steel")
         box(gn, 44, 52, y0, y0 + 4, 10, 11, "steel_dark")
         gn[67, y0 + 1:y0 + 3, 8:9] = C["enemy_red"]
+    elite_trim(m)
     return m
 
 
@@ -257,4 +492,16 @@ def ALL():
     return {"scrap_frame": (scrap_frame(), col),
             "pintle_turret": (pintle_turret(), col),
             "outrider": (outrider(), col),
-            "bulwark_frame": (bulwark_frame(), col)}
+            "bulwark_frame": (bulwark_frame(), col),
+            "courier_frame": (courier_frame(), col),
+            "torcher": (torcher(), col),
+            "sludger": (sludger(), col),
+            "harpoon": (harpoon(), col),
+            "mortar": (mortar(), col),
+            "rivet_gun": (rivet_gun(), col),
+            "flame_sprayer": (flame_sprayer(), col),
+            "acid_lobber": (acid_lobber(), col),
+            "arc_projector": (arc_projector(), col)}
+
+# Enemy hulls: checked to carry no player/UI accent colours (palette.ENEMY_FORBIDDEN).
+ENEMIES = ["outrider", "torcher", "sludger"]

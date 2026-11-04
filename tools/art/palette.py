@@ -5,14 +5,17 @@ and orange (accent) edge lights, red for enemies."""
 OUTLINE = (12, 11, 13, 255)
 
 # name -> RGB. Index order is the model colour index (0 = empty).
-NAMES = ["_", "steel", "steel_dark", "rust", "tyre", "glass", "cyan", "orange", "enemy_red", "bone", "elite_gold", "white_hot", "patch_green"]
+NAMES = ["_", "steel", "steel_dark", "rust", "tyre", "glass", "cyan", "orange", "enemy_red", "bone", "elite_gold", "white_hot", "patch_green", "acid", "goop"]
 PALETTE = {
     "steel": (79, 82, 85), "steel_dark": (48, 49, 52), "rust": (117, 64, 33),
     "tyre": (24, 24, 26), "glass": (40, 62, 70), "cyan": (64, 209, 224),
     "orange": (237, 122, 43), "enemy_red": (242, 61, 41), "bone": (176, 166, 140),
     "elite_gold": (255, 199, 64), "white_hot": (255, 242, 204), "patch_green": (115, 217, 128),
+    "acid": (153, 242, 64), "goop": (224, 164, 88),
 }
-EMISSIVE = {"cyan", "orange", "enemy_red", "elite_gold", "white_hot", "patch_green"}  # never darkened
+# Never on enemy rigs: cyan (player/extraction), orange (push), shield and truck colours.
+ENEMY_FORBIDDEN = {"cyan", "orange"}
+EMISSIVE = {"cyan", "orange", "enemy_red", "elite_gold", "white_hot", "patch_green", "acid", "goop"}  # never darkened
 SHADE_MUL = (0.62, 0.82, 1.0)
 
 
