@@ -11,6 +11,7 @@ const Parts := preload("res://scripts/parts.gd")
 const Crew := preload("res://scripts/crew.gd")
 const CrewCard := preload("res://scripts/crew_card.gd")
 const RarityFrame := preload("res://scripts/rarity_frame.gd")
+const Garage := preload("res://scripts/garage.gd")
 
 # Card types and the files that draw them: each must use UI.rarity_* and
 # none may colour by rarity another way.
@@ -64,11 +65,48 @@ func _initialize() -> void:
 	for f in DirAccess.get_files_at("res://scripts"):
 		if f.ends_with(".gd") and f != "tuning.gd":
 			_check(def.search(FileAccess.get_file_as_string("res://scripts/" + f)) == null, "%s defines no rarity colour" % f)
-	# Every card type asks UI.rarity_* (no Parts/Crew colour helpers).
+	# No card file colours by rarity through the old Parts/Crew helpers.
 	for kind: String in CARD_FILES:
 		var src := FileAccess.get_file_as_string(CARD_FILES[kind])
-		_check(src.contains("UI.rarity_"), "%s asks UI.rarity_*" % kind)
 		_check(not src.contains("Parts.color_of") and not src.contains("Crew.color_of"), "%s has no other rarity colour source" % kind)
+	# A crew card wears its member's frame.
+	_card = CrewCard.new()
+	_card.member = {"id": 1, "name": "Test Person", "role": "mechanic", "rarity": "Legendary", "xp": 0}
+	root.add_child(_card)
+	var cf: Control = _card.get_node_or_null("RarityFrame")
+	_check(cf != null and str(cf.rarity) == "Legendary", "crew card has a Legendary frame")
+	_card.member = null
+	_check(cf != null and not cf.visible, "crew card hides its frame when the member is cleared")
+	_card.member = {"id": 2, "name": "Back Again", "role": "mechanic", "rarity": "Rare", "xp": 0}
+	_check(cf != null and cf.visible and str(cf.rarity) == "Rare", "crew card shows the frame again for a new member")
+
+
+## Checks that need nodes to be ready and processing (run on the first frame).
+func _live_checks() -> void:
+	var profile: Node = root.get_node("Profile")
+	# Behaviour: each card type, built with a known rarity, draws its frame in
+	# exactly tuning.gd's colour for that rarity.
+	for r: String in T.RARITY_ORDER:
+		var cards := {
+			"crew card": CrewCard.new(),
+			"slot tag": Garage.SlotTag.new(),
+			"part card": Garage.PartCard.new(),
+		}
+		for kind: String in cards:
+			var card: Control = cards[kind]
+			if kind == "crew card":
+				card.member = {"id": 1, "name": "Test Person", "role": "mechanic", "rarity": r, "xp": 0}
+			else:
+				card.rarity = r
+			root.add_child(card)
+			var f: Control = card.get_node_or_null("RarityFrame")
+			_check(f != null and f.visible, "%s (%s) shows a rarity frame" % [kind, r])
+			if f != null:
+				f.animate = false   # static colour (Mythic cycles when animated)
+				_check(f.color() == T.RARITY_COLORS[r], "%s (%s) frame colour is T.RARITY_COLORS" % [kind, r])
+			card.free()
+	var q0 := str(profile.settings.get("quality", "High"))
+	profile.set_setting("quality", "High")
 	# A frame on every tier; Epic and up animate, Common to Rare stay static.
 	for r: String in T.RARITY_ORDER:
 		var c := Control.new()
@@ -77,21 +115,26 @@ func _initialize() -> void:
 		var f: Control = UI.rarity_frame(c, r)
 		_check(f.get_script() == RarityFrame and str(f.rarity) == r, "%s frame added" % r)
 		_check(UI.rarity_frame(c, r) == f, "%s frame reused, not stacked" % r)
-		f.animate = true
 		_check(f.animated() == (UI.rarity_tier(r) >= 4), "%s animates only if Epic+" % r)
-		f.animate = false
-		_check(not f.is_processing(), "%s frame idle when animation is off (Low)" % r)
-		c.queue_free()
-	# A crew card wears its member's frame.
-	_card = CrewCard.new()
-	_card.member = {"id": 1, "name": "Test Person", "role": "mechanic", "rarity": "Legendary", "xp": 0}
-	root.add_child(_card)
-	var cf: Control = _card.get_node_or_null("RarityFrame")
-	_check(cf != null and str(cf.rarity) == "Legendary", "crew card has a Legendary frame")
+		_check(f.is_processing() == (UI.rarity_tier(r) >= 4), "%s frame processes only if Epic+" % r)
+		# Behaviour: the quality preset drives animation, live, on frames
+		# already on screen (toggling Low then High in settings).
+		profile.set_setting("quality", "Low")
+		_check(not f.animated() and not f.is_processing(), "%s frame idle after switching to Low" % r)
+		var fresh: Control = UI.rarity_frame(Control.new(), r)
+		root.add_child(fresh.get_parent())
+		_check(not fresh.animated(), "%s frame made on Low starts static" % r)
+		profile.set_setting("quality", "High")
+		_check(f.animated() == (UI.rarity_tier(r) >= 4) and f.is_processing() == (UI.rarity_tier(r) >= 4), "%s frame animates again after switching back to High" % r)
+		fresh.get_parent().free()
+		c.free()
+	profile.set_setting("quality", q0)
 
 
 func _process(_delta: float) -> bool:
 	frame += 1
+	if frame == 1:
+		_live_checks()
 	if frame < 3:
 		return false
 	if failures.is_empty():
