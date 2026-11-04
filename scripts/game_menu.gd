@@ -189,7 +189,7 @@ func _settings_page() -> void:
 		slider.custom_minimum_size = Vector2(0, 48)
 		slider.value_changed.connect(func(v: float) -> void: profile.set_setting(key, v))
 		line.add_child(slider)
-	var note := UI.label("Lower quality caps the frame rate and draws fewer effects. New settings apply to the next fight; the frame cap applies now. Sound comes in a later build.", 18, UI.TEXT_DIM)
+	var note := UI.label("Lower quality caps the frame rate and draws fewer effects. New settings apply to the next fight; the frame cap applies now.", 18, UI.TEXT_DIM)
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_body.add_child(note)
 	_button("BACK", show_page.bind("main"), T.COL_CYAN)
