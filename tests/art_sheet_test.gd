@@ -49,7 +49,9 @@ func _run() -> void:
 	_check_ground_anchor()
 	_check_two_mounts()
 	_check_wreck()
-	_check_marks()
+	_check_layers()
+	_check_burnt()
+	_check_roll_cage()
 	print("art_sheet_test: ", "PASS" if fails == 0 else "%d FAILURES" % fails)
 	quit(1 if fails else 0)
 
@@ -143,8 +145,9 @@ func _check_two_mounts() -> void:
 	v.queue_free()
 
 
-## Wreck: every chunk but the chassis is flung from its offset, outward, and
-## fades; the hull keeps the burnt chassis; a revive restores the full sheet.
+## Wreck: every core chunk but the chassis and every piece of the fitted
+## layers (one per wheel) is flung from its offset and fades; the hull shows
+## the burnt chassis (lights out); a revive restores the full sheet.
 func _check_wreck() -> void:
 	var holder := Node2D.new()
 	root.add_child(holder)
@@ -154,36 +157,88 @@ func _check_wreck() -> void:
 	v.rotation = 5 * TAU / 32.0
 	v._update_art()
 	var full: Texture2D = v._hull_art.texture
-	var chunks: Dictionary = v._hull_art.meta.chunks
+	var meta: Dictionary = v._hull_art.meta
+	var want: int = meta.chunks.size() - 1
+	for id in v._layer_ids:
+		want += (meta.layers[id].pieces as Dictionary).size()
+	var wheels: Dictionary = meta.layers["drive:street_wheels"].pieces
+	check(wheels.size() == 4, "four wheel pieces, got %d" % wheels.size())
+	var seen := {}
+	for pn: String in wheels:
+		seen[str(wheels[pn].offsets[5])] = true
+	check(seen.size() == 4, "each wheel has its own offset")
 	v._wreck()
-	check(v.wreck_pieces.size() == chunks.size() - 1, "wreck: %d pieces for %d chunks" % [v.wreck_pieces.size(), chunks.size()])
+	check(v.wreck_pieces.size() == want, "wreck: %d pieces, want %d" % [v.wreck_pieces.size(), want])
 	for p in v.wreck_pieces:
 		check(p.get_parent() == holder, "wreck: piece in the world")
 		check(p.frame == 5, "wreck: piece uses the hull's frame")
 		check(p.velocity.length() > 50.0, "wreck: piece flung")
-	check(v._hull_art.texture != full and v._hull_art.visible, "wreck: hull shows the burnt chassis")
+	check(v._hull_art.texture.resource_path.ends_with("chassis_burnt.png"), "wreck: burnt chassis sheet")
+	for id: String in v._layer_sprites:
+		check(not v._layer_sprites[id].visible, "wreck: layer %s hidden" % id)
 	var p0: Sprite2D = v.wreck_pieces[0]
 	p0._process(1.0)
 	check(p0.modulate.a < 1.0, "wreck: piece fades")
 	v.revive(0.1)
+	v._update_art()
 	check(v._hull_art.texture == full, "revive: full sheet back")
+	for id: String in v._layer_sprites:
+		check(v._layer_sprites[id].visible, "revive: layer %s back" % id)
 	holder.queue_free()
 
 
-## Part marks follow the equipped parts.
-func _check_marks() -> void:
+## Burnt sheet: the lights go out (no pixel brighter than the soot palette).
+func _check_burnt() -> void:
+	var img: Image = (load("res://art/sprites/scrap_frame__chassis_burnt.png") as Texture2D).get_image()
+	var brightest := 0.0
+	for y in range(0, img.get_height(), 2):
+		for x in range(0, img.get_width(), 2):
+			var c := img.get_pixel(x, y)
+			if c.a > 0.5:
+				brightest = maxf(brightest, maxf(c.r, maxf(c.g, c.b)))
+	check(brightest < 0.35, "burnt chassis is dark, brightest %.2f" % brightest)
+
+
+## Part layers follow the equipped parts, are drawn with the hull's frame, and
+## a part without a sheet falls back to the stock one for its slot.
+func _check_layers() -> void:
 	var v := _rig(load("res://scripts/parts.gd").STARTER_LOADOUT)
-	check(v.art_marks().is_empty(), "starter: no extra marks %s" % [v.art_marks()])
+	check(str(v.art_layers()) == str(["drive:street_wheels", "armor:scrap_plating"]), "starter layers %s" % [v.art_layers()])
 	v.look = {"chassis": "scrap_frame", "drive": "half_track", "armor": "riot_plating",
 		"utility": ["mine_dropper", "emergency_patch"], "internal": ["roll_cage", "advanced_targeting"]}
-	var m: Array[String] = v.art_marks()
-	for want in ["half_track", "armor:riot_plating", "mine_rack", "patch_kit", "roll_cage", "sensor_dish"]:
-		check(m.has(want), "marks include " + want)
+	var m: Array[String] = v.art_layers()
+	for want in ["drive:half_track", "armor:riot_plating", "mine_rack", "patch_kit", "roll_cage", "sensor_dish"]:
+		check(m.has(want), "layers include " + want)
+	v.rotation = 9 * TAU / 32.0
+	v._update_art()
+	check(v._layer_sprites.size() == m.size(), "a sprite per layer")
+	for id: String in v._layer_sprites:
+		check(v._layer_sprites[id].frame == 9, "layer %s on the hull frame" % id)
 	v.gun_stats.clear()
 	v.gun_stats.append({"mount": v.Mount.FIXED})
+	check(v.art_layers().has("nose_guns"), "nose guns layer")
 	v._active["overcharge"] = 1.0
-	m = v.art_marks()
-	check(m.has("nose_guns") and m.has("nose_guns_hot"), "marks: nose guns, hot on Overcharge")
+	check(v.art_layers().has("nose_guns_hot") and not v.art_layers().has("nose_guns"), "hot nose guns on Overcharge")
 	v._active.erase("overcharge")
 	v.gun_stats.clear()
+	v.look = {"chassis": "scrap_frame", "drive": "street_wheels", "armor": "cowcatcher_ram"}
+	check(v.art_layers().has("armor:scrap_plating"), "armor without a sheet falls back to stock")
 	v.queue_free()
+
+
+## The roll cage is built per chassis around that chassis's cab: at every
+## sampled heading it covers the cab and is at most a few px bigger.
+func _check_roll_cage() -> void:
+	for name in ["scrap_frame", "bulwark_frame"]:
+		var s: Sprite2D = DS.new()
+		s.load_meta("res://art/sprites/%s.json" % name)
+		var cage: Image = (load("res://art/sprites/" + String(s.meta.layers.roll_cage.sheet)) as Texture2D).get_image()
+		var cab: Image = (load("res://art/sprites/" + String(s.meta.chunks.cab.sheet)) as Texture2D).get_image()
+		var fw := int(s.meta.frame_w)
+		for i in [0, 4, 8, 13]:
+			var r := Rect2i((i % 8) * fw, (i / 8) * fw, fw, fw)
+			var a := cage.get_region(r).get_used_rect()
+			var b := cab.get_region(r).get_used_rect()
+			check(a.grow(1).encloses(b), "%s: cage covers the cab at %d (%s vs %s)" % [name, i, a, b])
+			check(a.size.x - b.size.x <= 8 and a.size.y - b.size.y <= 10, "%s: cage fits the cab at %d (%s vs %s)" % [name, i, a, b])
+		s.free()
