@@ -26,6 +26,7 @@ func _initialize() -> void:
 	profile = root.get_node("Profile")
 	profile.persist = false
 	profile.new_game()
+	seed(20261104)   # deterministic spawns and rolls, so a failure always reproduces
 
 
 func _process(_delta: float) -> bool:
@@ -78,13 +79,15 @@ func _process(_delta: float) -> bool:
 				# stop the Hunt finishing: place one every run, so this is tested
 				# every time rather than only when a Tank happens to drop one.
 				mission.drop_cache(mission.vehicle.global_position + Vector2(0, 900), 10)
-				mark = {"crates": mission.pickups.get_child_count()}
 				e.take_damage(99999.0)
 			if frame == 305:
 				# Its wreck blast can take a nearby rig (its Patcher, say) with it,
 				# so look for the Elite's own crate rather than the newest one.
 				var crate: Variant = mission._rig_crate.get(mission.elite)
-				_check(crate != null and mission.pickups.get_child_count() >= int(mark.crates) + 1, "the Elite always drops something")
+				# Check the Elite's own crate, not the crate count: moving the rig
+				# can land it on an older crate (a Tank's cache, a rig's salvage)
+				# and pick that up in these frames, so the count may not grow.
+				_check(crate != null and is_instance_valid(crate) and (crate as Node).get_parent() == mission.pickups, "the Elite always drops something")
 				_check(mission.state == Mission.State.RUNNING, "Hunt isn't over until you grab the drop")
 				mark = {"known": profile.schematics.size()}
 				if crate != null:
