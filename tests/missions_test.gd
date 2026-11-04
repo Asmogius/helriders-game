@@ -39,7 +39,7 @@ func _process(_delta: float) -> bool:
 			if frame == 3:
 				_check(mission.skulls == 1 and mission.target_kills == 31, "Clear 1 skull: 30 shamblers + 1 Hunter, no Outrider")
 				_check(mission.bulwarks.size() == 1 and not mission.bulwark.is_inside_tree(), "one Bulwark is built up front but stays out of a 1-skull Clear")
-				_check(mission.zombies.cap == 24, "Clear 1 skull: crowd capped at 24")
+				_check(mission.zombies.cap == 19, "Clear 1 skull: crowd capped at 19 (24, 20% smaller at 1 skull)")
 				_next()
 		2:
 			_start(Missions.make("survive", 1, 7), true)

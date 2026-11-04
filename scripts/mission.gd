@@ -259,6 +259,7 @@ func _ready() -> void:
 		rig.bullets = bullets
 		rig.fx = fx
 		rig.arm_for_skulls(skulls)   # Gunner Rigs and the Convoy cab carry a shield from 4 skulls
+		_skull_damage(rig)
 	if truck != null:
 		# Escort: the truck rolls out behind you, and the zombies and enemy
 		# rigs go for it.
@@ -270,6 +271,7 @@ func _ready() -> void:
 		for rig: EnemyRig in _all_enemy_rigs():
 			rig.player = truck
 	for h in hunters:
+		h.damage_mult = float(T.ENEMY_DAMAGE_BY_SKULL[skulls - 1])
 		h.target = vehicle
 		h.nav = nav
 	zombies.nav = nav
@@ -370,8 +372,9 @@ func _ready() -> void:
 
 ## Crowd size, specials and objective for this mission's type and skulls.
 func _configure_mission() -> void:
-	var cap: int = Missions.stat(spec, "cap")
+	var cap: int = maxi(roundi(float(Missions.stat(spec, "cap")) * float(T.HORDE_SCALE_BY_SKULL[skulls - 1])), 1)   # smaller hordes at 1-2 skulls
 	zombies.cap = cap
+	zombies.damage_mult = float(T.ENEMY_DAMAGE_BY_SKULL[skulls - 1])
 	zombies.set_mix(skulls, mission_type == "courier")
 	var outrider_count := 0
 	var bulwark_count := 0
@@ -946,6 +949,19 @@ class WreckCrew extends Node2D:
 			draw_circle(at + dir * 20.0 + dir.orthogonal() * 8.0, 6.0, Color(0.35, 0.45, 0.3, fade))
 			draw_circle(at + dir * 20.0 - dir.orthogonal() * 8.0, 6.0, Color(0.35, 0.45, 0.3, fade))
 			draw_string(font, at + Vector2(-120.0, -22.0), names[i].to_upper(), HORIZONTAL_ALIGNMENT_CENTER, 240.0, 22, Color(T.COL_ENEMY, fade))
+
+
+## The skull's enemy damage on a rig (and a Convoy's trailer).
+func _skull_damage(rig: Node) -> void:
+	if bool(rig.call("is_elite")):
+		return   # a Hunt Elite has its own damage table by skulls
+	var m := float(T.ENEMY_DAMAGE_BY_SKULL[skulls - 1])
+	rig.set("skull_damage", m)
+	if m != 1.0:
+		rig.call("scale_damage", m)
+		var trailer: Variant = rig.get("trailer")
+		if trailer is Node and (trailer as Node).has_method("scale_damage"):
+			(trailer as Node).call("scale_damage", m)
 
 
 ## The Database id of an enemy rig.

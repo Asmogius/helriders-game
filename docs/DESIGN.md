@@ -288,6 +288,7 @@ Agreed with the owner on 2026-11-03. **Do not implement until the numbers are dr
 ## Combat Contract and Loss
 
 - Time to wreck (focused, standing still): 15 / 13 / 11 / 9 / 7.5 / 6 s at skulls 1-6. Anchor damage numbers to this.
+- **Balanced (2026-11-04).** Agreed with the owner: the target describes a build that fits the skull (a starter at 1-2, a mid build at 3-4, a late build at 5-6). `tools/balance/balance_report.gd` measures it: the whole Clear roster spawned around a parked rig, mean of 5 runs. To hit it, enemy rigs' guns and rams, zombies and Hunters deal ×0.85 / 0.95 / 1.0 / 1.1 / 1.95 / 1.95 of their damage at skulls 1-6 (`T.ENEMY_DAMAGE_BY_SKULL`; a Hunt Elite keeps its own table), and hordes at skulls 1-2 are 20% / 10% smaller (`T.HORDE_SCALE_BY_SKULL`). Result: 14.5 / 12.8 / 10.6 / 8.9 / 7.8 / 6.6 s. Consequence: the step from 4 to 5 skulls is steep (a mid build at 5 lasts about 3 s), so 5-6 skull jobs ask for late gear.
 - Rig loss is minor: the day after a wreck, the player can rebuild close to their last build and run the same skull level.
 - Lost crew return: after 3 days (Uncommon), +1 day per rarity step (Rare 4, Epic 5, Legendary 6, Mythic 7), they enter a rehire pool at level 1 with the same specialty and rarity (perks reset).
 - Saloon rehire section: one extra card a day, drawn at random from the rehire pool. A rehire can be dismissed permanently, which returns them to the general hire pool.

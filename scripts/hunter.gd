@@ -15,6 +15,7 @@ const HULL_HALF := Vector2(30.0, 17.0)   # where it clings, in rig-local space
 
 var target: Rig                           # the player's rig
 var nav: NavGrid
+var damage_mult := 1.0     # the skull's enemy damage (the mission sets it)
 var state := State.CHASE
 
 var _shape: CollisionShape2D
@@ -223,7 +224,7 @@ func _hold_on(delta: float) -> void:
 		_knock_off(Vector2.RIGHT.rotated(randf() * TAU))
 		return
 	_follow_rig()
-	target.take_damage(T.HUNTER_DPS * delta * float(target.get("latch_mult")), global_position - target.global_position)
+	target.take_damage(T.HUNTER_DPS * damage_mult * delta * float(target.get("latch_mult")), global_position - target.global_position)
 
 	# The rig ran this tick already, so its wall contact is current.
 	if target.touching_wall:

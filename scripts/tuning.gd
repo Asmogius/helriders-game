@@ -617,6 +617,14 @@ const OVERLOAD_COIL_JUMPS := 3     # Arc Projector mod: the chain hits 2 extra t
 const MOBILE_WORKSHOP_AT := 0.30   # Hauler mod: when HP first falls under 30%...
 const MOBILE_WORKSHOP_HEAL := 0.15 # ...restore 15% of max HP, once per mission
 
+# Combat contract (DESIGN: time to wreck 15/13/11/9/7.5/6 s at skulls 1-6, for
+# a build that fits the skull; agreed with the owner 2026-11-04). Measured by
+# tools/balance/balance_report.gd. Enemy rigs' guns and rams, zombies and
+# Hunters deal this share of their damage at skulls 1-6; hordes at skulls 1-2
+# are this much smaller (alive at once).
+const ENEMY_DAMAGE_BY_SKULL := [0.85, 0.95, 1.0, 1.1, 1.95, 1.95]
+const HORDE_SCALE_BY_SKULL := [0.8, 0.9, 1.0, 1.0, 1.0, 1.0]
+
 const CREW_PRICES := {"Common": 0, "Uncommon": 80, "Rare": 200, "Epic": 450, "Legendary": 900, "Mythic": 1600}
 # Lost crew (§14; agreed with the owner): a crew member lost in a wreck turns
 # up again after 3 days (Uncommon), a day more per rarity step, and joins the
