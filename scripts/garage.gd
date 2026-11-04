@@ -1235,7 +1235,7 @@ class PartCard extends Button:
 		var dim := 0.45 if disabled else 1.0
 		UI.draw_fit(self, font, Vector2(12, 30), title, HORIZONTAL_ALIGNMENT_LEFT, size.x - 24.0, 19, Color(UI.TEXT, dim))
 		draw_string(font, Vector2(12, 50), subtitle, HORIZONTAL_ALIGNMENT_LEFT, size.x - 24.0, 14, Color(rarity_color, 0.9 * dim))
-		draw_string(font, Vector2(12, 72), headline, HORIZONTAL_ALIGNMENT_LEFT, size.x - 24.0, 14, Color(UI.TEXT_DIM, dim))
+		UI.draw_fit(self, font, Vector2(12, 72), headline, HORIZONTAL_ALIGNMENT_LEFT, size.x - 24.0, 14, Color(UI.TEXT_DIM, dim))   # long Drive lines shrink, never clip
 		var y := 94.0
 		var x := 12.0
 		for d: Array in deltas:

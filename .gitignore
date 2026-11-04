@@ -15,4 +15,5 @@ smoke.log
 garage.log
 missions.log
 export.log
-imp.log   # import log written by the local test runner
+# import log written by the local test runner
+imp.log
