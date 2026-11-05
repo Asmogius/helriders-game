@@ -1,0 +1,130 @@
+{
+ "room_size": [
+  1280,
+  720
+ ],
+ "scale": 3.4,
+ "tilt_deg": 30.0,
+ "background": "res://art/saloon/saloon_room.png",
+ "lights": "res://art/saloon/saloon_room_lights.png",
+ "lights_note": "Fireplace + lantern glow only. Composite above the world night grade; do not CanvasModulate this layer.",
+ "seats": [
+  {
+   "id": "bar_left",
+   "slot": 0,
+   "pos": [
+    234,
+    136
+   ],
+   "z": 200,
+   "hit_rect": [
+    225,
+    128,
+    64,
+    80
+   ],
+   "anchor": [
+    258,
+    157
+   ],
+   "card_side": "left",
+   "sprites": {
+    "idle": "res://art/saloon/crew_bar_left_idle.png",
+    "highlight": "res://art/saloon/crew_bar_left_highlight.png",
+    "dim": "res://art/saloon/crew_bar_left_dim.png"
+   }
+  },
+  {
+   "id": "bar_mid",
+   "slot": 1,
+   "pos": [
+    421,
+    136
+   ],
+   "z": 200,
+   "hit_rect": [
+    412,
+    128,
+    64,
+    80
+   ],
+   "anchor": [
+    445,
+    157
+   ],
+   "card_side": "left",
+   "sprites": {
+    "idle": "res://art/saloon/crew_bar_mid_idle.png",
+    "highlight": "res://art/saloon/crew_bar_mid_highlight.png",
+    "dim": "res://art/saloon/crew_bar_mid_dim.png"
+   }
+  },
+  {
+   "id": "table_left",
+   "slot": 2,
+   "pos": [
+    251,
+    333
+   ],
+   "z": 394,
+   "hit_rect": [
+    242,
+    325,
+    64,
+    77
+   ],
+   "anchor": [
+    275,
+    351
+   ],
+   "card_side": "left",
+   "sprites": {
+    "idle": "res://art/saloon/crew_table_left_idle.png",
+    "highlight": "res://art/saloon/crew_table_left_highlight.png",
+    "dim": "res://art/saloon/crew_table_left_dim.png"
+   }
+  },
+  {
+   "id": "table_mid",
+   "slot": 3,
+   "pos": [
+    394,
+    306
+   ],
+   "z": 370,
+   "hit_rect": [
+    385,
+    298,
+    64,
+    80
+   ],
+   "anchor": [
+    418,
+    327
+   ],
+   "card_side": "left",
+   "sprites": {
+    "idle": "res://art/saloon/crew_table_mid_idle.png",
+    "highlight": "res://art/saloon/crew_table_mid_highlight.png",
+    "dim": "res://art/saloon/crew_table_mid_dim.png"
+   }
+  }
+ ],
+ "ui_colours_needed": {
+  "PANEL": "#181d20",
+  "PANEL_BODY": "#24292f",
+  "HEADER": "#1e1b14",
+  "ACCENT_GOLD": "#e1b441",
+  "HAIRLINE": "#3a3d3c",
+  "TEXT": "#ccc8bc",
+  "TEXT_DIM": "#8a8a84",
+  "RARITY_COMMON": "#8a8a84",
+  "RARITY_UNCOMMON": "#5aa05a",
+  "RARITY_RARE": "#4a7ac8",
+  "RARITY_EPIC": "#9a5ac8",
+  "RARITY_LEGENDARY": "#e1b441",
+  "RARITY_MYTHIC": "#c4473f",
+  "NIGHT_WORLD": "#512b11"
+ },
+ "ui_colours_note": "Do not add these to tuning.gd from this PR. UI #68 (or follow-up) owns the palette constants."
+}
