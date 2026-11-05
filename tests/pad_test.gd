@@ -142,6 +142,7 @@ func _process(_delta: float) -> bool:
 			main.vehicle.armor = main.vehicle.armor_max
 			var l: Dictionary = Parts.STARTER_LOADOUT.duplicate(true)
 			l.utility = ["nitro_bottle"]
+			l.engine = "patched_v8"   # power headroom: an overloaded rig's utilities go offline
 			main.apply_rig(profile.build_stats(l))
 			_button(JOY_BUTTON_DPAD_UP)
 			pad.set("override", {"left": Vector2(0, -1), "right": Vector2(1, 0), "r2": false})
