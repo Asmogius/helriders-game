@@ -432,7 +432,7 @@ func _check_loadouts(rig: Vehicle) -> void:
 	_check(is_equal_approx(starter.max_speed, 495.0) and is_equal_approx(starter.acceleration, 560.0)
 		and float(starter.hp) == 150.0 and float(starter.front) == 80.0 and float(starter.side) == 80.0 and float(starter.rear) == 80.0 and float(starter.shield) == 30.0,
 		"starter parts add up: HP 150, Scrap Plating 80 on every facing, a 30 shield")
-	_check(float(starter.lock_range) == 0.0 and int(starter.power_draw) == 100 and int(starter.weight) == 95, "the starter (with its Junk Emitter) runs 100 / 100 power, 95 / 100 weight, no LOCK")
+	_check(float(starter.lock_range) == 0.0 and int(starter.power_draw) == 100 and int(starter.power_output) == 115 and int(starter.weight) == 95, "the starter (with its Junk Emitter) runs 100 / 115 power, 95 / 100 weight, no LOCK")
 	_check(rig.can_lock() and main.hud.is_lock_button_visible(), "the Advanced Targeting Computer gives LOCK")
 	print("  lock build power %.0f / %.0f" % [rig.power_draw, rig.power_output])
 	_check(rig.power_draw <= rig.power_output, "the lock build fits its power budget")

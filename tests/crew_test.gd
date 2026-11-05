@@ -21,11 +21,11 @@ const T := preload("res://scripts/tuning.gd")
 const Vehicle := preload("res://scripts/vehicle.gd")
 
 const OPEN_SPOT := Vector2(1600, 1200)
-# Overloaded on power (115 / 100): Sport Wheels and the Advanced Targeting
-# Computer on the Junk V6.
+# Overloaded on power (125 / 115): Sport Wheels, the Advanced Targeting
+# Computer and a Coolant Loop on the Junk V6.
 const OVERLOAD_BUILD := {
 	"chassis": "scrap_frame", "engine": "junk_v6", "drive": "outrider_sport_wheels", "armor": "scrap_plating",
-	"weapons": ["pintle_turret"], "utility": [], "internal": ["advanced_targeting"],
+	"weapons": ["pintle_turret"], "utility": [], "internal": ["advanced_targeting", "coolant_loop"],
 }
 const COURIER_BUILD := {
 	"chassis": "courier_frame", "engine": "junk_v6", "drive": "street_wheels", "armor": "outrider_light_plating",

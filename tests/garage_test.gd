@@ -117,7 +117,11 @@ func _run_checks() -> void:
 	_check(int(profile.storage.get("street_wheels", 0)) == 1, "the old wheels went to storage")
 	var stats := Loadout.build(profile.rig)
 	print("  power with Sport Wheels %d / %d" % [int(stats.power_draw), int(stats.power_output)])
-	_check(float(stats.power_draw) > float(stats.power_output), "Sport Wheels + Targeting Computer overloads the starter")
+	_check(float(stats.power_draw) == 110.0 and float(stats.power_output) == 115.0, "Sport Wheels + Targeting Computer fit the starter's 115 power")
+	# Put the Junk Emitter back in the spare internal slot for the overload checks.
+	(profile.rig.internal as Array).append("junk_emitter")
+	stats = Loadout.build(profile.rig)
+	_check(float(stats.power_draw) > float(stats.power_output), "Sport Wheels + Targeting Computer + Junk Emitter overload the starter")
 	_check(garage.choose("street_wheels") and profile.scrap == 30, "putting stored wheels back on is free")
 
 	# --- Two-tap cards and the full stat sheet ------------------------------------
@@ -127,7 +131,7 @@ func _run_checks() -> void:
 	var speed_now: float = sheet.now.speed
 	var speed_after: float = sheet.after.speed
 	print("  stat sheet top speed %d > %d (overload included), power load %d > %d" % [roundi(speed_now), roundi(speed_after), int(sheet.now.load), int(sheet.after.load)])
-	_check(sheet.visible and int(sheet.after.load) == 110 and float(sheet.after.mobility) < 1.0, "stat sheet shows the previewed part's power and overload")
+	_check(sheet.visible and int(sheet.after.load) == 135 and float(sheet.after.mobility) < 1.0, "stat sheet shows the previewed part's power and overload")
 	# Overload fit: preview already done; next tap arms confirm, then fit.
 	_check(not garage.press_card("outrider_sport_wheels") and profile.rig.drive == "street_wheels", "overload fit asks for a confirm tap")
 	_check(garage._overload_armed == "outrider_sport_wheels", "confirm is armed for the overloaded part")
@@ -139,6 +143,7 @@ func _run_checks() -> void:
 			over_color = c.get("status_color") as Color
 	_check(over_status.contains("FIT ANYWAY") and over_status.contains("OVERLOAD") and over_color.is_equal_approx(UI.BAD), "overload card uses the warn colour, not go-ahead green (%s)" % over_status)
 	_check(garage.press_card("outrider_sport_wheels") and profile.rig.drive == "outrider_sport_wheels", "third tap fits the overloaded part")
+	(profile.rig.internal as Array).erase("junk_emitter")   # back to 110 / 115 for the swap back
 	_check(garage.press_card("street_wheels") == false and garage.press_card("street_wheels") and profile.scrap == 30, "two taps to swap back, still free")
 	garage.close_sheet()
 	# V2.3 sample: the stats panel stays on the right (whole-rig stats) when the sheet closes.

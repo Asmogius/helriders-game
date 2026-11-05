@@ -173,6 +173,7 @@ func _process(_delta: float) -> bool:
 			main.zombies.clear_all()
 			var l: Dictionary = Parts.STARTER_LOADOUT.duplicate(true)
 			l.utility = ["nitro_bottle"]
+			l.engine = "patched_v8"   # power headroom: an overloaded rig's utilities go offline
 			main.apply_rig(profile.build_stats(l))
 			main.vehicle.armor_max = 100000.0
 			main.vehicle.armor = main.vehicle.armor_max

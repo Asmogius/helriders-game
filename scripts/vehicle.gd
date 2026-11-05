@@ -917,6 +917,31 @@ func is_power_overloaded() -> bool:
 	return power_output > 0.0 and power_load() > power_capacity()
 
 
+# Power overload disables systems (DESIGN §4 "Overload reduces mobility or
+# disables systems"; rule approved by the owner 2026-11-05, with the starter
+# Junk V6 raised to 115 power so one utility fits). On top of the mobility scaling:
+#   draw over output (> 100%)          -> utilities offline (can't be fired)
+#   draw at POWER_SHIELD_OFFLINE x output -> the shield stops recharging too
+# Systems come back the moment draw is within those limits again (crew power
+# bonuses, an injury healing...). Overclock ignores it like mobility.
+const POWER_SHIELD_OFFLINE := 1.25
+
+
+## Power drawn / output (0 with no engine).
+func power_ratio() -> float:
+	return power_load() / power_capacity() if power_capacity() > 0.0 else 0.0
+
+
+## Power overload: utilities can't be fired.
+func utilities_offline() -> bool:
+	return is_power_overloaded() and not bool(crew_mods.ignore_overload)
+
+
+## Heavy power overload: the shield stops recharging.
+func shield_offline() -> bool:
+	return utilities_offline() and power_ratio() >= POWER_SHIELD_OFFLINE
+
+
 func is_weight_overloaded() -> bool:
 	return weight_capacity > 0.0 and weight_load > weight_limit()
 
@@ -1628,7 +1653,7 @@ func use_ability(index: int) -> bool:
 	if is_wrecked or index < 0 or index >= abilities.size():
 		return false
 	var a := abilities[index]
-	if float(a.ready_in) > 0.0:
+	if float(a.ready_in) > 0.0 or utilities_offline():
 		return false
 	a.ready_in = float(a.cooldown) * float(crew_mods.util_cd)
 	match str(a.ability):
@@ -2035,7 +2060,7 @@ func _recharge_shield(delta: float) -> void:
 	if jammed_left > 0.0:
 		jammed_left -= delta   # Jammer's Static Burst
 		return
-	if shield >= shield_max or shield_max <= 0.0:
+	if shield >= shield_max or shield_max <= 0.0 or shield_offline():
 		return
 	if _shield_wait > 0.0 and not _active.has("tune_up") and not _active.has("power_divert"):
 		_shield_wait -= delta

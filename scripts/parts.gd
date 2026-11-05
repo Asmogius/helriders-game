@@ -75,7 +75,7 @@ const CATALOG := {
 	# --- Engines: acceleration and the power budget -------------------------------
 	"junk_v6": {
 		"name": "Junk V6", "category": "Engine", "rarity": "Common", "cost": 40, "power": 0.0, "weight": 20.0,
-		"power_output": 100.0, "acceleration": 560.0,  # DRAFT slower rigs (pending Cameron)
+		"power_output": 115.0, "acceleration": 560.0,  # power 115 approved by the owner with the overload rule (#113); acceleration DRAFT slower rigs (pending Cameron)
 	},
 	"turbo_four": {
 		"name": "Turbo Four", "category": "Engine", "rarity": "Uncommon", "cost": 70, "power": 0.0, "weight": 15.0,

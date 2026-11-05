@@ -19,7 +19,8 @@ const T := preload("res://scripts/tuning.gd")
 
 const SPOT := Vector2(1600, 1200)
 const DROPPER_BUILD := {
-	"chassis": "courier_frame", "engine": "junk_v6", "drive": "street_wheels",
+	"chassis": "courier_frame", "engine": "patched_v8",   # 102 draw: needs the V8 so the droppers stay online
+	 "drive": "street_wheels",
 	"armor_front": "scrap_plating", "armor_sides": "scrap_plating", "armor_rear": "scrap_plating",
 	"weapons": ["pintle_turret"], "utility": ["oil_slick", "spike_strip"], "internal": [],
 }
