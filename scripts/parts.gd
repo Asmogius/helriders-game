@@ -328,6 +328,39 @@ const STARTER_LOADOUT := {
 	"internal": ["junk_emitter"],
 }
 
+# --- Endless starter rigs (Quickplay QP8; SPEC: "3 Endless starter rigs: fast,
+# balanced, tough", Cameron 2026-11-05) ---------------------------------------
+# Keyed by T.ENDLESS_STARTER_RIG_IDS. Part choices are DRAFT (pending Cameron);
+# every part already exists in CATALOG and every rig fits its power and weight.
+#   fast:     Courier Frame, 77 / 90 power, 69 / 80 weight. DRAFT
+#   balanced: the campaign STARTER_LOADOUT (100 / 100 power, 95 / 100 weight).
+#   tough:    Bulwark Frame, 105 / 125 power, 129 / 160 weight. DRAFT
+const ENDLESS_STARTER_RIGS := {
+	"fast": {  # DRAFT
+		"chassis": "courier_frame",
+		"engine": "turbo_four",
+		"drive": "outrider_sport_wheels",
+		"armor_front": "outrider_light_plating",
+		"armor_sides": "outrider_light_plating",
+		"armor_rear": "outrider_light_plating",
+		"weapons": ["outrider_twin_guns"],
+		"utility": ["nitro_bottle"],
+		"internal": [],
+	},
+	"balanced": STARTER_LOADOUT,
+	"tough": {  # DRAFT
+		"chassis": "bulwark_frame",
+		"engine": "patched_v8",
+		"drive": "off_road_tires",
+		"armor_front": "riot_plating",
+		"armor_sides": "riot_plating",
+		"armor_rear": "riot_plating",
+		"weapons": ["pintle_turret"],
+		"utility": [],
+		"internal": ["junk_emitter"],
+	},
+}
+
 # Schematics a new game starts with: the starter's parts plus the Targeting
 # Computer, for rigs that run a turret with no Gunner.
 const STARTER_SCHEMATICS := ["scrap_frame", "junk_v6", "street_wheels", "scrap_plating", "pintle_turret", "targeting_computer", "junk_emitter"]
