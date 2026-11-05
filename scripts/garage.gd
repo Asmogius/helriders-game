@@ -739,9 +739,8 @@ func _stats_items(s: Dictionary) -> Array:
 		["dps", "DPS", str(roundi(Loadout.total_dps(s))), T.COL_UI_ACCENT],
 		["lock", "LOCK", str(int(s.lock_range)) if float(s.lock_range) > 0.0 else "NONE", UI.TEXT_DIM],
 	]
-	var over := StatSheet.overload_cause(s)
-	if over != "":
-		items.append(["power", "", over, T.COL_UI_ACCENT])
+	# Overload is not repeated here: the POWER / WEIGHT LOAD bars under the rig
+	# say it in red, and the long text ran into the stats panel (playtest).
 	return items
 
 
@@ -787,7 +786,7 @@ func _refresh_tags() -> void:
 				tag.detail = "%s    PWR %d    CAP %d" % [part.rarity, int(part.power), int(part.weight_capacity)]
 			elif part.category == "Armor":
 				var sides := str(slot.key) == "armor_sides"
-				tag.detail = "%s    %d / FACING    WT %d" % [part.rarity, int(part.armor), int(part.get("weight_sides" if sides else "weight", part.weight))]
+				tag.detail = "%s   ARMOR %d   WT %d" % [part.rarity, int(part.armor), int(part.get("weight_sides" if sides else "weight", part.weight))]
 			else:
 				tag.detail = "%s    PWR %d    WT %d" % [part.rarity, int(part.power), int(part.get("weight", 0))]
 		tag.rarity = "" if id == "" else str(profile.part(id).rarity)   # V1.3
@@ -1553,11 +1552,18 @@ class StatSheet extends Control:
 		if single_column and headline:   # V2.3 sample: one small box, 5 headline stats
 			col_w = size.x - 32.0
 			var rows: Array = (LEFT + RIGHT).filter(func(r: Array) -> bool: return HEADLINE.has(r[1]))
-			_column(font, rows, Vector2(16, 30), col_w)
 			var more: Array = (LEFT + RIGHT).filter(func(r: Array) -> bool: return not HEADLINE.has(r[1]) and _changed(r))
+			# The ALSO line and the OVERLOAD footer both want the bottom of this small
+			# box (playtest: they drew over each other). Rows tighten so both fit.
+			var footer := float(after.mobility) < 1.0 or float(now.mobility) < 1.0
+			var lines := rows.size() + (1 if not more.is_empty() else 0)
+			var room := size.y - 30.0 - (24.0 if footer else 4.0)
+			_row_h = minf(ROW_H, room / float(maxi(lines, 1)))
+			_column(font, rows, Vector2(16, 30), col_w)
 			if not more.is_empty():
 				var names: Array = more.map(func(r: Array) -> String: return str(r[0]))
-				draw_string(font, Vector2(16, 30 + (rows.size() + 1) * ROW_H - 4.0), "ALSO: " + ", ".join(names), HORIZONTAL_ALIGNMENT_LEFT, col_w, 12, UI.TEXT_DIM)
+				UI.draw_fit(self, font, Vector2(16, 30 + (rows.size() + 1) * _row_h - 4.0), "ALSO: " + ", ".join(names), HORIZONTAL_ALIGNMENT_LEFT, col_w, 12, UI.TEXT_DIM)
+			_row_h = ROW_H
 		elif single_column:   # V2.3 sample: the stats panel on the right
 			col_w = size.x - 32.0
 			_row_h = minf(ROW_H, (size.y - 64.0) / float(LEFT.size() + RIGHT.size()))
