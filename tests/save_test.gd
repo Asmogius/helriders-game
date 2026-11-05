@@ -34,7 +34,7 @@ func _initialize() -> void:
 	_write(PATH, "{\"scrap\": 9, oops")
 	profile.notice = ""
 	_check(profile.load_game() and profile.scrap == 123, "an unreadable save loads the backup")
-	_check(profile.notice != "" and FileAccess.file_exists(PATH + ".broken"), "the player is told, and the broken file is kept aside")
+	_check(profile.notice != "" and _has_broken(), "the player is told, and the broken file is kept aside")
 
 	_write(PATH, "not json")
 	_write(PATH + ".bak", "")
@@ -74,6 +74,17 @@ func _clean() -> void:
 	for ext: String in ["", ".bak", ".tmp", ".broken"]:
 		if FileAccess.file_exists(PATH + ext):
 			DirAccess.remove_absolute(ProjectSettings.globalize_path(PATH + ext))
+	for f: String in DirAccess.get_files_at(PATH.get_base_dir()):
+		if f.begins_with(PATH.get_file() + ".broken"):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(PATH.get_base_dir().path_join(f)))
+
+
+## A timestamped .broken-* copy of the save exists.
+func _has_broken() -> bool:
+	for f: String in DirAccess.get_files_at(PATH.get_base_dir()):
+		if f.begins_with(PATH.get_file() + ".broken"):
+			return true
+	return false
 
 
 func _check(ok: bool, what: String) -> void:
