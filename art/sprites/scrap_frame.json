@@ -9531,6 +9531,9 @@
  ],
  "sheet": "scrap_frame__core.png",
  "composite": "scrap_frame.png",
+ "lights": {
+  "sheet": "scrap_frame__lights.png"
+ },
  "shadow": {
   "sheet": "scrap_frame__shadow.png",
   "frame_w": 126,

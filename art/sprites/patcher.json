@@ -1483,6 +1483,9 @@
  "defaults": [],
  "sheet": "patcher__core.png",
  "composite": "patcher.png",
+ "lights": {
+  "sheet": "patcher__lights.png"
+ },
  "shadow": {
   "sheet": "patcher__shadow.png",
   "frame_w": 122,

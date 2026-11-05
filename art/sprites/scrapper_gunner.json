@@ -1483,6 +1483,9 @@
  "defaults": [],
  "sheet": "scrapper_gunner__core.png",
  "composite": "scrapper_gunner.png",
+ "lights": {
+  "sheet": "scrapper_gunner__lights.png"
+ },
  "shadow": {
   "sheet": "scrapper_gunner__shadow.png",
   "frame_w": 112,

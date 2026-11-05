@@ -672,5 +672,8 @@
  "layers": {},
  "defaults": [],
  "sheet": "outrider_twin_guns.png",
- "composite": "outrider_twin_guns.png"
+ "composite": "outrider_twin_guns.png",
+ "lights": {
+  "sheet": "outrider_twin_guns__lights.png"
+ }
 }

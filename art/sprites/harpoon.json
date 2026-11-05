@@ -672,5 +672,8 @@
  "layers": {},
  "defaults": [],
  "sheet": "harpoon.png",
- "composite": "harpoon.png"
+ "composite": "harpoon.png",
+ "lights": {
+  "sheet": "harpoon__lights.png"
+ }
 }
