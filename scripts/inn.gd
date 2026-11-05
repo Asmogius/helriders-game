@@ -44,7 +44,7 @@ func _ready() -> void:
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 
-	_title = UI.label("", 30, T.COL_CYAN)
+	_title = UI.label("", 30, T.COL_UI_ACCENT)
 	_title.position = Vector2(24, 14)
 	add_child(_title)
 	_seats = UI.label("", 20, UI.TEXT)
@@ -69,7 +69,7 @@ func _ready() -> void:
 	_dismiss.pressed.connect(dismiss_selected)
 	bar.add_child(_dismiss)
 	_seat = _button("SEAT", 200)
-	UI.accent(_seat, T.COL_CYAN)
+	UI.accent(_seat, T.COL_UI_ACCENT)
 	_seat.pressed.connect(seat_selected)
 	bar.add_child(_seat)
 
@@ -181,7 +181,7 @@ func _status(card: CrewCard, m: Dictionary) -> void:
 	var block := profile.seat_block(m)
 	if bool(m.seated):
 		card.status = "SEATED"
-		card.status_color = T.COL_CYAN
+		card.status_color = T.COL_UI_ACCENT
 	elif profile.is_away(m):
 		card.status = "AWAY  -  %s" % _days_left_text(m)
 		card.status_color = T.COL_ORANGE
@@ -445,7 +445,7 @@ func _fill_expeditions() -> void:
 	right.custom_minimum_size = Vector2(606, 0)
 	right.add_theme_constant_override("separation", 10)
 	_expeditions.add_child(right)
-	right.add_child(UI.label("TEAM  -  %s benched crew (up to %d)" % [PadScript.hint("tap", "pick"), T.EXPEDITION_MAX_TEAM], 20, T.COL_CYAN))
+	right.add_child(UI.label("TEAM  -  %s benched crew (up to %d)" % [PadScript.hint("tap", "pick"), T.EXPEDITION_MAX_TEAM], 20, T.COL_UI_ACCENT))
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 8)
@@ -460,7 +460,7 @@ func _fill_expeditions() -> void:
 		b.custom_minimum_size.y = 50
 		b.clip_text = true
 		if team.has(int(m.id)):
-			UI.accent(b, T.COL_CYAN)
+			UI.accent(b, T.COL_UI_ACCENT)
 		b.pressed.connect(toggle_team.bind(int(m.id)))
 		grid.add_child(b)
 	if free == 0:
@@ -488,7 +488,7 @@ func _trip_card(i: int) -> Button:
 	var card := _button("", 0)
 	card.custom_minimum_size = Vector2(600, 104)
 	if i == trip:
-		UI.accent(card, T.COL_CYAN)
+		UI.accent(card, T.COL_UI_ACCENT)
 	card.pressed.connect(pick_trip.bind(i))
 	var box := VBoxContainer.new()
 	box.set_anchors_preset(Control.PRESET_FULL_RECT)

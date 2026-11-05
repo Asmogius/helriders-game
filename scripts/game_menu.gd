@@ -131,7 +131,7 @@ func show_page(which: String) -> void:
 
 
 func _title(text: String) -> void:
-	var l := UI.label(text, 30, T.COL_CYAN)
+	var l := UI.label(text, 30, T.COL_UI_ACCENT)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_body.add_child(l)
 
@@ -151,7 +151,7 @@ func _button(text: String, call: Callable, accent := Color.TRANSPARENT) -> Butto
 func _main_page() -> void:
 	_title("PAUSED" if in_job else "MENU")
 	if in_job:
-		_button("RESUME", resume, T.COL_CYAN)
+		_button("RESUME", resume, T.COL_UI_ACCENT)
 		_button(PadScript.hint("TAP AGAIN TO RESTART THE JOB", "PRESS AGAIN TO RESTART THE JOB") if restart_armed else "RESTART JOB", restart, T.COL_ORANGE if restart_armed else Color.TRANSPARENT)
 	if in_tutorial:
 		_button("LEAVE TUTORIAL", func() -> void: leave_requested.emit())
@@ -161,7 +161,7 @@ func _main_page() -> void:
 		_button("TUTORIAL", func() -> void: tutorial_requested.emit())
 	_button("QUIT GAME", quit_game)
 	if not in_job:
-		_button("CLOSE", close, T.COL_CYAN)
+		_button("CLOSE", close, T.COL_UI_ACCENT)
 	var note_text := ""
 	if in_tutorial:
 		note_text = "The Training Run uses a loaner rig and crew. Nothing here counts and nothing can be lost."
@@ -224,7 +224,7 @@ func _settings_page() -> void:
 	var note := UI.label("Lower quality caps the frame rate and draws fewer effects. New settings apply to the next fight; the frame cap applies now.", 18, UI.TEXT_DIM)
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_body.add_child(note)
-	_button("BACK", show_page.bind("main"), T.COL_CYAN)
+	_button("BACK", show_page.bind("main"), T.COL_UI_ACCENT)
 
 
 func set_quality(q: String) -> void:
@@ -283,7 +283,7 @@ func _controller_page() -> void:
 	var note := UI.label("Pick an action, then press the pad button you want for it (L2 and R2 work too). A button already in use swaps over. Menus always use the D-pad, Cross, Circle and L1 / R1; Cross always picks in the crew wheel.", 18, UI.TEXT_DIM)
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_body.add_child(note)
-	_button("BACK", show_page.bind("settings"), T.COL_CYAN)
+	_button("BACK", show_page.bind("settings"), T.COL_UI_ACCENT)
 
 
 ## Wait for the next pad press for `action`.
@@ -343,7 +343,7 @@ func _database_page() -> void:
 		text.autowrap_mode = TextServer.AUTOWRAP_WORD
 		text.custom_minimum_size = Vector2(980, 0)
 		list.add_child(text)
-	_button("BACK", show_page.bind("main"), T.COL_CYAN)
+	_button("BACK", show_page.bind("main"), T.COL_UI_ACCENT)
 
 
 func show_category(cat: String) -> void:

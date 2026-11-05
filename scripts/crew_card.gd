@@ -94,7 +94,7 @@ func _draw() -> void:
 	draw_string(font, Vector2(16, 126), "LEVEL %d / %d" % [lv, Crew.max_level(member)], HORIZONTAL_ALIGNMENT_LEFT, w, 15, Color(UI.TEXT_DIM, a))
 	var bar := Rect2(16, 134, w, 8)
 	draw_rect(bar, Color(0, 0, 0, 0.5))
-	draw_rect(Rect2(bar.position, Vector2(bar.size.x * Crew.level_progress(member), bar.size.y)), Color(T.COL_CYAN, 0.8 * a))
+	draw_rect(Rect2(bar.position, Vector2(bar.size.x * Crew.level_progress(member), bar.size.y)), Color(T.COL_UI_ACCENT, 0.8 * a))
 	# What they do, two lines.
 	var text := Crew.summary(member)
 	var halves := text.split("    ")
@@ -107,6 +107,6 @@ func _draw() -> void:
 		var names: Array[String] = []
 		for p: String in perks:
 			names.append(Crew.perk_name(p))
-		draw_string(font, Vector2(16, y + 6.0), "PERKS  " + ", ".join(names), HORIZONTAL_ALIGNMENT_LEFT, w, 13, Color(T.COL_CYAN, 0.9 * a))
+		draw_string(font, Vector2(16, y + 6.0), "PERKS  " + ", ".join(names), HORIZONTAL_ALIGNMENT_LEFT, w, 13, Color(T.COL_UI_ACCENT, 0.9 * a))
 	if status != "":
 		draw_string(font, Vector2(16, size.y - 16), status, HORIZONTAL_ALIGNMENT_LEFT, w, 17, status_color)

@@ -36,7 +36,7 @@ func _ready() -> void:
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 
-	_title = UI.label("", 30, T.COL_CYAN)
+	_title = UI.label("", 30, T.COL_UI_ACCENT)
 	_title.position = Vector2(24, 14)
 	add_child(_title)
 	_info = UI.label("", 22, T.COL_ORANGE)
@@ -121,7 +121,7 @@ func refresh() -> void:
 			card.status_color = T.COL_ORANGE if price <= profile.scrap else UI.BAD
 		elif bool(m.get("hired", false)):
 			card.status = "HIRED"
-			card.status_color = T.COL_CYAN
+			card.status_color = T.COL_UI_ACCENT
 			card.dim = true
 		elif price == 0:
 			card.status = "FREE"

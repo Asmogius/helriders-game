@@ -75,7 +75,7 @@ func rebuild() -> void:
 		row.add_child(info)
 		var level := profile.upgrade_level(key)
 		var max_level: int = (T.UPGRADES[key].costs as Array).size()
-		row.add_child(UI.label("LV %d/%d" % [level, max_level], 20, T.COL_CYAN))
+		row.add_child(UI.label("LV %d/%d" % [level, max_level], 20, T.COL_UI_ACCENT))
 		var cost := profile.upgrade_cost(key)
 		var block := profile.upgrade_block(key)
 		var text := "MAXED" if cost < 0 else (block if block != "" else "BUY  %d" % cost)

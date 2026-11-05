@@ -956,7 +956,7 @@ class CrewWheel extends Control:
 		draw_line(c + Vector2(-12, -12), c + Vector2(12, 12), Color(0.85, 0.83, 0.78), 3.0)
 		draw_line(c + Vector2(-12, 12), c + Vector2(12, -12), Color(0.85, 0.83, 0.78), 3.0)
 		if hover >= 0 and hover < entries.size():
-			draw_arc(slice_pos(hover), SLICE + 6.0, 0.0, TAU, 32, T.COL_CYAN, 4.0)   # controller pick
+			draw_arc(slice_pos(hover), SLICE + 6.0, 0.0, TAU, 32, T.COL_UI_ACCENT, 4.0)   # controller pick
 		for i in entries.size():
 			var e := entries[i]
 			var p := slice_pos(i)
@@ -1085,7 +1085,7 @@ class RigIcon extends Control:
 			return Color(0.25, 0.25, 0.27, 0.6)   # nothing fitted
 		if v <= 0.0:
 			return Color(0.45, 0.12, 0.1)          # stripped
-		return T.COL_ORANGE.lerp(T.COL_CYAN, clampf(v * 1.4 - 0.2, 0.0, 1.0)).darkened(0.35 * (1.0 - v))
+		return T.COL_ORANGE.lerp(T.COL_UI_ACCENT, clampf(v * 1.4 - 0.2, 0.0, 1.0)).darkened(0.35 * (1.0 - v))
 
 	func _draw() -> void:
 		var c := size * 0.5
@@ -1136,7 +1136,7 @@ class ArmorBar extends Control:
 		draw_rect(Rect2(Vector2(-3, -3), Vector2(size.x + 6, 1)), Color(0.42, 0.43, 0.45, 0.9))
 		draw_rect(Rect2(Vector2(-3, size.y + 2), Vector2(size.x + 6, 1)), Color(0.06, 0.06, 0.07, 0.9))
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0, 0, 0, 0.7))
-		var fill := T.COL_CYAN if ratio > 0.35 else T.COL_ORANGE
+		var fill := T.COL_UI_ACCENT if ratio > 0.35 else T.COL_ORANGE
 		var inner := Rect2(Vector2(2, 2), size - Vector2(4, 4))
 		var seg_w := inner.size.x / SEGMENTS
 		var lit := inner.size.x * ratio

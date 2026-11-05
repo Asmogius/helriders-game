@@ -473,7 +473,7 @@ func _build_top_bar() -> void:
 	# Rig upgrades (fabrication / loot / salvage) moved to RESEARCH (Cameron); UI hosts them there.
 	_rebuild = _button("REBUILD", 200)
 	_rebuild.pressed.connect(rebuild)
-	UI.accent(_rebuild, T.COL_CYAN)
+	UI.accent(_rebuild, T.COL_UI_ACCENT)
 	bar.add_child(_rebuild)
 	_deploy = _button("DEPLOY", 180)
 	_deploy.pressed.connect(deploy)
@@ -672,7 +672,7 @@ func _refresh_crew_line() -> void:
 	var tail := "    PERK READY  >" if waiting > 0 else "    >"
 	_crew_line.text = "CREW    " + "    ".join(bits) + tail
 	var blocked := profile.has_rig() and profile.deploy_block() != ""
-	var color := UI.BAD if blocked else T.COL_CYAN
+	var color := UI.BAD if blocked else T.COL_UI_ACCENT
 	for state: String in ["font_color", "font_hover_color", "font_pressed_color"]:
 		_crew_line.add_theme_color_override(state, color)
 
@@ -683,7 +683,7 @@ func _stats_items(s: Dictionary) -> Array:
 	var items: Array = [
 		["hp", "HP", str(int(s.get("hp", 0.0))), UI.GOOD],
 		["armor", "ARMOR", "%d/%d/%d" % [int(s.get("front", 0.0)), int(s.get("side", 0.0)), int(s.get("rear", 0.0))], UI.TEXT_DIM],
-		["shield", "SHIELD", str(int(s.get("shield", 0.0))), T.COL_CYAN],
+		["shield", "SHIELD", str(int(s.get("shield", 0.0))), T.COL_UI_ACCENT],
 		["speed", "SPEED", str(roundi(float(s.max_speed) * m)), UI.TEXT_DIM],
 		["accel", "ACCEL", str(roundi(float(s.acceleration) * m)), UI.TEXT_DIM],
 		["dps", "DPS", str(roundi(Loadout.total_dps(s))), T.COL_ORANGE],
@@ -847,7 +847,7 @@ func _style_card(card: PartCard) -> void:
 	var again := PadScript.hint("TAP AGAIN:  ", "PRESS AGAIN:  ") if card.selected else ""
 	if card.installed:
 		card.status = "INSTALLED"
-		card.status_color = T.COL_CYAN
+		card.status_color = T.COL_UI_ACCENT
 	elif card.cost > profile.scrap:
 		card.status = "NEED %d SCRAP" % card.cost
 		card.status_color = UI.BAD
@@ -1040,7 +1040,7 @@ func _open_presets() -> void:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 10)
 		var p := profile.preset(i)
-		var name_label := UI.label(profile.preset_name(i), 22, T.COL_CYAN)
+		var name_label := UI.label(profile.preset_name(i), 22, T.COL_UI_ACCENT)
 		name_label.custom_minimum_size = Vector2(200, 0)
 		name_label.clip_text = true
 		row.add_child(name_label)
@@ -1090,7 +1090,7 @@ func open_rename(index: int) -> void:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
 	var done := _button("DONE", 160)
-	UI.accent(done, T.COL_CYAN)
+	UI.accent(done, T.COL_UI_ACCENT)
 	done.pressed.connect(finish_rename.bind(index))
 	row.add_child(done)
 	var cancel := _button("CANCEL", 160)
@@ -1136,7 +1136,7 @@ func _open_upgrades() -> void:
 		row.add_child(info)
 		var level := profile.upgrade_level(key)
 		var max_level: int = (T.UPGRADES[key].costs as Array).size()
-		row.add_child(UI.label("LV %d/%d" % [level, max_level], 22, T.COL_CYAN))
+		row.add_child(UI.label("LV %d/%d" % [level, max_level], 22, T.COL_UI_ACCENT))
 		var cost := profile.upgrade_cost(key)
 		var buy := _button("MAXED" if cost < 0 else "BUY  %d" % cost, 170)
 		buy.disabled = cost < 0 or cost > profile.scrap
@@ -1188,7 +1188,7 @@ func _on_tab(tab_name: String) -> void:
 func _highlight_tab(tab_name: String) -> void:
 	for tab in _tab_buttons:
 		if tab.text == tab_name:
-			UI.accent(tab, T.COL_CYAN)
+			UI.accent(tab, T.COL_UI_ACCENT)
 		else:
 			for state: String in ["normal", "hover", "pressed"]:
 				tab.remove_theme_stylebox_override(state)
@@ -1226,7 +1226,7 @@ class SlotTag extends Button:
 			return T.COL_ORANGE
 		if empty and required:
 			return UI.BAD
-		return T.COL_CYAN
+		return T.COL_UI_ACCENT
 
 	func _draw() -> void:
 		var font := get_theme_default_font()
@@ -1349,9 +1349,9 @@ class Callouts extends Control:
 			var from := Vector2(r.end.x, r.get_center().y) if int(slots[i].side) == 0 else Vector2(r.position.x, r.get_center().y)
 			var to: Vector2 = rig.to_global(g.call("slot_anchor", i))
 			var on := i == selected
-			var c := T.COL_ORANGE if on else Color(T.COL_CYAN, 0.35)
+			var c := T.COL_ORANGE if on else Color(T.COL_UI_ACCENT, 0.35)
 			if rings_only:
-				draw_arc(to, 9.0 if on else 6.0, 0.0, TAU, 20, Color(c, 1.0) if on else Color(T.COL_CYAN, 0.8), 2.5 if on else 2.0)
+				draw_arc(to, 9.0 if on else 6.0, 0.0, TAU, 20, Color(c, 1.0) if on else Color(T.COL_UI_ACCENT, 0.8), 2.5 if on else 2.0)
 				continue
 			var elbow := Vector2(lerpf(from.x, to.x, 0.3), from.y)
 			draw_line(from, elbow, c, 2.0 if on else 1.5)
@@ -1640,7 +1640,7 @@ class FloorGrid extends Control:
 			y += step
 		var c := Vector2(size.x * 0.5, 290.0)
 		draw_circle(c, 150.0, Color(0, 0, 0, 0.25))
-		draw_arc(c, 150.0, 0.0, TAU, 64, Color(T.COL_CYAN, 0.18), 2.0)
+		draw_arc(c, 150.0, 0.0, TAU, 64, Color(T.COL_UI_ACCENT, 0.18), 2.0)
 		draw_arc(c, 158.0, 0.0, TAU, 64, Color(T.COL_ORANGE, 0.12), 1.0)
 
 

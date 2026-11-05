@@ -49,7 +49,7 @@ func _ready() -> void:
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 
-	_title = UI.label("", 30, T.COL_CYAN)
+	_title = UI.label("", 30, T.COL_UI_ACCENT)
 	_title.position = Vector2(24, 14)
 	add_child(_title)
 	_info = UI.label("", 22, T.COL_ORANGE)
@@ -108,7 +108,7 @@ func _ready() -> void:
 	column.add_child(_name)
 	_kind = UI.label("", 18, UI.TEXT_DIM)
 	column.add_child(_kind)
-	_level = UI.label("", 24, T.COL_CYAN)
+	_level = UI.label("", 24, T.COL_UI_ACCENT)
 	column.add_child(_level)
 	_stats = VBoxContainer.new()
 	_stats.add_theme_constant_override("separation", 4)
@@ -194,7 +194,7 @@ func _make_row(id: String) -> Button:
 	var row := _button("", 0)
 	row.custom_minimum_size = Vector2(0, ROW_H)
 	if id == selected:
-		UI.accent(row, T.COL_CYAN)
+		UI.accent(row, T.COL_UI_ACCENT)
 	row.pressed.connect(select.bind(id))
 	var line := HBoxContainer.new()
 	line.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -220,7 +220,7 @@ func _make_row(id: String) -> Button:
 	right.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	right.add_theme_constant_override("separation", 0)
 	line.add_child(right)
-	var lv := UI.label("LV %d / %d" % [level, Parts.max_level(part)], 20, T.COL_CYAN)
+	var lv := UI.label("LV %d / %d" % [level, Parts.max_level(part)], 20, T.COL_UI_ACCENT)
 	lv.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	right.add_child(lv)
 	var cost := profile.research_cost(id)
@@ -371,7 +371,7 @@ func show_rig_upgrades(on: bool) -> void:
 		c.visible = not on
 	_rig_view.visible = on
 	if on:
-		UI.accent(_rig_toggle, T.COL_CYAN)
+		UI.accent(_rig_toggle, T.COL_UI_ACCENT)
 	else:
 		for state: String in ["normal", "hover", "pressed"]:
 			_rig_toggle.remove_theme_stylebox_override(state)
@@ -401,7 +401,7 @@ func refresh_rig() -> void:
 		row.add_child(info)
 		var level := profile.upgrade_level(key)
 		var max_level: int = (T.UPGRADES[key].costs as Array).size()
-		var lv := UI.label("LV %d/%d" % [level, max_level], 26, T.COL_CYAN)
+		var lv := UI.label("LV %d/%d" % [level, max_level], 26, T.COL_UI_ACCENT)
 		lv.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(lv)
 		var cost := profile.upgrade_cost(key)
@@ -474,7 +474,7 @@ func open_upgrades() -> void:
 		row.add_child(info)
 		var level := profile.upgrade_level(key)
 		var max_level: int = (T.UPGRADES[key].costs as Array).size()
-		row.add_child(UI.label("LV %d/%d" % [level, max_level], 22, T.COL_CYAN))
+		row.add_child(UI.label("LV %d/%d" % [level, max_level], 22, T.COL_UI_ACCENT))
 		var cost := profile.upgrade_cost(key)
 		var buy := _button("MAXED" if cost < 0 else "BUY  %d" % cost, 170)
 		buy.disabled = cost < 0 or cost > profile.scrap

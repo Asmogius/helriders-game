@@ -38,7 +38,7 @@ func _ready() -> void:
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 
-	_day = UI.label("", 30, T.COL_CYAN)
+	_day = UI.label("", 30, T.COL_UI_ACCENT)
 	_day.position = Vector2(24, 14)
 	add_child(_day)
 	_scrap = UI.label("", 24, T.COL_ORANGE)
@@ -221,7 +221,7 @@ func _open_upgrades() -> void:
 		row.add_child(info)
 		var level := profile.upgrade_level(key)
 		var max_level: int = (T.UPGRADES[key].costs as Array).size()
-		row.add_child(UI.label("LV %d/%d" % [level, max_level], 22, T.COL_CYAN))
+		row.add_child(UI.label("LV %d/%d" % [level, max_level], 22, T.COL_UI_ACCENT))
 		var cost := profile.upgrade_cost(key)
 		var buy := _button("MAXED" if cost < 0 else "BUY  %d" % cost, 170)
 		buy.disabled = cost < 0 or cost > profile.scrap
@@ -285,7 +285,7 @@ class MissionCard extends Button:
 			var oc := UI.rarity_color(odds_rarity) if odds_rarity != "" else UI.GOOD
 			UI.draw_fit(self, font, Vector2(16, size.y - 28), "+ " + schematic_odds, HORIZONTAL_ALIGNMENT_LEFT, w, 15, oc)
 		if taken:
-			draw_string(font, Vector2(16, size.y - 8), "TAKEN", HORIZONTAL_ALIGNMENT_RIGHT, w, 15, T.COL_CYAN)
+			draw_string(font, Vector2(16, size.y - 8), "TAKEN", HORIZONTAL_ALIGNMENT_RIGHT, w, 15, T.COL_UI_ACCENT)
 
 	## Simple word wrap for card text (up to `max_lines` lines).
 	func _wrapped(font: Font, text: String, at: Vector2, width: float, font_size: int, tint: Color, max_lines := 3, gap := 6.0) -> void:
@@ -333,14 +333,14 @@ class DistrictBar extends Control:
 			var open := score >= needs[i]
 			var r := Rect2(x, 30, w, size.y - 30)
 			draw_rect(r, Color(0.1, 0.1, 0.11))
-			draw_rect(r, Color(T.COL_CYAN, 0.6) if open else UI.PANEL_EDGE, false, 2.0)
+			draw_rect(r, Color(T.COL_UI_ACCENT, 0.6) if open else UI.PANEL_EDGE, false, 2.0)
 			draw_string(font, Vector2(x + 12, 58), names[i], HORIZONTAL_ALIGNMENT_LEFT, w - 24, 19, UI.TEXT if open else UI.TEXT_DIM)
 			var status := "OPEN" if open else "%d / %d" % [score, needs[i]]
-			draw_string(font, Vector2(x + 12, 58), status, HORIZONTAL_ALIGNMENT_RIGHT, w - 24, 15, T.COL_CYAN if open else T.COL_ORANGE)
+			draw_string(font, Vector2(x + 12, 58), status, HORIZONTAL_ALIGNMENT_RIGHT, w - 24, 15, T.COL_UI_ACCENT if open else T.COL_ORANGE)
 			var bar := Rect2(x + 12, 72, w - 24, 10)
 			draw_rect(bar, Color(0, 0, 0, 0.5))
 			var fill := 1.0 if needs[i] == 0 else clampf(float(score) / needs[i], 0.0, 1.0)
-			draw_rect(Rect2(bar.position, Vector2(bar.size.x * fill, bar.size.y)), T.COL_CYAN if open else T.COL_ORANGE)
+			draw_rect(Rect2(bar.position, Vector2(bar.size.x * fill, bar.size.y)), T.COL_UI_ACCENT if open else T.COL_ORANGE)
 			var band: Array = T.DISTRICTS[i].skulls
 			var skull_text := "%d-%d skulls" % [int(band[0]), int(band[1])]
 			if i == 0:
