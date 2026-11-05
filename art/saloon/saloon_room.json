@@ -4,10 +4,10 @@
   720
  ],
  "fireplace_rect": [
-  651,
-  171,
-  144,
-  229
+  560,
+  90,
+  300,
+  220
  ],
  "card_left_rect": [
   24,
@@ -21,9 +21,9 @@
   356,
   448
  ],
- "camera": "voxel_render HD ppv=3 tilt=45.0\u00b0 heading=0.0\u00b0 (PR #70)",
+ "camera": "voxel_render HD ppv=2 tilt=45.0\u00b0 heading=0.0\u00b0 (PR #70)",
  "tilt_deg": 45.0,
- "px_per_voxel": 3,
+ "px_per_voxel": 2,
  "hd": true,
  "sun": "dim moonlight upper-left \u2192 hard cast shadows down-right; fire/lanterns hero lights",
  "night": "#512b11 world grade + vignette; emissive pools untinted on lights plate",
@@ -49,19 +49,19 @@
    "id": "bar_left",
    "slot": 0,
    "pos": [
-    193,
-    168
+    171,
+    164
    ],
    "z": 420,
    "hit_rect": [
-    179,
-    154,
-    216,
-    280
+    157,
+    150,
+    243,
+    284
    ],
    "anchor": [
-    287,
-    218
+    278,
+    215
    ],
    "card_side": "right",
    "sprites": {
@@ -72,7 +72,7 @@
    },
    "anim": {
     "idle_frames": 4,
-    "idle_frame_w": 188,
+    "idle_frame_w": 215,
     "fps": 4
    }
   },
@@ -80,19 +80,19 @@
    "id": "table_left",
    "slot": 1,
    "pos": [
-    300,
-    358
+    282,
+    350
    ],
-   "z": 610,
+   "z": 606,
    "hit_rect": [
-    286,
-    344,
-    217,
-    280
+    268,
+    336,
+    244,
+    284
    ],
    "anchor": [
-    394,
-    408
+    390,
+    401
    ],
    "card_side": "right",
    "sprites": {
@@ -103,7 +103,7 @@
    },
    "anim": {
     "idle_frames": 4,
-    "idle_frame_w": 189,
+    "idle_frame_w": 216,
     "fps": 4
    }
   },
@@ -111,19 +111,19 @@
    "id": "table_mid",
    "slot": 2,
    "pos": [
-    474,
-    327
+    457,
+    316
    ],
-   "z": 578,
+   "z": 570,
    "hit_rect": [
-    460,
-    313,
-    201,
-    279
+    443,
+    302,
+    221,
+    282
    ],
    "anchor": [
-    560,
-    377
+    553,
+    366
    ],
    "card_side": "right",
    "sprites": {
@@ -134,7 +134,7 @@
    },
    "anim": {
     "idle_frames": 4,
-    "idle_frame_w": 173,
+    "idle_frame_w": 193,
     "fps": 4
    }
   },
@@ -142,19 +142,19 @@
    "id": "table_right",
    "slot": 3,
    "pos": [
-    624,
+    600,
     362
    ],
-   "z": 612,
+   "z": 617,
    "hit_rect": [
-    610,
+    586,
     348,
-    200,
-    278
+    239,
+    283
    ],
    "anchor": [
-    710,
-    412
+    705,
+    413
    ],
    "card_side": "right",
    "sprites": {
@@ -165,12 +165,12 @@
    },
    "anim": {
     "idle_frames": 4,
-    "idle_frame_w": 172,
+    "idle_frame_w": 211,
     "fps": 4
    }
   }
  ],
- "card_side_rule": "All seats open right (fireplace centre-back clear of card strip x>=900).",
+ "card_side_rule": "Per seat: opens away from the figure. Left/center \u2192 right. Fireplace stays clear.",
  "ui_colours_needed": {
   "PANEL": "#181d20",
   "PANEL_BODY": "#24292f",

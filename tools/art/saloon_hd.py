@@ -24,20 +24,20 @@ CONCEPT_HD = "/workspace/concepts/saloon_hd"
 
 TILT_GAME = 45.0
 TILT_CONCEPT = 52.0
-PPV = 3
+PPV = 2  # denser voxels; on-screen size locked via TARGET_CREW_H
 HEADING = 0.0  # +x screen-right; bar left, fire centre-back
 
 # Dense room; layout scaled from concept C (160×72)
-SX, SY, SZ = 340, 190, 110
+SX, SY, SZ = 520, 280, 140  # ~1.5× denser than 95cf9e0
 SX_S, SY_S = SX / 160.0, SY / 72.0
 
 SEAT_IDS = ["bar_left", "table_left", "table_mid", "table_right"]
 # Seated hip height on tall stools
 SEATS_VOX = [
-    (int(24 * SX_S), int(22 * SY_S), 18),
-    (int(38 * SX_S), int(50 * SY_S), 18),
-    (int(58 * SX_S), int(46 * SY_S), 18),
-    (int(78 * SX_S), int(52 * SY_S), 18),
+    (int(22 * SX_S), int(22 * SY_S), 24),
+    (int(36 * SX_S), int(50 * SY_S), 24),
+    (int(56 * SX_S), int(46 * SY_S), 24),
+    (int(76 * SX_S), int(52 * SY_S), 24),
 ]
 FIRE_X0, FIRE_X1 = int(80 * SX_S), int(104 * SX_S)
 FIRE_Y0, FIRE_Y1 = 8, 26
@@ -57,9 +57,12 @@ C = {
     "table_top": (132, 100, 68), "table_leg": (72, 52, 38),
     "stone": (92, 86, 80), "stone_lt": (118, 112, 104), "stone_dk": (64, 60, 56),
     "mortar": (48, 44, 40), "ash": (30, 22, 16),
-    "log": (58, 38, 24), "log_end": (132, 100, 62), "ember": PALETTE["orange"],
-    "fire_orange": PALETTE["orange"], "fire_hot": PALETTE["white_hot"],
-    "lantern": PALETTE["orange"], "lantern_hot": PALETTE["white_hot"],
+    "log": (58, 38, 24), "log_end": (132, 100, 62), "ember": (200, 70, 28),
+    # Clamped flame layers — never pure white
+    "fire_deep": (150, 28, 16), "fire_mid": (220, 88, 28),
+    "fire_yellow": (235, 170, 48), "fire_core": (240, 195, 90),
+    "fire_orange": (220, 88, 28), "fire_hot": (235, 170, 48),
+    "lantern": (200, 90, 32), "lantern_hot": (230, 160, 70),
     "lantern_frame": (70, 60, 48), "lantern_glass": (160, 170, 150),
     "bottle_g": (48, 140, 72), "bottle_a": (160, 78, 36), "bottle_b": (70, 90, 180),
     "bottle_r": (180, 48, 52), "cork": (140, 110, 70),
@@ -88,10 +91,16 @@ C = {
 }
 NAMES = ["_"] + list(C)
 IDX = {n: i for i, n in enumerate(NAMES)}
-EMISSIVE_NAMES = {"fire_orange", "fire_hot", "lantern", "lantern_hot", "ember"}
+EMISSIVE_NAMES = {"fire_deep", "fire_mid", "fire_yellow", "fire_core", "fire_orange", "fire_hot", "lantern", "lantern_hot", "ember"}
 
 
 def colors_rgba(light_only=False):
+    # Register emissive RGBs into palette.EMISSIVE so shade() won't darken them
+    import palette as _pal
+    for n in EMISSIVE_NAMES:
+        rgb = tuple(C[n])
+        _pal.PALETTE[n] = rgb
+        _pal.EMISSIVE.add(n)
     out = [(0, 0, 0, 0)]
     for n in NAMES[1:]:
         if light_only and n not in EMISSIVE_NAMES:
@@ -136,6 +145,41 @@ def cyl(g, cx, cy, r, z0, z1, n, own=None, oid=0):
                     own[x, y, z0:z1] = oid
 
 
+def ellipsoid(g, cx, cy, cz, rx, ry, rz, n, own=None, oid=0):
+    """Filled ellipsoid for rounder heads/shoulders/hats."""
+    for x in range(int(cx - rx), int(cx + rx) + 1):
+        for y in range(int(cy - ry), int(cy + ry) + 1):
+            for z in range(int(cz - rz), int(cz + rz) + 1):
+                if not (0 <= x < SX and 0 <= y < SY and 0 <= z < SZ):
+                    continue
+                if ((x - cx) / max(rx, 0.5)) ** 2 + ((y - cy) / max(ry, 0.5)) ** 2 + ((z - cz) / max(rz, 0.5)) ** 2 <= 1.05:
+                    g[x, y, z] = IDX[n]
+                    if own is not None and oid:
+                        own[x, y, z] = oid
+
+
+def flame_tongue(g, cx, cy, z0, w, d, h, frame_off=0):
+    """Tapered flame: deep red base → orange → yellow → small core. No white blowout."""
+    for zi in range(h):
+        t = zi / max(h - 1, 1)
+        # taper width
+        rw = max(1.0, w * (1.0 - t * 0.85) * (0.85 + 0.15 * ((zi + frame_off) % 3 == 0)))
+        rd = max(1.0, d * (1.0 - t * 0.75))
+        if t < 0.25:
+            col = "fire_deep"
+        elif t < 0.55:
+            col = "fire_mid"
+        elif t < 0.82:
+            col = "fire_yellow"
+        else:
+            col = "fire_core"
+        for x in range(int(cx - rw), int(cx + rw) + 1):
+            for y in range(int(cy - rd), int(cy + rd) + 1):
+                if 0 <= x < SX and 0 <= y < SY and 0 <= z0 + zi < SZ:
+                    if ((x - cx) / rw) ** 2 + ((y - cy) / rd) ** 2 <= 1.0:
+                        g[x, y, z0 + zi] = IDX[col]
+
+
 def wood_grain_top(g, x0, x1, y0, y1, z, seed=0):
     rng = np.random.default_rng(seed)
     box(g, x0, x1, y0, y1, z, z + 1, "wood_top")
@@ -148,16 +192,15 @@ def wood_grain_top(g, x0, x1, y0, y1, z, seed=0):
 
 # ---------- furniture / props ----------
 def stool(g, x, y):
-    for lx, ly in ((x + 2, y + 2), (x + 12, y + 2), (x + 2, y + 12), (x + 12, y + 12)):
-        box(g, lx, lx + 2, ly, ly + 2, 2, 17, "stool_leg")
-    # ring brace
-    box(g, x + 3, x + 13, y + 3, y + 13, 8, 9, "stool_leg")
-    box(g, x, x + 16, y, y + 16, 17, 18, "stool_top")
-    box(g, x + 1, x + 15, y + 1, y + 15, 18, 19, "stool_top")
-    wood_grain_top(g, x + 2, x + 14, y + 2, y + 14, 18, seed=x + y)
+    for lx, ly in ((x + 3, y + 3), (x + 18, y + 3), (x + 3, y + 18), (x + 18, y + 18)):
+        box(g, lx, lx + 3, ly, ly + 3, 2, 22, "stool_leg")
+    box(g, x + 5, x + 19, y + 5, y + 19, 10, 11, "stool_leg")
+    box(g, x, x + 24, y, y + 24, 22, 23, "stool_top")
+    box(g, x + 2, x + 22, y + 2, y + 22, 23, 24, "stool_top")
+    wood_grain_top(g, x + 3, x + 21, y + 3, y + 21, 23, seed=x + y)
 
 
-def table(g, x, y, w=36, d=22, h=18):
+def table(g, x, y, w=48, d=28, h=22):
     cx, cy = x + w // 2, y + d // 2
     box(g, cx - 3, cx + 3, cy - 3, cy + 3, 2, h, "table_leg")
     box(g, cx - 5, cx + 5, cy - 1, cy + 1, 8, 9, "table_leg")
@@ -193,159 +236,164 @@ def lantern(g, x, y, z0=20, pulse=0):
     box(g, x + 1, x + 2, y + 1, y + 9, z0 + 1, z0 + 10, "lantern_glass")
     box(g, x + 8, x + 9, y + 1, y + 9, z0 + 1, z0 + 10, "lantern_glass")
     if pulse % 2 == 0:
-        box(g, x + 2, x + 8, y + 2, y + 8, z0 + 2, z0 + 9, "lantern")
-        box(g, x + 3, x + 7, y + 3, y + 7, z0 + 3, z0 + 8, "lantern_hot")
-        box(g, x + 4, x + 6, y + 4, y + 6, z0 + 4, z0 + 7, "fire_hot")
-    else:
         box(g, x + 3, x + 7, y + 3, y + 7, z0 + 3, z0 + 8, "lantern")
         box(g, x + 4, x + 6, y + 4, y + 6, z0 + 4, z0 + 7, "lantern_hot")
+    else:
+        box(g, x + 3, x + 7, y + 3, y + 7, z0 + 3, z0 + 8, "lantern")
+        box(g, x + 4, x + 6, y + 4, y + 6, z0 + 5, z0 + 6, "lantern_hot")
     box(g, x + 4, x + 6, y + 4, y + 6, z0 + 11, z0 + 14, "metal")
 
 
 
 def fireplace(g, frame=0):
     x0, x1, y0, y1 = FIRE_X0, FIRE_X1, FIRE_Y0, FIRE_Y1
-    # stone body with individual courses
-    for z in range(2, 42, 3):
-        for x in range(x0, x1, 4):
+    # stone body with individual courses + mortar
+    for z in range(2, 48, 3):
+        for x in range(x0, x1, 5):
             off = 2 if ((z // 3) % 2) else 0
-            col = "stone_lt" if ((x + z) // 4) % 3 == 0 else ("stone_dk" if ((x + z) // 3) % 2 else "stone")
-            box(g, x + off, min(x1, x + off + 4), y0, y1, z, z + 3, col)
-            # mortar lines
-            box(g, x + off, min(x1, x + off + 4), y0, y1, z, z + 1, "mortar")
-    # hearth opening
-    box(g, x0 + 6, x1 - 6, y1 - 6, y1, 2, 26, "ash")
-    # mantel
-    box(g, x0 - 3, x1 + 3, y0 - 1, y1 + 1, 40, 43, "stone_lt")
-    box(g, x0 - 2, x1 + 2, y0, y1, 43, 44, "stone")
-    # side pillars
-    box(g, x0, x0 + 5, y0, y1, 2, 40, "stone_dk")
-    box(g, x1 - 5, x1, y0, y1, 2, 40, "stone_dk")
-    # logs
-    box(g, x0 + 10, x1 - 10, y1 - 5, y1 - 2, 3, 7, "log")
-    box(g, x0 + 12, x1 - 14, y1 - 5, y1 - 2, 6, 9, "log")
-    box(g, x0 + 10, x0 + 12, y1 - 5, y1 - 2, 3, 7, "log_end")
-    box(g, x1 - 12, x1 - 10, y1 - 5, y1 - 2, 6, 9, "log_end")
-    # embers
-    for ex in range(x0 + 12, x1 - 12, 3):
-        box(g, ex, ex + 2, y1 - 4, y1 - 2, 4, 5, "ember")
-    # layered flames — push to the FRONT of the opening so the camera sees them
-    h = 18 + (frame % 4) * 4
-    inset = (frame % 2)
-    box(g, x0 + 8 + inset, x1 - 8 - inset, y1 - 3, y1 + 1, 6, 6 + h, "fire_orange")
-    box(g, x0 + 12, x1 - 12, y1 - 2, y1 + 2, 8, 8 + max(8, h - 3), "fire_hot")
-    box(g, x0 + 16, x1 - 16, y1 - 1, y1 + 2, 10, 12 + (frame % 3) * 2, "fire_hot")
-    # protruding tongue of flame toward camera
-    box(g, x0 + 14, x1 - 14, y1, y1 + 3, 7, 7 + h // 2, "fire_orange")
+            col = "stone_lt" if ((x + z) // 5) % 3 == 0 else ("stone_dk" if ((x + z) // 4) % 2 else "stone")
+            box(g, x + off, min(x1, x + off + 5), y0, y1, z, min(48, z + 3), col)
+            box(g, x + off, min(x1, x + off + 5), y0, y1, z, z + 1, "mortar")
+    # hearth opening (ash back wall)
+    box(g, x0 + 8, x1 - 8, y1 - 8, y1, 2, 28, "ash")
+    # mantel + pillars
+    box(g, x0 - 4, x1 + 4, y0 - 1, y1 + 1, 46, 50, "stone_lt")
+    box(g, x0 - 3, x1 + 3, y0, y1, 50, 51, "stone")
+    box(g, x0, x0 + 7, y0, y1, 2, 46, "stone_dk")
+    box(g, x1 - 7, x1, y0, y1, 2, 46, "stone_dk")
+    # crossed logs with end grain
+    box(g, x0 + 12, x1 - 12, y1 - 6, y1 - 2, 3, 8, "log")
+    box(g, x0 + 14, x1 - 16, y1 - 6, y1 - 2, 7, 11, "log")
+    box(g, x0 + 16, x1 - 14, y1 - 5, y1 - 2, 5, 9, "log")
+    box(g, x0 + 12, x0 + 14, y1 - 6, y1 - 2, 3, 8, "log_end")
+    box(g, x1 - 14, x1 - 12, y1 - 6, y1 - 2, 7, 11, "log_end")
+    # ember bed
+    for ex in range(x0 + 14, x1 - 14, 2):
+        box(g, ex, ex + 2, y1 - 5, y1 - 2, 4, 6, "ember" if (ex // 2 + frame) % 2 == 0 else "fire_deep")
+    # 3–4 flame tongues with flicker offsets (frame moves them)
+    fo = frame % 4
+    mid = (x0 + x1) // 2
+    cy = y1 - 2
+    flame_tongue(g, mid - 12 + (fo % 2), cy, 7, w=3.2, d=2.2, h=22 + fo * 2, frame_off=fo)
+    flame_tongue(g, mid - 2 - (fo // 2), cy + 1, 6, w=4.0, d=2.6, h=28 + (3 - fo) * 2, frame_off=fo + 1)
+    flame_tongue(g, mid + 10 - fo, cy, 7, w=3.0, d=2.0, h=20 + fo * 2, frame_off=fo + 2)
+    flame_tongue(g, mid + 2, cy + 2, 8, w=2.6, d=1.8, h=16 + (fo % 3) * 2, frame_off=fo + 3)
+    # small lick toward camera
+    flame_tongue(g, mid + (2 if fo % 2 else -2), cy + 4, 9, w=2.2, d=1.6, h=12 + fo, frame_off=fo)
+
 
 
 def figure(g, own, oid, x, y, z, shirt, shirt_dk, skin, skin_dk, hat, hair,
            hatstyle="cap", facing="back", seated=True, drink=False, breath=0, drink_frame=0,
            beard=False):
-    """Hand-detailed seated/standing crew. ~48×30×70 vox so 2× crops read."""
+    """Finer crew (~80×50×90 vox) with bevelled heads/hats, defined hands, AO folds."""
     bob = breath % 2
-    W, D = 48, 30
-    # --- legs / seat ---
+    W, D = 80, 50
+    cx, cy = x + W // 2, y + D // 2
     if seated:
-        # hips
-        box(g, x + 4, x + W - 4, y + 4, y + D - 2, z, z + 8, "pants", own, oid)
-        box(g, x + 6, x + W - 6, y + 6, y + D - 4, z + 1, z + 7, "pants_hi", own, oid)
+        # hips (rounded)
+        ellipsoid(g, cx, cy + 2, z + 5, 22, 16, 6, "pants", own, oid)
+        ellipsoid(g, cx, cy + 2, z + 5, 18, 12, 4, "pants_hi", own, oid)
         # thighs forward
-        box(g, x + 6, x + 14, y + D - 4, y + D + 6, z - 2, z + 6, "pants", own, oid)
-        box(g, x + W - 14, x + W - 6, y + D - 4, y + D + 6, z - 2, z + 6, "pants", own, oid)
-        # shins down to floor
-        box(g, x + 7, x + 13, y + D + 4, y + D + 8, z - 14, z - 2, "pants", own, oid)
-        box(g, x + W - 13, x + W - 7, y + D + 4, y + D + 8, z - 14, z - 2, "pants", own, oid)
-        # boots
-        box(g, x + 6, x + 14, y + D + 5, y + D + 10, z - 16, z - 12, "boot", own, oid)
-        box(g, x + W - 14, x + W - 6, y + D + 5, y + D + 10, z - 16, z - 12, "boot", own, oid)
-        box(g, x + 7, x + 13, y + D + 8, y + D + 10, z - 15, z - 13, "boot_hi", own, oid)
-        box(g, x + W - 13, x + W - 7, y + D + 8, y + D + 10, z - 15, z - 13, "boot_hi", own, oid)
-        bz = z + 8 + bob
+        for side in (-1, 1):
+            tx = cx + side * 14
+            box(g, tx - 7, tx + 7, y + D - 6, y + D + 10, z - 2, z + 8, "pants", own, oid)
+            box(g, tx - 5, tx + 5, y + D + 6, y + D + 12, z - 18, z - 2, "pants", own, oid)
+            # boots with bevel
+            ellipsoid(g, tx, y + D + 10, z - 14, 8, 6, 4, "boot", own, oid)
+            box(g, tx - 6, tx + 6, y + D + 12, y + D + 16, z - 16, z - 12, "boot_hi", own, oid)
+        bz = z + 10 + bob
     else:
-        box(g, x + 8, x + 14, y + 6, y + D - 4, z, z + 22, "pants", own, oid)
-        box(g, x + W - 14, x + W - 8, y + 6, y + D - 4, z, z + 22, "pants", own, oid)
-        box(g, x + 7, x + 15, y + 5, y + D - 3, z, z + 4, "boot", own, oid)
-        box(g, x + W - 15, x + W - 7, y + 5, y + D - 3, z, z + 4, "boot", own, oid)
-        bz = z + 22 + bob
-    # belt
-    box(g, x + 4, x + W - 4, y + 4, y + D - 2, bz, bz + 2, "belt", own, oid)
-    box(g, x + W // 2 - 2, x + W // 2 + 2, y + D - 3, y + D - 1, bz, bz + 2, "brass", own, oid)
-    # torso
-    box(g, x + 6, x + W - 6, y + 5, y + D - 2, bz + 2, bz + 26, shirt, own, oid)
-    box(g, x + 8, x + W - 8, y + 7, y + D - 4, bz + 4, bz + 24, shirt_dk, own, oid)
-    # buttons
-    for bz_b in range(bz + 8, bz + 22, 4):
-        box(g, x + W // 2 - 1, x + W // 2 + 1, y + D - 3, y + D - 1, bz_b, bz_b + 1, "brass", own, oid)
+        for side in (-1, 1):
+            tx = cx + side * 12
+            box(g, tx - 6, tx + 6, y + 8, y + D - 6, z, z + 28, "pants", own, oid)
+            ellipsoid(g, tx, cy, z + 3, 7, 8, 4, "boot", own, oid)
+        bz = z + 28 + bob
+    # belt + buckle
+    box(g, x + 10, x + W - 10, y + 8, y + D - 4, bz, bz + 3, "belt", own, oid)
+    box(g, cx - 3, cx + 3, y + D - 5, y + D - 2, bz, bz + 3, "brass", own, oid)
+    # torso with rounded shoulders
+    box(g, x + 12, x + W - 12, y + 8, y + D - 4, bz + 3, bz + 32, shirt, own, oid)
+    box(g, x + 16, x + W - 16, y + 12, y + D - 8, bz + 6, bz + 28, shirt_dk, own, oid)
+    ellipsoid(g, cx - 22, cy, bz + 28, 10, 10, 8, shirt, own, oid)  # L shoulder
+    ellipsoid(g, cx + 22, cy, bz + 28, 10, 10, 8, shirt, own, oid)  # R shoulder
+    for bz_b in range(bz + 10, bz + 28, 5):
+        box(g, cx - 1, cx + 1, y + D - 5, y + D - 2, bz_b, bz_b + 1, "brass", own, oid)
     # collar
-    box(g, x + 14, x + W - 14, y + 7, y + D - 4, bz + 24, bz + 26, skin, own, oid)
-    box(g, x + 10, x + 16, y + 6, y + D - 3, bz + 22, bz + 26, shirt_dk, own, oid)
-    box(g, x + W - 16, x + W - 10, y + 6, y + D - 3, bz + 22, bz + 26, shirt_dk, own, oid)
-    # sleeves / arms — reach forward a bit when seated
-    arm_y1 = y + D + 2 if seated else y + D - 4
-    box(g, x - 4, x + 7, y + 7, arm_y1, bz + 4, bz + 24, shirt, own, oid)
-    box(g, x + W - 7, x + W + 4, y + 7, arm_y1, bz + 4, bz + 24, shirt, own, oid)
-    box(g, x - 3, x + 5, y + 8, arm_y1 - 1, bz + 6, bz + 22, shirt_dk, own, oid)
-    box(g, x + W - 5, x + W + 3, y + 8, arm_y1 - 1, bz + 6, bz + 22, shirt_dk, own, oid)
-    # hands with fingers
-    hand_lift = 5 if drink and (drink_frame % 4) >= 2 else 0
-    hy1 = arm_y1
-    box(g, x - 4, x + 5, y + 10, hy1, bz + 2 + hand_lift, bz + 7 + hand_lift, skin, own, oid)
-    box(g, x + W - 5, x + W + 4, y + 10, hy1, bz + 2 + hand_lift, bz + 7 + hand_lift, skin, own, oid)
-    for fx in range(0, 4):
-        box(g, x - 4 + fx, x - 3 + fx, y + 12, y + 14, bz + 2 + hand_lift, bz + 3 + hand_lift, skin_dk, own, oid)
-        box(g, x + W + fx, x + W + 1 + fx, y + 12, y + 14, bz + 2 + hand_lift, bz + 3 + hand_lift, skin_dk, own, oid)
+    box(g, cx - 8, cx + 8, y + 12, y + D - 8, bz + 30, bz + 33, skin, own, oid)
+    box(g, x + 16, x + 26, y + 10, y + D - 6, bz + 28, bz + 33, shirt_dk, own, oid)
+    box(g, x + W - 26, x + W - 16, y + 10, y + D - 6, bz + 28, bz + 33, shirt_dk, own, oid)
+    # arms — tapered cylinders toward hands
+    arm_y1 = y + D + 4 if seated else y + D - 6
+    hand_lift = 6 if drink and (drink_frame % 4) >= 2 else 0
+    for side, sx0, sx1 in ((-1, x - 2, x + 14), (1, x + W - 14, x + W + 2)):
+        box(g, sx0, sx1, y + 12, arm_y1, bz + 6, bz + 30, shirt, own, oid)
+        box(g, sx0 + 2, sx1 - 2, y + 14, arm_y1 - 1, bz + 8, bz + 28, shirt_dk, own, oid)
+        # forearm taper
+        box(g, sx0 + 1, sx1 - 1, arm_y1 - 4, arm_y1 + 2, bz + 4 + hand_lift, bz + 12 + hand_lift, shirt, own, oid)
+        # hand + fingers
+        hx = (sx0 + sx1) // 2
+        ellipsoid(g, hx, arm_y1, bz + 6 + hand_lift, 6, 5, 4, skin, own, oid)
+        for fi in range(4):
+            box(g, hx - 4 + fi * 2, hx - 2 + fi * 2, arm_y1 + 2, arm_y1 + 5,
+                bz + 5 + hand_lift, bz + 6 + hand_lift, skin_dk, own, oid)
     if drink:
-        glass_mug(g, x + W - 1, y + 12, bz + 7 + hand_lift, own, oid)
-    # head (large)
-    box(g, x + 10, x + W - 10, y + 6, y + D - 4, bz + 22, bz + 42, skin, own, oid)
-    box(g, x + 12, x + W - 12, y + 8, y + D - 6, bz + 24, bz + 40, skin_dk, own, oid)
+        glass_mug(g, x + W - 4, arm_y1, bz + 10 + hand_lift, own, oid)
+    # head — ellipsoid with bevelled jaw
+    ellipsoid(g, cx, cy + 1, bz + 42, 16, 14, 14, skin, own, oid)
+    ellipsoid(g, cx, cy + 1, bz + 42, 13, 11, 11, skin_dk, own, oid)
     # ears
-    box(g, x + 8, x + 11, y + 10, y + D - 8, bz + 30, bz + 36, skin, own, oid)
-    box(g, x + W - 11, x + W - 8, y + 10, y + D - 8, bz + 30, bz + 36, skin, own, oid)
-    # hair under hat
-    box(g, x + 11, x + W - 11, y + 5, y + D - 3, bz + 40, bz + 44, hair, own, oid)
-    # face
+    ellipsoid(g, cx - 16, cy, bz + 42, 3, 4, 5, skin, own, oid)
+    ellipsoid(g, cx + 16, cy, bz + 42, 3, 4, 5, skin, own, oid)
+    # hair
+    ellipsoid(g, cx, cy - 2, bz + 50, 15, 12, 6, hair, own, oid)
     if facing == "front":
         # brows
-        box(g, x + 14, x + 20, y + D - 5, y + D - 3, bz + 36, bz + 38, "beard", own, oid)
-        box(g, x + W - 20, x + W - 14, y + D - 5, y + D - 3, bz + 36, bz + 38, "beard", own, oid)
-        # eye whites + pupils (multi-voxel)
-        box(g, x + 14, x + 20, y + D - 5, y + D - 2, bz + 32, bz + 36, "eye_w", own, oid)
-        box(g, x + W - 20, x + W - 14, y + D - 5, y + D - 2, bz + 32, bz + 36, "eye_w", own, oid)
-        box(g, x + 16, x + 19, y + D - 4, y + D - 2, bz + 33, bz + 36, "eye", own, oid)
-        box(g, x + W - 19, x + W - 16, y + D - 4, y + D - 2, bz + 33, bz + 36, "eye", own, oid)
-        # nose bridge + tip
-        box(g, x + W // 2 - 2, x + W // 2 + 2, y + D - 5, y + D - 2, bz + 28, bz + 33, "nose", own, oid)
-        box(g, x + W // 2 - 3, x + W // 2 + 3, y + D - 3, y + D - 1, bz + 27, bz + 29, skin_dk, own, oid)
-        # mouth + lip
-        box(g, x + W // 2 - 5, x + W // 2 + 5, y + D - 4, y + D - 2, bz + 24, bz + 26, "eye", own, oid)
-        box(g, x + W // 2 - 4, x + W // 2 + 4, y + D - 4, y + D - 2, bz + 26, bz + 27, skin_dk, own, oid)
+        box(g, cx - 12, cx - 4, y + D - 8, y + D - 5, bz + 46, bz + 48, "beard", own, oid)
+        box(g, cx + 4, cx + 12, y + D - 8, y + D - 5, bz + 46, bz + 48, "beard", own, oid)
+        # eyes
+        box(g, cx - 11, cx - 4, y + D - 7, y + D - 4, bz + 40, bz + 45, "eye_w", own, oid)
+        box(g, cx + 4, cx + 11, y + D - 7, y + D - 4, bz + 40, bz + 45, "eye_w", own, oid)
+        box(g, cx - 9, cx - 5, y + D - 6, y + D - 4, bz + 41, bz + 44, "eye", own, oid)
+        box(g, cx + 5, cx + 9, y + D - 6, y + D - 4, bz + 41, bz + 44, "eye", own, oid)
+        # nose
+        ellipsoid(g, cx, y + D - 5, bz + 36, 3, 4, 4, "nose", own, oid)
+        # mouth
+        box(g, cx - 6, cx + 6, y + D - 6, y + D - 4, bz + 30, bz + 32, "eye", own, oid)
+        box(g, cx - 5, cx + 5, y + D - 6, y + D - 4, bz + 32, bz + 33, skin_dk, own, oid)
         if beard:
-            box(g, x + 12, x + W - 12, y + D - 5, y + D - 2, bz + 22, bz + 27, "beard", own, oid)
-            box(g, x + W // 2 - 6, x + W // 2 + 6, y + D - 4, y + D - 1, bz + 20, bz + 24, "beard", own, oid)
+            ellipsoid(g, cx, y + D - 5, bz + 28, 12, 5, 8, "beard", own, oid)
     else:
-        box(g, x + 12, x + W - 12, y + 4, y + 7, bz + 30, bz + 40, hair, own, oid)
-    # hat
+        ellipsoid(g, cx, y + 4, bz + 44, 14, 4, 10, hair, own, oid)
+    # hats — bevelled
     if hatstyle == "cap":
-        box(g, x + 10, x + W - 10, y + 5, y + D - 3, bz + 42, bz + 48, hat, own, oid)
-        brim = 7 if facing == "front" else -5
-        box(g, x + 10, x + W - 10, y + brim, y + brim + 5, bz + 42, bz + 45, hat, own, oid)
+        ellipsoid(g, cx, cy, bz + 54, 16, 14, 6, hat, own, oid)
+        brim = 8 if facing == "front" else -6
+        box(g, cx - 14, cx + 14, y + brim, y + brim + 6, bz + 52, bz + 54, hat, own, oid)
     elif hatstyle == "wide":
-        box(g, x + 0, x + W, y + 0, y + D + 2, bz + 42, bz + 45, hat, own, oid)
-        box(g, x + 10, x + W - 10, y + 5, y + D - 3, bz + 45, bz + 50, hat, own, oid)
+        # brim disk + crown dome
+        for dx in range(-28, 29):
+            for dy in range(-22, 23):
+                if dx * dx / (28 * 28) + dy * dy / (22 * 22) <= 1.0:
+                    xx, yy = cx + dx, cy + dy
+                    if 0 <= xx < SX and 0 <= yy < SY:
+                        g[xx, yy, bz + 52:bz + 54] = IDX[hat]
+                        if own is not None and oid:
+                            own[xx, yy, bz + 52:bz + 54] = oid
+        ellipsoid(g, cx, cy, bz + 58, 14, 12, 7, hat, own, oid)
     elif hatstyle == "mohawk":
-        box(g, x + W // 2 - 4, x + W // 2 + 4, y + 6, y + D - 4, bz + 42, bz + 58, hat, own, oid)
-        box(g, x + W // 2 - 3, x + W // 2 + 3, y + 7, y + D - 5, bz + 58, bz + 62, hat, own, oid)
+        for zi, rw in enumerate(range(8, 2, -1)):
+            box(g, cx - rw // 2, cx + rw // 2, y + 10, y + D - 8, bz + 52 + zi * 2, bz + 54 + zi * 2, hat, own, oid)
     elif hatstyle == "hood":
-        box(g, x + 8, x + W - 8, y + 4, y + D - 2, bz + 22, bz + 48, hat, own, oid)
-        fy = y + D - 4 if facing == "front" else y + 5
-        box(g, x + 12, x + W - 12, fy, fy + 4, bz + 30, bz + 40, skin, own, oid)
+        ellipsoid(g, cx, cy, bz + 44, 20, 18, 18, hat, own, oid)
+        fy = y + D - 6 if facing == "front" else y + 6
+        box(g, cx - 10, cx + 10, fy, fy + 5, bz + 36, bz + 48, skin, own, oid)
         if facing == "front":
-            box(g, x + 15, x + 19, fy + 2, fy + 4, bz + 34, bz + 37, "eye_w", own, oid)
-            box(g, x + W - 19, x + W - 15, fy + 2, fy + 4, bz + 34, bz + 37, "eye_w", own, oid)
-            box(g, x + 16, x + 18, fy + 3, fy + 4, bz + 35, bz + 37, "eye", own, oid)
-            box(g, x + W - 18, x + W - 16, fy + 3, fy + 4, bz + 35, bz + 37, "eye", own, oid)
+            box(g, cx - 8, cx - 3, fy + 2, fy + 4, bz + 42, bz + 45, "eye_w", own, oid)
+            box(g, cx + 3, cx + 8, fy + 2, fy + 4, bz + 42, bz + 45, "eye_w", own, oid)
+            box(g, cx - 7, cx - 4, fy + 3, fy + 4, bz + 43, bz + 45, "eye", own, oid)
+            box(g, cx + 4, cx + 7, fy + 3, fy + 4, bz + 43, bz + 45, "eye", own, oid)
+
 
 
 def bake_cast_shadows(g):
@@ -541,44 +589,59 @@ def place_on_room(img, own_img, room=(1280, 720), target_crew_h=TARGET_CREW_H):
     out[py:py + nh, px:px + nw] = crop_r
     ow[py:py + nh, px:px + nw] = own_r
     rgb = out[:, :, :3].astype(np.int16)
-    # fire/lantern only: very bright warm OR near-white hot
-    em = (out[:, :, 3] > 0) & (rgb[:, :, 0] > 200) & (rgb[:, :, 1] > 90) & (rgb[:, :, 0] > rgb[:, :, 2] + 40) & (rgb[:, :, 1] > rgb[:, :, 2])
-    em |= (out[:, :, 3] > 0) & (rgb[:, :, 0] > 240) & (rgb[:, :, 1] > 220) & (rgb[:, :, 2] > 170)
+    # flame/lantern: warm and fairly bright, but allow deep-red base
+    em = (out[:, :, 3] > 0) & (rgb[:, :, 0] > 145) & (rgb[:, :, 0] > rgb[:, :, 2] + 30) & (rgb[:, :, 1] < rgb[:, :, 0] + 10)
+    em &= (rgb[:, :, 1] > 20)  # not pure dark
+    # exclude saturated clothing blues/greens (B or G dominant)
+    em &= ~((rgb[:, :, 2] > rgb[:, :, 0]) | ((rgb[:, :, 1] > rgb[:, :, 0] + 15) & (rgb[:, :, 1] > 80)))
     return out, ow, em, (px, py, nw, nh, scale)
 
 
 def grade_night(rgba, em):
-    """#512b11 night like a0c1213: dark corners, hero fire/lantern pools, dim moon key."""
+    """Grade ambient/shadows toward #512b11; keep lit-surface hue (bottles, cloth, brass)."""
     rgb = rgba[:, :, :3].astype(np.float32)
-    graded = night_grade(rgb, em).astype(np.float32)
-    body = (rgba[:, :, 3] > 0) & ~em
-    # land near a0 mean (~68,38,15): gentle crush, not a black-out
-    graded[body] = graded[body] * 0.92
+    tint = np.array([0x51, 0x2b, 0x11], dtype=np.float32)
+    lum = (rgb @ np.array([0.299, 0.587, 0.114], dtype=np.float32))
+    # How "in shadow" — low luminance gets more night tint; bright keeps albedo hue
+    shadow = np.clip(1.0 - lum / 140.0, 0.0, 1.0)
     heat = np.array(Image.fromarray((em.astype(np.uint8) * 255)).filter(
-        ImageFilter.GaussianBlur(42))).astype(np.float32) / 255.0
-    warm = np.array([1.70, 1.10, 0.45], dtype=np.float32)
-    # outside pools go darker; inside pools warm up
-    graded = graded * (0.75 + 0.90 * heat[..., None] * warm)
-    graded[body] = np.clip(graded[body] * 1.12 + 6.0, 0, 255)
-    e = np.zeros_like(graded)
-    e[em] = np.maximum(rgb[em] * 1.15, graded[em])
+        ImageFilter.GaussianBlur(40))).astype(np.float32) / 255.0
+    # Lit by fire/lantern: prefer true albedo
+    lit = np.clip(heat * 1.4 + (1.0 - shadow) * 0.55, 0, 1)
+    # Ambient: night tint at readable level (aim ~a0 mean)
+    ambient = np.clip((lum[..., None] / 145.0), 0.25, 1.45) * tint[None, None, :] * 1.70
+    # Preserve hue on lit surfaces
+    warm_lit = rgb * np.array([1.02, 1.0, 0.95], dtype=np.float32)
+    out = ambient * (1.0 - lit[..., None]) + warm_lit * lit[..., None]
+    body = (rgba[:, :, 3] > 0) & ~em
+    out[body] = np.clip(out[body] * (0.95 + 0.08 * lit[body][..., None]) + 3.0, 0, 255)
+    # Emissive sculpt + hard anti-blowout clamp (no flat white)
+    e = np.zeros_like(out)
+    e[em] = np.clip(rgb[em], 0, 230)
     glow = np.array(Image.fromarray(np.clip(e, 0, 255).astype(np.uint8)).filter(
-        ImageFilter.GaussianBlur(16))).astype(np.float32)
-    out = np.clip(graded + glow * 2.0, 0, 255)
-    out[em] = np.clip(rgb[em] * 0.65 + out[em] * 0.35 + 50, 0, 255)
+        ImageFilter.GaussianBlur(10))).astype(np.float32)
+    out = out + glow * 0.45
+    # Global anti-blowout: nothing becomes a flat white/near-white block
+    out = np.clip(out, 0, 235)
+    out[em] = np.clip(rgb[em], 0, 225)
+    # Near-white leftovers → flame yellow
+    near_white = (out[:, :, 0] > 220) & (out[:, :, 1] > 220) & (out[:, :, 2] > 200)
+    if near_white.any():
+        out[near_white] = np.array([225, 160, 55], dtype=np.float32)
     H, W = out.shape[:2]
     Y, X = np.mgrid[0:H, 0:W].astype(np.float32)
-    v = np.clip((np.hypot((X - W / 2) / (W * 0.58), (Y - H * 0.42) / (H * 0.58)) - 0.70) / 0.50, 0, 1)
-    out *= (1.0 - 0.55 * v)[..., None]
-    return np.clip(out, 0, 255).astype(np.uint8)
+    v = np.clip((np.hypot((X - W / 2) / (W * 0.60), (Y - H * 0.42) / (H * 0.60)) - 0.78) / 0.42, 0, 1)
+    out *= (1.0 - 0.42 * v)[..., None]
+    return np.clip(out, 0, 235).astype(np.uint8)
+
 
 
 def lights_overlay(rgb, em):
     out = np.zeros((rgb.shape[0], rgb.shape[1], 4), np.uint8)
-    out[em, :3] = rgb[em]
+    out[em, :3] = np.clip(rgb[em], 0, 245)
     out[em, 3] = 255
-    bloom = np.array(Image.fromarray(out).filter(ImageFilter.GaussianBlur(10))).astype(np.float32)
-    bloom[..., 3] *= 0.6
+    bloom = np.array(Image.fromarray(out).filter(ImageFilter.GaussianBlur(8))).astype(np.float32)
+    bloom[..., 3] *= 0.45
     return Image.alpha_composite(
         Image.fromarray(np.clip(bloom, 0, 255).astype(np.uint8), "RGBA"),
         Image.fromarray(out, "RGBA"))
@@ -750,12 +813,15 @@ def bake(tilt=TILT_GAME, write_assets=True):
     ys, xs = np.where(em_bg | em)
     fire_rect = [560, 50, 280, 180]
     if len(xs):
-        fx0, fx1 = max(480, int(xs.min())), min(880, int(xs.max()))
-        fy0, fy1 = max(20, int(ys.min()) - 8), min(400, int(ys.max()) + 8)
+        fx0, fx1 = max(500, int(xs.min())), min(860, int(xs.max()))
+        fy0, fy1 = max(40, int(ys.min()) - 8), min(380, int(ys.max()) + 8)
         if fx1 > fx0 and fy1 > fy0:
             fire_rect = [fx0, fy0, fx1 - fx0, fy1 - fy0]
-            if fire_rect[0] + fire_rect[2] > 900:
-                fire_rect[2] = 900 - fire_rect[0] - 8
+            # Keep clear of card strip; prefer structure-sized rect
+            if fire_rect[0] + fire_rect[2] > 890:
+                fire_rect[2] = 890 - fire_rect[0]
+            if fire_rect[2] > 320:
+                fire_rect = [560, 90, 300, 220]
 
     meta = {
         "room_size": [1280, 720],
