@@ -1,7 +1,7 @@
 extends SceneTree
 ## Day / night before-after of the HD-2D look test. Needs a display:
 ##   xvfb-run -s "-screen 0 1280x720x24" godot --rendering-driver opengl3 --path . -s res://tools/art/capture_looktest.gd -- concepts/looktest
-## Writes day_before, day_after, day_after_dof, night_before, night_after, and perf.txt.
+## Writes day_before, day_after, night_before, night_after, and perf.txt.
 
 const Fight := preload("res://scripts/looktest_fight.gd")
 
@@ -45,18 +45,12 @@ func _process(_delta: float) -> bool:
 			_shot("day_before.png")
 			stack.call("set_mode", "day")
 			stack.call("set_practicals", true)
-			stack.call("set_dof", false)
 			stack.call("set_enabled", true)
 			_phase = "day"
 		"day":
 			_shot("day_after.png")
-			stack.call("set_dof", true)
-			_phase = "dof"
-		"dof":
-			_shot("day_after_dof.png")
 			stack.call("set_mode", "night")
 			stack.call("set_practicals", false)
-			stack.call("set_dof", false)
 			_phase = "night_flat"
 		"night_flat":
 			_shot("night_before.png")
@@ -97,4 +91,3 @@ func _write_perf(stack: Node) -> void:
 	f.store_line("light_cap_now=%d" % int(stack.call("light_cap")))
 	for line: String in _draws:
 		f.store_line(line)
-	f.store_line("dof_on_last=%s" % str(bool(stack.call("effective_dof"))))

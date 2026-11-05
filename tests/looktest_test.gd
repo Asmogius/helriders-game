@@ -23,8 +23,11 @@ func _run() -> void:
 	var emis := load("res://scripts/look_emissive.gdshader")
 	check(emis is Shader, "emissive shader loads")
 	var src := FileAccess.get_file_as_string("res://scripts/look_stack.gd")
+	var grade_src := FileAccess.get_file_as_string("res://scripts/look_grade.gdshader")
 	check(not src.contains("sprites_hd"), "look stack does not use HD 2px sheets")
 	check(not src.contains("Occluder2D"), "no shadow occluders")
+	check(not src.to_lower().contains("dof"), "look stack has no blur path")
+	check(not grade_src.to_lower().contains("dof"), "grade shader has no blur path")
 	var sheet := FileAccess.get_file_as_string("res://art/sprites/scrap_frame.json")
 	check(sheet.contains("\"px_per_voxel\": 1"), "rig sheets stay 1 px/voxel")
 	check(sheet.contains("\"tilt_deg\": 45.0"), "fight art is the 45 deg camera")
@@ -41,7 +44,6 @@ func _run() -> void:
 
 	var stack := Look.new()
 	stack.low_end = true
-	stack.dof_requested = true
 	stack.fire_at = Vector2(140, 120)
 	stack.muzzle_at = Vector2(180, 80)
 	world.add_child(stack)
@@ -54,11 +56,8 @@ func _run() -> void:
 	check(gap > 0.35, "night ambient is far from #512b11 (got %s)" % night)
 	check(stack.POOL_SIZE == 8, "flash pool is 8")
 	check(stack.light_cap() == 3, "low preset caps lights at 3")
-	check(stack.effective_dof() == false, "DoF stays off on the low preset even if requested")
 	stack.set_low_end(false)
-	stack.set_dof(true)
 	check(stack.light_cap() == 4, "high preset caps lights at 4")
-	check(stack.effective_dof(), "DoF can turn on when not low-end")
 	stack.set_mode("night")
 	stack.set_enabled(true)
 	stack.set_practicals(true)
@@ -73,7 +72,6 @@ func _run() -> void:
 	stack.set_practicals(true)
 	stack._apply()
 	check(stack.active_light_count() <= 3, "low day stays within the mobile cap (got %d)" % stack.active_light_count())
-	check(stack.effective_dof() == false, "switching to low clears DoF")
 	check(world.get_node_or_null("LookHeadStandin") != null, "low-end headlight stand-in exists")
 
 	if fails == 0:

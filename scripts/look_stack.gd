@@ -6,8 +6,8 @@ extends Node
 ## - CanvasModulate ambient (no extra pass)
 ## - up to 4 PointLight2Ds drawn inside the canvas item shader (not deferred)
 ## - 1 full-screen grade pass, which is also the only backbuffer copy
-## - DoF is more taps in that same pass, and it stays off on the low preset
 ## - bloom is a few pre-blurred additive sprites (no HDR glow; Compatibility has none)
+## Cameron cut the screen-edge blur on 2026-11-05. This stack cannot turn it on.
 
 const POOL_SIZE := 8
 const CAP_HIGH := 4
@@ -31,7 +31,6 @@ var mode := "day"             # "day" or "night"
 var enabled := true           # false = the stock look (before shots)
 var practicals := true        # false = ambient + grade only, no PointLight2Ds
 var low_end := false
-var dof_requested := false
 var fire_at := Vector2.ZERO
 var muzzle_at := Vector2.ZERO
 var show_fire := true
@@ -151,10 +150,6 @@ func light_cap() -> int:
 	return CAP_LOW if low_end else CAP_HIGH
 
 
-func effective_dof() -> bool:
-	return dof_requested and not low_end and enabled
-
-
 func active_light_count() -> int:
 	var n := 0
 	for light: PointLight2D in _pool:
@@ -187,13 +182,6 @@ func set_practicals(on: bool) -> void:
 
 func set_low_end(on: bool) -> void:
 	low_end = on
-	if low_end:
-		dof_requested = false
-	_apply()
-
-
-func set_dof(on: bool) -> void:
-	dof_requested = on and not low_end
 	_apply()
 
 
@@ -351,9 +339,6 @@ func _grade_params() -> void:
 	_grade_mat.set_shader_parameter("fog_amount", 0.22 if night else 0.10)
 	# Night keeps lamp hues. Day lets the warm grade sit on the highlights a little.
 	_grade_mat.set_shader_parameter("protect", 0.92 if night else 0.35)
-	var dof := 1.0 if effective_dof() else 0.0
-	_grade_mat.set_shader_parameter("dof_enabled", dof)
-	_grade_mat.set_shader_parameter("dof_px", 8.0)
 
 
 func _lift() -> void:
