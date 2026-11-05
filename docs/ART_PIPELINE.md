@@ -165,3 +165,9 @@ subclasses that call `super()` connect it exactly once. Content will not add a
 the leading edge only; spikes heat to enemy red. Stub:
 `tests/stubs/convoy_windup_stub.gd`. Shot: `capture_windup.gd -- out.png convoy`
 -> `art/previews/capture_convoy_windup.png`.
+
+## Baked cast shadows (Ebbtide plan phase 1, Cameron 2026-11-04)
+- One team sun: `voxel_render.LIGHT = (-0.45, -0.55, 0.70)` (screen x right, y down, z up): light from the upper-left, shadows fall down-right.
+- Ground offset per voxel of height: `SHADOW_DIR = (0.643, 0.786)`; on screen at 45 deg tilt that is (+0.643, +0.556) px per voxel.
+- Every model with a `chassis` chunk gets `<name>__shadow.png`: same 32-heading, 8-column layout, its own square frame (`meta.shadow.frame_w`), centre = ground centre, opaque `SHADOW_RGB (20,11,6)`, drawn at `meta.shadow.alpha` 0.5.
+- `directional_sprite.gd` adds it as a `Shadow` child (`show_behind_parent`), synced to the frame. Turrets and weapons have none (they sit on the hull, inside its shadow).

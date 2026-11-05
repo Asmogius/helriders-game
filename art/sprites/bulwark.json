@@ -2154,5 +2154,20 @@
  "defaults": [],
  "sheet": "bulwark__core.png",
  "composite": "bulwark.png",
+ "shadow": {
+  "sheet": "bulwark__shadow.png",
+  "frame_w": 144,
+  "frame_h": 144,
+  "alpha": 0.5,
+  "sun": [
+   -0.45,
+   -0.55,
+   0.7
+  ],
+  "dir": [
+   0.643,
+   0.786
+  ]
+ },
  "burnt": "bulwark__chassis_burnt.png"
 }

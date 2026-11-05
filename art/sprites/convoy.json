@@ -2154,5 +2154,20 @@
  "defaults": [],
  "sheet": "convoy__core.png",
  "composite": "convoy.png",
+ "shadow": {
+  "sheet": "convoy__shadow.png",
+  "frame_w": 158,
+  "frame_h": 158,
+  "alpha": 0.5,
+  "sun": [
+   -0.45,
+   -0.55,
+   0.7
+  ],
+  "dir": [
+   0.643,
+   0.786
+  ]
+ },
  "burnt": "convoy__chassis_burnt.png"
 }

@@ -4308,5 +4308,20 @@
  ],
  "sheet": "bulwark_frame__core.png",
  "composite": "bulwark_frame.png",
+ "shadow": {
+  "sheet": "bulwark_frame__shadow.png",
+  "frame_w": 272,
+  "frame_h": 272,
+  "alpha": 0.5,
+  "sun": [
+   -0.45,
+   -0.55,
+   0.7
+  ],
+  "dir": [
+   0.643,
+   0.786
+  ]
+ },
  "hd": true
 }

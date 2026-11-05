@@ -52,6 +52,7 @@ func _run() -> void:
 	_check_layers()
 	_check_burnt()
 	_check_roll_cage()
+	_check_shadows()
 	print("art_sheet_test: ", "PASS" if fails == 0 else "%d FAILURES" % fails)
 	quit(1 if fails else 0)
 
@@ -245,3 +246,26 @@ func _check_roll_cage() -> void:
 			check(a.grow(2).encloses(b), "%s: cage covers the cab at %d (%s vs %s)" % [name, i, a, b])
 			check(a.size.x - b.size.x <= 8 and a.size.y - b.size.y <= 10, "%s: cage fits the cab at %d (%s vs %s)" % [name, i, a, b])
 		s.free()
+
+
+## Baked cast shadows (Ebbtide plan phase 1): hulls carry a shadow child at the
+## same frame, drawn behind; turrets don't. The shadow falls down-right.
+func _check_shadows() -> void:
+	for name in ["scrap_frame", "outrider", "bulwark"]:
+		var s: Sprite2D = DS.new()
+		s.load_meta("res://art/sprites/%s.json" % name)
+		var sh: Sprite2D = s.get("shadow")
+		check(sh != null and sh.show_behind_parent, name + ": has a shadow behind it")
+		if sh != null:
+			for h in [0.0, 1.3, 4.0]:
+				s.set("heading", h)
+				check(sh.frame == s.frame, "%s: shadow frame follows heading %.1f" % [name, h])
+			var img: Image = sh.texture.get_image()
+			var fw := int(s.meta.shadow.frame_w)
+			var used := img.get_region(Rect2i(0, 0, fw, fw)).get_used_rect()
+			check(used.get_center().x > fw / 2 and used.get_center().y > fw / 2, name + ": shadow falls down-right")
+		s.free()
+	var t: Sprite2D = DS.new()
+	t.load_meta("res://art/sprites/pintle_turret.json")
+	check(t.get("shadow") == null, "turret: no own shadow")
+	t.free()

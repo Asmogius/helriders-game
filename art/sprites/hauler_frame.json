@@ -10589,5 +10589,20 @@
  ],
  "sheet": "hauler_frame__core.png",
  "composite": "hauler_frame.png",
+ "shadow": {
+  "sheet": "hauler_frame__shadow.png",
+  "frame_w": 148,
+  "frame_h": 148,
+  "alpha": 0.5,
+  "sun": [
+   -0.45,
+   -0.55,
+   0.7
+  ],
+  "dir": [
+   0.643,
+   0.786
+  ]
+ },
  "burnt": "hauler_frame__chassis_burnt.png"
 }

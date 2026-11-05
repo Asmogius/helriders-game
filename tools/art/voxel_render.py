@@ -31,6 +31,13 @@ TILT_DEG = 45.0      # camera tilt off straight-down; 0 = pure top-down (Ebbtide
 SAMPLES = 3          # face samples per voxel edge per pixel (no holes)
 COLUMNS = 8
 LIGHT = np.array([-0.45, -0.55, 0.70])  # from upper-left of the screen, above
+# The team sun (Ebbtide standard, Cameron 2026-11-04): the same vector lights the
+# voxels and casts the baked shadows. Screen-space x right, y down, z up.
+# A point at height z lands on the ground at (x, y) + z * SHADOW_DIR, i.e.
+# shadows fall down-right; on screen that is (+0.643, +0.786 * cos(tilt)) px per voxel of height.
+SHADOW_DIR = (-LIGHT[0] / LIGHT[2], -LIGHT[1] / LIGHT[2])
+SHADOW_RGB = (20, 11, 6)   # near-black warm; the game draws the sheet at SHADOW_ALPHA
+SHADOW_ALPHA = 0.5
 # Garage-preview HD set (--garage-hd): the player's chassis and weapon sheets.
 GARAGE_HD = ["scrap_frame", "bulwark_frame", "courier_frame", "pintle_turret", "burst_turret", "rivet_gun",
              "flame_sprayer", "arc_projector", "harpoon", "mortar", "acid_lobber"]
@@ -189,6 +196,38 @@ def canvas_for(shape, ppv=PX_PER_VOXEL):
     return 2 * int(math.ceil((r + shape[2] * math.sin(math.radians(TILT_DEG))) * ppv)) + 4
 
 
+def shadow_canvas(shape, ppv=PX_PER_VOXEL):
+    r = math.hypot(shape[0], shape[1]) / 2 + 1
+    return 2 * int(math.ceil((r + shape[2] * math.hypot(*SHADOW_DIR)) * ppv)) + 4
+
+
+def render_shadow(grid, heading_deg, ppv=PX_PER_VOXEL, tilt=TILT_DEG, canvas=None):
+    """Baked cast shadow: every voxel projected along the sun onto the ground
+    (z = 0), then seen through the tilted camera. Opaque SHADOW_RGB silhouette;
+    the frame centre is the footprint centre at ground level, like the sprite."""
+    sx, sy, sz = grid.shape
+    a, t = math.radians(heading_deg), math.radians(tilt)
+    ca, sa, ct = math.cos(a), math.sin(a), math.cos(t)
+    W = H = canvas
+    k = max(2, 2 * ppv)
+    o = (np.arange(k) + 0.5) / k
+    du, dv, dw = [g.ravel() for g in np.meshgrid(o, o, o)]
+    v = np.argwhere(grid > 0).astype(float)
+    x = (v[:, None, 0] + du[None]) - sx / 2.0
+    y = (v[:, None, 1] + dv[None]) - sy / 2.0
+    z = v[:, None, 2] + dw[None]
+    wx, wy = x * ca - y * sa, x * sa + y * ca
+    gx, gy = wx + z * SHADOW_DIR[0], wy + z * SHADOW_DIR[1]
+    ix = np.floor(gx * ppv + W / 2).astype(int).ravel()
+    iy = np.floor(gy * ct * ppv + H / 2).astype(int).ravel()
+    ok = (ix >= 0) & (ix < W) & (iy >= 0) & (iy < H)
+    m = np.zeros((H, W), bool)
+    m[iy[ok], ix[ok]] = True
+    out = np.zeros((H, W, 4), np.uint8)
+    out[m] = SHADOW_RGB + (255,)
+    return out
+
+
 def save_sheet(frames, path):
     fh, fw = frames[0].shape[:2]
     rows = math.ceil(len(frames) / COLUMNS)
@@ -236,6 +275,15 @@ def render_model(name, model, colors, outdir, directions=DIRECTIONS, ppv=PX_PER_
     meta["sheet"] = f"{name}__core.png" if layers else f"{name}.png"
     save_sheet([render_frame(core, colors, h, ppv, canvas=canvas, hd=hd) for h in heads], os.path.join(outdir, meta["sheet"]))
     meta["composite"] = f"{name}.png"
+    # Baked cast shadow (hulls only: a model with a "chassis" chunk stands on the
+    # ground; turrets and weapons sit on a deck, and the hull's shadow covers them).
+    if "chassis" in chunks:
+        sgrid = union([core] + [union(layers[d]["pieces"].values()) for d in model.defaults if d in layers])
+        sc = shadow_canvas(shape, ppv)
+        fn = f"{name}__shadow.png"
+        save_sheet([render_shadow(sgrid, h, ppv, canvas=sc) for h in heads], os.path.join(outdir, fn))
+        meta["shadow"] = {"sheet": fn, "frame_w": sc, "frame_h": sc, "alpha": SHADOW_ALPHA,
+                          "sun": [float(c) for c in LIGHT], "dir": [round(float(c), 3) for c in SHADOW_DIR]}
     if hd:
         meta["hd"] = True
         for lid, L in layers.items():

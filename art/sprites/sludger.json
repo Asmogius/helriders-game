@@ -1751,5 +1751,20 @@
  "defaults": [],
  "sheet": "sludger__core.png",
  "composite": "sludger.png",
+ "shadow": {
+  "sheet": "sludger__shadow.png",
+  "frame_w": 132,
+  "frame_h": 132,
+  "alpha": 0.5,
+  "sun": [
+   -0.45,
+   -0.55,
+   0.7
+  ],
+  "dir": [
+   0.643,
+   0.786
+  ]
+ },
  "burnt": "sludger__chassis_burnt.png"
 }
