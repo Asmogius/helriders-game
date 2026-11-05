@@ -95,6 +95,7 @@ godot --headless --fixed-fps 60 --path . -s res://tests/keywords_test.gd   # mus
 godot --headless --fixed-fps 60 --path . -s res://tests/pad_test.gd        # must end "PAD TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/save_test.gd       # must end "SAVE TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/quickplay_level_test.gd # must end "QUICKPLAY LEVEL TEST PASSED"
+godot --headless --fixed-fps 60 --path . -s res://tests/quickplay_bake_test.gd # must end "QUICKPLAY BAKE TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/quickplay_spawner_test.gd # must end "QUICKPLAY SPAWNER TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/quickplay_wave_test.gd # must end "QUICKPLAY WAVE TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/quickplay_endless_save_test.gd # must end "QUICKPLAY ENDLESS SAVE TEST PASSED"
