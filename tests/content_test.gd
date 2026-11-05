@@ -234,6 +234,7 @@ func _process(_delta: float) -> bool:
 			if frame == 2:
 				main.zombies.clear_all()
 				mark.scrap = int(profile.get("scrap"))
+				mark.clears = int(profile.get("record").clears)
 				main._succeed("BLOCK CLEARED", "", 1.0)
 				_check(main.push_state == Mission.Push.CHOOSING and main.state == Mission.State.RUNNING, "the objective shows both markers instead of ending the job")
 				_check(main.push_at.distance_to(main.push_extract) >= T.PUSH_MARKER_GAP - 1.0, "the push beacon sits 600+ px from the extraction marker")
@@ -250,6 +251,9 @@ func _process(_delta: float) -> bool:
 				_check(main.state == Mission.State.CLEARED and main.pushed, "extracting after the push ends the job, pushed")
 				var paid := int(profile.get("scrap")) - int(mark.scrap)
 				_check(paid >= roundi(int(main.spec.reward) * T.PUSH_PAY), "a push pays the job x1.5 (%d)" % paid)
+				var c := int(profile.get("record").clears)
+				_check(c == int(mark.clears) + 1, "a pushed clear counts toward job unlocks (%d -> %d)" % [mark.clears, c])
+				_check(str(main.bank_report.get("new_job_types", [])) == str(Missions.newly_unlocked_types(int(mark.clears), c)), "the results report lists what the pushed clear unlocked")
 				_finish()
 	return false
 

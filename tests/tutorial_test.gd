@@ -12,6 +12,7 @@ const Mission := preload("res://scripts/mission.gd")
 const Garage := preload("res://scripts/garage.gd")
 const ProfileScript := preload("res://scripts/profile.gd")
 const T := preload("res://scripts/tuning.gd")
+const Missions := preload("res://scripts/missions.gd")
 
 var profile: ProfileScript
 var main: Mission
@@ -71,6 +72,11 @@ func _process(_delta: float) -> bool:
 			if frame == 22:
 				_check(main.tut_step == 5 and main.hud.is_result_visible() and main.hud.result_text().contains("TRAINING DONE"), "grab it: TRAINING DONE")
 				_check(_state() == str(before.save), "nothing of yours changed: no day, no scrap, no crew, no run")
+				_check(int(profile.record.clears) == 0 and profile.new_job_types.is_empty(), "the tutorial isn't a clear and unlocks no job types")
+				var locked := true
+				for m: Dictionary in profile.board:
+					locked = locked and Missions.unlocked_types(0).has(str(m.type))
+				_check(locked, "after the tutorial the board is still Clear / Survive only")
 				_check(profile.is_discovered("enemies", "outrider"), "what you met still goes in the Database")
 				# What the result card's button does, minus the scene change.
 				profile.tutorial_active = false

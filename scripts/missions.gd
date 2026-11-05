@@ -49,6 +49,27 @@ static func unlocked_types(clears: int) -> Array:
 	return open
 
 
+## Types that open between `old_clears` and `new_clears` (TYPES order); empty
+## if none. Drives the "new job type" message after a clear.
+static func newly_unlocked_types(old_clears: int, new_clears: int) -> Array:
+	var before := unlocked_types(old_clears)
+	var out: Array = []
+	for type: String in unlocked_types(new_clears):
+		if not before.has(type):
+			out.append(type)
+	return out
+
+
+## One-line message for newly unlocked types ("" if none). UI owns the final look.
+static func unlock_message(types: Array) -> String:
+	if types.is_empty():
+		return ""
+	var names: Array = []
+	for type: String in types:
+		names.append(str(T.MISSIONS[type].label))
+	return "NEW JOB TYPE ON COMMS: " + ", ".join(names)
+
+
 ## District ids from the first up to `district` (the ones a board in it may
 ## send you to), in T.DISTRICTS order.
 static func districts_through(district: String) -> Array:

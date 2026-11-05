@@ -51,6 +51,8 @@ extends Node
 ##   seated crew member may survive, injured.
 
 signal changed
+## A clear opened new job types (T.JOB_UNLOCK_CLEARS); ids in Missions.TYPES order.
+signal job_types_unlocked(types: Array)
 
 const T := preload("res://scripts/tuning.gd")
 const Parts := preload("res://scripts/parts.gd")
@@ -82,6 +84,7 @@ var day := 1
 var board: Array = []               # today's missions on the Comms board
 var active_mission := {}            # the one you took; DEPLOY runs it
 var run_active := false             # a mission is under way (saved, so a quit counts)
+var new_job_types: Array = []         # types the last bank_run unlocked (not saved; results / Comms read it)
 var notice := ""                    # one-time message for the garage to show
 var crew: Array = []                # the roster (crew.gd dictionaries)
 var next_crew_id := 1
@@ -508,11 +511,18 @@ func bank_run(run_scrap: int, salvaged: Array[String], cleared := true) -> Dicti
 			schematics.append(id)
 			unlocked.append(id)
 	scrap += run_scrap
+	var clears_before := int(record.clears)
 	if cleared:   # a failed job (the truck lost) banks its haul but isn't a clear
 		record.clears = int(record.clears) + 1
+	new_job_types = Missions.newly_unlocked_types(clears_before, int(record.clears))
+	if not new_job_types.is_empty():
+		var msg := Missions.unlock_message(new_job_types)
+		notice = (notice + "\n" if notice != "" else "") + msg   # the garage toasts it
 	save_game()
 	changed.emit()
-	return {"scrap": run_scrap, "unlocked": unlocked}
+	if not new_job_types.is_empty():
+		job_types_unlocked.emit(new_job_types)
+	return {"scrap": run_scrap, "unlocked": unlocked, "new_job_types": new_job_types.duplicate()}
 
 
 ## Wrecked: the rig and every part on it are gone and everyone seated dies.

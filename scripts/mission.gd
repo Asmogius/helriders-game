@@ -2630,6 +2630,9 @@ func _succeed(title: String, detail: String, pay_mult: float) -> void:
 		lines = detail + "\n" + lines
 	if not crew_lines.is_empty():
 		lines += "\nCrew: " + ";  ".join(crew_lines)
+	var unlock_line := Missions.unlock_message(bank_report.get("new_job_types", []))
+	if unlock_line != "":
+		lines += "\n" + unlock_line
 	Engine.time_scale = 1.0
 	hud.show_result(title, lines, "RETURN TO GARAGE", _type_color())
 	hud.show_finds(_schematic_finds())   # V1.3

@@ -44,6 +44,25 @@ func _initialize() -> void:
 		for m: Dictionary in Missions.make_board(day, 3, 0, "outer_blocks", 1):
 			seen[str(m.type)] = true
 	_check(seen.has("courier") and not seen.has("hunt"), "1 clear: Courier appears, Hunt doesn't yet")
+	# The unlock hook: what opened between two clear counts, and its message.
+	_check(Missions.newly_unlocked_types(0, 1) == ["courier"], "clear 1 opens Courier")
+	_check(Missions.newly_unlocked_types(1, 2) == ["hunt"], "clear 2 opens Hunt")
+	_check(Missions.newly_unlocked_types(2, 3).is_empty(), "clear 3 (night starts) opens nothing")
+	_check(Missions.newly_unlocked_types(3, 4) == ["retrieve"] and Missions.newly_unlocked_types(4, 5) == ["escort"], "clears 4 and 5 open Retrieve and Escort")
+	_check(Missions.newly_unlocked_types(0, 10).size() == 4 and Missions.newly_unlocked_types(5, 5).is_empty(), "a jump lists every type; no change lists none")
+	_check(Missions.unlock_message(["courier"]) == "NEW JOB TYPE ON COMMS: COURIER" and Missions.unlock_message([]) == "", "the unlock message")
+	var hp: Node = ProfileScript.new()
+	hp.set("persist", false)
+	hp.new_game()
+	var got: Array = []
+	hp.job_types_unlocked.connect(func(t: Array) -> void: got.append_array(t))
+	var rep: Dictionary = hp.bank_run(0, [] as Array[String])
+	_check(got == ["courier"] and rep.new_job_types == ["courier"] and hp.new_job_types == ["courier"], "the first clear signals Courier and puts it in the report")
+	_check(str(hp.notice).contains("COURIER"), "and leaves a notice for the garage to show")
+	got.clear()
+	rep = hp.bank_run(0, [] as Array[String], false)
+	_check(got.is_empty() and rep.new_job_types.is_empty() and int(hp.record.clears) == 1, "a failed job isn't a clear and unlocks nothing")
+	hp.free()
 	# Profile: a new game is gated; an old save with many clears is not.
 	var p: Node = ProfileScript.new()
 	p.set("persist", false)

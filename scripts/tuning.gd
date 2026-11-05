@@ -548,13 +548,16 @@ const BOARD_SIZE := 3                  # missions on the Comms board each day
 # only offers types whose count is met; it repeats types to fill its slots.
 # Clears are already saved, so old saves unlock whatever their count allows.
 # Night (PR #79) starts at NIGHT_MIN_CLEARS = 3; nothing new unlocks on that clear.
+# Approved by Cameron 2026-11-05 (PR #117): order and counts. Push clears count;
+# the tutorial doesn't. A message shows when a type unlocks (no "unlocks after
+# N" line on Comms).
 const JOB_UNLOCK_CLEARS := {
 	"clear": 0,      # always (taught by the tutorial)
 	"survive": 0,    # always
-	"courier": 1,    # DRAFT
-	"hunt": 2,       # DRAFT
-	"retrieve": 4,   # DRAFT (introduces Extract-style exits)
-	"escort": 5,     # DRAFT
+	"courier": 1,
+	"hunt": 2,
+	"retrieve": 4,   # introduces Extract-style exits
+	"escort": 5,
 }
 
 # Garage upgrade tracks: 3 levels each, bought with scrap.
