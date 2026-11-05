@@ -29,17 +29,35 @@ const COL_BLOOD := Color(0.3, 0.09, 0.07, 0.85)
 # The one source of truth: Parts, Crew and UI.rarity_* all read this.
 const RARITY_ORDER := ["Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic"]
 const RARITY_COLORS := {
-	"Common": Color(0.75, 0.75, 0.72),
-	"Uncommon": Color(0.4, 0.85, 0.45),
-	"Rare": Color(0.35, 0.6, 1.0),
-	"Epic": Color(0.75, 0.45, 1.0),
-	"Legendary": Color(1.0, 0.72, 0.25),
-	"Mythic": Color(1.0, 0.36, 0.42),
+	"Common": Color(0.75, 0.75, 0.72),       # grey
+	"Uncommon": Color(0.4, 0.85, 0.45),     # green
+	"Rare": Color(0.35, 0.6, 1.0),          # blue
+	"Epic": Color(0.75, 0.45, 1.0),         # purple
+	"Legendary": Color(1.0, 0.604, 0.165),  # #ff9a2a orange-leaning gold (distinct from COL_UI_ACCENT #e1b441)
+	"Mythic": Color(0.91, 0.20, 0.16),      # red
 }
 # Perk tiers show as a rarity frame (V1.3): minor, major, signature.
 const PERK_TIER_RARITY := {"minor": "Rare", "major": "Epic", "signature": "Legendary"}
 # Fight crate beam height (px) per rarity tier 1..6 (V1.3; art only).
 const RARITY_BEAM := [0.0, 40.0, 80.0, 140.0, 220.0, 320.0]
+
+
+# --- UI / HUD charcoal + gold (Ebbtide; Cameron 2026-11-04) --------------------
+# Charcoal panels with gold as the only UI accent. Cyan stays for the player
+# and world FX (COL_CYAN). Rarity borders keep their own colours above.
+const COL_UI_PANEL := Color(0.094, 0.114, 0.125, 0.9)       # #181d20 @0.9
+const COL_UI_PANEL_ALT := Color(0.141, 0.161, 0.184, 0.9)   # #24292f @0.9
+const COL_UI_DEEP := Color(0.075, 0.075, 0.067, 0.95)       # #131311
+const COL_UI_HEADER := Color(0.118, 0.106, 0.078)           # #1e1b14 warm header strip
+const COL_UI_BORDER := Color(0.227, 0.239, 0.235)           # #3a3d3c hairline
+const COL_UI_ACCENT := Color(0.882, 0.706, 0.255)           # #e1b441 gold (only UI accent)
+const COL_UI_ACCENT_HOVER := Color(0.961, 0.745, 0.286)     # #f5be49
+const COL_UI_TEXT := Color(0.800, 0.784, 0.737)             # #ccc8bc warm off-white
+const COL_UI_TEXT_DIM := Color(0.541, 0.541, 0.518)         # #8a8a84
+const COL_UI_DANGER := Color(0.510, 0.161, 0.106)           # #82291b pill fill
+const COL_UI_OK := Color(0.294, 0.388, 0.255)               # #4b6341 Ready chip
+const COL_UI_OK_TEXT := Color(0.498, 0.749, 0.416)          # #7fbf6a delta / Ready text
+const COL_UI_DANGER_TEXT := Color(0.769, 0.278, 0.247)      # #c4473f readable on dark
 
 # --- Art colours (VISUAL_PLAN rule 3; added through P0) -----------------------
 # Art-only colours for the style samples. No gameplay reads these. Generators in

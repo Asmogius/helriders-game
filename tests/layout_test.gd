@@ -5,6 +5,7 @@ extends SceneTree
 ## Run:  godot --headless --fixed-fps 60 --path . -s res://tests/layout_test.gd
 
 const UI := preload("res://scripts/ui_theme.gd")
+const T := preload("res://scripts/tuning.gd")
 
 var failures: Array[String] = []
 var screen: Control
@@ -45,6 +46,11 @@ func _process(_delta: float) -> bool:
 	_check(second.theme == bar.theme and bar.theme == UI.shared_theme(), "bottom_bar reuses one cached theme")
 	for c: Node in bar.get_children():
 		_check((c as Button).size.y >= UI.MIN_TOUCH, "button at least MIN_TOUCH tall")
+	# Ebbtide UI palette aliases (COL_UI_* in tuning.gd).
+	_check(UI.PANEL == T.COL_UI_PANEL and UI.PANEL_EDGE == T.COL_UI_BORDER, "UI.PANEL aliases COL_UI_*")
+	_check(UI.TEXT == T.COL_UI_TEXT and UI.TEXT_DIM == T.COL_UI_TEXT_DIM, "UI.TEXT aliases COL_UI_*")
+	_check(UI.ACCENT == T.COL_UI_ACCENT and UI.ACCENT.to_html(false) == "e1b441", "UI.ACCENT is #e1b441")
+	_check(UI.GOOD == T.COL_UI_OK_TEXT and UI.BAD == T.COL_UI_DANGER_TEXT, "GOOD/BAD alias OK/danger text")
 	if failures.is_empty():
 		print("LAYOUT TEST PASSED")
 		quit(0)
