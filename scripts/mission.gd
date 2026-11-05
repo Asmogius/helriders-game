@@ -72,6 +72,7 @@ var _threat_points := PackedVector2Array()   # reused each frame (edge arrows)
 var _threat_colors := PackedColorArray()
 var loading_map := false        # start held (tree paused) while the styled map bakes
 var _load_layer: CanvasLayer
+var abandoned := false          # ABANDON JOB was used (tests)
 var _restarting := false         # RESTART keeps the baked map cached; leaving drops it
 var spec := {}                   # the mission being run
 var night := false               # a night job (spec.night): zombies only, PR #69
@@ -1316,6 +1317,7 @@ func open_menu() -> GameMenu:
 	menu.leave_requested.connect(leave_tutorial)
 	menu.resumed.connect(_on_menu_closed)
 	menu.restart_requested.connect(restart_job)
+	menu.abandon_requested.connect(abandon_job)
 	hud.add_child(menu)
 	return menu
 
@@ -1323,6 +1325,27 @@ func open_menu() -> GameMenu:
 func _on_menu_closed() -> void:
 	menu = null
 	get_tree().paused = false
+
+
+## ABANDON JOB from the pause menu (playtest 2 #7): give the job up and go
+## home. Like a failed job the day passes with no job pay, but nothing picked
+## up comes home either (kill scrap, salvage, schematics). The rig and the
+## crew are kept: not a wreck, no wreck count, no crew lost, no crew XP.
+## Injuries already taken in this fight stand.
+func abandon_job() -> void:
+	if tutorial or state != State.RUNNING:
+		return
+	menu = null
+	state = State.FAILED
+	get_tree().paused = false
+	Engine.time_scale = 1.0
+	if _music != null:
+		_music.end_combat()
+	var hurt := _rest_ids()
+	profile.finish_day()
+	profile.bank_crew(0, hurt, bool(vehicle.crew_mod("triage")), vehicle.has_sp("sp_clean_bandage"))
+	abandoned = true
+	get_tree().change_scene_to_file(GARAGE_SCENE)
 
 
 ## The fight starts over: same job, same rig and crew, nothing lost.
