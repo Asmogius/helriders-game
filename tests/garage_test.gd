@@ -40,7 +40,9 @@ func _process(_delta: float) -> bool:
 	if frame == 3:
 		_run_checks()
 	if frame == 4:
-		# No job yet: DEPLOY sends you to Comms instead of launching.
+		# No job yet: the DEPLOY button is off (playtest P2-1); deploy() itself
+		# still sends you to Comms instead of launching.
+		_check(garage._deploy.disabled, "DEPLOY is disabled with no job taken")
 		garage.deploy()
 		_check(garage._comms.visible and garage.is_inside_tree() and current_scene == null, "DEPLOY without a job opens Comms")
 		var cards := garage._comms._cards.get_children().size()
@@ -48,6 +50,7 @@ func _process(_delta: float) -> bool:
 		garage._comms.select(0)
 		_check(garage._comms.take_selected() and profile.has_mission(), "TAKE JOB sets the mission")
 		_check(not garage._comms.visible and garage._job.text.begins_with("JOB:"), "taking a job returns to the Garage with the job shown")
+		_check(not garage._deploy.disabled, "DEPLOY is enabled once a job is taken")
 		garage.deploy()
 	if frame == 30:
 		var mission := current_scene
@@ -64,7 +67,7 @@ func _run_checks() -> void:
 	# --- New game ----------------------------------------------------------------
 	_check(profile.has_rig() and profile.scrap == 60, "new game: starter rig and 60 scrap")
 	_check(profile.schematics.size() == 7, "new game: the seven starter schematics")
-	_check(not garage._deploy.disabled, "DEPLOY is available with a complete rig")
+	_check(profile.has_rig() and profile.deploy_block() == "", "a complete rig is ready to DEPLOY (the button waits for a job)")
 	var visible_tags := garage._tags.filter(func(t: Control) -> bool: return t.visible).size()
 	_check(visible_tags == 10, "Scrap Frame shows 10 slots (3 core, 3 armor, 1 weapon, 2 internal, 1 utility)")
 	var seated := profile.seated_crew()
@@ -107,7 +110,8 @@ func _run_checks() -> void:
 	_check(garage.press_card("outrider_sport_wheels") and profile.rig.drive == "outrider_sport_wheels", "second tap fits the part")
 	_check(garage.press_card("street_wheels") == false and garage.press_card("street_wheels") and profile.scrap == 30, "two taps to swap back, still free")
 	garage.close_sheet()
-	_check(not sheet.visible and garage._rig_holder.visible, "closing the sheet brings the rig back")
+	# V2.3 sample: the stats panel stays on the right (whole-rig stats) when the sheet closes.
+	_check(not garage._sheet.visible and sheet.title == "RIG STATS" and garage._rig_holder.visible, "closing the sheet brings the rig back")
 	garage.open_slot(DRIVE)
 
 	# --- Taking a part off frees its slot and power -----------------------------------

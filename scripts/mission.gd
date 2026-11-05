@@ -10,6 +10,7 @@ extends Node2D
 ## Builds the whole scene in code (see AGENTS.md).
 
 const T := preload("res://scripts/tuning.gd")
+const UI := preload("res://scripts/ui_theme.gd")
 const Parts := preload("res://scripts/parts.gd")
 const Loadout := preload("res://scripts/loadout.gd")
 const Missions := preload("res://scripts/missions.gd")
@@ -65,6 +66,13 @@ var mission_override := {}
 ## Tests: ride with these crew (crew.gd dictionaries) instead of the seated ones.
 var crew_override: Array = []
 
+const HUD_REFRESH := 1.0 / 15.0   # seconds between HUD bar/number refreshes
+var _hud_timer := 0.0
+var _threat_points := PackedVector2Array()   # reused each frame (edge arrows)
+var _threat_colors := PackedColorArray()
+var loading_map := false        # start held (tree paused) while the styled map bakes
+var _load_layer: CanvasLayer
+var _restarting := false         # RESTART keeps the baked map cached; leaving drops it
 var spec := {}                   # the mission being run
 var mission_type := "clear"
 var skulls := 3                  # difficulty, 1 to 6
@@ -173,6 +181,7 @@ var _events: Array = []          # [seconds, kind, kills that also trigger it (-
 
 
 func _ready() -> void:
+	preload("res://scripts/ui_transitions.gd").fade_in(self)   # V6.5
 	profile = get_node("/root/Profile")
 	var pad := get_node_or_null("/root/Pad")
 	if pad != null:
@@ -373,8 +382,50 @@ func _ready() -> void:
 	hud.crew_picked.connect(use_crew_ability)
 	hud.crew_wheel_toggled.connect(_on_crew_wheel)
 	_sync_hud_to_rig()
-	hud.banner("%s  -  %s" % [Missions.label(spec), str(spec.name).to_upper()], _type_color(), 3.0)
+	if arena.is_baking():
+		_hold_for_bake()
+	else:
+		_start_banner()
 	_refresh_hud()
+
+
+func _start_banner() -> void:
+	hud.banner("%s  -  %s" % [Missions.label(spec), str(spec.name).to_upper()], _type_color(), 3.0)
+
+
+## Outer Blocks style only: the map bakes on a worker; the job waits behind a
+## loading screen (tree paused, input ignored) so the code-drawn map never
+## shows and swaps. The flag-off path never gets here.
+func _hold_for_bake() -> void:
+	loading_map = true
+	get_tree().paused = true
+	_load_layer = CanvasLayer.new()
+	_load_layer.layer = 120
+	_load_layer.process_mode = Node.PROCESS_MODE_ALWAYS
+	var bg := ColorRect.new()
+	bg.color = Color(0.05, 0.05, 0.06)
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.mouse_filter = Control.MOUSE_FILTER_STOP   # swallows taps while loading
+	_load_layer.add_child(bg)
+	var label := Label.new()
+	label.text = "LOADING MAP"
+	label.add_theme_color_override("font_color", T.COL_CYAN)
+	label.add_theme_font_size_override("font_size", 40)
+	label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	bg.add_child(label)
+	add_child(_load_layer)
+	arena.bake_finished.connect(_on_map_ready, CONNECT_ONE_SHOT)
+
+
+func _on_map_ready() -> void:
+	loading_map = false
+	if _load_layer != null:
+		_load_layer.queue_free()
+		_load_layer = null
+	get_tree().paused = false
+	_start_banner()
 
 
 ## Crowd size, specials and objective for this mission's type and skulls.
@@ -629,12 +680,19 @@ func _physics_process(delta: float) -> void:
 func _process(_delta: float) -> void:
 	_pass_mark()
 	zombies.contagion = vehicle.has_sp("sp_contagion")
-	if vehicle.strip_pending > 0.0:
+	if vehicle.strip_pending > 0.0 and state != State.WRECKED:
 		scrap += vehicle.strip_pending   # Strip Mine
 		vehicle.strip_pending = 0.0
-	_refresh_hud()
+	# Bars, numbers and the status line at ~15 Hz (they allocate strings and
+	# arrays); the edge arrows track the camera, so they update every frame.
+	_hud_timer -= _delta
+	if _hud_timer <= 0.0:
+		_hud_timer = HUD_REFRESH
+		_refresh_hud()
+		hud.right_stick.set_gauges(vehicle.weapon_gauges())
+	else:
+		_refresh_threats()
 	_music_tick(_delta)
-	hud.right_stick.set_gauges(vehicle.weapon_gauges())
 	bullets.big_game = float(vehicle.crew_mod("big_game"))
 
 
@@ -959,6 +1017,9 @@ func _wreck_sequence(aboard: Array[String]) -> void:
 
 ## A tap (or any pad button) during the wreck skips to the card.
 func _input(event: InputEvent) -> void:
+	if loading_map:
+		get_viewport().set_input_as_handled()
+		return
 	if not _in_wreck:
 		_kbm_event(event)
 		return
@@ -1188,6 +1249,8 @@ func pad_wants_focus() -> bool:
 ## A pad button in the fight (bound in Settings > CONTROLLER; pad.gd).
 ## Returns true when it was used.
 func pad_button(button: int) -> bool:
+	if loading_map:
+		return true   # swallowed behind the loading screen
 	var pad := _pad()
 	var action := str(pad.call("action_for", button)) if pad != null else ""
 	if menu != null:
@@ -1248,6 +1311,7 @@ func _on_menu_closed() -> void:
 
 ## The fight starts over: same job, same rig and crew, nothing lost.
 func restart_job() -> void:
+	_restarting = true
 	menu = null
 	get_tree().paused = false
 	Engine.time_scale = 1.0
@@ -1281,6 +1345,8 @@ func go_back() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if loading_map:
+		return
 	if menu == null and event is InputEventKey and (event as InputEventKey).pressed and not (event as InputEventKey).echo and (event as InputEventKey).keycode == KEY_ESCAPE:
 		go_back()
 		get_viewport().set_input_as_handled()
@@ -1288,6 +1354,8 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _exit_tree() -> void:
 	Engine.time_scale = 1.0
+	if not _restarting:
+		Arena.clear_cache()   # left the job: free the baked map
 	if is_inside_tree():
 		get_tree().paused = false
 	# Rigs are built up front; free any that never made it into the fight.
@@ -1855,9 +1923,17 @@ func _fail(title: String, detail: String) -> void:
 	profile.finish_day()
 	profile.bank_crew(0, _rest_ids(), bool(vehicle.crew_mod("triage")), vehicle.has_sp("sp_clean_bandage"))
 	var lines := detail + "\nKill scrap +%d    Time %s" % [int(scrap), _clock(elapsed)]
-	for id: String in bank_report.unlocked:
-		lines += "\nNew schematic: " + Parts.describe(Parts.get_part(id))
 	hud.show_result(title, lines, "RETURN TO GARAGE", T.COL_ORANGE)
+	hud.show_finds(_schematic_finds())   # V1.3
+
+
+## Results card lines for the schematics banked this run (V1.3).
+func _schematic_finds() -> Array:
+	var finds: Array = []
+	for id: String in bank_report.unlocked:
+		var p := Parts.get_part(id)
+		finds.append(["New schematic: " + Parts.describe(p), str(p.rarity)])
+	return finds
 
 
 # --- HUD -------------------------------------------------------------------------
@@ -1876,10 +1952,16 @@ func _refresh_hud() -> void:
 		hud.set_ability_charge(i, vehicle.ability_charge(i))
 	hud.set_status_text(_status_line())
 	hud.set_lock_state(vehicle.lock_enabled, vehicle.lock_target != null)
+	_refresh_threats()
+
+
+func _refresh_threats() -> void:
 	# Edge arrows: specials always, the Courier's next stop, salvage, and the
 	# last few shamblers in a Clear.
-	var points := PackedVector2Array()
-	var colors := PackedColorArray()
+	var points := _threat_points
+	var colors := _threat_colors
+	points.clear()
+	colors.clear()
 	if state == State.RUNNING:
 		var to_screen := get_viewport().get_canvas_transform()
 		for h in hunters:
@@ -1965,6 +2047,8 @@ func _type_color() -> Color:
 # --- Kills and drops -----------------------------------------------------------
 
 func _add_kill(points: int, rig := false) -> void:
+	if state == State.WRECKED:
+		return   # the rig's gone: kills behind the wreck pay nothing (hand playtest)
 	kills += 1
 	var mult := profile.salvage_mult() * float(vehicle.crew_mod("scrap"))
 	if rig:
@@ -2387,7 +2471,7 @@ func _take_salvage(pickup: Pickup) -> void:
 		hud.banner("SCRAP CACHE  +%d" % pickup.scrap_value, T.COL_ORANGE, 2.0)
 	else:
 		salvage.append(pickup.part)
-		hud.banner("SCHEMATIC: " + Parts.describe(pickup.part).to_upper(), Parts.color_of(pickup.part), 3.0)
+		hud.banner("SCHEMATIC: " + Parts.describe(pickup.part).to_upper(), UI.rarity_color(str(pickup.part.rarity)), 3.0)
 	# A Hunt ends when the Elite's drop is in the rig. (Not "when the ground is
 	# empty": a Tank's or escort's cache lying elsewhere mustn't block it.)
 	var elite_drop: bool = elite != null and _rig_crate.get(elite) == pickup
@@ -2451,12 +2535,11 @@ func _succeed(title: String, detail: String, pay_mult: float) -> void:
 	var lines := "Job pay +%d    Kill scrap +%d    Time %s" % [pay, int(scrap), _clock(elapsed)]
 	if detail != "":
 		lines = detail + "\n" + lines
-	for id: String in bank_report.unlocked:
-		lines += "\nNew schematic: " + Parts.describe(Parts.get_part(id))
 	if not crew_lines.is_empty():
 		lines += "\nCrew: " + ";  ".join(crew_lines)
 	Engine.time_scale = 1.0
 	hud.show_result(title, lines, "RETURN TO GARAGE", _type_color())
+	hud.show_finds(_schematic_finds())   # V1.3
 
 
 ## Ids of crew hurt during this run.
@@ -2645,6 +2728,10 @@ func _on_wrecked() -> void:
 		lines += "."
 	await _wreck_sequence(aboard)
 	hud.show_result("WRECKED", lines, "BACK TO THE YARD", T.COL_ORANGE)
+	# Freeze the fight behind the result (hand playtest: it kept running and the
+	# horde kept chewing). The overlay runs while paused; leaving unpauses (_exit_tree).
+	if is_inside_tree():
+		get_tree().paused = true
 
 
 class CourierMarkers extends Node2D:

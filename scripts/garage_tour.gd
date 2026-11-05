@@ -31,7 +31,7 @@ var _next: Button
 
 
 func _ready() -> void:
-	add_theme_stylebox_override("panel", UI.box(UI.PANEL, T.COL_CYAN, 2))
+	add_theme_stylebox_override("panel", UI.box(UI.PANEL, T.COL_UI_ACCENT, 2))
 	anchor_left = 0.5
 	anchor_right = 0.5
 	offset_left = -440.0
@@ -58,7 +58,7 @@ func _ready() -> void:
 	_next = Button.new()
 	_next.focus_mode = Control.FOCUS_NONE
 	_next.custom_minimum_size = Vector2(170, 52)
-	UI.accent(_next, T.COL_CYAN)
+	UI.accent(_next, T.COL_UI_ACCENT)
 	_next.pressed.connect(next)
 	row.add_child(_next)
 	profile.changed.connect(_check_fit)

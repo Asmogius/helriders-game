@@ -13,6 +13,7 @@ signal leave_requested
 
 const T := preload("res://scripts/tuning.gd")
 const UI := preload("res://scripts/ui_theme.gd")
+const Parts := preload("res://scripts/parts.gd")
 const Codex := preload("res://scripts/codex.gd")
 const ProfileScript := preload("res://scripts/profile.gd")
 const PadScript := preload("res://scripts/pad.gd")
@@ -130,7 +131,7 @@ func show_page(which: String) -> void:
 
 
 func _title(text: String) -> void:
-	var l := UI.label(text, 30, T.COL_CYAN)
+	var l := UI.label(text, 30, T.COL_UI_ACCENT)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_body.add_child(l)
 
@@ -150,8 +151,8 @@ func _button(text: String, call: Callable, accent := Color.TRANSPARENT) -> Butto
 func _main_page() -> void:
 	_title("PAUSED" if in_job else "MENU")
 	if in_job:
-		_button("RESUME", resume, T.COL_CYAN)
-		_button(PadScript.hint("TAP AGAIN TO RESTART THE JOB", "PRESS AGAIN TO RESTART THE JOB") if restart_armed else "RESTART JOB", restart, T.COL_ORANGE if restart_armed else Color.TRANSPARENT)
+		_button("RESUME", resume, T.COL_UI_ACCENT)
+		_button(PadScript.hint("TAP AGAIN TO RESTART THE JOB", "PRESS AGAIN TO RESTART THE JOB") if restart_armed else "RESTART JOB", restart, T.COL_UI_ACCENT if restart_armed else Color.TRANSPARENT)
 	if in_tutorial:
 		_button("LEAVE TUTORIAL", func() -> void: leave_requested.emit())
 	_button("SETTINGS", show_page.bind("settings"))
@@ -160,7 +161,7 @@ func _main_page() -> void:
 		_button("TUTORIAL", func() -> void: tutorial_requested.emit())
 	_button("QUIT GAME", quit_game)
 	if not in_job:
-		_button("CLOSE", close, T.COL_CYAN)
+		_button("CLOSE", close, T.COL_UI_ACCENT)
 	var note_text := ""
 	if in_tutorial:
 		note_text = "The Training Run uses a loaner rig and crew. Nothing here counts and nothing can be lost."
@@ -188,7 +189,7 @@ func _settings_page() -> void:
 		b.custom_minimum_size = Vector2(0, 58)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		if str(profile.settings.get("quality", "")) == q:
-			UI.accent(b, T.COL_ORANGE)
+			UI.accent(b, T.COL_UI_ACCENT)
 		b.pressed.connect(set_quality.bind(q))
 		row.add_child(b)
 	var shake := _button("SCREEN SHAKE: %s" % ("ON" if bool(profile.settings.get("shake", true)) else "OFF"), toggle_shake)
@@ -223,7 +224,7 @@ func _settings_page() -> void:
 	var note := UI.label("Lower quality caps the frame rate and draws fewer effects. New settings apply to the next fight; the frame cap applies now.", 18, UI.TEXT_DIM)
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_body.add_child(note)
-	_button("BACK", show_page.bind("main"), T.COL_CYAN)
+	_button("BACK", show_page.bind("main"), T.COL_UI_ACCENT)
 
 
 func set_quality(q: String) -> void:
@@ -269,7 +270,7 @@ func _controller_page() -> void:
 		b.custom_minimum_size = Vector2(300, 54)
 		b.text = "PRESS A BUTTON..." if waiting == action else str(pad.call("button_name", action))
 		if waiting == action:
-			UI.accent(b, T.COL_ORANGE)
+			UI.accent(b, T.COL_UI_ACCENT)
 		b.pressed.connect(rebind.bind(action))
 		grid.add_child(b)
 		if action == _focus_action and bool(pad.get("active")):
@@ -282,7 +283,7 @@ func _controller_page() -> void:
 	var note := UI.label("Pick an action, then press the pad button you want for it (L2 and R2 work too). A button already in use swaps over. Menus always use the D-pad, Cross, Circle and L1 / R1; Cross always picks in the crew wheel.", 18, UI.TEXT_DIM)
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_body.add_child(note)
-	_button("BACK", show_page.bind("settings"), T.COL_CYAN)
+	_button("BACK", show_page.bind("settings"), T.COL_UI_ACCENT)
 
 
 ## Wait for the next pad press for `action`.
@@ -319,7 +320,7 @@ func _database_page() -> void:
 		b.custom_minimum_size = Vector2(0, 52)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		if cat == category:
-			UI.accent(b, T.COL_ORANGE)
+			UI.accent(b, T.COL_UI_ACCENT)
 		b.pressed.connect(show_category.bind(cat))
 		tabs.add_child(b)
 	var scroll := ScrollContainer.new()
@@ -333,13 +334,16 @@ func _database_page() -> void:
 	scroll.add_child(list)
 	for e: Array in rows:
 		var known := profile.is_discovered(category, str(e[0]))
-		var name := UI.label(str(e[1]) if known else "? ? ? ? ?", 22, UI.TEXT if known else UI.TEXT_DIM)
+		var name_color := UI.TEXT if known else UI.TEXT_DIM
+		if known and category == "parts":   # V1.3: part names in rarity colour
+			name_color = UI.rarity_color(str(Parts.get_part(str(e[0])).get("rarity", "")))
+		var name := UI.label(str(e[1]) if known else "? ? ? ? ?", 22, name_color)
 		list.add_child(name)
 		var text := UI.label(str(e[2]) if known else "Not met yet.", 18, UI.TEXT_DIM)
 		text.autowrap_mode = TextServer.AUTOWRAP_WORD
 		text.custom_minimum_size = Vector2(980, 0)
 		list.add_child(text)
-	_button("BACK", show_page.bind("main"), T.COL_CYAN)
+	_button("BACK", show_page.bind("main"), T.COL_UI_ACCENT)
 
 
 func show_category(cat: String) -> void:

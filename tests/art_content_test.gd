@@ -100,6 +100,8 @@ func _check_weapons_in_game() -> void:
 			check((a.global_position + a.point_offset("pivot")).distance_to(want) < 0.01, "harpoon: on nose_mount at %d" % i)
 	h.queue_free()
 	var o := _rig({"weapons": ["outrider_twin_guns"]})
+	check(not o.art_layers().has("nose_guns"), "outrider twin guns: own sheet, no stock nose guns")
+	o.gun_stats[0]["id"] = "no_such_gun"   # every fixed player gun has art now: fake one without
 	check(o.art_layers().has("nose_guns"), "fixed gun without art keeps the stock nose guns")
 	o.queue_free()
 	var p := _rig({"utility": ["shock_pulse"]})

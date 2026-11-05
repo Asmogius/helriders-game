@@ -18,6 +18,63 @@ var checkpoints: Array = []    # Courier stops, Retrieve caches, Escort sites
 var barrel_spots: Array = []
 var spawn_points: Array[Vector2] = []
 
+# --- P4 Outer Blocks map style (VISUAL_PLAN V5.5) -----------------------------
+# Off by default until the owner approves it; captures turn it on. When on, an
+# Outer Blocks layout (layouts.gd `district`) is baked whole-map from art/map/
+# into a few chunk textures (map_art.gd); missing art keeps the code-drawn look.
+# Purely visual: collision and layout data are untouched.
+const MapArt := preload("res://scripts/map_art.gd")
+const MapAmbient := preload("res://scripts/map_ambient.gd")
+const STYLED_DISTRICTS := ["outer_blocks"]
+var _chunks: Array = []        # [[Rect2, Texture2D], ...] from MapArt.bake_chunks
+var bake_ms := 0.0             # last bake, start to textures ready (perf captures)
+var bake_main_ms := 0.0        # of which spent on the main thread (atlas reads, uploads)
+var bake_bytes := 0            # GPU bytes of the baked map
+var bake_cached := false       # the last bake came from the cache (RESTART)
+var _task := -1                # WorkerThreadPool task while baking
+var _task_out: Array = []
+var _bake_t0 := 0
+# Last bake, keyed by layout + variation (seed_for) + texture mode; one entry,
+# so RESTART of the same job skips the bake and memory stays bounded. Held in a
+# tree-root meta cache (like zombie.gd's art), not static vars, so nothing keeps
+# this script or the baked textures alive past exit.
+const MAP_META := &"arena_map_cache"   # root meta: {"key": String, "chunks": Array, "style": bool}
+
+signal bake_finished
+
+
+static func _map_cache() -> Dictionary:
+	var tree := Engine.get_main_loop() as SceneTree
+	var root: Window = tree.root if tree != null else null
+	if root != null and root.has_meta(MAP_META):
+		return root.get_meta(MAP_META)
+	var c := {"key": "", "chunks": [], "style": false}
+	if root != null:
+		root.set_meta(MAP_META, c)
+	return c
+
+
+## The Outer Blocks style flag (off by default; captures and tests turn it on).
+static func set_outer_blocks_style(on: bool) -> void:
+	_map_cache().style = on
+
+
+static func outer_blocks_style() -> bool:
+	return bool(_map_cache().style)
+
+
+## Drops the restart cache (the mission calls this when the player leaves the
+## job for the garage or menu; RESTART keeps it).
+static func clear_cache() -> void:
+	var c := _map_cache()
+	c.key = ""
+	c.chunks = []
+
+
+## The cached chunks (tests).
+static func cached_chunks() -> Array:
+	return _map_cache().chunks
+
 
 func _init() -> void:
 	setup(layout)
@@ -52,6 +109,102 @@ func _ready() -> void:
 		_add_box(solid, b.get_center(), b.size, 0.0)
 	for p: Array in props:
 		_add_box(solid, p[0], p[1], p[2])
+	if outer_blocks_style() and STYLED_DISTRICTS.has(str(layout.get("district", ""))):
+		_setup_style()
+
+
+func is_styled() -> bool:
+	return not _chunks.is_empty()
+
+
+func _setup_style() -> void:
+	_bake_t0 = Time.get_ticks_usec()
+	var single := MapArt.max_texture_size() >= 4096
+	var data := MapArt.snapshot(self)
+	var key := "%s:%d:%d:%s" % [str(layout.get("id", "")), MapArt.seed_for(data), hash(str(layout.get("surfaces", []))), str(single)]
+	var cache := _map_cache()
+	if key == cache.key and not (cache.chunks as Array).is_empty():
+		bake_cached = true
+		_use_chunks(cache.chunks)
+		bake_main_ms = (Time.get_ticks_usec() - _bake_t0) / 1000.0
+		bake_ms = bake_main_ms
+		return
+	clear_cache()   # drop the old map before baking the new one
+	var src := MapArt.load_sources()   # main thread: texture reads
+	if src.is_empty():
+		return   # missing art: code-drawn look stays
+	bake_main_ms = (Time.get_ticks_usec() - _bake_t0) / 1000.0
+	_task_out = []
+	var out := _task_out
+	_task = WorkerThreadPool.add_task(func() -> void: out.append_array(MapArt.bake_images(data, src, single)), false, "map bake")
+	set_meta("bake_key", key)
+	process_mode = Node.PROCESS_MODE_ALWAYS   # keeps polling while the mission holds the start paused
+	set_process(true)
+
+
+## True while the background bake runs (the code-drawn look shows meanwhile).
+func is_baking() -> bool:
+	return _task >= 0
+
+
+## Blocks until a running bake finishes (tests and captures).
+func finish_bake() -> void:
+	if _task >= 0:
+		WorkerThreadPool.wait_for_task_completion(_task)
+		_task = -1
+		_bake_done()
+
+
+func _process(_delta: float) -> void:
+	if _task < 0:
+		set_process(false)
+		return
+	if WorkerThreadPool.is_task_completed(_task):
+		WorkerThreadPool.wait_for_task_completion(_task)
+		_task = -1
+		_bake_done()
+
+
+func _exit_tree() -> void:
+	# Left (or quit) mid-bake: wait for the worker (~200 ms) and drop its
+	# result. A task still running at quit aborts the engine (exit 134).
+	if _task >= 0:
+		WorkerThreadPool.wait_for_task_completion(_task)
+		_task = -1
+		_task_out = []
+
+
+func _bake_done() -> void:
+	set_process(false)
+	process_mode = Node.PROCESS_MODE_INHERIT
+	var t1 := Time.get_ticks_usec()
+	var chunks: Array = []
+	for c: Array in _task_out:
+		chunks.append([c[0], ImageTexture.create_from_image(c[1])])
+	_task_out = []   # free the images
+	bake_main_ms += (Time.get_ticks_usec() - t1) / 1000.0
+	bake_ms = (Time.get_ticks_usec() - _bake_t0) / 1000.0
+	if chunks.is_empty():
+		bake_finished.emit()
+		return
+	var cache := _map_cache()
+	cache.key = str(get_meta("bake_key", ""))
+	cache.chunks = chunks
+	_use_chunks(chunks)
+	bake_finished.emit()
+
+
+func _use_chunks(chunks: Array) -> void:
+	_chunks = chunks
+	bake_bytes = MapArt.chunk_bytes(_chunks)
+	queue_redraw()
+	var profile := get_node_or_null("/root/Profile")
+	var low := profile != null and profile.has_method("quality") and float(profile.quality().fx) < 0.5
+	if not low:
+		var motes := MapAmbient.new()
+		motes.z_index = 5
+		motes.setup(Rect2(Vector2.ZERO, T.WORLD_SIZE), 160)
+		add_child(motes)
 
 
 func _add_box(body: StaticBody2D, center: Vector2, size: Vector2, rot: float) -> void:
@@ -68,6 +221,12 @@ func _draw() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 1337
 	var w := T.WORLD_SIZE
+	if not _chunks.is_empty():
+		# Baked Outer Blocks look: ground, buildings and decor, one draw per chunk.
+		for c: Array in _chunks:
+			draw_texture_rect(c[1], c[0], false, T.COL_OB_GRADE)
+		_draw_props_and_wall(w)
+		return
 	draw_rect(Rect2(Vector2.ZERO, w), T.COL_CONCRETE)
 
 	# Patchy lots so the concrete isn't flat.
@@ -114,6 +273,10 @@ func _draw() -> void:
 	for b: Rect2 in buildings:
 		_draw_building(b, rng)
 
+	_draw_props_and_wall(w)
+
+
+func _draw_props_and_wall(w: Vector2) -> void:
 	for p: Array in props:
 		_draw_prop(p[0], p[1], p[2], p[3])
 

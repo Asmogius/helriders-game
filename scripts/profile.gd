@@ -121,6 +121,7 @@ func _ready() -> void:
 
 func new_game() -> void:
 	_ready_state = true
+	remove_meta(&"crew_seen_level")   # V6.5: crew_card.gd SEEN_META; no level-up flash carried over
 	scrap = T.START_SCRAP
 	schematics.clear()
 	for id: String in Parts.STARTER_SCHEMATICS:
@@ -141,7 +142,7 @@ func new_game() -> void:
 	day = 1
 	active_mission = {}
 	run_active = false
-	board = Missions.make_board(day, board_size(), 0)
+	board = Missions.make_board(day, board_size(), 0, board_district())
 	_starter_crew()
 	saloon_day = 0
 	ensure_saloon()
@@ -373,7 +374,7 @@ func board_size() -> int:
 
 func ensure_board() -> void:
 	if board.size() != board_size():
-		board = Missions.make_board(day, board_size(), int(upgrades.get("quality", 0)))
+		board = Missions.make_board(day, board_size(), int(upgrades.get("quality", 0)), board_district())
 
 
 func choose_mission(index: int) -> void:
@@ -397,7 +398,7 @@ func finish_day() -> void:
 	day += 1
 	research_today = 0
 	active_mission = {}
-	board = Missions.make_board(day, board_size(), int(upgrades.get("quality", 0)))
+	board = Missions.make_board(day, board_size(), int(upgrades.get("quality", 0)), board_district())
 	_advance_lost()
 	ensure_saloon()
 	_advance_expeditions()
@@ -479,6 +480,16 @@ func research(id: String) -> bool:
 	save_game()
 	changed.emit()
 	return true
+
+
+## The furthest district open: the board rolls its skull band and may use
+## layouts from it and every district before it.
+func board_district() -> String:
+	var id := str(T.DISTRICTS[0].id)
+	for i in T.DISTRICTS.size():
+		if is_district_open(i):
+			id = str(T.DISTRICTS[i].id)
+	return id
 
 
 func is_district_open(index: int) -> bool:
@@ -824,13 +835,21 @@ func hire_offer(index: int) -> bool:
 ## owner: it can be hired even with a full roster, up to one over the cap
 ## (so an injured lone Driver never leaves you stuck: days only pass on jobs).
 ## While over the cap, nothing else joins until someone leaves.
+## The free Common `role` hire on offer right now: exactly who hire_basic()
+## adds (same seed), so the Saloon card can show their name and specialty.
+func basic_offer(role: String) -> Dictionary:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("helriders-basic-%d-%d" % [day, next_crew_id])
+	var m := Crew.make(role, "Common", rng)
+	m.xp = hire_start_xp(m)
+	m["price"] = 0
+	return m
+
+
 func hire_basic(role: String) -> bool:
 	if not can_hire_basic() or not Crew.ROLES.has(role):
 		return false
-	var rng := RandomNumberGenerator.new()
-	rng.seed = hash("helriders-basic-%d-%d" % [day, next_crew_id])
-	var m := _add_crew(Crew.make(role, "Common", rng))
-	m.xp = hire_start_xp(m)
+	var m := _add_crew(basic_offer(role))
 	_auto_seat(m)
 	save_game()
 	changed.emit()
@@ -1206,7 +1225,7 @@ func buy_upgrade(key: String) -> bool:
 	upgrades[key] = upgrade_level(key) + 1
 	if key == "choices" or key == "quality":
 		# Same seed, so today's missions stay; more of them, or better paid.
-		board = Missions.make_board(day, board_size(), int(upgrades.quality))
+		board = Missions.make_board(day, board_size(), int(upgrades.quality), board_district())
 	if key == "back_room":
 		ensure_saloon()
 	if key == "seasoned_hands":

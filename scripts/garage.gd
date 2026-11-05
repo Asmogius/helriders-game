@@ -13,6 +13,7 @@ const Mods := preload("res://scripts/mods.gd")
 const Loadout := preload("res://scripts/loadout.gd")
 const Vehicle := preload("res://scripts/vehicle.gd")
 const UI := preload("res://scripts/ui_theme.gd")
+const RigUpgrades := preload("res://scripts/rig_upgrades.gd")
 const ProfileScript := preload("res://scripts/profile.gd")
 const Comms := preload("res://scripts/comms.gd")
 const Inn := preload("res://scripts/inn.gd")
@@ -57,7 +58,7 @@ const TAG_COMPACT_H := 56.0        # five tags on one side: shorter, so the shee
 const TAG_COMPACT_TOP := 100.0
 const TAG_COMPACT_GAP := 5.0
 const RIG_SCALE := 3.4
-const FOOTER_H := 72.0
+const FOOTER_H := UI.BAR_H  # shared grid (ui_theme.gd)
 const SHEET_H := 236.0
 
 var selected := -1                 # index into SLOTS of the open sheet, -1 = closed
@@ -65,6 +66,10 @@ var profile: ProfileScript         # the /root/Profile autoload
 var preview: Vehicle
 
 var _rig_holder: Node2D
+const WorkshopRoom := preload("res://scripts/workshop_room.gd")   # V2 sample (P6)
+const GarageLayout := preload("res://scripts/garage_layout.gd")   # V2.3 sample: reading order
+const GarageFocus := preload("res://scripts/garage_focus.gd")     # V2.3 sample: open slot lights its part
+var _workshop: Control
 var _rig_touch: Control
 var _stat_sheet: StatSheet
 var _preview := ""                 # part id previewed in the open sheet ("" = empty slot)
@@ -75,6 +80,8 @@ var _power_meter: PowerMeter
 var _hint: Label
 var _scrap_label: Label
 var _stats_label: Label
+var _stats_icons: Control   # V6.3 icon row over the stat line
+const IconLine := preload("res://scripts/icon_line.gd")
 var _toast: Label
 var _toast_tween: Tween
 var _no_rig: Label
@@ -95,6 +102,7 @@ var _crew_line: Button
 
 
 func _ready() -> void:
+	preload("res://scripts/ui_transitions.gd").fade_in(self)   # V6.5
 	profile = get_node("/root/Profile")
 	var pad := get_node_or_null("/root/Pad")
 	if pad != null:
@@ -116,6 +124,13 @@ func _ready() -> void:
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg)
 	add_child(FloorGrid.new())
+	# --- V2 style sample (P6): the Workshop bay room behind the GARAGE tab. ---
+	_workshop = WorkshopRoom.new()
+	add_child(_workshop)
+	_workshop.set_open(true, true)
+	var focus := GarageFocus.new()
+	focus.garage = self
+	add_child(focus)
 
 	_build_rig_area()
 	_build_top_bar()
@@ -140,7 +155,7 @@ func _ready() -> void:
 		panel.visible = false
 		add_child(panel)
 
-	_toast = UI.label("", 22, T.COL_ORANGE)
+	_toast = UI.label("", 22, T.COL_UI_ACCENT)
 	_toast.z_index = 12   # above overlays and the menu
 	_toast.anchor_right = 1.0
 	_toast.offset_top = 100.0
@@ -202,6 +217,7 @@ func _show_stat_sheet(on: bool) -> void:
 	_callouts.visible = not on
 	_rings.visible = not on
 	_rig_touch.mouse_filter = Control.MOUSE_FILTER_IGNORE if on else Control.MOUSE_FILTER_STOP
+	GarageLayout.apply(self)   # V2.3 sample
 
 
 ## First tap on a card previews it; a second tap on the same card fits it.
@@ -236,7 +252,8 @@ func choose(id: String) -> bool:
 		toast("Not enough scrap")
 		return false
 	_preview = id
-	toast("Fitted: " + (str(Parts.get_part(id).name) if id != "" else "slot emptied"))
+	toast("Fitted: " + (str(Parts.get_part(id).name) if id != "" else "slot emptied"), 2.2,
+		UI.rarity_color(str(Parts.get_part(id).rarity)) if id != "" else T.COL_UI_ACCENT)
 	return true
 
 
@@ -272,7 +289,8 @@ func deploy() -> void:
 		show_tab("INN")
 		toast(block, 3.5)
 		return
-	get_tree().change_scene_to_file(MISSION_SCENE)
+	# Ebbtide: short push-in on the rig, then charcoal fade into the fight.
+	preload("res://scripts/ui_transitions.gd").deploy_to_fight(self, MISSION_SCENE)
 
 
 ## Rig stats for `loadout` with the seated crew's passives folded in.
@@ -320,8 +338,9 @@ func slot_anchor(i: int) -> Vector2:
 	return slot.anchor
 
 
-func toast(text: String, seconds := 2.2) -> void:
+func toast(text: String, seconds := 2.2, color := T.COL_UI_ACCENT) -> void:
 	_toast.text = text
+	_toast.add_theme_color_override("font_color", color)
 	if _toast_tween != null:
 		_toast_tween.kill()
 	_toast.modulate.a = 1.0
@@ -403,7 +422,7 @@ func _build_rig_area() -> void:
 	_crew_line.pressed.connect(func() -> void: show_tab("INN"))
 	add_child(_crew_line)
 
-	_job = UI.label("", 20, T.COL_ORANGE)
+	_job = UI.label("", 20, T.COL_UI_ACCENT)
 	_job.anchor_right = 1.0
 	_job.anchor_top = 1.0
 	_job.anchor_bottom = 1.0
@@ -419,7 +438,7 @@ func _build_rig_area() -> void:
 	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(_hint)
 
-	_no_rig = UI.label("NO RIG", 30, T.COL_ORANGE)
+	_no_rig = UI.label("NO RIG", 30, T.COL_UI_ACCENT)
 	_no_rig.anchor_left = 0.5
 	_no_rig.anchor_right = 0.5
 	_no_rig.offset_left = -250.0
@@ -431,7 +450,7 @@ func _build_rig_area() -> void:
 
 
 func _build_top_bar() -> void:
-	_scrap_label = UI.label("", 30, T.COL_ORANGE)
+	_scrap_label = UI.label("", 30, T.COL_UI_ACCENT)
 	_scrap_label.position = Vector2(24, 14)
 	add_child(_scrap_label)
 
@@ -448,20 +467,20 @@ func _build_top_bar() -> void:
 
 	var menu_button := _button("MENU", 120)
 	menu_button.pressed.connect(open_menu)
+	UI.ghost(menu_button)
 	bar.add_child(menu_button)
 	var presets := _button("PRESETS", 150)
 	presets.pressed.connect(_open_presets)
+	UI.ghost(presets)
 	bar.add_child(presets)
-	var upgrades := _button("UPGRADES", 170)
-	upgrades.pressed.connect(_open_upgrades)
-	bar.add_child(upgrades)
+	# Rig upgrades (fabrication / loot / salvage) moved to RESEARCH (Cameron); UI hosts them there.
 	_rebuild = _button("REBUILD", 200)
 	_rebuild.pressed.connect(rebuild)
-	UI.accent(_rebuild, T.COL_CYAN)
+	UI.ghost(_rebuild)
 	bar.add_child(_rebuild)
 	_deploy = _button("DEPLOY", 180)
 	_deploy.pressed.connect(deploy)
-	UI.accent(_deploy, T.COL_ORANGE)
+	UI.primary(_deploy)
 	bar.add_child(_deploy)
 
 	_stats_label = UI.label("", 19, UI.TEXT)
@@ -469,6 +488,13 @@ func _build_top_bar() -> void:
 	_stats_label.offset_top = 66.0
 	_stats_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(_stats_label)
+	# V6.3: the stat line as icons + numbers; the label keeps the text (tests,
+	# fallback) and hides while the icon row draws.
+	_stats_icons = IconLine.new()
+	_stats_icons.anchor_right = 1.0
+	_stats_icons.offset_top = 64.0
+	_stats_icons.offset_bottom = 92.0
+	add_child(_stats_icons)
 
 
 func _build_tags() -> void:
@@ -508,6 +534,7 @@ func _layout_tags() -> void:
 			tag.offset_top = y
 			tag.offset_bottom = y + h
 			y += h + gap
+	GarageLayout.apply(self)   # V2.3 sample: the slot grid
 
 
 func _build_sheet() -> void:
@@ -579,6 +606,7 @@ func _button(text: String, min_width: float) -> Button:
 func _layout() -> void:
 	# The rig sits in the middle, nudged up so the sheet doesn't cover it.
 	_rig_holder.position = Vector2(size.x * 0.5, 290.0)
+	GarageLayout.apply(self)   # V2.3 sample
 
 
 # --- Refresh ---------------------------------------------------------------------
@@ -603,10 +631,12 @@ func _refresh() -> void:
 	var built := _built(profile.rig)
 	_refresh_crew_line()
 	_stats_label.text = _stats_line(built, has_rig)
+	_stats_icons.items = _stats_items(built) if has_rig and _stats_icons.get("_icons").ok() else []
+	_stats_label.visible = (_stats_icons.items as Array).is_empty()
 	_power_meter.set_values(float(built.power_draw), float(built.power_output), float(built.weight), float(built.weight_capacity))
 	_power_meter.visible = has_rig and selected < 0
 
-	_deploy.disabled = not has_rig
+	_deploy.disabled = not has_rig or not profile.has_mission()   # pick a job in Comms first
 	var target := rebuild_target()
 	var rebuild_cost := profile.build_cost(target)
 	_rebuild.visible = not has_rig
@@ -645,9 +675,27 @@ func _refresh_crew_line() -> void:
 	var tail := "    PERK READY  >" if waiting > 0 else "    >"
 	_crew_line.text = "CREW    " + "    ".join(bits) + tail
 	var blocked := profile.has_rig() and profile.deploy_block() != ""
-	var color := UI.BAD if blocked else T.COL_CYAN
+	var color := UI.BAD if blocked else T.COL_UI_ACCENT
 	for state: String in ["font_color", "font_hover_color", "font_pressed_color"]:
 		_crew_line.add_theme_color_override(state, color)
+
+
+## V6.3: the stat line as [icon, label, value, tint] for the icon row.
+func _stats_items(s: Dictionary) -> Array:
+	var m := Loadout.mobility(s)
+	var items: Array = [
+		["hp", "HP", str(int(s.get("hp", 0.0))), UI.GOOD],
+		["armor", "ARMOR", "%d/%d/%d" % [int(s.get("front", 0.0)), int(s.get("side", 0.0)), int(s.get("rear", 0.0))], UI.TEXT_DIM],
+		["shield", "SHIELD", str(int(s.get("shield", 0.0))), T.COL_UI_ACCENT],
+		["speed", "SPEED", str(roundi(float(s.max_speed) * m)), UI.TEXT_DIM],
+		["accel", "ACCEL", str(roundi(float(s.acceleration) * m)), UI.TEXT_DIM],
+		["dps", "DPS", str(roundi(Loadout.total_dps(s))), T.COL_UI_ACCENT],
+		["lock", "LOCK", str(int(s.lock_range)) if float(s.lock_range) > 0.0 else "NONE", UI.TEXT_DIM],
+	]
+	var over := StatSheet.overload_cause(s)
+	if over != "":
+		items.append(["power", "", over, T.COL_UI_ACCENT])
+	return items
 
 
 func _stats_line(s: Dictionary, complete: bool) -> String:
@@ -695,6 +743,7 @@ func _refresh_tags() -> void:
 				tag.detail = "%s    %d / FACING    WT %d" % [part.rarity, int(part.armor), int(part.get("weight_sides" if sides else "weight", part.weight))]
 			else:
 				tag.detail = "%s    PWR %d    WT %d" % [part.rarity, int(part.power), int(part.get("weight", 0))]
+		tag.rarity = "" if id == "" else str(profile.part(id).rarity)   # V1.3
 		tag.queue_redraw()
 
 
@@ -768,6 +817,7 @@ func _make_card(slot: Dictionary, id: String, current: String, now: Dictionary) 
 		card.title = "Remove"
 		card.subtitle = "Back to storage"
 		card.rarity_color = UI.TEXT_DIM
+		card.rarity = ""
 	else:
 		var part := profile.part(id)
 		card.title = part.name
@@ -779,7 +829,9 @@ func _make_card(slot: Dictionary, id: String, current: String, now: Dictionary) 
 		card.subtitle = "%s %s" % [part.rarity, kind]
 		if int(part.level) > 1:
 			card.subtitle += "  LV %d" % int(part.level)
-		card.rarity_color = Parts.color_of(part)
+		card.rarity_color = UI.rarity_color(str(part.rarity))   # V1.3
+		card.rarity = str(part.rarity)
+		card.category = "cat_armor" if str(part.category) == "Armor" else str(part.category).to_lower()   # V6.3 icon id
 		card.headline = _headline(part)
 		card.mod_line = mod_line(part)
 		card.mod_chips = mod_chips(part)
@@ -798,7 +850,7 @@ func _style_card(card: PartCard) -> void:
 	var again := PadScript.hint("TAP AGAIN:  ", "PRESS AGAIN:  ") if card.selected else ""
 	if card.installed:
 		card.status = "INSTALLED"
-		card.status_color = T.COL_CYAN
+		card.status_color = T.COL_UI_ACCENT
 	elif card.cost > profile.scrap:
 		card.status = "NEED %d SCRAP" % card.cost
 		card.status_color = UI.BAD
@@ -807,7 +859,7 @@ func _style_card(card: PartCard) -> void:
 		card.status_color = UI.GOOD
 	else:
 		card.status = again + "BUILD  %d SCRAP" % card.cost
-		card.status_color = T.COL_ORANGE
+		card.status_color = T.COL_UI_ACCENT
 	card.queue_redraw()
 
 
@@ -966,7 +1018,7 @@ func _open_overlay(title: String, body: Control) -> void:
 	column.add_theme_constant_override("separation", 14)
 	panel.add_child(column)
 	var head := HBoxContainer.new()
-	var title_label := UI.label(title, 28, T.COL_ORANGE)
+	var title_label := UI.label(title, 28, T.COL_UI_ACCENT)
 	title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(title_label)
 	var close := _button("CLOSE", 120)
@@ -991,7 +1043,7 @@ func _open_presets() -> void:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 10)
 		var p := profile.preset(i)
-		var name_label := UI.label(profile.preset_name(i), 22, T.COL_CYAN)
+		var name_label := UI.label(profile.preset_name(i), 22, T.COL_UI_ACCENT)
 		name_label.custom_minimum_size = Vector2(200, 0)
 		name_label.clip_text = true
 		row.add_child(name_label)
@@ -1041,7 +1093,7 @@ func open_rename(index: int) -> void:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
 	var done := _button("DONE", 160)
-	UI.accent(done, T.COL_CYAN)
+	UI.ghost(done)
 	done.pressed.connect(finish_rename.bind(index))
 	row.add_child(done)
 	var cancel := _button("CANCEL", 160)
@@ -1076,8 +1128,8 @@ func _summary(loadout: Dictionary) -> String:
 func _open_upgrades() -> void:
 	var body := VBoxContainer.new()
 	body.add_theme_constant_override("separation", 12)
-	body.add_child(UI.label("Scrap  %d" % profile.scrap, 22, T.COL_ORANGE))
-	for key: String in ["fabrication", "loot", "salvage"]:
+	body.add_child(UI.label("Scrap  %d" % profile.scrap, 22, T.COL_UI_ACCENT))
+	for key: String in RigUpgrades.KEYS:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 14)
 		var info := VBoxContainer.new()
@@ -1087,7 +1139,7 @@ func _open_upgrades() -> void:
 		row.add_child(info)
 		var level := profile.upgrade_level(key)
 		var max_level: int = (T.UPGRADES[key].costs as Array).size()
-		row.add_child(UI.label("LV %d/%d" % [level, max_level], 22, T.COL_CYAN))
+		row.add_child(UI.label("LV %d/%d" % [level, max_level], 22, T.COL_UI_ACCENT))
 		var cost := profile.upgrade_cost(key)
 		var buy := _button("MAXED" if cost < 0 else "BUY  %d" % cost, 170)
 		buy.disabled = cost < 0 or cost > profile.scrap
@@ -1101,37 +1153,26 @@ func _open_upgrades() -> void:
 
 
 func _upgrade_effect(key: String) -> String:
-	var level := profile.upgrade_level(key)
-	var step: float = T.UPGRADES[key].per_level
-	var next := level + 1
-	var max_level: int = (T.UPGRADES[key].costs as Array).size()
-	var now_text := ""
-	var next_text := ""
-	match key:
-		"fabrication":
-			now_text = "Parts cost %d%% less" % roundi(step * level * 100.0)
-			next_text = "%d%%" % roundi(step * next * 100.0)
-		"loot":
-			now_text = "Outrider schematic drop chance %d%%" % roundi(profile.schematic_chance() * 100.0)
-			next_text = "%d%%" % roundi(minf(T.SCHEMATIC_DROP_CHANCE + step * next, 0.95) * 100.0)
-		"salvage":
-			now_text = "Scrap from kills +%d%%" % roundi(step * level * 100.0)
-			next_text = "+%d%%" % roundi(step * next * 100.0)
-	return now_text if level >= max_level else "%s    (next: %s)" % [now_text, next_text]
+	return RigUpgrades.effect_text(profile, key)
 
 
 func _on_tab(tab_name: String) -> void:
 	tab = tab_name
+	if _workshop != null:
+		_workshop.set_open(tab_name == "GARAGE")   # V2 sample: rooms fade (P6)
 	_comms.visible = tab_name == "COMMS"
 	_inn.visible = tab_name == "INN"
 	_saloon.visible = tab_name == "SALOON"
 	_research.visible = tab_name == "RESEARCH"
 	_rig_holder.visible = tab_name == "GARAGE" and not _stat_sheet.visible   # V0.1
+	GarageLayout.apply(self)   # V2.3 sample
 	if tab_name == "GARAGE":
 		_close_overlay()
 		return
 	_close_overlay()
 	close_sheet()
+	var station: Node = {"COMMS": _comms, "INN": _inn, "SALOON": _saloon, "RESEARCH": _research}.get(tab_name)
+	preload("res://scripts/ui_transitions.gd").slide_in(station.get("_cards") if station != null else null)   # V6.5: cards slide in
 	match tab_name:
 		"COMMS":
 			_comms.selected = -1
@@ -1150,7 +1191,7 @@ func _on_tab(tab_name: String) -> void:
 func _highlight_tab(tab_name: String) -> void:
 	for tab in _tab_buttons:
 		if tab.text == tab_name:
-			UI.accent(tab, T.COL_CYAN)
+			UI.accent(tab, T.COL_UI_ACCENT)
 		else:
 			for state: String in ["normal", "hover", "pressed"]:
 				tab.remove_theme_stylebox_override(state)
@@ -1170,6 +1211,13 @@ class SlotTag extends Button:
 	var empty := false
 	var required := false
 	var active := false
+	var rarity := "":   # fitted part's rarity (V1.3); "" when empty
+		set(v):
+			if v != rarity:
+				rarity = v
+				var f: Control = UI.rarity_frame(self, v) if v != "" else get_node_or_null("RarityFrame")
+				if f != null:
+					f.visible = v != ""
 	var compact := false   # shorter tag when five share a side
 
 	func _ready() -> void:
@@ -1178,10 +1226,10 @@ class SlotTag extends Button:
 
 	func accent() -> Color:
 		if active:
-			return T.COL_ORANGE
+			return T.COL_UI_ACCENT
 		if empty and required:
 			return UI.BAD
-		return T.COL_CYAN
+		return T.COL_UI_ACCENT
 
 	func _draw() -> void:
 		var font := get_theme_default_font()
@@ -1191,11 +1239,13 @@ class SlotTag extends Button:
 			fill = Color(0.17, 0.12, 0.08, 0.95)
 		draw_rect(Rect2(Vector2.ZERO, size), fill)
 		draw_rect(Rect2(Vector2.ZERO, size), Color(a, 0.85 if active else 0.4), false, 2.0)
+		if active and rarity != "":   # the rarity frame covers the edge: ring inside it
+			draw_rect(Rect2(Vector2(4, 4), size - Vector2(8, 8)), Color(a, 0.85), false, 2.0)
 		draw_rect(Rect2(size.x - 4.0 if side == 0 else 0.0, 0.0, 4.0, size.y), a)
 		var ys := PackedFloat32Array([17.0, 36.0, 51.0]) if compact else PackedFloat32Array([20.0, 45.0, 63.0])
 		draw_string(font, Vector2(14, ys[0]), slot_label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13 if compact else 14, UI.TEXT_DIM)
-		draw_string(font, Vector2(14, ys[1]), part_name, HORIZONTAL_ALIGNMENT_LEFT, size.x - 26.0, 18 if compact else 21, UI.TEXT_DIM if empty else UI.TEXT)
-		draw_string(font, Vector2(14, ys[2]), detail, HORIZONTAL_ALIGNMENT_LEFT, size.x - 26.0, 13 if compact else 14, Color(a, 0.9))
+		UI.draw_fit(self, font, Vector2(14, ys[1]), part_name, HORIZONTAL_ALIGNMENT_LEFT, size.x - 26.0, 18 if compact else 21, UI.TEXT_DIM if empty else UI.TEXT)
+		UI.draw_fit(self, font, Vector2(14, ys[2]), detail, HORIZONTAL_ALIGNMENT_LEFT, size.x - 26.0, 13 if compact else 14, Color(a, 0.9))
 
 
 class PartCard extends Button:
@@ -1212,6 +1262,13 @@ class PartCard extends Button:
 	var status_color := Color.WHITE
 	var warning := ""
 	var rarity_color := Color.WHITE
+	var category := ""   # V6.3: the category icon left of the title
+	var _icons: RefCounted = UI.icons()
+	var rarity := "":   # V1.3: a part's cards wear its rarity frame
+		set(v):
+			rarity = v
+			if is_inside_tree():
+				_frame()
 	var installed := false
 	var selected := false          # previewed on the stat sheet
 	var part_id := ""
@@ -1222,6 +1279,15 @@ class PartCard extends Button:
 		focus_mode = Control.FOCUS_NONE
 		custom_minimum_size = Vector2(262, 176)
 		action_mode = BaseButton.ACTION_MODE_BUTTON_RELEASE
+		_frame()
+
+	func _frame() -> void:
+		var f: Control = get_node_or_null("RarityFrame")
+		if rarity == "":
+			if f != null:
+				f.visible = false
+			return
+		UI.rarity_frame(self, rarity).visible = true
 
 	func _draw() -> void:
 		var font := get_theme_default_font()
@@ -1231,15 +1297,18 @@ class PartCard extends Button:
 		elif get_draw_mode() == DRAW_PRESSED:
 			fill = Color(0.2, 0.13, 0.08)
 		draw_rect(Rect2(Vector2.ZERO, size), fill)
-		draw_rect(Rect2(0, 0, size.x, 5), rarity_color)
-		if selected:
-			draw_rect(Rect2(Vector2.ZERO, size), T.COL_ORANGE, false, 3.0)
-		else:
+		if rarity == "":
+			draw_rect(Rect2(0, 0, size.x, 5), rarity_color)
 			draw_rect(Rect2(Vector2.ZERO, size), Color(rarity_color, 0.35), false, 2.0)
+		if selected:   # inside the rarity frame, so both show
+			draw_rect(Rect2(Vector2(4, 4), size - Vector2(8, 8)), T.COL_UI_ACCENT, false, 3.0)
 		var dim := 0.45 if disabled else 1.0
-		draw_string(font, Vector2(12, 30), title, HORIZONTAL_ALIGNMENT_LEFT, size.x - 24.0, 19, Color(UI.TEXT, dim))
+		var tx := 12.0
+		if category != "" and _icons.draw(self, category, Rect2(12, 14, 20, 20), Color(rarity_color, dim)):
+			tx = 38.0
+		UI.draw_fit(self, font, Vector2(tx, 30), title, HORIZONTAL_ALIGNMENT_LEFT, size.x - tx - 12.0, 19, Color(UI.TEXT, dim))
 		draw_string(font, Vector2(12, 50), subtitle, HORIZONTAL_ALIGNMENT_LEFT, size.x - 24.0, 14, Color(rarity_color, 0.9 * dim))
-		draw_string(font, Vector2(12, 72), headline, HORIZONTAL_ALIGNMENT_LEFT, size.x - 24.0, 14, Color(UI.TEXT_DIM, dim))
+		UI.draw_fit(self, font, Vector2(12, 72), headline, HORIZONTAL_ALIGNMENT_LEFT, size.x - 24.0, 14, Color(UI.TEXT_DIM, dim))   # long Drive lines shrink, never clip
 		var y := 94.0
 		var x := 12.0
 		for d: Array in deltas:
@@ -1283,9 +1352,9 @@ class Callouts extends Control:
 			var from := Vector2(r.end.x, r.get_center().y) if int(slots[i].side) == 0 else Vector2(r.position.x, r.get_center().y)
 			var to: Vector2 = rig.to_global(g.call("slot_anchor", i))
 			var on := i == selected
-			var c := T.COL_ORANGE if on else Color(T.COL_CYAN, 0.35)
+			var c := T.COL_UI_ACCENT if on else Color(T.COL_UI_BORDER, 0.7)
 			if rings_only:
-				draw_arc(to, 9.0 if on else 6.0, 0.0, TAU, 20, Color(c, 1.0) if on else Color(T.COL_CYAN, 0.8), 2.5 if on else 2.0)
+				draw_arc(to, 9.0 if on else 6.0, 0.0, TAU, 20, Color(c, 1.0) if on else Color(T.COL_UI_BORDER, 0.85), 2.5 if on else 2.0)
 				continue
 			var elbow := Vector2(lerpf(from.x, to.x, 0.3), from.y)
 			draw_line(from, elbow, c, 2.0 if on else 1.5)
@@ -1302,6 +1371,10 @@ class StatSheet extends Control:
 	const Loadout := preload("res://scripts/loadout.gd")
 	const BulletPool := preload("res://scripts/bullet_pool.gd")
 	const ROW_H := 26.0
+	var single_column := false   # V2.3 sample: one tall column (garage_layout.gd)
+	var _row_h := ROW_H
+	var headline := false        # V2.3 sample: only the HEADLINE rows (garage_layout.gd)
+	const HEADLINE := ["speed", "accel", "hp", "front", "dps"]
 	# [label, key, higher is better, decimals, suffix]
 	const LEFT := [
 		["TOP SPEED", "speed", true, 0, ""],
@@ -1329,6 +1402,12 @@ class StatSheet extends Control:
 	]
 	# Rows shown as "used / limit": compared by headroom, not the raw load.
 	const LIMITS := {"load": "output", "weight": "capacity"}
+	# V6.3: an icon per row (rows without one keep the same indent).
+	const ROW_ICONS := {"speed": "speed", "accel": "accel", "turn": "drive", "grip": "drive", "ram": "cat_armor",
+		"hp": "hp", "front": "armor", "side": "armor", "rear": "armor", "shield": "shield",
+		"dps": "dps", "damage": "weapon", "rate": "weapon", "range": "lock", "spread": "dps", "aim": "gunner",
+		"lock": "lock", "brake": "drive", "load": "power", "weight": "weight"}
+	var _icons: RefCounted = UI.icons()
 	var title := ""
 	var now := {}
 	var after := {}
@@ -1393,12 +1472,27 @@ class StatSheet extends Control:
 		var font := get_theme_default_font()
 		draw_rect(Rect2(Vector2.ZERO, size), UI.PANEL)
 		draw_rect(Rect2(Vector2.ZERO, size), UI.PANEL_EDGE, false, 2.0)
-		draw_string(font, Vector2(16, 28), title, HORIZONTAL_ALIGNMENT_LEFT, size.x - 32.0, 17, T.COL_ORANGE)
+		draw_string(font, Vector2(16, 28), title, HORIZONTAL_ALIGNMENT_LEFT, size.x - 32.0, 17, T.COL_UI_ACCENT)
 		var col_w := (size.x - 56.0) / 2.0
-		_column(font, LEFT, Vector2(16, 42), col_w)
-		_column(font, RIGHT, Vector2(40 + col_w, 42), col_w)
+		if single_column and headline:   # V2.3 sample: one small box, 5 headline stats
+			col_w = size.x - 32.0
+			var rows: Array = (LEFT + RIGHT).filter(func(r: Array) -> bool: return HEADLINE.has(r[1]))
+			_column(font, rows, Vector2(16, 30), col_w)
+			var more: Array = (LEFT + RIGHT).filter(func(r: Array) -> bool: return not HEADLINE.has(r[1]) and _changed(r))
+			if not more.is_empty():
+				var names: Array = more.map(func(r: Array) -> String: return str(r[0]))
+				draw_string(font, Vector2(16, 30 + (rows.size() + 1) * ROW_H - 4.0), "ALSO: " + ", ".join(names), HORIZONTAL_ALIGNMENT_LEFT, col_w, 12, UI.TEXT_DIM)
+		elif single_column:   # V2.3 sample: the stats panel on the right
+			col_w = size.x - 32.0
+			_row_h = minf(ROW_H, (size.y - 64.0) / float(LEFT.size() + RIGHT.size()))
+			_column(font, LEFT, Vector2(16, 34), col_w)
+			_column(font, RIGHT, Vector2(16, 34 + LEFT.size() * _row_h + 4.0), col_w)
+			_row_h = ROW_H
+		else:
+			_column(font, LEFT, Vector2(16, 42), col_w)
+			_column(font, RIGHT, Vector2(40 + col_w, 42), col_w)
 		var count := maxi(int(now.weapon_count), int(after.weapon_count))
-		if count > 1:
+		if count > 1 and not single_column:
 			draw_string(font, Vector2(40 + col_w, 47), "gun rows show WEAPON %d" % (int(now.weapon) + 1), HORIZONTAL_ALIGNMENT_RIGHT, col_w, 12, UI.TEXT_DIM)
 		var m_now: float = now.mobility
 		var m_after: float = after.mobility
@@ -1409,14 +1503,23 @@ class StatSheet extends Control:
 				why.append("power")
 			if float(after.capacity) > 0.0 and float(after.weight) > float(after.capacity):
 				why.append("weight")
-			draw_string(font, foot, "OVERLOAD (%s): speed and acceleration -%d%%" % [" + ".join(why), roundi((1.0 - m_after) * 100.0)], HORIZONTAL_ALIGNMENT_LEFT, size.x - 32.0, 15, UI.BAD)
+			var msg := "OVERLOAD (%s): speed and acceleration -%d%%" % [" + ".join(why), roundi((1.0 - m_after) * 100.0)]
+			if single_column:   # V2.3 sample: narrow panel
+				msg = "OVERLOAD: speed, accel -%d%%" % roundi((1.0 - m_after) * 100.0)
+			draw_string(font, foot, msg, HORIZONTAL_ALIGNMENT_LEFT, size.x - 32.0, 15, UI.BAD)
 		elif m_now < 1.0:
 			draw_string(font, foot, "Overload cleared", HORIZONTAL_ALIGNMENT_LEFT, size.x - 32.0, 15, UI.GOOD)
+
+	func _changed(r: Array) -> bool:
+		var key: String = r[1]
+		if absf(float(now[key]) - float(after[key])) >= 0.05:
+			return true
+		return LIMITS.has(key) and absf(float(now[LIMITS[key]]) - float(after[LIMITS[key]])) >= 0.05
 
 	func _column(font: Font, rows: Array, origin: Vector2, width: float) -> void:
 		var y := origin.y
 		for r: Array in rows:
-			y += ROW_H
+			y += _row_h
 			var key: String = r[1]
 			var a: float = now[key]
 			var b: float = after[key]
@@ -1431,7 +1534,11 @@ class StatSheet extends Control:
 				a = float(now[limit]) - a
 				b = float(after[limit]) - b
 				better = b > a
-			draw_string(font, Vector2(origin.x, y), r[0], HORIZONTAL_ALIGNMENT_LEFT, -1, 14, UI.TEXT_DIM)
+			var lx := origin.x
+			if _icons.ok():
+				_icons.draw(self, str(ROW_ICONS.get(key, "")), Rect2(origin.x, y - 13.0, 16, 16), Color(UI.TEXT_DIM, 0.9))
+				lx += 22.0
+			draw_string(font, Vector2(lx, y), r[0], HORIZONTAL_ALIGNMENT_LEFT, -1, 14, UI.TEXT_DIM)
 			if absf(b - a) < 0.05:
 				var over := LIMITS.has(key) and a < 0.0
 				draw_string(font, Vector2(origin.x, y), text_now, HORIZONTAL_ALIGNMENT_RIGHT, width, 17, UI.BAD if over else UI.TEXT)
@@ -1471,8 +1578,8 @@ class PowerMeter extends Control:
 	func _draw() -> void:
 		var gap := 24.0
 		var w := (size.x - gap) * 0.5
-		_bar(Rect2(0, 0, w, size.y), "POWER LOAD", used, output, Color(0.95, 0.85, 0.4))
-		_bar(Rect2(w + gap, 0, w, size.y), "WEIGHT LOAD", weight, capacity, Color(0.7, 0.78, 0.85))
+		_bar(Rect2(0, 0, w, size.y), "POWER LOAD", used, output, T.COL_UI_ACCENT)
+		_bar(Rect2(w + gap, 0, w, size.y), "WEIGHT LOAD", weight, capacity, UI.TEXT)
 
 	func _bar(area: Rect2, label: String, value: float, limit: float, tint: Color) -> void:
 		if limit <= 0.0:
@@ -1536,8 +1643,8 @@ class FloorGrid extends Control:
 			y += step
 		var c := Vector2(size.x * 0.5, 290.0)
 		draw_circle(c, 150.0, Color(0, 0, 0, 0.25))
-		draw_arc(c, 150.0, 0.0, TAU, 64, Color(T.COL_CYAN, 0.18), 2.0)
-		draw_arc(c, 158.0, 0.0, TAU, 64, Color(T.COL_ORANGE, 0.12), 1.0)
+		draw_arc(c, 150.0, 0.0, TAU, 64, Color(T.COL_UI_ACCENT, 0.22), 2.0)
+		draw_arc(c, 158.0, 0.0, TAU, 64, Color(T.COL_UI_BORDER, 0.35), 1.0)
 
 
 ## The garage's menu: settings, the Database, quit.

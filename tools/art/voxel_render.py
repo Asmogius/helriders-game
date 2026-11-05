@@ -31,6 +31,9 @@ TILT_DEG = 30.0      # camera tilt off straight-down; 0 = pure top-down
 SAMPLES = 3          # face samples per voxel edge per pixel (no holes)
 COLUMNS = 8
 LIGHT = np.array([-0.45, -0.55, 0.70])  # from upper-left of the screen, above
+# Garage-preview HD set (--garage-hd): the player's chassis and weapon sheets.
+GARAGE_HD = ["scrap_frame", "bulwark_frame", "courier_frame", "pintle_turret", "burst_turret", "rivet_gun",
+             "flame_sprayer", "arc_projector", "harpoon", "mortar", "acid_lobber"]
 
 
 def load_vox(path):
@@ -55,10 +58,15 @@ def load_vox(path):
     return grid, pal
 
 
-def render_frame(grid, colors, heading_deg, ppv=PX_PER_VOXEL, tilt=TILT_DEG, canvas=None, owner=None):
+def render_frame(grid, colors, heading_deg, ppv=PX_PER_VOXEL, tilt=TILT_DEG, canvas=None, owner=None, hd=False):
     """grid[x,y,z] = palette index (0 empty). Returns an RGBA image, or
     (image, owner map) when `owner` (same shape, int) is given: the owner id of
-    the voxel each pixel shows, -1 for empty and outline pixels."""
+    the voxel each pixel shows, -1 for empty and outline pixels.
+
+    hd=True (opt-in, garage preview sheets only; the in-game sheets never set
+    it): continuous light instead of the 3 shade steps, and soft ambient
+    occlusion per face sample (a face darkens towards an edge where a voxel
+    stands in front of it), so 2 px per voxel shows fine shading."""
     sx, sy, sz = grid.shape
     cx, cy = sx / 2.0, sy / 2.0
     a = math.radians(heading_deg)
@@ -76,8 +84,12 @@ def render_frame(grid, colors, heading_deg, ppv=PX_PER_VOXEL, tilt=TILT_DEG, can
     uu, vv = np.meshgrid(offs, offs)
     uu, vv = uu.ravel(), vv.ravel()
     L = LIGHT / np.linalg.norm(LIGHT)
-    view = np.array([0.0, -st, ct])
+    # Screen y grows with world +y (py = wy*cos t - z*sin t) and nearer points
+    # have larger depth (wy*sin t + z*cos t), so the camera sits on the +y
+    # (south) side: south-facing sides and tops face it, north sides don't.
+    view = np.array([0.0, st, ct])
     cols = np.array([[shade(colors[c], lv) for lv in range(3)] for c in range(len(colors))], dtype=np.uint8)
+    emissive = np.array([cols[c, 0, :3].tolist() == cols[c, 2, :3].tolist() for c in range(len(colors))])
     for n in ((1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)):
         n = np.array(n)
         rn = np.array([n[0] * ca - n[1] * sa, n[0] * sa + n[1] * ca, n[2]])
@@ -108,12 +120,34 @@ def render_frame(grid, colors, heading_deg, ppv=PX_PER_VOXEL, tilt=TILT_DEG, can
         ix, iy, depth, idx, oid = ix[ok], iy[ok], depth[ok], idx[ok], oid[ok]
         lum = float(np.clip(rn @ L, -1, 1))
         level = 2 if (n[2] == 1 or lum > 0.45) else (1 if lum > -0.05 else 0)
+        if hd:
+            # soft AO: voxels standing in front of this face, across each edge
+            def occ_at(d):
+                q = vox + n + d
+                ins = (q >= 0).all(1) & (q < np.array(grid.shape)).all(1)
+                o = np.zeros(len(vox))
+                o[ins] = occ[q[ins, 0], q[ins, 1], q[ins, 2]]
+                return np.repeat(o, len(uu))
+            e0, e1 = np.eye(3, dtype=int)[ax[0]], np.eye(3, dtype=int)[ax[1]]
+            su, sv = np.tile(uu, len(vox)), np.tile(vv, len(vox))
+            ao = 1.0 - 0.32 * (occ_at(-e0) * np.clip(1 - 2 * su, 0, 1) + occ_at(e0) * np.clip(2 * su - 1, 0, 1)
+                               + occ_at(-e1) * np.clip(1 - 2 * sv, 0, 1) + occ_at(e1) * np.clip(2 * sv - 1, 0, 1))
+            ao = np.clip(ao, 0.5, 1.0)[ok]
+            light = 1.0 if n[2] == 1 else 0.62 + 0.36 * max(lum, 0.0)
+            hd_shade = np.clip(light * ao, 0, 1)
         order = np.argsort(depth)
         lin, depth, idx, oid = (iy * W + ix)[order], depth[order], idx[order], oid[order]
         keep = depth >= zbuf[lin]
         lin, depth, idx, oid = lin[keep], depth[keep], idx[keep], oid[keep]
         zbuf[lin] = depth            # sorted ascending: the nearest write wins
-        out[lin] = cols[idx, level]
+        if hd:
+            f = hd_shade[order][keep]
+            f = np.where(emissive[idx], 1.0, f)
+            c = cols[idx, 2].astype(float)
+            c[:, :3] *= f[:, None]
+            out[lin] = c.astype(np.uint8)
+        else:
+            out[lin] = cols[idx, level]
         own[lin] = oid
     img = outline(out.reshape(H, W, 4))
     return (img, own.reshape(H, W)) if owner is not None else img
@@ -181,7 +215,10 @@ def union(grids):
     return full
 
 
-def render_model(name, model, colors, outdir, directions=DIRECTIONS, ppv=PX_PER_VOXEL):
+def render_model(name, model, colors, outdir, directions=DIRECTIONS, ppv=PX_PER_VOXEL, hd=False):
+    """hd=True: the garage preview set (2 px per voxel, soft light + AO): core
+    and layer sheets only (no composite, wreck chunks, burnt hull or pieces,
+    which the preview never shows)."""
     chunks, layers, points = model.chunks, model.layers, model.points
     shape = next(iter(chunks.values())).shape
     canvas = canvas_for(shape, ppv)
@@ -197,7 +234,23 @@ def render_model(name, model, colors, outdir, directions=DIRECTIONS, ppv=PX_PER_
             "chunks": {}, "layers": {}, "defaults": list(model.defaults)}
     # Core sheet (what the hull sprite shows) and a composite with the default layers.
     meta["sheet"] = f"{name}__core.png" if layers else f"{name}.png"
-    save_sheet([render_frame(core, colors, h, ppv, canvas=canvas) for h in heads], os.path.join(outdir, meta["sheet"]))
+    save_sheet([render_frame(core, colors, h, ppv, canvas=canvas, hd=hd) for h in heads], os.path.join(outdir, meta["sheet"]))
+    meta["composite"] = f"{name}.png"
+    if hd:
+        meta["hd"] = True
+        for lid, L in layers.items():
+            lgrid = union(L["pieces"].values())
+            combo = np.where(lgrid > 0, lgrid, core)
+            owner = np.where(lgrid > 0, 1, 0).astype(np.int32)
+            frames = []
+            for h in heads:
+                img, own = render_frame(combo, colors, h, ppv, canvas=canvas, owner=owner, hd=True)
+                frames.append(masked(img, own, 1))
+            fn = f"{name}__L_{lid.replace(':', '_')}.png"
+            save_sheet(frames, os.path.join(outdir, fn))
+            meta["layers"][lid] = {"slot": L["slot"], "sheet": fn, "offsets": centroids(frames, canvas), "pieces": {}}
+        json.dump(meta, open(os.path.join(outdir, f"{name}.json"), "w"), indent=1)
+        return meta
     if layers:
         comp = union([core] + [union(layers[d]["pieces"].values()) for d in model.defaults])
         save_sheet([render_frame(comp, colors, h, ppv, canvas=canvas) for h in heads], os.path.join(outdir, f"{name}.png"))
@@ -287,7 +340,21 @@ def main():
     ap.add_argument("--name")
     ap.add_argument("--out", default=os.path.join(HERE, "..", "..", "art", "sprites"))
     ap.add_argument("--directions", type=int, default=DIRECTIONS)
+    ap.add_argument("--garage-hd", action="store_true",
+                    help="garage preview sheets only: 2 px/voxel, soft light + AO, into art/sprites_hd/")
     a = ap.parse_args()
+    if a.garage_hd:
+        import models
+        out = os.path.join(HERE, "..", "..", "art", "sprites_hd")
+        os.makedirs(out, exist_ok=True)
+        for name, (m, colors) in models.ALL().items():
+            if name in GARAGE_HD:
+                render_model(name, m, colors, out, a.directions, ppv=2, hd=True)
+                for f in os.listdir(out):
+                    if f.startswith(name) and f.endswith(".png"):
+                        write_import(os.path.join(out, f))
+                print("hd", name)
+        return
     import models
     if a.vox:
         grid, pal = load_vox(a.vox)

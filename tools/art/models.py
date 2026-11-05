@@ -68,7 +68,7 @@ def rivets(g, x0, x1, y0, y1, z, step=4):
             g[x, y, z] = C["steel_dark"]
 
 
-def chassis_layers(m, L, W, wheels_x, wheel_len, deck_z, cab, nose_x):
+def chassis_layers(m, L, W, wheels_x, wheel_len, deck_z, cab, nose_x, engine_x=None):
     """Drive, front armor and extras for a chassis L x W voxels.
     wheels_x: wheel start x per axle; cab = (x0, x1, y0, y1, z0, z1)."""
     # --- drives: one piece per wheel ---
@@ -117,6 +117,44 @@ def chassis_layers(m, L, W, wheels_x, wheel_len, deck_z, cab, nose_x):
         if x % 2 == 0:
             box(g, x, x + 1, y0, y1, 4, 6, "steel_dark")
     box(g, nose_x - 2, nose_x, 3, W - 3, 3, deck_z + 2, "rust")
+    g = plate("armor:slag_plating")   # lumpy cast slag slabs with glowing seams
+    for x in range(nose_x - 3, L):
+        h = deck_z + 2 - (x - nose_x) // 2
+        box(g, x, x + 1, 3, W - 3, 3, max(5, h), "rust" if (x // 3) % 2 else "steel_dark")
+    for y in range(6, W - 6, 7):
+        box(g, nose_x - 3, L - 1, y, y + 1, deck_z + 1, deck_z + 2, "orange")
+    box(g, L - 1, L, 5, W - 5, 5, 6, "orange")
+    # --- engine blocks (display only): one per engine part, all on engine_mount ---
+    ex0 = engine_x if engine_x is not None else cab[1] + 1
+    ey, ez = W // 2, deck_z
+    m.points["engine_mount"] = (ex0 + 5.0, W / 2.0, float(deck_z))
+    g = m.layer("engine:junk_v6", "engine")          # rusty block, two rows of three heads
+    box(g, ex0, ex0 + 10, ey - 5, ey + 5, ez, ez + 4, "rust")
+    for k in range(3):
+        for y0 in (ey - 5, ey + 3):
+            box(g, ex0 + 1 + k * 3, ex0 + 3 + k * 3, y0, y0 + 2, ez + 4, ez + 5, "steel_dark")
+    g[ex0 + 4, ey, ez + 4] = C["bone"]
+    g = m.layer("engine:turbo_four", "engine")       # compact steel four with an orange turbo snail
+    box(g, ex0 + 1, ex0 + 9, ey - 3, ey + 3, ez, ez + 4, "steel")
+    for k in range(4):
+        box(g, ex0 + 1 + k * 2, ex0 + 2 + k * 2, ey - 2, ey + 2, ez + 4, ez + 5, "steel_dark")
+    for x in range(ex0 + 2, ex0 + 7):
+        for z in range(ez + 1, ez + 6):
+            if (x - ex0 - 4.5) ** 2 + (z - ez - 3.5) ** 2 <= 5:
+                g[x, ey + 3:ey + 6, z] = C["orange"]
+    g = m.layer("engine:patched_v8", "engine")       # two cylinder banks, green patch tape
+    box(g, ex0, ex0 + 11, ey - 6, ey + 6, ez, ez + 3, "steel_dark")
+    for y0 in (ey - 6, ey + 2):
+        box(g, ex0, ex0 + 11, y0, y0 + 4, ez + 3, ez + 5, "steel")
+    box(g, ex0 + 3, ex0 + 5, ey - 6, ey - 2, ez + 5, ez + 6, "patch_green")
+    box(g, ex0 + 7, ex0 + 9, ey + 2, ey + 6, ez + 5, ez + 6, "patch_green")
+    box(g, ex0 + 1, ex0 + 10, ey - 1, ey + 1, ez + 3, ez + 4, "rust")
+    g = m.layer("engine:diesel_block", "engine")     # tall dark block with an exhaust stack
+    box(g, ex0, ex0 + 10, ey - 5, ey + 5, ez, ez + 6, "steel_dark")
+    box(g, ex0 + 1, ex0 + 9, ey - 4, ey + 4, ez + 6, ez + 7, "steel")
+    top = min(ez + 10, g.shape[2] - 1)
+    box(g, ex0 + 1, ex0 + 3, ey + 5, ey + 7, ez, top, "steel")
+    g[ex0 + 1:ex0 + 3, ey + 5:ey + 7, top] = C["tyre"]
     m.defaults += ["drive:street_wheels", "armor:scrap_plating"]
     # --- extras ---
     for lid, tip in (("nose_guns", "steel_dark"), ("nose_guns_hot", "white_hot")):
@@ -140,6 +178,28 @@ def chassis_layers(m, L, W, wheels_x, wheel_len, deck_z, cab, nose_x):
         g[ex, ey, ez + 5 + k] = C["steel"]
     g[ex, ey, ez + 7] = C["white_hot"]
     m.points["nose_mount"] = (float(nose_x - 6), W / 2.0, float(deck_z))
+    # --- utility parts (display only) ---
+    g = m.layer("oil_slick", "extra")       # black oil drum and nozzle at the tail
+    for x in range(1, 8):
+        for y in range(W // 2 - 4, W // 2 + 4):
+            if (x - 4) ** 2 + (y - W / 2 + 0.5) ** 2 <= 12:
+                g[x, y, deck_z:deck_z + 6] = C["tyre"]
+    g[3:6, W // 2 - 1:W // 2 + 1, deck_z + 6] = C["glass"]
+    box(g, 0, 2, W // 2 - 1, W // 2 + 1, 4, 6, "steel")
+    g = m.layer("spike_strip", "extra")     # rolled spike strip on a rear rack
+    box(g, 0, 3, 5, W - 5, 4, 7, "steel_dark")
+    for y in range(6, W - 6, 3):
+        g[1, y, 7] = C["bone"]; g[1, y, 8] = C["white_hot"]
+    g = m.layer("goop_launcher", "extra")   # stubby goop mortar on the rear deck
+    box(g, 6, 14, 3, 9, deck_z, deck_z + 3, "steel")
+    for k in range(4):
+        box(g, 8 + k, 12 + k, 4, 8, deck_z + 3 + k, deck_z + 4 + k, "steel_dark")
+    g[14, 5:7, deck_z + 6] = C["goop"]; g[13, 5:7, deck_z + 6] = C["goop"]
+    g = m.layer("nitro_bottle", "extra")    # two cyan-capped nitro bottles along one side
+    for y0 in (W - 10, W - 7):
+        box(g, 8, 22, y0, y0 + 3, deck_z, deck_z + 3, "steel")
+        box(g, 22, 24, y0, y0 + 3, deck_z, deck_z + 3, "cyan")
+    box(g, 12, 13, W - 10, W - 4, deck_z + 3, deck_z + 4, "steel_dark")
     g = m.layer("patch_kit", "extra")
     box(g, 8, 16, W - 12, W - 5, deck_z + 1, deck_z + 5, "steel_dark")
     box(g, 11, 13, W - 11, W - 6, deck_z + 5, deck_z + 6, "patch_green")
@@ -191,7 +251,7 @@ def scrap_frame():
     box(rp, 6, 20, 9, 27, 11, 13, "rust")
     box(rp, 8, 18, 11, 25, 13, 14, "steel_dark")
     rivets(rp, 6, 20, 9, 27, 13, 4)
-    chassis_layers(m, 64, 36, (6, 42), 14, 11, (28, 47, 9, 27, 11, 19), 56)
+    chassis_layers(m, 64, 36, (6, 42), 14, 11, (28, 47, 9, 27, 11, 19), 56, engine_x=46)
     m.points["turret_mount"] = (24.0, 18.0, 11.0)
     return m
 
@@ -214,7 +274,7 @@ def bulwark_frame():
     rp = m.g("rear_plates")
     box(rp, 4, 12, 8, 34, 12, 14, "rust")
     rivets(rp, 4, 12, 8, 34, 14, 4)
-    chassis_layers(m, 76, 42, (6, 30, 54), 14, 12, (30, 46, 10, 32, 12, 19), 68)
+    chassis_layers(m, 76, 42, (6, 30, 54), 14, 12, (30, 46, 10, 32, 12, 19), 68, engine_x=57)
     m.points["mount_a"] = (53.0, 21.0, 12.0)
     m.points["mount_b"] = (15.0, 21.0, 14.0)
     m.points["turret_mount"] = (24.0, 21.0, 12.0)
@@ -239,8 +299,125 @@ def courier_frame():
     box(cab, 40, 54, 7, 25, 11, 18, "steel")
     box(cab, 50, 54, 8, 24, 13, 18, "glass")
     box(cab, 41, 50, 8, 24, 18, 19, "steel_dark")
-    chassis_layers(m, 66, 32, (6, 44), 13, 11, (40, 54, 7, 25, 11, 19), 58)
+    chassis_layers(m, 66, 32, (6, 44), 13, 11, (40, 54, 7, 25, 11, 19), 58, engine_x=54)
     m.points["turret_mount"] = (22.0, 16.0, 22.0)   # on the cargo roof
+    return m
+
+
+def raider_frame():
+    """Raider Frame: 66x34, low and lean, rust wedge nose, two hardpoints."""
+    m = Model((66, 34, 20))
+    c = m.g("chassis")
+    box(c, 2, 64, 7, 27, 3, 8, "steel_dark")
+    box(c, 3, 50, 6, 28, 8, 10, "rust")
+    for x in range(50, 64):                          # wedge hood
+        inset = (x - 50) // 4
+        box(c, x, x + 1, 6 + inset, 28 - inset, 8, 10 - (x - 50) // 7, "rust")
+    box(c, 10, 46, 6, 7, 9, 11, "orange"); box(c, 10, 46, 27, 28, 9, 11, "orange")   # flank stripes
+    box(c, 2, 5, 9, 25, 5, 10, "steel_dark")
+    c[2, 9:12, 7:9] = C["orange"]; c[2, 22:25, 7:9] = C["orange"]
+    cab = m.g("cab")
+    box(cab, 30, 44, 9, 25, 10, 16, "steel")
+    box(cab, 41, 44, 10, 24, 11, 16, "glass")
+    box(cab, 31, 41, 10, 24, 16, 17, "steel_dark")
+    rp = m.g("rear_plates")
+    box(rp, 5, 16, 9, 25, 10, 12, "steel")
+    rivets(rp, 5, 16, 9, 25, 12, 4)
+    chassis_layers(m, 66, 34, (6, 44), 13, 10, (30, 44, 9, 25, 10, 17), 56, engine_x=45)
+    m.points["mount_a"] = (36.0, 17.0, 17.0)    # cab roof
+    m.points["mount_b"] = (14.0, 17.0, 12.0)    # rear deck
+    m.points["turret_mount"] = (24.0, 17.0, 10.0)
+    return m
+
+
+def hauler_frame():
+    """Hauler Frame: 82x44 heavy hauler, flatbed with a cargo cage, six wheels."""
+    m = Model((82, 44, 24))
+    c = m.g("chassis")
+    box(c, 2, 80, 7, 37, 3, 10, "steel_dark")
+    box(c, 3, 76, 6, 38, 10, 12, "steel")
+    box(c, 2, 5, 9, 35, 6, 12, "steel_dark")
+    c[2, 9:13, 8:10] = C["orange"]; c[2, 31:35, 8:10] = C["orange"]
+    box(c, 26, 56, 6, 7, 11, 13, "cyan"); box(c, 26, 56, 37, 38, 11, 13, "cyan")
+    bed = m.g("cargo_cage")
+    for x in (5, 20, 35):
+        for y in (7, 36):
+            box(bed, x, x + 1, y, y + 1, 12, 19, "steel_dark")
+    box(bed, 5, 36, 7, 8, 18, 19, "steel_dark"); box(bed, 5, 36, 36, 37, 18, 19, "steel_dark")
+    box(bed, 8, 18, 12, 22, 12, 16, "rust"); box(bed, 22, 32, 24, 33, 12, 15, "rust")   # crates
+    cab = m.g("cab")
+    box(cab, 46, 62, 10, 34, 12, 21, "steel")
+    box(cab, 59, 62, 12, 32, 14, 20, "glass")
+    box(cab, 47, 59, 12, 32, 21, 22, "steel_dark")
+    for y in (14, 21, 28):
+        box(cab, 48, 58, y, y + 1, 22, 23, "rust")
+    chassis_layers(m, 82, 44, (6, 24, 62), 15, 12, (46, 62, 10, 34, 12, 22), 72, engine_x=63)
+    m.points["mount_a"] = (53.0, 22.0, 22.0)    # cab roof
+    m.points["mount_b"] = (20.0, 22.0, 12.0)    # flatbed
+    m.points["turret_mount"] = (30.0, 22.0, 12.0)
+    return m
+
+
+def scattergun_turret():
+    """Short, fat barrel with a flared mouth and a shell box."""
+    m = _turret_model(36, 24, 10, 11.0)
+    b = m.g("mount")
+    _ring(b, 11, 12)
+    box(b, 5, 17, 6, 18, 3, 6, "steel")
+    box(b, 6, 14, 18, 22, 2, 6, "orange")                # red-orange shell box
+    g = m.g("barrel")
+    box(g, 17, 32, 9, 15, 3, 7, "steel")
+    box(g, 32, 36, 8, 16, 2, 8, "steel_dark")             # flared mouth
+    box(g, 35, 36, 10, 14, 4, 6, "orange")
+    m.points["muzzle"] = (35.5, 12.0, 5.0)
+    return m
+
+
+def heavy_mg_turret():
+    """Big gun shield, long thick barrel with a cooling jacket and a belt feed."""
+    m = _turret_model(52, 26, 12, 11.0)
+    b = m.g("mount")
+    _ring(b, 11, 13, 11)
+    box(b, 4, 18, 5, 21, 3, 7, "steel")
+    box(b, 17, 19, 3, 23, 3, 11, "steel_dark")            # gun shield
+    box(b, 6, 14, 21, 25, 2, 7, "rust")                   # ammo can
+    box(b, 13, 17, 19, 21, 6, 7, "bone")                  # belt
+    g = m.g("barrel")
+    box(g, 19, 50, 11, 15, 4, 8, "steel")
+    for x in range(21, 36, 3):
+        box(g, x, x + 1, 10, 16, 3, 9, "steel_dark")      # jacket rings
+    box(g, 50, 52, 10, 16, 4, 8, "steel_dark")
+    box(g, 51, 52, 12, 14, 5, 7, "orange")
+    m.points["muzzle"] = (51.5, 13.0, 6.0)
+    return m
+
+
+def hood_guns():
+    """Fixed: two stubby hood-mounted guns on one bracket, ~22 x 20 px."""
+    m = Model((22, 20, 8))
+    m.points["pivot"] = (1.0, 10.0, 0.0); m.points["muzzle"] = (21.5, 10.0, 4.5)
+    b = m.g("bracket")
+    box(b, 0, 8, 2, 18, 0, 3, "steel_dark")
+    box(b, 2, 6, 8, 12, 3, 5, "rust")
+    g = m.g("guns")
+    for y0 in (2, 14):
+        box(g, 3, 14, y0, y0 + 4, 2, 6, "steel")
+        box(g, 14, 21, y0 + 1, y0 + 3, 3, 5, "steel_dark")
+        box(g, 21, 22, y0 + 1, y0 + 3, 3, 5, "orange")
+    return m
+
+
+def outrider_twin_guns():
+    """Fixed: the Outrider's long twin guns, salvaged with player hardware, ~30 x 26 px."""
+    m = Model((30, 26, 7))
+    m.points["pivot"] = (1.0, 13.0, 0.0); m.points["muzzle"] = (29.5, 13.0, 4.0)
+    b = m.g("bracket")
+    box(b, 0, 6, 3, 23, 0, 2, "steel_dark")
+    g = m.g("guns")
+    for y0 in (0, 22):
+        box(g, 1, 29, y0, y0 + 4, 2, 5, "steel")
+        box(g, 1, 9, y0, y0 + 4, 5, 6, "steel_dark")
+        box(g, 29, 30, y0 + 1, y0 + 3, 3, 4, "orange")
     return m
 
 
@@ -732,6 +909,12 @@ def ALL():
             "outrider": (outrider(), col),
             "bulwark_frame": (bulwark_frame(), col),
             "courier_frame": (courier_frame(), col),
+            "raider_frame": (raider_frame(), col),
+            "hauler_frame": (hauler_frame(), col),
+            "scattergun_turret": (scattergun_turret(), col),
+            "heavy_mg_turret": (heavy_mg_turret(), col),
+            "hood_guns": (hood_guns(), col),
+            "outrider_twin_guns": (outrider_twin_guns(), col),
             "torcher": (torcher(), col),
             "sludger": (sludger(), col),
             "harpoon": (harpoon(), col),

@@ -18,6 +18,7 @@ signal crew_ability_used(kind: String, ability: Dictionary)   # Mark, Flare, Mag
 signal status_started(kind: int)   # a status bar filled (StatusBars index)
 signal revived                     # a Patcher brought this wreck back
 
+const TracerStyles := preload("res://scripts/tracer_styles.gd")   # P2 V4.3 tracer looks (visual only; see the P2 sections below)
 const T := preload("res://scripts/tuning.gd")
 const Hostile := preload("res://scripts/hostile.gd")
 const BulletPool := preload("res://scripts/bullet_pool.gd")
@@ -42,6 +43,7 @@ var body_wid := 36.0
 
 # Final stats (filled from a stats dictionary, see apply_stats).
 var max_speed := 0.0
+var _drive_want := 0.0   # forward speed the throttle asks for this tick (zombie shove)
 var reverse_speed := 0.0
 var acceleration := 0.0
 var brake := 0.0
@@ -281,6 +283,7 @@ func apply_stats(s: Dictionary) -> void:
 	_reload_left.clear()
 	_heat.clear()
 	_overheated.clear()
+	_cache_tracer_styles()   # P2 V4.3 look: resolved once per mount, shots reuse it
 	for w in gun_stats:
 		_cooldowns.append(0.0)
 		_burst_left.append(0)
@@ -332,7 +335,7 @@ func _sync_parts() -> void:
 		sprite.enemy = team != BulletPool.TEAM_PLAYER
 		sprite.position = turret_position(i, count)
 		add_child(sprite)
-		var tpath := art_path(str(ART_WEAPON_ALIASES.get(sprite.kind, sprite.kind)))
+		var tpath := _art_for(str(ART_WEAPON_ALIASES.get(sprite.kind, sprite.kind)))
 		if tpath != "":
 			var ta: Sprite2D = DirectionalSprite.new()
 			if ta.load_meta(tpath):
@@ -367,7 +370,7 @@ func _sync_fixed_art() -> void:
 		if int(w.mount) != Mount.FIXED:
 			continue
 		var wid := str(w.get("id", ""))
-		var path := art_path(str(ART_WEAPON_ALIASES.get(wid, wid))) if wid != "" else ""
+		var path := _art_for(str(ART_WEAPON_ALIASES.get(wid, wid))) if wid != "" else ""
 		if path == "":
 			continue
 		var a: Sprite2D = DirectionalSprite.new()
@@ -384,7 +387,16 @@ func _sync_fixed_art() -> void:
 
 ## Which voxel sheet this rig wears ("" = drawn by code).
 func _art_meta_path() -> String:
-	return art_path(str(look.get("chassis", "")))
+	return _art_for(str(look.get("chassis", "")))
+
+
+## V5 garage sample: the garage preview sets art_dir to the HD sheets
+## (art/sprites_hd/, 2 px per voxel); missing there -> the normal sheet.
+var art_dir := ""
+func _art_for(id: String) -> String:
+	if art_dir != "" and id != "" and FileAccess.file_exists(art_dir + id + ".json"):
+		return art_dir + id + ".json"
+	return art_path(id)
 
 
 func _sync_art() -> void:
@@ -397,7 +409,7 @@ func _sync_art() -> void:
 		if _art_overlay != null:
 			_art_overlay.queue_free()
 			_art_overlay = null
-	if path != "" and _hull_art == null and ResourceLoader.exists(path.get_basename() + ".png"):
+	if path != "" and _hull_art == null and (ResourceLoader.exists(path.get_basename() + ".png") or (art_dir != "" and path.begins_with(art_dir))):   # HD sheets have no composite
 		_hull_art = DirectionalSprite.new()
 		if _hull_art.load_meta(path):
 			_hull_art.meta_path = path
@@ -426,8 +438,13 @@ func art_layer_modulate(_id: String) -> Color:
 ## frame for its own aim, placed on the hull's projected mount point.
 ## Gameplay (bodies, turret pivots, muzzles) is untouched.
 func _update_art() -> void:
+	# ==== P6 garage preview scale (art/garage-preview-scale) ====
+	# Art-only: `sc` and every `* sc` below in this function. Top-level art doesn't inherit the rig's scale: copy it (the garage preview
+	# shows the rig at RIG_SCALE 3.4), and scale every point offset by it.
+	var sc := absf(global_scale.x)
 	if _hull_art != null:
 		_hull_art.visible = visible
+		_hull_art.scale = Vector2(sc, sc) / float(_hull_art.call("ppv"))
 		_hull_art.global_position = global_position
 		_hull_art.heading = global_rotation
 		_hull_art.modulate = Color.WHITE if is_wrecked else Color.WHITE.lerp(Color(1.6, 1.4, 1.2), _flash * 0.6)
@@ -449,21 +466,24 @@ func _update_art() -> void:
 			continue
 		var a: Sprite2D = t.art
 		a.heading = t.global_rotation
+		a.scale = Vector2(sc, sc) / float(a.call("ppv"))
 		var base: Vector2 = t.global_position
 		if _hull_art != null:
-			base = global_position + _hull_art.point_offset(art_mount_name(i, total))
-		a.global_position = base - a.point_offset("pivot")
+			base = global_position + _hull_art.point_offset(art_mount_name(i, total)) * sc
+		a.global_position = base - a.point_offset("pivot") * sc
 		if t.glow != null:
 			t.glow.visible = t.hot and t.visible
-			t.glow.global_position = a.global_position + a.point_offset("muzzle")
+			t.glow.global_position = a.global_position + a.point_offset("muzzle") * sc
 	for k in _fixed_art.size():
 		var fa := _fixed_art[k]
 		fa.visible = visible and not is_wrecked
 		fa.heading = global_rotation
-		var at := global_position + Vector2(body_len * 0.35, 0.0).rotated(global_rotation)
+		fa.scale = Vector2(sc, sc) / float(fa.call("ppv"))
+		var at := global_position + Vector2(body_len * 0.35, 0.0).rotated(global_rotation) * sc
 		if _hull_art != null and _hull_art.meta.has("points") and _hull_art.meta.points.has("nose_mount"):
-			at = global_position + _hull_art.point_offset("nose_mount")
-		fa.global_position = at - fa.point_offset("pivot")
+			at = global_position + _hull_art.point_offset("nose_mount") * sc
+		fa.global_position = at - fa.point_offset("pivot") * sc
+	# ==== end P6 garage preview scale ====
 
 
 ## Which hull point turret `index` of `total` sits on.
@@ -485,6 +505,10 @@ func art_layers() -> Array[String]:
 	ids.append(drive if have.has(drive) else "drive:street_wheels")
 	var armor := "armor:" + str(look.get("armor", "scrap_plating"))
 	ids.append(armor if have.has(armor) else "armor:scrap_plating")
+	# Display only: the engine block (slot "engine", so the garage can pick it out).
+	var engine := "engine:" + str(look.get("engine", ""))
+	if have.has(engine):
+		ids.append(engine)
 	for w in gun_stats:
 		if int(w.mount) == Mount.FIXED and art_path(str(w.get("id", ""))) == "":
 			ids.append("nose_guns_hot" if _active.has("overcharge") or _active.has("deadeye") else "nose_guns")
@@ -496,6 +520,9 @@ func art_layers() -> Array[String]:
 		ids.append("patch_kit")
 	if utils.has("mine_dropper"):
 		ids.append("mine_rack")
+	for u: String in ["oil_slick", "spike_strip", "goop_launcher", "nitro_bottle"]:   # display only
+		if utils.has(u):
+			ids.append(u)
 	var internal: Array = look.get("internal", [])
 	if internal.has("targeting_computer") or internal.has("advanced_targeting"):
 		ids.append("sensor_dish")
@@ -1002,9 +1029,11 @@ func _drive(delta: float) -> void:
 
 	# An overloaded power plant can't deliver full speed or acceleration.
 	var power := mobility()
+	_drive_want = 0.0
 	if throttle > 0.0:
 		var spiked := T.SPIKE_RIG_SPEED if spike_left > 0.0 else 1.0
 		var target := throttle * max_speed * power * crew_speed * spiked * (0.75 if neuro_left > 0.0 else 1.0)   # Neurotoxin
+		_drive_want = target
 		var rate := acceleration * power * crew_accel if fwd_speed < target else coast
 		if fwd_speed < 0.0:
 			rate = brake
@@ -1039,6 +1068,24 @@ func _resolve_collisions(pre_velocity: Vector2) -> void:
 		var impact := -pre_velocity.dot(collision.get_normal())
 		if other is Hostile:
 			var hostile := other as Hostile
+			if impact < RAM_MIN_SPEED and not already_hit.has(hostile) and hostile.has_method("shove"):
+				# Too slow to ram: push the zombie aside so a packed horde (a
+				# Slimer swarm) can't pin the rig (hand playtest 0.1.75). The push
+				# follows how hard the rig is driving (not its stalled speed), on
+				# a smooth ramp: a near-stopped rig stays held.
+				var ahead := Vector2.RIGHT.rotated(rotation)
+				var to_z := hostile.global_position - global_position
+				var ramp := smoothstep(T.SHOVE_RAMP.x, T.SHOVE_RAMP.y, _drive_want)
+				if ramp > 0.0 and to_z.dot(ahead) > -body_len * 0.5:   # anything from the rig's middle forward
+					already_hit.append(hostile)
+					# Mostly sideways off the rig's line (straight ahead would just
+					# pack the horde tighter), a little forward.
+					var lateral := to_z - ahead * to_z.dot(ahead)
+					if lateral.length_squared() < 1.0:
+						lateral = ahead.orthogonal() * (1.0 if hostile.get_instance_id() % 2 == 0 else -1.0)
+					var speed := ramp * (_drive_want + T.SHOVE_CLEAR)
+					hostile.call("shove", (lateral.normalized() * 0.9 + ahead * 0.3).normalized() * speed)
+				continue
 			if already_hit.has(hostile) or impact < RAM_MIN_SPEED:
 				continue
 			already_hit.append(hostile)
@@ -1539,10 +1586,33 @@ func _shoot(w: Dictionary, muzzle: Vector2, direction: Vector2) -> void:
 	if chain and has_mod("overload_coil") and _gun_overloaded(gun_stats.find(w)):
 		jumps = T.OVERLOAD_COIL_JUMPS
 		_perk_fired("overload_coil")
+	# ==== P2 V4.3 tracer look (art/sample-fx): visual only ====
+	bullets.next_style = tracer_style_of(w)
+	# ==== end P2 tracer look ====
 	for p in pellets:
 		var dir := direction.rotated(randf_range(-cone, cone))
 		bullets.fire(muzzle, dir * speed * randf_range(0.95, 1.05) if pellets > 1 else dir * speed, damage, team, pierce, dtype, 0.0, chain, rider, self,
 				_last_of_burst and has_sp("sp_shrapnel"), jumps)   # Shrapnel: the burst's last round splashes
+	bullets.next_style = -1   # P2 V4.3 tracer look: reset after the volley
+
+
+# ==== P2 V4.3 tracer looks (art/sample-fx) =========================================
+# Visual only: never read by damage, range, speed or fire rate. Each weapon's
+# tracer style index (player and enemy team) is resolved once in apply_stats()
+# and stored on the weapon under "_tracer"; _shoot() only reads it.
+
+func _cache_tracer_styles() -> void:
+	for w: Dictionary in gun_stats:
+		var id := str(w.get("id", ""))
+		w["_tracer"] = Vector2i(TracerStyles.index_for(id, false), TracerStyles.index_for(id, true))
+
+
+## The cached tracer style for weapon `w` on this rig's team (no lookup per shot).
+func tracer_style_of(w: Dictionary) -> int:
+	var c: Vector2i = w.get("_tracer", Vector2i.ZERO)
+	return c.x if team == BulletPool.TEAM_PLAYER else c.y
+
+# ==== end P2 V4.3 tracer looks ======================================================
 
 
 # --- Utilities ---------------------------------------------------------------------
@@ -2232,6 +2302,7 @@ class EnemyStatusBar extends Node2D:
 
 
 class CableLine extends Node2D:
+	const HARPOON_STYLE: Dictionary = TracerStyles.STYLES.harpoon   # P2 V4.3 look, resolved once
 	## The Harpoon's spear flash and its cable, in world space.
 	var _a := Vector2.ZERO
 	var _b := Vector2.ZERO
@@ -2266,7 +2337,12 @@ class CableLine extends Node2D:
 			draw_line(_a, _b, Color(0.8, 0.78, 0.6), 2.5)
 			draw_circle(_b, 4.0, Color(0.6, 0.6, 0.62))
 		elif _flash > 0.0:
-			draw_line(_a, _b, Color(0.9, 0.9, 0.85, _flash * 4.0), 3.0)
+			# ==== P2 V4.3 Harpoon look (art/sample-fx): cable plus a bright spear head ====
+			var a := clampf(_flash * 4.0, 0.0, 1.0)
+			draw_line(_a, _b, Color(HARPOON_STYLE.glow, a), 1.5 * float(HARPOON_STYLE.width))
+			var head_dir := (_b - _a).normalized()
+			draw_line(_b - head_dir * 14.0, _b, Color(HARPOON_STYLE.core, a), 3.0 * float(HARPOON_STYLE.width))
+			# ==== end P2 Harpoon look ====
 
 
 # --- Flag mods and specialty perks (proposal 01, implement-03) ----------------------

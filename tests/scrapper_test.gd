@@ -131,7 +131,7 @@ func _process(_delta: float) -> bool:
 				_park(SPOT + Vector2(0, -120))
 				rig.rotation = -PI / 2.0
 				main.hud.left_stick.output = Vector2.UP
-			if frame == 30:
+			if frame == 36:
 				_check(rig.spike_left > 0.0, "crossing its spike strip slows your rig (-%d%% for %d s)" % [roundi((1.0 - T.SPIKE_RIG_SPEED) * 100.0), int(T.SPIKE_RIG_TIME)])
 				_park(SPOT)
 				# Its oil, set alight, burns you (§14: enemy oil hurts you even when you lit it).
@@ -186,8 +186,8 @@ func _check_tables() -> void:
 	_check(spikes.rarity == "Uncommon" and float(spikes.power) == 15.0 and float(spikes.weight) == 15.0 and float(spikes.cooldown) == 12.0 and float(spikes.spike_time) == 15.0,
 		"Spike Strip Dropper: Uncommon, 15 power, 15 weight, every 12 s, a 15 s strip")
 	_check(Parts.DROP_POOLS.scrapper.has("spike_strip") and Parts.DROP_POOLS.scrapper.has("oil_slick") and Parts.DROP_POOLS.scrapper.has("mine_dropper"), "the Scrapper's pool has the hazard utilities")
-	_check(float(T.SCRAPPER.fire_rate) == 0.0 and float(T.SCRAPPER.hp) == 90.0 and float(T.SCRAPPER.max_speed) == 580.0 and T.SCRAPPER_TRAP_EVERY == 3.0,
-		"Scrapper: unarmed, HP 90, speed 580, a hazard every 3 s")
+	_check(float(T.SCRAPPER.fire_rate) == 0.0 and float(T.SCRAPPER.hp) == 90.0 and float(T.SCRAPPER.max_speed) == 510.0 and T.SCRAPPER_TRAP_EVERY == 3.0,
+		"Scrapper: unarmed, HP 90, speed 510, a hazard every 3 s")
 	_check(float(T.SCRAPPER_GUNNER.hp) == 110.0 and float(T.SCRAPPER_GUNNER.front) == 45.0 and T.SCRAPPER_GUNNER_TRAP_EVERY == 4.0 and T.SCRAPPER_GUNNER_SCRAP == 35,
 		"Scrapper Gunner: HP 110, 45 a facing, a trap every 4 s, 35 scrap")
 	var low := 0
