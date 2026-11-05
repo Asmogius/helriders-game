@@ -319,12 +319,23 @@ static func bottom_bar(parent: Control) -> HBoxContainer:
 			var b := c as Button
 			b.custom_minimum_size.y = maxf(b.custom_minimum_size.y, MIN_TOUCH)
 			b.size_flags_vertical = Control.SIZE_SHRINK_CENTER)
+	bar.set_meta(&"ui_bottom_bar", true)
 	parent.add_child(bar)
 	_place_bottom_bar(bar, parent)
-	if not parent.is_inside_tree():
-		parent.ready.connect(_place_bottom_bar.bind(bar, parent), CONNECT_ONE_SHOT)
-	parent.resized.connect(_place_bottom_bar.bind(bar, parent))
+	# One handler per parent places every bar on it: a second bar on the same
+	# parent used to try to connect again (an error, and it never moved).
+	var place := _place_bottom_bars.bind(parent)
+	if not parent.is_inside_tree() and not parent.ready.is_connected(place):
+		parent.ready.connect(place, CONNECT_ONE_SHOT)
+	if not parent.resized.is_connected(place):
+		parent.resized.connect(place)
 	return bar
+
+
+static func _place_bottom_bars(parent: Control) -> void:
+	for c: Node in parent.get_children():
+		if c is HBoxContainer and c.has_meta(&"ui_bottom_bar"):
+			_place_bottom_bar(c as HBoxContainer, parent)
 
 
 static func _place_bottom_bar(bar: HBoxContainer, parent: Control) -> void:

@@ -275,7 +275,7 @@ func _controller_page() -> void:
 		grid.add_child(b)
 		if action == _focus_action and bool(pad.get("active")):
 			b.focus_mode = Control.FOCUS_ALL   # keep the pad's place on the row just rebound
-			b.grab_focus.call_deferred()
+			_focus_later.call_deferred(b)   # the page may be rebuilt (and b freed) first
 	var swapped := bool(pad.call("sticks_swapped"))
 	_button("STICKS: %s" % ("LEFT AIMS, RIGHT DRIVES" if swapped else "LEFT DRIVES, RIGHT AIMS"), func() -> void:
 		pad.call("set_sticks_swapped", not swapped))
@@ -349,3 +349,9 @@ func _database_page() -> void:
 func show_category(cat: String) -> void:
 	category = cat
 	show_page("database")
+
+
+## Deferred focus that skips a button the page rebuilt away in the meantime.
+func _focus_later(b: Control) -> void:
+	if is_instance_valid(b) and b.is_inside_tree():
+		b.grab_focus()
