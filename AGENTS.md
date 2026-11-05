@@ -109,6 +109,7 @@ godot --headless --fixed-fps 60 --path . -s res://tests/kill_loops_test.gd   # m
 godot --headless --fixed-fps 60 --path . -s res://tests/wreck_and_swarm_test.gd   # must end "WRECK AND SWARM TEST PASSED" (shove through a pack, wreck freezes the fight, free hires match their card)
 godot --headless --fixed-fps 60 --path . -s res://tests/crew_seating_test.gd   # must end "CREW SEATING TEST PASSED" (hires seated after a rebuild, no Driver = no DEPLOY)
 godot --headless --fixed-fps 60 --path . -s res://tests/escort_truck_test.gd # must end "ESCORT TRUCK TEST PASSED" (truck HP line, low-HP warning, GOOPED pulls the horde)
+godot --headless --fixed-fps 60 --path . -s res://tests/retest2_test.gd       # must end "RETEST2 TEST PASSED" (REBUILD hides after rebuild, dead rig PWR 0, Courier radius 130, wreck/radio-call freezes)
 godot --headless --fixed-fps 60 --path . -s res://tests/saloon_match_test.gd # must end "SALOON MATCH TEST PASSED" (every Saloon card is exactly who you hire)
 godot --headless --fixed-fps 60 --path . -s res://tests/tutorial_readability_test.gd # must end "TUTORIAL READABILITY TEST PASSED" (Training Run brightens the arena and rings zombies)
 ```
