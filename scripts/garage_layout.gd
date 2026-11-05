@@ -197,6 +197,9 @@ static func _action_bar(g: Control, size: Vector2, footer_h: float, open: bool, 
 		var n := String(b.name)
 		if n == "Back" or n == "Equip":
 			(b as Control).visible = open
+		elif b == g.get("_rebuild"):
+			# REBUILD is only for a wrecked rig (retest: REBUILD FREE stayed up after rebuilding).
+			(b as Control).visible = not open and not g.profile.has_rig()
 		elif b is Button:
 			(b as Control).visible = not open
 	if open:

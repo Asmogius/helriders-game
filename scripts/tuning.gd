@@ -250,7 +250,7 @@ const COURIER_PAR_PER_CHECKPOINT := 0.5   # gold is ~1.2-1.4x a perfect autopilo
 const COURIER_SILVER := 1.3
 const COURIER_BRONZE := 1.7
 const COURIER_TIER_PAY := {"gold": 1.0, "silver": 0.75, "bronze": 0.5, "late": 0.25}
-const COURIER_RADIUS := 90.0
+const COURIER_RADIUS := 130.0   # was 90 (retest: easy to overshoot)
 
 # --- Districts (DESIGN §7) ----------------------------------------------------
 # Unlocked by parts score: extracted schematics, rarity points x Research level.

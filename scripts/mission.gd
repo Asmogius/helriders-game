@@ -2023,7 +2023,9 @@ func _refresh_hud() -> void:
 		plates[i] = vehicle.facing_armor[i] / vehicle.facing_max[i] if vehicle.facing_max[i] > 0.0 else -1.0
 	hud.set_defense(vehicle.shield / vehicle.shield_max if vehicle.shield_max > 0.0 else -1.0, plates, vehicle.hp / maxf(vehicle.hp_max, 1.0))
 	hud.set_statuses(vehicle.status.build, vehicle.status.left)
-	hud.set_power(vehicle.power_load(), vehicle.power_capacity(), vehicle.weight_load, vehicle.weight_limit())
+	# A dead rig draws nothing (retest: PWR stayed 100/100 at 0 HP).
+	var draw := 0.0 if vehicle.hp <= 0.0 or state == State.WRECKED else vehicle.power_load()
+	hud.set_power(draw, vehicle.power_capacity(), vehicle.weight_load, vehicle.weight_limit())
 	for i in vehicle.crew.size():
 		_crew_state(i)
 	for i in vehicle.abilities.size():
