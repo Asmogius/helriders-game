@@ -330,13 +330,13 @@ const STARTER_LOADOUT := {
 
 # --- Endless starter rigs (Quickplay QP8; SPEC: "3 Endless starter rigs: fast,
 # balanced, tough", Cameron 2026-11-05) ---------------------------------------
-# Keyed by T.ENDLESS_STARTER_RIG_IDS. Part choices are DRAFT (pending Cameron);
+# Keyed by T.ENDLESS_STARTER_RIG_IDS. Part choices approved by the owner (2026-11-05);
 # every part already exists in CATALOG and every rig fits its power and weight.
-#   fast:     Courier Frame, 77 / 90 power, 69 / 80 weight. DRAFT
+#   fast:     Courier Frame, 77 / 90 power, 69 / 80 weight. Approved
 #   balanced: the campaign STARTER_LOADOUT (100 / 100 power, 95 / 100 weight).
-#   tough:    Bulwark Frame, 105 / 125 power, 129 / 160 weight. DRAFT
+#   tough:    Bulwark Frame, 105 / 125 power, 129 / 160 weight. Approved
 const ENDLESS_STARTER_RIGS := {
-	"fast": {  # DRAFT
+	"fast": {  # approved
 		"chassis": "courier_frame",
 		"engine": "turbo_four",
 		"drive": "outrider_sport_wheels",
@@ -348,7 +348,7 @@ const ENDLESS_STARTER_RIGS := {
 		"internal": [],
 	},
 	"balanced": STARTER_LOADOUT,
-	"tough": {  # DRAFT
+	"tough": {  # approved
 		"chassis": "bulwark_frame",
 		"engine": "patched_v8",
 		"drive": "off_road_tires",

@@ -1194,24 +1194,23 @@ const SHOVE_CLEAR := 140.0
 # Read by the Endless wave director (scripts/quickplay/wave_director.gd, QP6)
 # and the Endless garage. SPEC gives: escalating waves until wrecked, always
 # day, 3 starter rigs (fast / balanced / tough), Endless scrap separate from
-# campaign scrap. Every other number here is DRAFT (DESIGN §14: pending
-# Cameron). Campaign values above are untouched.
+# campaign scrap. Every other number here was approved by the owner (2026-11-05). Campaign values above are untouched.
 #
 # Waves: a wave lasts ENDLESS_WAVE_SECONDS, then ENDLESS_INTERMISSION_SECONDS of
 # quiet. Wave n (1-based) allows min(BASE + PER_WAVE * (n - 1), ZOMBIE_CAP)
 # zombies alive, refilled every ramp seconds (Survive's "ramp"), which shrinks
 # by RAMP_STEP a wave down to RAMP_MIN.
-const ENDLESS_WAVE_SECONDS := 60.0                 # DRAFT
-const ENDLESS_INTERMISSION_SECONDS := 10.0         # DRAFT
-const ENDLESS_ZOMBIES_BASE := 12                   # DRAFT alive cap on wave 1
-const ENDLESS_ZOMBIES_PER_WAVE := 2                # DRAFT
+const ENDLESS_WAVE_SECONDS := 60.0                 # approved
+const ENDLESS_INTERMISSION_SECONDS := 10.0         # approved
+const ENDLESS_ZOMBIES_BASE := 12                   # approved alive cap on wave 1
+const ENDLESS_ZOMBIES_PER_WAVE := 2                # approved
 const ENDLESS_ZOMBIES_CAP := ZOMBIE_CAP            # existing cap (28), not new
-const ENDLESS_RAMP_START := 3.0                    # DRAFT (Survive 1-skull ramp)
-const ENDLESS_RAMP_STEP := 0.1                     # DRAFT
-const ENDLESS_RAMP_MIN := 1.5                      # DRAFT
+const ENDLESS_RAMP_START := 3.0                    # approved (Survive 1-skull ramp)
+const ENDLESS_RAMP_STEP := 0.1                     # approved
+const ENDLESS_RAMP_MIN := 1.5                      # approved
 # Zombie mix: [first wave, {kind: share}], the last row whose wave <= n applies;
 # the rest are Shamblers. Kinds are ZOMBIE_KINDS keys.
-const ENDLESS_MIX_BY_WAVE := [                     # DRAFT
+const ENDLESS_MIX_BY_WAVE := [                     # approved
 	[1, {"slimer": 0.0, "boomer": 0.0, "brute": 0.0, "tank": 0.0}],
 	[3, {"slimer": 0.06, "boomer": 0.0, "brute": 0.0, "tank": 0.0}],
 	[5, {"slimer": 0.08, "boomer": 0.05, "brute": 0.05, "tank": 0.0}],
@@ -1222,11 +1221,11 @@ const ENDLESS_MIX_BY_WAVE := [                     # DRAFT
 # rigs; count = 1 + (rig waves so far) / ENDLESS_RIG_COUNT_STEP, capped at the
 # existing 3-rig cap. Kinds come from the last row whose wave <= n (names match
 # mission.spawn_*).
-const ENDLESS_RIG_FIRST_WAVE := 3                  # DRAFT
-const ENDLESS_RIG_EVERY := 2                       # DRAFT
-const ENDLESS_RIG_COUNT_STEP := 3                  # DRAFT
+const ENDLESS_RIG_FIRST_WAVE := 3                  # approved
+const ENDLESS_RIG_EVERY := 2                       # approved
+const ENDLESS_RIG_COUNT_STEP := 3                  # approved
 const ENDLESS_RIG_MAX := 3                         # existing 3-rig cap, not new
-const ENDLESS_RIG_POOL_BY_WAVE := [                # DRAFT
+const ENDLESS_RIG_POOL_BY_WAVE := [                # approved
 	[1, ["scrapper"]],
 	[5, ["scrapper", "outrider"]],
 	[8, ["scrapper", "outrider", "gunner", "bulwark"]],
@@ -1237,17 +1236,17 @@ const ENDLESS_RIG_POOL_BY_WAVE := [                # DRAFT
 # kind's ZOMBIE_KINDS "scrap" times ENDLESS_SCRAP_KILL_MULT; rigs pay a flat
 # amount; clearing wave n pays BASE + PER_WAVE * (n - 1). Scrap banks when the
 # run ends (wrecked), keeping ENDLESS_WRECK_KEEP of it.
-const ENDLESS_SCRAP_KILL_MULT := 1.0               # DRAFT
-const ENDLESS_SCRAP_PER_RIG := 25                  # DRAFT (a Scrapper's campaign pay)
-const ENDLESS_WAVE_SCRAP_BASE := 10                # DRAFT
-const ENDLESS_WAVE_SCRAP_PER_WAVE := 5             # DRAFT
-const ENDLESS_WRECK_KEEP := 1.0                    # DRAFT (Endless only ends in a wreck)
-const ENDLESS_START_SCRAP := 0                     # DRAFT new Endless profile
-const ENDLESS_UNLOCK_COST_MULT := 1.0              # DRAFT x Parts CATALOG "cost" in the Endless garage
+const ENDLESS_SCRAP_KILL_MULT := 1.0               # approved
+const ENDLESS_SCRAP_PER_RIG := 25                  # approved (a Scrapper's campaign pay)
+const ENDLESS_WAVE_SCRAP_BASE := 10                # approved
+const ENDLESS_WAVE_SCRAP_PER_WAVE := 5             # approved
+const ENDLESS_WRECK_KEEP := 1.0                    # approved (Endless only ends in a wreck)
+const ENDLESS_START_SCRAP := 0                     # approved new Endless profile
+const ENDLESS_UNLOCK_COST_MULT := 1.0              # approved x Parts CATALOG "cost" in the Endless garage
 # Score (best score is tracked locally).
-const ENDLESS_SCORE_PER_KILL := 10                 # DRAFT
-const ENDLESS_SCORE_PER_RIG := 100                 # DRAFT
-const ENDLESS_SCORE_PER_WAVE := 250                # DRAFT x wave number on clear
+const ENDLESS_SCORE_PER_KILL := 10                 # approved
+const ENDLESS_SCORE_PER_RIG := 100                 # approved
+const ENDLESS_SCORE_PER_WAVE := 250                # approved x wave number on clear
 # Starter rigs (SPEC: fast, balanced, tough). Loadouts: Parts.ENDLESS_STARTER_RIGS.
 const ENDLESS_STARTER_RIG_IDS := ["fast", "balanced", "tough"]
-const ENDLESS_STARTER_RIG_DEFAULT := "balanced"    # DRAFT preselected pick
+const ENDLESS_STARTER_RIG_DEFAULT := "balanced"    # approved preselected pick
