@@ -4,10 +4,10 @@
   720
  ],
  "fireplace_rect": [
-  560,
-  50,
-  280,
-  180
+  500,
+  153,
+  282,
+  220
  ],
  "card_left_rect": [
   24,
@@ -21,113 +21,152 @@
   356,
   448
  ],
- "camera": "near-isometric ~52\u00b0 (S=8,TOP=5,FRONT=10,SIDE=4) \u2014 identical to saloon_v2 concept C",
- "tilt_note": "Not garage TILT 30\u00b0. Matches approved concepts/saloon_v2/saloon_c_*.png.",
- "sun": "upper-left \u2192 hard shadows down-right",
+ "camera": "voxel_render HD ppv=3 tilt=45.0\u00b0 heading=0.0\u00b0 (PR #70 game camera)",
+ "tilt_deg": 45.0,
+ "px_per_voxel": 3,
+ "hd": true,
+ "sun": "upper-left \u2192 hard shadows down-right (baked into floor voxels)",
  "night": "#512b11 world grade; fire/lanterns untinted on lights plate",
  "background": "res://art/saloon/saloon_room.png",
  "lights": "res://art/saloon/saloon_room_lights.png",
  "lights_note": "Fireplace + lantern glow. Composite above world night grade; do not CanvasModulate.",
- "sprite_scale": 1.0,
+ "animations": {
+  "fireplace_flicker": {
+   "sheet": "res://art/saloon/fireplace_flicker.png",
+   "frames": 4,
+   "fps": 8
+  },
+  "lantern_pulse": {
+   "plates": [
+    "res://art/saloon/saloon_room_lights_pulse0.png",
+    "res://art/saloon/saloon_room_lights_pulse1.png"
+   ],
+   "fps": 2
+  }
+ },
  "seats": [
   {
    "id": "bar_left",
    "slot": 0,
    "pos": [
-    232,
-    135
+    203,
+    171
    ],
-   "z": 381,
+   "z": 346,
    "hit_rect": [
-    220,
-    123,
-    120,
-    270
+    189,
+    157,
+    143,
+    203
    ],
    "anchor": [
-    284,
-    168
+    260,
+    206
    ],
    "card_side": "right",
    "sprites": {
     "idle": "res://art/saloon/crew_bar_left_idle.png",
     "highlight": "res://art/saloon/crew_bar_left_highlight.png",
-    "dim": "res://art/saloon/crew_bar_left_dim.png"
+    "dim": "res://art/saloon/crew_bar_left_dim.png",
+    "idle_anim": "res://art/saloon/crew_bar_left_idle_anim.png"
+   },
+   "anim": {
+    "idle_frames": 4,
+    "idle_frame_w": 115,
+    "fps": 4
    }
   },
   {
    "id": "table_left",
    "slot": 1,
    "pos": [
-    328,
-    260
+    311,
+    347
    ],
-   "z": 506,
+   "z": 522,
    "hit_rect": [
-    316,
-    248,
-    124,
-    270
+    297,
+    333,
+    143,
+    203
    ],
    "anchor": [
-    380,
-    293
+    368,
+    382
    ],
    "card_side": "right",
    "sprites": {
     "idle": "res://art/saloon/crew_table_left_idle.png",
     "highlight": "res://art/saloon/crew_table_left_highlight.png",
-    "dim": "res://art/saloon/crew_table_left_dim.png"
+    "dim": "res://art/saloon/crew_table_left_dim.png",
+    "idle_anim": "res://art/saloon/crew_table_left_idle_anim.png"
+   },
+   "anim": {
+    "idle_frames": 4,
+    "idle_frame_w": 115,
+    "fps": 4
    }
   },
   {
    "id": "table_mid",
    "slot": 2,
    "pos": [
-    440,
-    250
+    436,
+    321
    ],
-   "z": 486,
+   "z": 456,
    "hit_rect": [
-    428,
-    238,
-    124,
-    260
+    422,
+    307,
+    143,
+    163
    ],
    "anchor": [
-    492,
-    273
+    493,
+    348
    ],
    "card_side": "right",
    "sprites": {
     "idle": "res://art/saloon/crew_table_mid_idle.png",
     "highlight": "res://art/saloon/crew_table_mid_highlight.png",
-    "dim": "res://art/saloon/crew_table_mid_dim.png"
+    "dim": "res://art/saloon/crew_table_mid_dim.png",
+    "idle_anim": "res://art/saloon/crew_table_mid_idle_anim.png"
+   },
+   "anim": {
+    "idle_frames": 4,
+    "idle_frame_w": 115,
+    "fps": 4
    }
   },
   {
    "id": "table_right",
    "slot": 3,
    "pos": [
-    536,
-    280
+    562,
+    353
    ],
-   "z": 516,
+   "z": 535,
    "hit_rect": [
-    524,
-    268,
-    124,
-    260
+    548,
+    339,
+    142,
+    210
    ],
    "anchor": [
-    588,
-    303
+    619,
+    389
    ],
    "card_side": "right",
    "sprites": {
     "idle": "res://art/saloon/crew_table_right_idle.png",
     "highlight": "res://art/saloon/crew_table_right_highlight.png",
-    "dim": "res://art/saloon/crew_table_right_dim.png"
+    "dim": "res://art/saloon/crew_table_right_dim.png",
+    "idle_anim": "res://art/saloon/crew_table_right_idle_anim.png"
+   },
+   "anim": {
+    "idle_frames": 4,
+    "idle_frame_w": 114,
+    "fps": 4
    }
   }
  ],
