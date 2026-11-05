@@ -104,8 +104,14 @@ godot --headless --fixed-fps 60 --path . -s res://tests/garage_layout_test.gd # 
 godot --headless --fixed-fps 60 --path . -s res://tests/fx_sample_test.gd # must end "FX SAMPLE TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/tracer_styles_test.gd # must end "TRACER STYLES TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/transitions_test.gd # must end "TRANSITIONS TEST PASSED"
+godot --headless --fixed-fps 60 --path . -s res://tests/night_test.gd      # must end "NIGHT TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/kill_loops_test.gd   # must end "KILL LOOPS TEST PASSED" (one blast hits every zombie in range)
 godot --headless --fixed-fps 60 --path . -s res://tests/wreck_and_swarm_test.gd   # must end "WRECK AND SWARM TEST PASSED" (shove through a pack, wreck freezes the fight, free hires match their card)
+godot --headless --fixed-fps 60 --path . -s res://tests/abandon_job_test.gd   # must end "ABANDON JOB TEST PASSED" (pause menu gives a job up: day passes, no pay, rig and crew kept)
+godot --headless --fixed-fps 60 --path . -s res://tests/crew_seating_test.gd   # must end "CREW SEATING TEST PASSED" (hires seated after a rebuild, no Driver = no DEPLOY)
+godot --headless --fixed-fps 60 --path . -s res://tests/escort_truck_test.gd # must end "ESCORT TRUCK TEST PASSED" (truck HP line, low-HP warning, GOOPED pulls the horde)
+godot --headless --fixed-fps 60 --path . -s res://tests/saloon_match_test.gd # must end "SALOON MATCH TEST PASSED" (every Saloon card is exactly who you hire)
+godot --headless --fixed-fps 60 --path . -s res://tests/tutorial_readability_test.gd # must end "TUTORIAL READABILITY TEST PASSED" (Training Run brightens the arena and rings zombies)
 ```
 
 - Tests must call `Profile.new_game()` with `persist = false` first, so they never touch a real save.
@@ -122,3 +128,10 @@ https://github.com/Asmogius/helriders-game/releases/download/latest-build/helrid
 The same run also exports a Windows build (preset "Windows" in `export_presets.cfg`, one self-contained .exe) and attaches `helriders-windows.zip` to the release; that step is `continue-on-error`, so a Windows failure never blocks the APK. Each build is stamped version 0.1.<run number>. A signed release APK (`helriders-release.apk`) is also built once the repository secrets `ANDROID_RELEASE_KEYSTORE_BASE64`, `ANDROID_RELEASE_KEY_ALIAS` and `ANDROID_RELEASE_KEY_PASSWORD` exist; never commit a release key.
 
 If the workflow fails, the owner gets no build. Check the run and fix it before moving on.
+
+## Cursor Cloud
+
+- `godot` on `PATH` is Godot 4.7.2 (`/usr/local/bin/godot`). Verify with the headless commands above.
+- Import may print `Unable to open Android 'build-tools' directory`. The Android SDK is not installed here. That line is a warning: import still succeeds, and the headless tests do not need the SDK. APK and Windows export stay on GitHub Actions.
+- Rendered checks use the installed `xvfb`: `xvfb-run -a godot --rendering-driver opengl3 --path . ...`. There is no sound card; Godot falls back to the dummy audio driver.
+- `python3` has numpy and Pillow, and `ffmpeg` encodes Vorbis, for `tools/art` and `tools/audio/synth.py`.
