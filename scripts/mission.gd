@@ -1155,10 +1155,10 @@ func _pad_input() -> void:
 
 
 # --- Mouse and keyboard (PC; pad.gd tracks the scheme) ------------------------------
-# WASD / arrows drive, the turret follows the mouse, left click fires (the
-# Mortar lands where you point), right click toggles LOCK, Q / E / F fire
-# utilities 1-3, Tab opens the crew wheel (point and click, or 1-4), Esc pauses.
-# With LOCK on and no click, the turret is left to the lock.
+# WASD / arrows drive, the turret follows the mouse. Fire / lock / pause /
+# utilities / crew follow Pad.kbm_map (defaults LMB / RMB / Esc / Q E F / Tab).
+# Esc always pauses as a hard fallback. With LOCK on and no fire, the turret
+# is left to the lock.
 
 var kbm_mouse_override := Vector2.INF   # tests: a world point standing in for the mouse
 var kbm_fire_override := -1             # tests: 1 = left button held, 0 = not
@@ -1176,6 +1176,9 @@ func _kbm_mouse() -> Vector2:
 func _kbm_firing() -> bool:
 	if kbm_fire_override >= 0:
 		return kbm_fire_override == 1
+	var pad := _pad()
+	if pad != null and pad.has_method("kbm_fire_held"):
+		return bool(pad.call("kbm_fire_held"))
 	return Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
 
 
@@ -1218,19 +1221,42 @@ func _kbm_event(event: InputEvent) -> void:
 		return
 	if event is InputEventMouseButton and (event as InputEventMouseButton).pressed:
 		var mb := event as InputEventMouseButton
+		var code := PadScript.kbm_encode_mouse(int(mb.button_index))
 		if hud.is_crew_wheel_open():
+			# Crew wheel UI keeps left-confirm / right-cancel regardless of fire/lock binds.
 			if mb.button_index == MOUSE_BUTTON_LEFT:
 				hud.pad_wheel_confirm()
 			elif mb.button_index == MOUSE_BUTTON_RIGHT:
 				hud.close_crew_wheel()
-		elif mb.button_index == MOUSE_BUTTON_RIGHT:
-			hud.pad_lock()
+			return
+		match PadScript.kbm_action(code):
+			"lock":
+				hud.pad_lock()
+			"pause":
+				open_menu()
+			"ability_1":
+				use_ability(0)
+			"ability_2":
+				use_ability(1)
+			"ability_3":
+				use_ability(2)
+			"crew":
+				if hud.is_crew_wheel_open():
+					hud.close_crew_wheel()
+				else:
+					hud.open_crew_wheel()
 	elif event is InputEventKey and (event as InputEventKey).pressed and not (event as InputEventKey).echo:
 		var key := int((event as InputEventKey).physical_keycode)
 		if hud.is_crew_wheel_open() and key >= KEY_1 and key <= KEY_9:
 			hud.pick_crew(key - KEY_1)
 			return
 		match PadScript.kbm_action(key):
+			"lock":
+				hud.pad_lock()
+			"pause":
+				# Bound pause key (Esc is also handled in _unhandled_input as fallback).
+				if key != KEY_ESCAPE:
+					open_menu()
 			"ability_1":
 				use_ability(0)
 			"ability_2":
@@ -1264,14 +1290,15 @@ func pad_wants_focus() -> bool:
 
 
 ## A pad button in the fight (bound in Settings > CONTROLLER; pad.gd).
-## Returns true when it was used.
+## Returns true when it was used. Start / OPTIONS always pauses as a fallback.
 func pad_button(button: int) -> bool:
 	if loading_map:
 		return true   # swallowed behind the loading screen
 	var pad := _pad()
 	var action := str(pad.call("action_for", button)) if pad != null else ""
+	var pause_press := action == "pause" or button == JOY_BUTTON_START
 	if menu != null:
-		if action == "pause":
+		if pause_press:
 			menu.resume()
 			return true
 		return false
@@ -1280,9 +1307,10 @@ func pad_button(button: int) -> bool:
 	if hud.is_crew_wheel_open() and button == JOY_BUTTON_A:
 		hud.pad_wheel_confirm()   # Cross picks in the wheel, whatever it's bound to
 		return true
+	if pause_press:
+		open_menu()
+		return true
 	match action:
-		"pause":
-			open_menu()
 		"ability_1":
 			use_ability(0)
 		"ability_2":

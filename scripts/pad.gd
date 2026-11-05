@@ -13,6 +13,8 @@ extends Node
 ## scene's pad_button(button) if it has one.
 
 signal mode_changed(active: bool)
+signal scheme_changed(scheme: String)   # "touch" | "pad" | "kbm" — last input used
+signal joy_connection_changed(connected: bool)
 
 const DEAD := 0.18           # stick deadzone
 const TRIGGER := 0.4         # R2 counts as held past this
@@ -25,6 +27,8 @@ var _scan := 0.0
 var _modal: Control          # the modal at the last scan (a new one rescans at once)
 var override := {}           # tests: "left" / "right" Vector2 and "r2" bool stand in for the pad
 var kbm := false             # PC: mouse and keyboard in use (pad.gd tracks all three schemes)
+var last_scheme := "touch"   # prompts / glyphs follow the last input used
+var joy_connected := false   # any joypad currently plugged in
 
 
 func _ready() -> void:
@@ -32,6 +36,12 @@ func _ready() -> void:
 	if _desktop():
 		# On a PC the mouse aims and clicks; it mustn't grab the touch sticks.
 		Input.emulate_touch_from_mouse = false
+		if DisplayServer.get_name() != "headless":
+			kbm = true   # playtest #10: real PC starts KBM so touch chrome stays hidden
+			last_scheme = "kbm"
+	_refresh_joy_connected()
+	if not Input.joy_connection_changed.is_connected(_on_joy_connection_changed):
+		Input.joy_connection_changed.connect(_on_joy_connection_changed)
 	var layer := CanvasLayer.new()
 	layer.layer = 120
 	add_child(layer)
@@ -39,6 +49,41 @@ func _ready() -> void:
 	_ring.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(_ring)
+
+
+func _refresh_joy_connected() -> void:
+	joy_connected = not Input.get_connected_joypads().is_empty()
+
+
+func _on_joy_connection_changed(_device: int, connected: bool) -> void:
+	var was := joy_connected
+	_refresh_joy_connected()
+	if joy_connected != was:
+		joy_connection_changed.emit(joy_connected)
+	# Android: last pad unplugged → drop controller mode so touch chrome returns.
+	if not joy_connected and active and not _desktop():
+		set_active(false)
+	elif joy_connected and not _desktop():
+		# A pad plugged in on a phone: prefer controller chrome immediately.
+		set_scheme("pad")
+	mode_changed.emit(active)
+
+
+## Hide on-screen touch sticks / ability / CREW / LOCK / pause when a pad is
+## connected, the player is on KBM, or this is a desktop build.
+func touch_chrome_hidden() -> bool:
+	if _desktop() and DisplayServer.get_name() != "headless":
+		return true
+	if joy_connected or active or kbm:
+		return true
+	return false
+
+
+func set_scheme(scheme: String) -> void:
+	if scheme == last_scheme:
+		return
+	last_scheme = scheme
+	scheme_changed.emit(scheme)
 
 
 func _input(event: InputEvent) -> void:
@@ -71,6 +116,16 @@ func _input(event: InputEvent) -> void:
 				_trig_down[k] = down
 	elif event is InputEventKey and (event as InputEventKey).pressed and not (event as InputEventKey).echo:
 		var k := event as InputEventKey
+		if capturing_kbm != "":
+			# Esc cancels any rebind except PAUSE, where Esc assigns Esc-pause.
+			if k.keycode == KEY_ESCAPE and capturing_kbm != "pause":
+				cancel_kbm_capture()
+			elif k.keycode == KEY_ESCAPE and capturing_kbm == "pause":
+				_capture_kbm(KEY_ESCAPE)
+			else:
+				_capture_kbm(int(k.physical_keycode))
+			get_viewport().set_input_as_handled()
+			return
 		if _desktop():
 			set_kbm(true)
 		if k.keycode == KEY_F11 or ((k.keycode == KEY_ENTER or k.keycode == KEY_KP_ENTER) and k.alt_pressed):
@@ -78,9 +133,17 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 	elif event is InputEventScreenTouch and (event as InputEventScreenTouch).pressed:
 		capturing = ""
+		capturing_kbm = ""
+		set_scheme("touch")
 		set_active(false)
 		set_kbm(false)
 	elif event is InputEventMouseButton and (event as InputEventMouseButton).pressed:
+		var mb := event as InputEventMouseButton
+		if capturing_kbm != "":
+			# Bind the click; mark handled so Settings buttons underneath do not press.
+			_capture_kbm(kbm_encode_mouse(int(mb.button_index)))
+			get_viewport().set_input_as_handled()
+			return
 		capturing = ""
 		set_active(false)
 		if _desktop():
@@ -102,6 +165,12 @@ func set_kbm(on: bool) -> void:
 	if on == kbm:
 		return
 	kbm = on
+	if on:
+		set_scheme("kbm")
+	elif active or joy_connected:
+		set_scheme("pad")
+	else:
+		set_scheme("touch")
 	if on and active:
 		set_active(false)
 		return   # set_active emitted the change
@@ -117,6 +186,7 @@ func set_active(on: bool) -> void:
 		return
 	if on:
 		kbm = false
+		set_scheme("pad")
 	active = on
 	_scan = 0.0
 	if not on:
@@ -124,18 +194,20 @@ func set_active(on: bool) -> void:
 		var owner := get_viewport().gui_get_focus_owner()
 		if owner != null:
 			owner.release_focus()
+		if not kbm and not joy_connected:
+			set_scheme("touch")
 	mode_changed.emit(on)
 
 
-## The touch wording, or the pad's while a controller is in use (hints and
-## tips; screens listen to mode_changed to swap them).
+## The touch wording, or the pad/KBM wording for the last input used (hints and
+## tips; screens listen to mode_changed / scheme_changed to swap them).
 static func hint(touch: String, pad: String, mouse := "") -> String:
 	var tree := Engine.get_main_loop() as SceneTree
 	var p: Node = tree.root.get_node_or_null("Pad") if tree != null else null
-	if p != null and bool(p.get("active")):
+	var scheme := str(p.get("last_scheme")) if p != null else "touch"
+	if scheme == "pad" or (p != null and bool(p.get("active"))):
 		return pad
-	if p != null and bool(p.get("kbm")):
-		# Mouse and keyboard: its own wording, or the touch text with clicks for taps.
+	if scheme == "kbm" or (p != null and bool(p.get("kbm"))):
 		return mouse if mouse != "" else touch.replace("Tap", "Click").replace("tap", "click").replace("TAP", "CLICK")
 	return touch
 
@@ -172,11 +244,12 @@ func held(action: String) -> bool:
 
 
 # --- Button mapping (Settings > CONTROLLER) ---------------------------------------
-# Fight actions can be rebound to any pad button, L2 or R2; menus keep the
-# D-pad, Cross, Circle and L1 / R1. The map lives in Profile.settings
-# ("pad_map": action -> code, "pad_swap": sticks swapped), saved with the
-# other settings. Codes are Godot joypad buttons, or TRIGGER_BASE + axis for
-# L2 / R2.
+# All fight actions (fire, lock, pause, utilities, crew) can be rebound to any
+# pad button, L2 or R2; menus keep the D-pad, Cross, Circle and L1 / R1.
+# Start / OPTIONS always pauses as a hard fallback. The map lives in
+# Profile.settings ("pad_map": action -> code, "pad_swap": sticks swapped),
+# saved with the other settings. Codes are Godot joypad buttons, or
+# TRIGGER_BASE + axis for L2 / R2.
 
 const TRIGGER_BASE := 100
 const ACTIONS := ["fire", "ability_1", "ability_2", "ability_3", "lock", "crew", "pause"]
@@ -192,18 +265,127 @@ const BUTTON_NAMES := {JOY_BUTTON_A: "CROSS", JOY_BUTTON_B: "CIRCLE", JOY_BUTTON
 	JOY_BUTTON_DPAD_RIGHT: "D-PAD RIGHT", JOY_BUTTON_MISC1: "MUTE", JOY_BUTTON_TOUCHPAD: "TOUCHPAD",
 	TRIGGER_BASE + JOY_AXIS_TRIGGER_LEFT: "L2", TRIGGER_BASE + JOY_AXIS_TRIGGER_RIGHT: "R2"}
 
-## Mouse and keyboard (fixed layout): WASD / arrows drive, the mouse aims,
-## left click fires, right click toggles LOCK, Q / E / F fire utilities 1-3,
-## Tab opens the crew wheel (point and click, or 1-4), Esc pauses.
-const KBM_KEYS := {"ability_1": KEY_Q, "ability_2": KEY_E, "ability_3": KEY_F, "crew": KEY_TAB}
+## Mouse and keyboard: WASD / arrows drive, the mouse aims. Fire / lock / pause /
+## utilities / CREW are all rebindable (Settings > KEYBOARD & MOUSE). Defaults:
+## LMB fire, RMB lock, Esc pause, Q / E / F utilities, Tab crew.
+## Mouse buttons are stored as KBM_MOUSE_BASE + MouseButton index.
+const KBM_MOUSE_BASE := 1000000
+const KBM_DEFAULT := {
+	"fire": KBM_MOUSE_BASE + MOUSE_BUTTON_LEFT,
+	"lock": KBM_MOUSE_BASE + MOUSE_BUTTON_RIGHT,
+	"pause": KEY_ESCAPE,
+	"ability_1": KEY_Q, "ability_2": KEY_E, "ability_3": KEY_F, "crew": KEY_TAB,
+}
+const KBM_KEYS := KBM_DEFAULT   # compat alias for older callers / tests
+const KBM_REBIND := ["fire", "lock", "pause", "ability_1", "ability_2", "ability_3", "crew"]
 const KBM_NAMES := {"fire": "LEFT CLICK", "lock": "RIGHT CLICK", "ability_1": "Q", "ability_2": "E", "ability_3": "F", "crew": "TAB", "pause": "ESC"}
 const KBM_BADGES := {"fire": "LMB", "lock": "RMB", "ability_1": "Q", "ability_2": "E", "ability_3": "F", "crew": "TAB", "pause": "ESC"}
+var capturing_kbm := ""   # action waiting for a key/click (Settings), or ""
 
 
-## The fight action a key is bound to (physical key, so it works on any layout), or "".
-static func kbm_action(physical: int) -> String:
-	for a: String in KBM_KEYS:
-		if int(KBM_KEYS[a]) == physical:
+static func kbm_encode_mouse(button_index: int) -> int:
+	return KBM_MOUSE_BASE + button_index
+
+
+static func kbm_is_mouse(code: int) -> bool:
+	return code >= KBM_MOUSE_BASE and code < KBM_MOUSE_BASE + 32
+
+
+static func kbm_mouse_index(code: int) -> int:
+	return code - KBM_MOUSE_BASE if kbm_is_mouse(code) else -1
+
+
+## Physical key or encoded mouse button currently bound to a KBM action.
+func kbm_binding(action: String) -> int:
+	var m: Variant = _settings().get("kbm_map", {})
+	if m is Dictionary and (m as Dictionary).has(action):
+		return int(m[action])
+	return int(KBM_DEFAULT.get(action, -1))
+
+
+## Display name for a KBM binding (mouse button or key).
+func kbm_code_name(code: int) -> String:
+	if kbm_is_mouse(code):
+		match kbm_mouse_index(code):
+			MOUSE_BUTTON_LEFT:
+				return "LEFT CLICK"
+			MOUSE_BUTTON_RIGHT:
+				return "RIGHT CLICK"
+			MOUSE_BUTTON_MIDDLE:
+				return "MIDDLE CLICK"
+			MOUSE_BUTTON_XBUTTON1:
+				return "MOUSE 4"
+			MOUSE_BUTTON_XBUTTON2:
+				return "MOUSE 5"
+			_:
+				return "MOUSE %d" % kbm_mouse_index(code)
+	if code == KEY_ESCAPE:
+		return "ESC"
+	if code >= 0:
+		return OS.get_keycode_string(code as Key).to_upper()
+	return "?"
+
+
+## Display name for a KBM action's current binding.
+func kbm_button_name(action: String) -> String:
+	return kbm_code_name(kbm_binding(action))
+
+
+## HUD badge for a KBM action (short form of the current binding).
+func kbm_badge(action: String) -> String:
+	var code := kbm_binding(action)
+	if kbm_is_mouse(code):
+		match kbm_mouse_index(code):
+			MOUSE_BUTTON_LEFT:
+				return "LMB"
+			MOUSE_BUTTON_RIGHT:
+				return "RMB"
+			MOUSE_BUTTON_MIDDLE:
+				return "MMB"
+			_:
+				return "M%d" % kbm_mouse_index(code)
+	var name := kbm_code_name(code)
+	return name.left(3) if name.length() > 3 else name
+
+
+## True while the bound fire input is held (mouse button or key).
+func kbm_fire_held() -> bool:
+	var code := kbm_binding("fire")
+	if kbm_is_mouse(code):
+		return Input.is_mouse_button_pressed(kbm_mouse_index(code) as MouseButton)
+	return code >= 0 and Input.is_physical_key_pressed(code as Key)
+
+
+## True if this event triggers pause: the pause binding, or Esc as hard fallback
+## so pause is never lost when rebound away from Esc.
+func kbm_is_pause_event(event: InputEvent) -> bool:
+	if event is InputEventKey and (event as InputEventKey).pressed and not (event as InputEventKey).echo:
+		var key := event as InputEventKey
+		if key.keycode == KEY_ESCAPE or int(key.physical_keycode) == KEY_ESCAPE:
+			return true   # Esc always pauses (fallback if pause was rebound)
+		return int(key.physical_keycode) == kbm_binding("pause")
+	if event is InputEventMouseButton and (event as InputEventMouseButton).pressed:
+		var code := kbm_binding("pause")
+		return kbm_is_mouse(code) and kbm_mouse_index(code) == int((event as InputEventMouseButton).button_index)
+	return false
+
+
+## The fight action a key/mouse code is bound to, or "".
+func kbm_action_of(code: int) -> String:
+	for a: String in KBM_REBIND:
+		if kbm_binding(a) == code:
+			return a
+	return ""
+
+
+## Static entry (preload callers): prefers the live Pad map.
+static func kbm_action(code: int) -> String:
+	var tree := Engine.get_main_loop() as SceneTree
+	var node: Node = tree.root.get_node_or_null("Pad") if tree != null else null
+	if node != null and node.has_method("kbm_action_of"):
+		return str(node.call("kbm_action_of", code))
+	for a: String in KBM_DEFAULT:
+		if int(KBM_DEFAULT[a]) == code:
 			return a
 	return ""
 
@@ -269,17 +451,29 @@ func badge(action: String) -> String:
 
 
 ## Bind `action` to `code`. An action already on that button swaps over to
-## this one's old button, so nothing is ever left unbound.
-func bind(action: String, code: int) -> void:
+## this one's old button, so nothing is ever left unbound. Refuses a bind that
+## would leave pause with no code. Start (OPTIONS) remains a hard pause fallback
+## in the fight even when Pause is rebound away from it.
+func bind(action: String, code: int) -> bool:
+	if action not in ACTIONS or code < 0:
+		return false
 	var m := {}
 	for a: String in ACTIONS:
 		m[a] = binding(a)
-	var old: int = m[action]
+	var old: int = int(m[action])
 	for a: String in ACTIONS:
 		if a != action and int(m[a]) == code:
 			m[a] = old
 	m[action] = code
+	if int(m.get("pause", -1)) < 0:
+		return false   # pause must never end up unbound
 	_store("pad_map", m)
+	return true
+
+
+## True when this pad code should pause: the pause binding, or Start as fallback.
+func is_pause_code(code: int) -> bool:
+	return code == binding("pause") or code == JOY_BUTTON_START
 
 
 func reset_map() -> void:
@@ -299,10 +493,52 @@ func set_sticks_swapped(on: bool) -> void:
 ## Wait for the next pad press and bind it to `action`.
 func start_capture(action: String) -> void:
 	capturing = action
+	capturing_kbm = ""
 
 
 func cancel_capture() -> void:
 	capturing = ""
+
+
+func start_kbm_capture(action: String) -> void:
+	capturing_kbm = action
+	capturing = ""
+
+
+func cancel_kbm_capture() -> void:
+	capturing_kbm = ""
+	map_changed.emit()
+
+
+## Bind `action` to `code` (key or encoded mouse). An action already on that
+## input swaps over so nothing is left unbound. Refuses a bind that would leave
+## pause with no code (should not happen with swap, but guarded anyway).
+func bind_kbm(action: String, code: int) -> bool:
+	if action not in KBM_REBIND or code < 0:
+		return false
+	var m := {}
+	for a: String in KBM_REBIND:
+		m[a] = kbm_binding(a)
+	var old_code: int = int(m[action])
+	for a: String in KBM_REBIND:
+		if a != action and int(m[a]) == code:
+			m[a] = old_code
+	m[action] = code
+	if int(m.get("pause", -1)) < 0:
+		return false   # pause must never end up unbound
+	_store("kbm_map", m)
+	return true
+
+
+func reset_kbm_map() -> void:
+	_store("kbm_map", KBM_DEFAULT.duplicate())
+
+
+func _capture_kbm(code: int) -> void:
+	var a := capturing_kbm
+	capturing_kbm = ""
+	if a != "":
+		bind_kbm(a, code)
 
 
 func _capture(code: int) -> void:

@@ -108,6 +108,8 @@ func _ready() -> void:
 	var pad := get_node_or_null("/root/Pad")
 	if pad != null:
 		pad.connect("mode_changed", _on_pad_mode)
+		if pad.has_signal("scheme_changed"):
+			pad.connect("scheme_changed", _on_scheme_changed)
 	var music := get_node_or_null("/root/MusicManager")
 	if music != null:
 		music.play_garage()
@@ -1798,6 +1800,10 @@ func _sheet_title_text(slot: Dictionary) -> String:
 
 
 ## Touch <-> controller: swap the wording on screen.
+func _on_scheme_changed(_scheme: String) -> void:
+	_on_pad_mode(bool(get_node_or_null("/root/Pad") and bool(get_node_or_null("/root/Pad").get("active"))))
+
+
 func _on_pad_mode(_on: bool) -> void:
 	_hint.text = _hint_text()
 	_refresh_tags()

@@ -4,6 +4,7 @@ extends SceneTree
 ## has a DISPLAY (windowed / fullscreen) toggle that is saved, and F11 or
 ## Alt+Enter flips it. Mouse and keyboard: WASD drive, the mouse aims, left
 ## click fires, right click LOCK, Q/E/F utilities, Tab and 1-4 the crew wheel.
+## Fire / lock / pause are rebindable; Esc always pauses as a fallback.
 ##
 ## Run:  godot --headless --fixed-fps 60 --path . -s res://tests/pc_test.gd
 
@@ -81,6 +82,58 @@ func _process(_delta: float) -> bool:
 					found = true
 					(b as Button).pressed.emit()
 			_check(found, "Settings shows DISPLAY: WINDOWED on a PC")
+			var kbm_btn := false
+			for b: Node in garage.menu.find_children("*", "Button", true, false):
+				if (b as Button).text == "KEYBOARD & MOUSE":
+					kbm_btn = true
+					(b as Button).pressed.emit()
+			_check(kbm_btn and garage.menu.page == "kbm", "Settings has KEYBOARD & MOUSE")
+			var pad: Node = root.get_node("Pad")
+			pad.call("start_kbm_capture", "ability_1")
+			garage.menu.show_page("kbm")
+			_check(str(pad.get("capturing_kbm")) == "ability_1", "KBM rebind is waiting for a key")
+			_key(KEY_ESCAPE)
+			_check(str(pad.get("capturing_kbm")) == "" and garage.menu.page == "kbm", "Esc cancels KBM rebind without leaving the page")
+			# Fire / lock / pause are rebindable (mouse + keys). Esc on PAUSE assigns Esc.
+			_check(pad.call("bind_kbm", "fire", KEY_R) and str(pad.call("kbm_button_name", "fire")) == "R", "FIRE rebinds to a key")
+			pad.call("start_kbm_capture", "lock")
+			garage.menu.show_page("kbm")
+			_click(MOUSE_BUTTON_MIDDLE)
+			_check(str(pad.get("capturing_kbm")) == "" and str(pad.call("kbm_button_name", "lock")) == "MIDDLE CLICK", "LOCK rebinds to a mouse button without leaving capture stuck")
+			_check(garage.menu.page == "kbm", "mouse rebind did not press a Settings button underneath")
+			pad.call("start_kbm_capture", "pause")
+			garage.menu.show_page("kbm")
+			_key(KEY_ESCAPE)
+			_check(str(pad.get("capturing_kbm")) == "" and int(pad.call("kbm_binding", "pause")) == KEY_ESCAPE, "Esc while rebinding PAUSE assigns Esc-pause")
+			_check(pad.call("bind_kbm", "pause", KEY_P) and int(pad.call("kbm_binding", "pause")) == KEY_P, "PAUSE rebinds to P")
+			_check(int(pad.call("kbm_binding", "fire")) >= 0, "swap left FIRE bound after pause move")
+			pad.call("reset_kbm_map")
+			_check(str(pad.call("kbm_button_name", "fire")) == "LEFT CLICK" and str(pad.call("kbm_button_name", "pause")) == "ESC", "RESET restores fire/lock/pause defaults")
+			# Defaults cover every fight action; map persists with settings.
+			var defaults: Dictionary = pad.get("KBM_DEFAULT")
+			for a: String in ["fire", "lock", "pause", "ability_1", "ability_2", "ability_3", "crew"]:
+				_check(defaults.has(a) and int(pad.call("kbm_binding", a)) == int(defaults[a]), "KBM default binds %s" % a)
+			pad.call("bind_kbm", "ability_2", KEY_G)
+			profile.persist = true
+			var ppath: String = profile.settings_path
+			profile.settings_path = "user://helriders_kbm_map_test.cfg"
+			profile.save_settings()
+			profile.settings.erase("kbm_map")
+			profile.load_settings()
+			_check(int(pad.call("kbm_binding", "ability_2")) == KEY_G, "kbm_map survives save/load")
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(profile.settings_path))
+			profile.settings_path = ppath
+			profile.persist = false
+			pad.call("reset_kbm_map")
+			# Device detection / touch chrome hide (simulated joy + scheme).
+			pad.set("joy_connected", true)
+			pad.call("set_scheme", "pad")
+			_check(bool(pad.call("touch_chrome_hidden")), "joy_connected hides touch chrome")
+			pad.set("joy_connected", false)
+			pad.call("set_scheme", "kbm")
+			pad.set("kbm", true)
+			_check(bool(pad.call("touch_chrome_hidden")), "kbm hides touch chrome")
+			garage.menu.show_page("settings")
 			_check(bool(profile.settings.get("fullscreen", false)), "the DISPLAY toggle turns fullscreen on")
 		5:
 			_key(KEY_F11)
@@ -147,9 +200,16 @@ func _process(_delta: float) -> bool:
 			_check(pwr_r.end.y <= status_r.position.y + 1.0, "PWR block sits above the status line")
 			_check(not pwr_r.intersects(hp_r), "PWR block does not cover the HP number")
 			_check(status_r.end.y <= hud._banner_bg.offset_top + 1.0, "status line sits above the mission title band")
+			# Playtest #10: touch stick chrome hidden on KBM (keys still work).
+			hud.set_lock_available(true)
+			_check(not hud._lock_button.visible and not hud._crew_button.visible, "LOCK and CREW buttons hide on KBM")
+			_check(not hud.left_stick.visible and not hud.right_stick.visible and not hud.pause_button.visible, "sticks and pause hide on KBM/PC")
+			_check(hud._ability_buttons.is_empty() or not hud._ability_buttons[0].visible, "ability buttons hide on KBM/PC")
+			_check(hud.rig_health_slot != null and hud.rig_health_slot.name == "RigHealthSlot", "HUD leaves a RigHealthSlot anchor for ui-rig-health-hud")
+			_check(str(hud._hint.text).contains("PAUSE"), "KBM control line shows the pause glyph")
+			_check(bool(root.get_node("Pad").get("kbm")), "still in KBM mode")
 			_key(KEY_Q)
 			_check(float(main.vehicle.abilities[0].ready_in) > 0.0, "Q fires the first utility")
-			hud._lock_button.visible = true
 			var lock: bool = hud._lock_button.on
 			_click(MOUSE_BUTTON_RIGHT)
 			_check(hud._lock_button.on != lock, "right click toggles LOCK")
@@ -160,11 +220,19 @@ func _process(_delta: float) -> bool:
 			_key(KEY_1)
 			_check(mark_picked and not hud.is_crew_wheel_open(), "1 picks the first crew member")
 		18:
+			# Pause rebound away from Esc: Esc still pauses (hard fallback).
+			root.get_node("Pad").call("bind_kbm", "pause", KEY_P)
 			_key(KEY_ESCAPE)
-			_check(paused and main.menu != null, "Esc pauses the fight")
+			_check(paused and main.menu != null, "Esc pauses the fight even when PAUSE is rebound to P")
 		20:
 			_key(KEY_ESCAPE)
 			_check(not paused and main.menu == null, "Esc again resumes")
+			# Bound pause key also pauses.
+			_key(KEY_P)
+			_check(paused and main.menu != null, "rebound PAUSE key pauses the fight")
+			_key(KEY_ESCAPE)
+			_check(not paused and main.menu == null, "Esc resumes after rebound pause")
+			root.get_node("Pad").call("reset_kbm_map")
 			_finish()
 	return false
 

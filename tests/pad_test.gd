@@ -72,8 +72,15 @@ func _process(_delta: float) -> bool:
 	match frame:
 		3:
 			_check(not bool(pad.get("active")) and _focus() == null, "touch mode to start: no focus")
+			_check(not bool(pad.call("touch_chrome_hidden")), "headless start keeps touch chrome available")
+			pad.set("joy_connected", true)
+			_check(bool(pad.call("touch_chrome_hidden")), "a connected joypad hides touch chrome")
+			pad.set("joy_connected", false)
+			_check(not bool(pad.call("touch_chrome_hidden")), "unplugging the joypad restores touch chrome on non-PC")
 			_button(JOY_BUTTON_DPAD_DOWN)
 			_check(bool(pad.get("active")), "a pad press switches to controller mode")
+			_check(str(pad.get("last_scheme")) == "pad", "last_scheme follows the pad")
+			_check(bool(pad.call("touch_chrome_hidden")), "controller mode hides touch chrome")
 		6:
 			var f := _focus()
 			_check(f is BaseButton and f.is_visible_in_tree(), "a visible button takes focus")
@@ -168,7 +175,7 @@ func _process(_delta: float) -> bool:
 				_button(JOY_BUTTON_X)
 				_check(float(ab[0].ready_in) > 0.0, "Square uses the first utility")
 			var lock: bool = _hud()._lock_button.on
-			_hud()._lock_button.visible = true
+			_hud().set_lock_available(true)   # starter apply_rig has no targeting; force LOCK for the pad check
 			_button(JOY_BUTTON_RIGHT_SHOULDER)
 			_check(_hud()._lock_button.on != lock, "R1 toggles LOCK")
 		30:
@@ -195,15 +202,25 @@ func _process(_delta: float) -> bool:
 			_check(not paused and main.menu == null, "Options again resumes")
 		40:
 			_check(_focus() == null, "no menu focus while you drive")
-			# Button mapping: Settings > CONTROLLER BUTTONS.
+			# Button mapping: Settings > CONTROLLER BUTTONS — all fight actions.
+			var defaults: Dictionary = pad.get("DEFAULT_MAP")
+			for a: String in ["fire", "lock", "pause", "ability_1", "ability_2", "ability_3", "crew"]:
+				_check(defaults.has(a) and int(pad.call("binding", a)) == int(defaults[a]), "pad default binds %s" % a)
 			_button(JOY_BUTTON_START)
 			main.menu.show_page("settings")
 			main.menu.show_page("controller")
+			_check(main.menu.page == "controller", "Settings opens CONTROLLER BUTTONS")
 			main.menu.rebind("ability_1")
 			_check(str(pad.get("capturing")) == "ability_1", "picking an action waits for a button")
 			_button(JOY_BUTTON_RIGHT_SHOULDER)
 			_check(int(pad.call("binding", "ability_1")) == JOY_BUTTON_RIGHT_SHOULDER and int(pad.call("binding", "lock")) == JOY_BUTTON_X, "the next press binds it; LOCK swaps over to Square")
 			_check(main.menu != null and main.menu.page == "controller", "binding a button keeps you on the page")
+			main.menu.rebind("fire")
+			_button(JOY_BUTTON_Y)
+			_check(int(pad.call("binding", "fire")) == JOY_BUTTON_Y, "FIRE rebinds to a face button")
+			main.menu.rebind("lock")
+			_button(JOY_BUTTON_LEFT_STICK)
+			_check(int(pad.call("binding", "lock")) == JOY_BUTTON_LEFT_STICK, "LOCK rebinds to L3")
 			main.menu.rebind("crew")
 			_trigger(JOY_AXIS_TRIGGER_LEFT, 1.0)
 			_trigger(JOY_AXIS_TRIGGER_LEFT, 0.0)
@@ -211,15 +228,26 @@ func _process(_delta: float) -> bool:
 			main.menu.rebind("pause")
 			_button(JOY_BUTTON_B)
 			_check(int(pad.call("binding", "pause")) == JOY_BUTTON_B and main.menu != null, "Circle can be bound too, and binding it doesn't close the menu")
+			_check(bool(pad.call("is_pause_code", JOY_BUTTON_START)), "Start remains a pause code after Pause leaves it")
+			main.menu.resume()
+			# Start hard fallback: Pause is on Circle, Start still pauses.
+			_button(JOY_BUTTON_START)
+			_check(paused and main.menu != null, "Start pauses even when PAUSE is rebound to Circle")
+			main.menu.resume()
+			_check(not paused, "resumed after Start fallback pause")
+			_button(JOY_BUTTON_B)
+			_check(paused and main.menu != null, "rebound PAUSE button still pauses")
+			main.menu.show_page("controller")
 			main.menu.rebind("pause")
 			_button(JOY_BUTTON_START)
 			main.menu.resume()
 		42:
 			var hud: Variant = _hud()
-			_check(hud._ability_buttons[0].pad_badge == "R1" and hud._lock_button.pad_badge == "square" and hud._crew_button.pad_badge == "L2", "HUD badges follow the new buttons")
+			_check(hud._ability_buttons[0].pad_badge == "R1" and hud._lock_button.pad_badge == "L3" and hud._crew_button.pad_badge == "L2", "HUD badges follow the new buttons")
+			hud.set_lock_available(true)
 			var lock: bool = hud._lock_button.on
-			_button(JOY_BUTTON_X)
-			_check(hud._lock_button.on != lock, "Square now toggles LOCK")
+			_button(JOY_BUTTON_LEFT_STICK)
+			_check(hud._lock_button.on != lock, "L3 now toggles LOCK")
 			_button(JOY_BUTTON_LEFT_SHOULDER)
 			_check(not hud.is_crew_wheel_open(), "L1 no longer opens the wheel")
 			hud.crew_wheel_cooldown = 0.0
@@ -241,7 +269,7 @@ func _process(_delta: float) -> bool:
 			profile.settings.erase("pad_map")
 			profile.settings.pad_swap = false
 			profile.load_settings()
-			_check(int(pad.call("binding", "lock")) == JOY_BUTTON_X and bool(pad.call("sticks_swapped")), "the mapping survives a relaunch")
+			_check(int(pad.call("binding", "lock")) == JOY_BUTTON_LEFT_STICK and int(pad.call("binding", "fire")) == JOY_BUTTON_Y and bool(pad.call("sticks_swapped")), "the mapping survives a relaunch")
 			DirAccess.remove_absolute(ProjectSettings.globalize_path(profile.settings_path))
 			profile.settings_path = old_path
 			profile.persist = false
