@@ -140,6 +140,21 @@ Weighting example: Common 1 pt/level, Uncommon 2, Rare 4, Epic 7, Legendary 12. 
 
 No forced ending. Core Collapse remains open for continued refinement.
 
+## Night (agreed with the owner 2026-11-05; built, PR #79)
+
+Night is rolled once per job from its seed and saved with the job (`night`). Comms shows a NIGHT badge before you take the job. Only zombies and Hunters change at night: speed x1.1 (Hunters x1.1), damage x1.1, +4 alive at the start, faster ramp, bigger packs, earlier Tanks and Hunter, a horde surge every 35 s (4 s, warned 1.5 s before). Enemy rigs don't change. Rewards: pay x1.3 (stacks with any district's pay), kill scrap x1.25 rounded up, schematic chance +0.10, crew XP x1.25. Numbers are in `tuning.gd` (`NIGHT_*`).
+
+Who gets night, first match wins:
+1. Core Collapse: always night, no exceptions (above every rule below).
+2. The tutorial: always day.
+3. 1 skull, or before the first 3 clears: day.
+4. Escort: day below 5 skulls, night at 5-6.
+5. Courier: 50/50.
+6. Outer Blocks Survive and Hunt at 4 skulls: night.
+7. District chance (Outer Blocks 10%, Midtown 35%, Industrial 60%), +25% for Survive and Hunt (capped at 100%).
+
+Board night share after 3 clears: Outer Blocks ~21%, Midtown ~43%, Industrial ~64%, Core 100%. A job saved before night existed rolls once on load from the same seed.
+
 # 8. Combat Design
 
 Arcade top-down. Mobility is a felt stat (turn radius + drift). Builds express immediately. Zombies are shared environmental pressure; enemy vehicles are the primary killers and best part source.
@@ -217,7 +232,8 @@ Start with basic pre-built vehicle + two free Common crew. One scripted low-thre
 - Caps: 25–30 zombies, max 3 enemy vehicles, limited active zones/projectiles.
 
 - Pause screen: Low / Medium / High / Ultra presets (frame cap, effects, density, shake). Auto-detected default, player override.
-- **Pause menu built (2026-11-04).** Agreed with the owner: a job has no way back to the garage; quitting the game or closing the app mid-job puts you back into the same job at the next launch, the fight reset and nothing lost (no day passes). The menu has RESUME, RESTART JOB (two taps; same as a reset), SETTINGS, DATABASE and QUIT GAME; the garage's MENU button has SETTINGS, DATABASE, QUIT GAME and CLOSE. The Database lists parts, crew specialties, enemies, hazards and statuses, districts and job types; anything the player hasn't met is censored. Gap-fillers: Low 30 fps, 40% effects and splats, 60% shake; Medium 30 fps, 70%; High 60 fps, 85% effects; Ultra no cap, everything; the first guess goes by the phone's core count (4 or fewer Low, 6 Medium, more High); settings also hold a screen-shake switch and Music and Effects volumes, live once audio exists, and live in their own file so they survive a new game; the II button sits top right; the phone's back button opens the menu (and steps back through it); the app going to the background pauses the job; "met" means owned or picked up (parts), on your roster (crew), seen in a fight (enemies), caught in or blown up near you (hazards, statuses), unlocked (districts) and played (jobs).
+- **ABANDON JOB (2026-11-05, playtest 2 #7; Cameron approved).** Two taps in the pause menu: back to the garage, the day passes and the job is gone, no job pay and nothing picked up comes home (kill scrap, salvage, schematics), no crew XP; not a wreck: rig, parts and crew kept, no wreck count. Not in the Training Run. This supersedes the earlier "no way back to the garage" rule.
+- **Pause menu built (2026-11-04; abandon rule updated 2026-11-05).** Quitting the game or closing the app mid-job puts you back into the same job at the next launch, the fight reset and nothing lost (no day passes). A deliberate ABANDON JOB (see above) is the way back to the garage mid-job. The menu has RESUME, RESTART JOB (two taps; same as a reset), ABANDON JOB (two taps), SETTINGS, DATABASE and QUIT GAME; the garage's MENU button has SETTINGS, DATABASE, QUIT GAME and CLOSE. The Database lists parts, crew specialties, enemies, hazards and statuses, districts and job types; anything the player hasn't met is censored. Gap-fillers: Low 30 fps, 40% effects and splats, 60% shake; Medium 30 fps, 70%; High 60 fps, 85% effects; Ultra no cap, everything; the first guess goes by the phone's core count (4 or fewer Low, 6 Medium, more High); settings also hold a screen-shake switch and Music and Effects volumes, live once audio exists, and live in their own file so they survive a new game; the II button sits top right; the phone's back button opens the menu (and steps back through it); the app going to the background pauses the job; "met" means owned or picked up (parts), on your roster (crew), seen in a fight (enemies), caught in or blown up near you (hazards, statuses), unlocked (districts) and played (jobs).
 
 - Vertical slice goal: one Outer Blocks Clear, functional Garage + Comms, 4–6 parts across categories, Driver + Gunner, full controls + dramatic wreck + return, 4–7 minute sessions, final-readability pixel-voxel art.
 

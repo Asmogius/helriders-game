@@ -9,6 +9,7 @@ extends RefCounted
 ##   name     flavor name ("Pharmacy Siege"); for Hunt, the Elite's name
 ##   seed     drives anything random in the run (Courier route)
 ##   reward   scrap paid on success, before Courier time tiers
+##   night    true if the job runs at night (rolled from the seed, saved)
 
 const T := preload("res://scripts/tuning.gd")
 const Layouts := preload("res://scripts/layouts.gd")
@@ -31,6 +32,7 @@ static func make_board(day: int, count: int, quality: int, district := "outer_bl
 		var type: String = types[i % types.size()]
 		var job := make(type, _roll_skulls(band, rng), rng.randi(), quality, day, i)
 		job["layout"] = Layouts.pick(type, int(job.seed), open)
+		job["night"] = roll_night(job, clears)
 		board.append(job)
 	return board
 
@@ -174,6 +176,91 @@ static func has_push(mission: Dictionary) -> bool:
 	return rng.randf() < T.PUSH_CHANCE
 
 
+# --- Night (approved 2026-11-04, PR #69) --------------------------------------
+
+## The district a job runs in: its layout's, else Outer Blocks.
+static func district_of(mission: Dictionary) -> String:
+	var id := str(mission.get("layout", ""))
+	if Layouts.LAYOUTS.has(id):
+		return str(Layouts.LAYOUTS[id].get("district", "outer_blocks"))
+	return "outer_blocks"
+
+
+static func district_index(district: String) -> int:
+	for i in T.DISTRICTS.size():
+		if T.DISTRICTS[i].id == district:
+			return i
+	return 0
+
+
+## Chance this job is a night job, before gating (roll_night). First match:
+##   1. Core Collapse (district chance 1.0): always night, every job type
+##   2. Escort: 0 below NIGHT_ESCORT_MIN_SKULLS, 1 at 5-6
+##   2b. Courier: NIGHT_CHANCE_COURIER (50/50) outside Core
+##   3. Outer Blocks Survive / Hunt at NIGHT_OB_SURE_SKULLS (4): 1
+##   4. District chance (NIGHT_CHANCE_BY_DISTRICT), + NIGHT_LEAN_SURVIVE_HUNT
+##      for Survive / Hunt, capped at 1.0
+## roll_night() checks Core Collapse first (always night, no exceptions),
+## then the tutorial, 1 skull and the first 3 clears (day), then these.
+static func night_chance(mission: Dictionary) -> float:
+	var type := str(mission.get("type", ""))
+	var level := skulls(mission)
+	var district := district_of(mission)
+	var chance := float(T.NIGHT_CHANCE_BY_DISTRICT[district_index(district)])
+	if chance >= 1.0:
+		return 1.0   # Core Collapse is always night, every job type (Cameron, outranks Escort)
+	if type == "escort":
+		return 1.0 if level >= T.NIGHT_ESCORT_MIN_SKULLS else 0.0
+	if type == "courier":
+		return 1.0 if chance >= 1.0 else T.NIGHT_CHANCE_COURIER
+	if type == "survive" or type == "hunt":
+		if district == "outer_blocks" and level == T.NIGHT_OB_SURE_SKULLS:
+			return 1.0
+		return minf(chance + T.NIGHT_LEAN_SURVIVE_HUNT, 1.0)
+	return chance
+
+
+## Rolls night from the job's seed (Comms, the mission and a relaunch agree).
+## Never at 1 skull or before the player's first T.NIGHT_MIN_CLEARS clears.
+static func roll_night(mission: Dictionary, clears: int) -> bool:
+	if is_core(mission):
+		return true   # Core Collapse: always night, no exceptions (Cameron 2026-11-05)
+	if bool(mission.get("tutorial", false)) or skulls(mission) < T.NIGHT_MIN_SKULLS or clears < T.NIGHT_MIN_CLEARS:
+		return false
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("helriders-night-%d" % int(mission.get("seed", 0)))
+	return rng.randf() < night_chance(mission)
+
+
+## Core Collapse jobs (by layout): night with no exceptions.
+static func is_core(mission: Dictionary) -> bool:
+	return float(T.NIGHT_CHANCE_BY_DISTRICT[district_index(district_of(mission))]) >= 1.0
+
+
+## Core is always night; otherwise the tutorial is day; otherwise the saved roll.
+static func is_night(mission: Dictionary) -> bool:
+	if is_core(mission):
+		return true
+	if bool(mission.get("tutorial", false)):
+		return false
+	return bool(mission.get("night", false))
+
+
+## Job pay with the night bonus (stacks with any district's pay).
+static func night_pay(base: int, mission: Dictionary) -> int:
+	return roundi(base * T.NIGHT_PAYOUT_MULT) if is_night(mission) else base
+
+
+## Zombie / Hunter kill scrap at night, rounded up.
+static func night_kill_scrap(points: int, night: bool) -> int:
+	return ceili(points * T.NIGHT_KILL_SCRAP_MULT) if night else points
+
+
+## Crew XP for the job at night.
+static func night_xp(xp: float, night: bool) -> float:
+	return xp * T.NIGHT_XP_MULT if night else xp
+
+
 ## The mission tests and a fresh mission scene fall back to.
 static func default_mission() -> Dictionary:
 	return make("clear", 3, 1)
@@ -193,7 +280,10 @@ static func skulls(mission: Dictionary) -> int:
 
 ## Chance this job pays a schematic from its type's pool on success.
 static func schematic_chance(mission: Dictionary) -> float:
-	return float(T.MISSION_SCHEMATIC_CHANCE[skulls(mission) - 1])
+	var chance := float(T.MISSION_SCHEMATIC_CHANCE[skulls(mission) - 1])
+	if is_night(mission):
+		chance = minf(chance + T.NIGHT_SCHEMATIC_BONUS, 1.0)
+	return chance
 
 
 ## One number from the type's table at this mission's skulls.

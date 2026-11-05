@@ -330,6 +330,7 @@ func apply_loadout(target: Dictionary) -> bool:
 	var cost := build_cost(target)
 	if cost > scrap:
 		return false
+	var was_empty := not has_rig()
 	var have := _on_hand()
 	for id in parts_in(target):
 		if int(have.get(id, 0)) > 0:
@@ -344,6 +345,8 @@ func apply_loadout(target: Dictionary) -> bool:
 	if is_complete(rig):
 		plan = rig.duplicate(true)
 	_fit_seats()
+	if was_empty:
+		fill_empty_seats()   # rebuilt after a wreck: crew hired meanwhile climb aboard
 	save_game()
 	changed.emit()
 	return true
@@ -694,6 +697,15 @@ func _fit_seats() -> void:
 			m.seated = false
 
 
+## Every empty seat the frame has takes a free crew member of that class
+## (roster order; not resting or away). Seated crew are never swapped.
+## Playtest 2 #10: hires made with no rig (after a wreck) stayed in the Inn.
+func fill_empty_seats() -> void:
+	for m: Dictionary in crew:
+		if not bool(m.seated):
+			_auto_seat(m)
+
+
 ## A fresh hire takes an empty seat for their class, if the frame has one.
 func _auto_seat(m: Dictionary) -> void:
 	if seated_in(str(m.role)).is_empty() and seat_block(m) == "":
@@ -947,12 +959,12 @@ func rehire_done_today() -> bool:
 ## injured goes to the Inn to rest (a day less with Tough, or with a Medic's
 ## Triage on the run). Call after finish_day(), so tonight's rest doesn't
 ## count. Returns lines for the results card.
-func bank_crew(skulls: int, injured_ids: Array, triage := false, half_rest := false) -> Array[String]:
+func bank_crew(skulls: int, injured_ids: Array, triage := false, half_rest := false, xp_mult := 1.0) -> Array[String]:
 	var lines: Array[String] = []
 	var riders := seated_crew()
 	if riders.is_empty():
 		return lines
-	var share := float(skulls) / riders.size()
+	var share := float(skulls) * xp_mult / riders.size()   # xp_mult: night jobs (T.NIGHT_XP_MULT)
 	for m in riders:
 		var before := Crew.level(m)
 		m.xp = float(m.xp) + share
@@ -1450,10 +1462,10 @@ func apply_data(data: Dictionary) -> bool:
 	day = maxi(1, int(data.get("day", 1)))
 	board = []
 	for m: Variant in data.get("board", []):
-		var clean := _clean_mission(m)
+		var clean := _clean_mission(m, int(record.clears))
 		if not clean.is_empty():
 			board.append(clean)
-	active_mission = _clean_mission(data.get("active_mission", {}))
+	active_mission = _clean_mission(data.get("active_mission", {}), int(record.clears))
 	run_active = bool(data.get("run_active", false))
 	discovered = {}
 	var saved_found: Dictionary = data.get("discovered", {})
@@ -1583,7 +1595,8 @@ static func _clean_member(raw: Variant) -> Dictionary:
 
 
 ## JSON turns ints into floats; put a mission back in shape, or {} if unusable.
-static func _clean_mission(raw: Variant) -> Dictionary:
+## `clears`: the save's clear count, for jobs saved before night existed.
+static func _clean_mission(raw: Variant, clears := 0) -> Dictionary:
 	if not raw is Dictionary:
 		return {}
 	var d: Dictionary = raw
@@ -1605,6 +1618,12 @@ static func _clean_mission(raw: Variant) -> Dictionary:
 	}
 	if Layouts.LAYOUTS.has(str(d.get("layout", ""))):
 		out["layout"] = str(d.layout)
+	if d.has("night"):
+		out["night"] = bool(d.night)   # the job's saved night roll (PR #69); a saved flag wins
+	else:
+		# Saved before night existed: roll once now from the same seed
+		# (helriders-night-<seed>); the next save keeps it.
+		out["night"] = Missions.roll_night(out, clears)
 	return out
 
 

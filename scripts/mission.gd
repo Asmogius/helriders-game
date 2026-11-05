@@ -72,8 +72,10 @@ var _threat_points := PackedVector2Array()   # reused each frame (edge arrows)
 var _threat_colors := PackedColorArray()
 var loading_map := false        # start held (tree paused) while the styled map bakes
 var _load_layer: CanvasLayer
+var abandoned := false          # ABANDON JOB was used (tests)
 var _restarting := false         # RESTART keeps the baked map cached; leaving drops it
 var spec := {}                   # the mission being run
+var night := false               # a night job (spec.night): zombies only, PR #69
 var mission_type := "clear"
 var skulls := 3                  # difficulty, 1 to 6
 
@@ -203,6 +205,7 @@ func _ready() -> void:
 		spec = Missions.default_mission()
 	mission_type = str(spec.type)
 	skulls = Missions.skulls(spec)
+	night = Missions.is_night(spec)
 
 	arena = Arena.new()
 	# Board jobs carry a layout and vary it by their seed; test and tutorial
@@ -294,7 +297,8 @@ func _ready() -> void:
 		for rig: EnemyRig in _all_enemy_rigs():
 			rig.player = truck
 	for h in hunters:
-		h.damage_mult = float(T.ENEMY_DAMAGE_BY_SKULL[skulls - 1])
+		h.damage_mult = float(T.ENEMY_DAMAGE_BY_SKULL[skulls - 1]) * (T.NIGHT_ZOMBIE_DPS_MULT if night else 1.0)
+		h.night_speed = T.NIGHT_HUNTER_SPEED_MULT if night else 1.0
 		h.target = vehicle
 		h.nav = nav
 	zombies.nav = nav
@@ -329,6 +333,7 @@ func _ready() -> void:
 	camera.make_current()
 
 	zombies.zombie_killed.connect(_on_zombie_killed)
+	zombies.surge_warned.connect(_on_surge_warned)
 	vehicle.wrecked.connect(_on_wrecked)
 	vehicle.status_started.connect(_on_status_started)
 	vehicle.crew_injured.connect(_on_crew_injured)
@@ -398,7 +403,8 @@ func _ready() -> void:
 
 
 func _start_banner() -> void:
-	hud.banner("%s  -  %s" % [Missions.label(spec), str(spec.name).to_upper()], _type_color(), 3.0)
+	var title := "%s  -  %s" % [Missions.label(spec), str(spec.name).to_upper()]
+	hud.banner(("NIGHT  -  " + title) if night else title, _type_color(), 3.0)
 
 
 ## Outer Blocks style only: the map bakes on a worker; the job waits behind a
@@ -442,6 +448,7 @@ func _configure_mission() -> void:
 	zombies.cap = cap
 	zombies.damage_mult = float(T.ENEMY_DAMAGE_BY_SKULL[skulls - 1])
 	zombies.set_mix(skulls, mission_type == "courier")
+	var hunter_time := T.NIGHT_HUNTER_SPAWN_TIME if night else T.HUNTER_SPAWN_TIME
 	var outrider_count := 0
 	var bulwark_count := 0
 	var gunner_count := 0
@@ -469,7 +476,7 @@ func _configure_mission() -> void:
 			for i in bulwark_count:
 				_events.append([T.BULWARK_SPAWN_TIME + 40.0 * i, "bulwark", T.BULWARK_SPAWN_KILLS if i == 0 else -1, false])
 			for i in hunter_count:
-				_events.append([T.HUNTER_SPAWN_TIME + 35.0 * i, "hunter", T.HUNTER_SPAWN_KILLS if i == 0 else -1, false])
+				_events.append([hunter_time + 35.0 * i, "hunter", T.HUNTER_SPAWN_KILLS if i == 0 else -1, false])
 			for i in outrider_count:
 				_events.append([T.OUTRIDER_SPAWN_TIME + 40.0 * i, "outrider", T.OUTRIDER_SPAWN_KILLS if i == 0 else -1, false])
 		"survive":
@@ -640,6 +647,8 @@ func _configure_mission() -> void:
 		zombies.spawn_budget = 0
 		zombies.start_count = 0
 		target_kills = 1 << 30
+	if night:
+		zombies.apply_night()   # speed, damage, start, ramp, packs, Tanks, bile, surge
 	# Patcher: one, rolled per job; it waits for an ally to work on.
 	use_patcher = Missions.has_patcher(spec)
 	patchers.append(PatcherRig.new())
@@ -1308,6 +1317,7 @@ func open_menu() -> GameMenu:
 	menu.leave_requested.connect(leave_tutorial)
 	menu.resumed.connect(_on_menu_closed)
 	menu.restart_requested.connect(restart_job)
+	menu.abandon_requested.connect(abandon_job)
 	hud.add_child(menu)
 	return menu
 
@@ -1315,6 +1325,27 @@ func open_menu() -> GameMenu:
 func _on_menu_closed() -> void:
 	menu = null
 	get_tree().paused = false
+
+
+## ABANDON JOB from the pause menu (playtest 2 #7): give the job up and go
+## home. Like a failed job the day passes with no job pay, but nothing picked
+## up comes home either (kill scrap, salvage, schematics). The rig and the
+## crew are kept: not a wreck, no wreck count, no crew lost, no crew XP.
+## Injuries already taken in this fight stand.
+func abandon_job() -> void:
+	if tutorial or state != State.RUNNING:
+		return
+	menu = null
+	state = State.FAILED
+	get_tree().paused = false
+	Engine.time_scale = 1.0
+	if _music != null:
+		_music.end_combat()
+	var hurt := _rest_ids()
+	profile.finish_day()
+	profile.bank_crew(0, hurt, bool(vehicle.crew_mod("triage")), vehicle.has_sp("sp_clean_bandage"))
+	abandoned = true
+	get_tree().change_scene_to_file(GARAGE_SCENE)
 
 
 ## The fight starts over: same job, same rig and crew, nothing lost.
@@ -2118,10 +2149,16 @@ func _add_kill(points: int, rig := false) -> void:
 		_succeed("BLOCK CLEARED", "", 1.0)
 
 
+## Night surge telegraph (PR #69): NIGHT_SURGE_WARN s before the horde frenzies.
+func _on_surge_warned() -> void:
+	if state == State.RUNNING:
+		hud.banner("THE HORDE STIRS", T.COL_ORANGE, T.NIGHT_SURGE_WARN + T.NIGHT_SURGE_TIME)
+
+
 func _on_zombie_killed(at: Vector2, kind: String) -> void:
 	splats.add(at)
 	fx.gore(at, (at - vehicle.global_position).normalized())
-	_add_kill(int(T.ZOMBIE_KINDS[kind].scrap))
+	_add_kill(Missions.night_kill_scrap(int(T.ZOMBIE_KINDS[kind].scrap), night))
 	match kind:
 		"tank":
 			hud.banner("TANK DOWN", T.COL_ORANGE, 1.8)
@@ -2195,7 +2232,7 @@ func _on_hunter_died(at: Vector2, h: Hunter) -> void:
 	_on_hunter_let_go()
 	var how := {"crushed": "HUNTER CRUSHED", "scraped": "HUNTER SCRAPED OFF", "rammed": "HUNTER RUN DOWN", "mine": "HUNTER BLOWN UP"}
 	hud.banner(how.get(h.last_hit_cause, "HUNTER DOWN"), T.COL_HUNTER, 1.8)
-	_add_kill(T.HUNTER_SCRAP)
+	_add_kill(Missions.night_kill_scrap(T.HUNTER_SCRAP, night))
 
 
 func _on_hunter_let_go() -> void:
@@ -2575,7 +2612,7 @@ func _succeed(title: String, detail: String, pay_mult: float) -> void:
 	# The job's done: anything still on the ground gets hauled home.
 	for p in pickups.get_children():
 		_take_salvage(p as Pickup)
-	var pay := roundi(int(spec.reward) * pay_mult)
+	var pay := roundi(Missions.night_pay(int(spec.reward), spec) * pay_mult)
 	var reward_part := _mission_reward_schematic(pay_mult)
 	var ids := _pending_ids()
 	if reward_part != "":
@@ -2587,7 +2624,7 @@ func _succeed(title: String, detail: String, pay_mult: float) -> void:
 	bank_report = profile.bank_run(int(scrap) + pay, ids)
 	profile.finish_day()
 	# After the day ends, so tonight doesn't count toward anyone's rest.
-	var crew_lines := profile.bank_crew(roundi(skulls * T.PUSH_XP) if pushed else skulls, _rest_ids(), bool(vehicle.crew_mod("triage")), vehicle.has_sp("sp_clean_bandage"))
+	var crew_lines := profile.bank_crew(roundi(skulls * T.PUSH_XP) if pushed else skulls, _rest_ids(), bool(vehicle.crew_mod("triage")), vehicle.has_sp("sp_clean_bandage"), T.NIGHT_XP_MULT if night else 1.0)
 	var lines := "Job pay +%d    Kill scrap +%d    Time %s" % [pay, int(scrap), _clock(elapsed)]
 	if detail != "":
 		lines = detail + "\n" + lines
