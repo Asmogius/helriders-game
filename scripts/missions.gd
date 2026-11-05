@@ -26,14 +26,26 @@ static func make_board(day: int, count: int, quality: int, district := "outer_bl
 	var types: Array = TYPES.duplicate()
 	_shuffle(types, rng)
 	var band := skull_band(district)
+	var open := districts_through(district)
 	var board: Array = []
 	for i in count:
 		var type: String = types[i % types.size()]
 		var job := make(type, _roll_skulls(band, rng), rng.randi(), quality, day, i)
-		job["layout"] = Layouts.pick(type, int(job.seed))
+		job["layout"] = Layouts.pick(type, int(job.seed), open)
 		job["night"] = roll_night(job, clears)
 		board.append(job)
 	return board
+
+
+## District ids from the first up to `district` (the ones a board in it may
+## send you to), in T.DISTRICTS order.
+static func districts_through(district: String) -> Array:
+	var out := []
+	for d: Dictionary in T.DISTRICTS:
+		out.append(str(d.id))
+		if d.id == district:
+			return out
+	return ["outer_blocks"]
 
 
 ## [lowest, highest] skulls a district's board can roll.
