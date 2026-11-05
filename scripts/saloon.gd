@@ -154,10 +154,7 @@ func offer(i: int) -> Dictionary:
 	if is_rehire(i):
 		return profile.rehire_offer()
 	var role: String = FREE_ROLES[i - profile.saloon.size()]
-	var m := {"id": 0, "name": "Free %s" % Crew.ROLE_NAMES[role], "role": role, "rarity": "Common",
-		"specialty": "", "xp": 0.0, "perks": [], "rest": 0, "seated": false, "price": 0}
-	m.xp = profile.hire_start_xp(m)
-	return m
+	return profile.basic_offer(role)   # the person you'll get (name, specialty), free
 
 
 func odds_text() -> String:

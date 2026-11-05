@@ -1171,3 +1171,11 @@ const NIGHT_PAYOUT_MULT := 1.30           # job pay; stacks with Core Collapse's
 const NIGHT_KILL_SCRAP_MULT := 1.25       # zombie kill scrap, rounded up (shambler 2 -> 3)
 const NIGHT_SCHEMATIC_BONUS := 0.10       # + MISSION_SCHEMATIC_CHANCE, cap 1.0
 const NIGHT_XP_MULT := 1.25               # crew job XP
+
+# --- Shoving through a horde (hand playtest 0.1.75, Cameron 2026-11-05) -----------------------------
+# Below RAM speed the rig pushes zombies in front aside (no damage). How hard
+# follows the speed the throttle asks for, ramping in smoothly over SHOVE_RAMP
+# (px/s); below .x a near-stopped rig stays held. A shoved zombie moves off at
+# ramp * (asked speed + SHOVE_CLEAR), so it clears faster than it walks back.
+const SHOVE_RAMP := Vector2(5.0, 30.0)
+const SHOVE_CLEAR := 140.0
