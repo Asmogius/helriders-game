@@ -295,7 +295,7 @@ const TANK_CHARGE_RANGE := 350.0
 const TANK_CHARGE_COOLDOWN := 8.0
 const TANK_WINDUP := 0.8               # roar before the charge...
 const TANK_AIM_LOCK := 0.3             # ...it stops tracking for the last part of it
-const TANK_CHARGE_SPEED := 460.0   # DRAFT (was 520.0, pending Cameron)
+const TANK_CHARGE_SPEED := 520.0   # kept at its old speed (Cameron, PR #82)
 const TANK_CHARGE_TIME := 0.9          # longest charge (~470 px)
 const TANK_CHARGE_DAMAGE := 25.0
 const TANK_SHOVE := 620.0              # velocity added to the rig it hits
@@ -320,11 +320,11 @@ const COL_BILE := Color(0.75, 0.8, 0.2, 0.28)
 
 # --- Hunter --------------------------------------------------------------------
 const HUNTER_HP := 60.0
-const HUNTER_SPEED := 220.0          # DRAFT (was 250.0, PR pending Cameron) - outrun it at full throttle (rig does 560)
+const HUNTER_SPEED := 250.0          # kept (Cameron, PR #82); outrun it at full throttle (starter rig does 495, DRAFT)
 const HUNTER_RADIUS := 12.0
 const HUNTER_POUNCE_RANGE := 180.0
 const HUNTER_WINDUP := 0.35          # telegraph before the leap
-const HUNTER_POUNCE_SPEED := 565.0   # DRAFT (was 640.0, pending Cameron)
+const HUNTER_POUNCE_SPEED := 640.0   # kept at its old speed (Cameron, PR #82)
 const HUNTER_POUNCE_TIME := 0.4
 const HUNTER_DPS := 8.0              # while latched on the hull
 const HUNTER_CRUSH_SPEED := 175.0    # DRAFT (was 200.0, PR pending Cameron) - hit a wall this hard on its side: dead
