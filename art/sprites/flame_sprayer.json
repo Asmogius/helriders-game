@@ -672,5 +672,8 @@
  "layers": {},
  "defaults": [],
  "sheet": "flame_sprayer.png",
- "composite": "flame_sprayer.png"
+ "composite": "flame_sprayer.png",
+ "lights": {
+  "sheet": "flame_sprayer__lights.png"
+ }
 }

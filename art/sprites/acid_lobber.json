@@ -672,5 +672,8 @@
  "layers": {},
  "defaults": [],
  "sheet": "acid_lobber.png",
- "composite": "acid_lobber.png"
+ "composite": "acid_lobber.png",
+ "lights": {
+  "sheet": "acid_lobber__lights.png"
+ }
 }

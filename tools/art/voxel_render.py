@@ -323,6 +323,21 @@ def render_model(name, model, colors, outdir, directions=DIRECTIONS, ppv=PX_PER_
     meta["sheet"] = f"{name}__core.png" if layers else f"{name}.png"
     save_sheet([render_frame(core, colors, h, ppv, canvas=canvas, hd=hd) for h in heads], os.path.join(outdir, meta["sheet"]))
     meta["composite"] = f"{name}.png"
+    # Lights sheet: only the emissive pixels of the hull sheet (colours that
+    # never shade: cyan, orange, enemy red, elite gold). The night grade tints
+    # the hull but not this child, so lights stay bright at night.
+    if not hd:
+        lit = np.array([shade(c, 2)[:3] for c in colors if shade(c, 0)[:3] == shade(c, 2)[:3] and len(c) > 3 and c[3] > 0])
+        if len(lit):
+            core_img = np.array(Image.open(os.path.join(outdir, meta["sheet"])).convert("RGBA"))
+            m = (core_img[..., 3] > 0) & (core_img[..., :3][:, :, None, :] == lit[None, None]).all(-1).any(-1)
+            if m.any():
+                li = np.zeros_like(core_img)
+                li[m] = core_img[m]
+                fn = f"{name}__lights.png"
+                Image.fromarray(li).save(os.path.join(outdir, fn))
+                write_import(os.path.join(outdir, fn))
+                meta["lights"] = {"sheet": fn}
     # Baked cast shadow (hulls only: a model with a "chassis" chunk stands on the
     # ground; turrets and weapons sit on a deck, and the hull's shadow covers them).
     if "chassis" in chunks:

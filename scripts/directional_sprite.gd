@@ -20,6 +20,10 @@ var meta: Dictionary = {}
 ## Baked cast shadow (meta "shadow", from voxel_render.py): a child drawn behind
 ## this sprite at the same frame. Null when the sheet has none.
 var shadow: Sprite2D = null
+## Emissive pixels of the sheet (meta "lights"): a child drawn over this sprite.
+## The night grade sets this sprite's self_modulate only, so lights stay bright.
+## Null when the sheet has none. Hide it for a burnt-out wreck.
+var lights: Sprite2D = null
 
 
 func _init() -> void:
@@ -63,9 +67,28 @@ func load_meta(path: String) -> bool:
 	columns = int(meta.columns)
 	texture = load(path.get_base_dir().path_join(String(meta.sheet)))
 	_load_shadow(path.get_base_dir())
+	_load_lights(path.get_base_dir())
 	_apply_grid()
 	_pick()
 	return true
+
+
+func _load_lights(dir: String) -> void:
+	var ld: Dictionary = meta.get("lights", {})
+	var p := dir.path_join(String(ld.get("sheet", "")))
+	if ld.is_empty() or not ResourceLoader.exists(p):
+		if lights != null:
+			lights.queue_free()
+			lights = null
+		return
+	if lights == null:
+		lights = Sprite2D.new()
+		lights.name = "Lights"
+		lights.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		add_child(lights)
+	lights.texture = load(p)
+	lights.hframes = columns
+	lights.vframes = int(ceil(directions / float(columns)))
 
 
 func _load_shadow(dir: String) -> void:
@@ -131,3 +154,5 @@ func _pick() -> void:
 	frame = frame_for(heading, directions)
 	if shadow != null:
 		shadow.frame = frame
+	if lights != null:
+		lights.frame = frame
