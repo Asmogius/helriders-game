@@ -105,7 +105,7 @@ func refresh() -> void:
 	_title.text = "SALOON   -   DAY %d" % profile.day
 	_info.text = "SCRAP  %d      ROSTER  %d / %d" % [profile.scrap, profile.crew.size(), profile.roster_cap()]
 	var start := 1 + profile.upgrade_level("seasoned_hands")
-	_note.text = "New hires start at level %d (capped by rarity) with a random specialty. Offers can be any class and change when the day ends. Free Common Drivers and Gunners are always here, even with a full roster (one over the cap), so you can never get stuck without a Driver.\nOdds today: %s" % [start, odds_text()]
+	_note.text = "New hires start at level %d (capped by rarity). Each card is exactly who you hire. Offers can be any class and change when the day ends. Free Common Drivers and Gunners are always here, even with a full roster (one over the cap), so you can never get stuck without a Driver.\nOdds today: %s" % [start, odds_text()]
 	for c in _cards.get_children():
 		_cards.remove_child(c)
 		c.queue_free()
@@ -154,10 +154,7 @@ func offer(i: int) -> Dictionary:
 	if is_rehire(i):
 		return profile.rehire_offer()
 	var role: String = FREE_ROLES[i - profile.saloon.size()]
-	var m := {"id": 0, "name": "Free %s" % Crew.ROLE_NAMES[role], "role": role, "rarity": "Common",
-		"specialty": "", "xp": 0.0, "perks": [], "rest": 0, "seated": false, "price": 0}
-	m.xp = profile.hire_start_xp(m)
-	return m
+	return profile.basic_offer(role)   # the person you'll get (name, specialty), free
 
 
 func odds_text() -> String:

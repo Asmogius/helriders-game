@@ -2,7 +2,7 @@
 """V2 style sample: the Workshop bay as a voxel diorama (P6 Garage).
 
 Built from voxels and rendered once with voxel_render.render_frame at the rig
-tilt (30 deg), 1 px per voxel. The garage shows the rig at RIG_SCALE 3.4, so the
+tilt (45 deg), 1 px per voxel. The garage shows the rig at RIG_SCALE 3.4, so the
 room is displayed at the same 3.4x: one room voxel = one rig voxel on screen.
 
 Writes art/garage/:
@@ -47,7 +47,7 @@ SAMPLE_COLOURS = {
     "GARAGE_OIL": (24, 23, 24),
     "GARAGE_PEGBOARD": (74, 60, 44),
     "GARAGE_WALL": (46, 48, 52),        # corrugated sheet
-    "GARAGE_STREET_NIGHT": (42, 53, 80),# outside the roll-up door (#2a3550, = COL_NIGHT_WORLD)
+    "GARAGE_STREET_NIGHT": (42, 53, 80), # outside the roll-up door (#2a3550, = COL_NIGHT_WORLD)
     "GARAGE_GAS_RED": (110, 40, 34),    # welding cylinders (muted, not enemy red)
 }
 C.update({k.lower(): v for k, v in SAMPLE_COLOURS.items()})

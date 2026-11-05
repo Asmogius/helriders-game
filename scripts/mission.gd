@@ -66,13 +66,17 @@ var mission_override := {}
 ## Tests: ride with these crew (crew.gd dictionaries) instead of the seated ones.
 var crew_override: Array = []
 
+const HUD_REFRESH := 1.0 / 15.0   # seconds between HUD bar/number refreshes
+var _hud_timer := 0.0
+var _threat_points := PackedVector2Array()   # reused each frame (edge arrows)
+var _threat_colors := PackedColorArray()
 var loading_map := false        # start held (tree paused) while the styled map bakes
 var _load_layer: CanvasLayer
 var _restarting := false         # RESTART keeps the baked map cached; leaving drops it
 var spec := {}                   # the mission being run
+var night := false               # a night job (Missions.is_night): zombie rules and the world grade
 var mission_type := "clear"
 var skulls := 3                  # difficulty, 1 to 6
-var night := false               # this job's world grade (T.COL_NIGHT_WORLD). FX stay white.
 
 var arena: Arena
 var splats: Splats
@@ -162,6 +166,9 @@ var _rig_calls_made := 0
 var _empty_warned := false
 # Escort: the salvage truck, its sites and the driver's optional detour.
 var truck: FriendlyTruck
+var truck_alert := false   # the low-HP warning is up
+var truck_hit_at := -100.0  # elapsed when the truck last took damage
+var _truck_banner_at := -100.0
 var optional_site := Vector2.INF
 var optional_offered := false
 var optional_taken := false
@@ -197,6 +204,7 @@ func _ready() -> void:
 		spec = Missions.default_mission()
 	mission_type = str(spec.type)
 	skulls = Missions.skulls(spec)
+	night = Missions.is_night(spec)
 
 	arena = Arena.new()
 	# Board jobs carry a layout and vary it by their seed; test and tutorial
@@ -245,6 +253,10 @@ func _ready() -> void:
 		var dice := RandomNumberGenerator.new()
 		dice.seed = 7
 		vehicle.set_crew([Crew.make("driver", "Common", dice), Crew.make("gunner", "Common", dice)])
+		# Readability for first-timers (playtest 06/07): a brighter street and
+		# ringed zombies, so the "point at a zombie" step is obvious.
+		arena.modulate = T.COL_TUTORIAL_GRADE
+		zombies.highlight = true
 	else:
 		var loadout: Dictionary = profile.rig if profile.has_rig() else Parts.STARTER_LOADOUT
 		vehicle.apply_stats(profile.build_stats(loadout))
@@ -284,7 +296,8 @@ func _ready() -> void:
 		for rig: EnemyRig in _all_enemy_rigs():
 			rig.player = truck
 	for h in hunters:
-		h.damage_mult = float(T.ENEMY_DAMAGE_BY_SKULL[skulls - 1])
+		h.damage_mult = float(T.ENEMY_DAMAGE_BY_SKULL[skulls - 1]) * (T.NIGHT_ZOMBIE_DPS_MULT if night else 1.0)
+		h.night_speed = T.NIGHT_HUNTER_SPEED_MULT if night else 1.0
 		h.target = vehicle
 		h.nav = nav
 	zombies.nav = nav
@@ -320,6 +333,7 @@ func _ready() -> void:
 	camera.make_current()
 
 	zombies.zombie_killed.connect(_on_zombie_killed)
+	zombies.surge_warned.connect(_on_surge_warned)
 	vehicle.wrecked.connect(_on_wrecked)
 	vehicle.status_started.connect(_on_status_started)
 	vehicle.crew_injured.connect(_on_crew_injured)
@@ -359,6 +373,7 @@ func _ready() -> void:
 		elite.wrecked.connect(_on_elite_wrecked)
 	if truck != null:
 		truck.wrecked.connect(_on_truck_lost)
+		truck.damaged.connect(func(_a: float) -> void: truck_hit_at = elapsed)
 		truck.site_reached.connect(_on_site_reached)
 		truck.site_done.connect(_on_site_done)
 		hud.choice_made.connect(_on_optional_choice)
@@ -387,13 +402,13 @@ func _ready() -> void:
 	_refresh_hud()
 
 
-## Night multiplies the world only: the map, ground stains, zombies and
-## Hunters. Rig lights, the truck, barrels, hazards, tracers, muzzle flashes
-## and the FX drawer stay Color.WHITE. T.COL_NIGHT_WORLD is a multiply.
-## The garage day-cycle does not call this. Tutorial is always day.
+## World grade only. Whether the job is night is Content's (Missions.is_night,
+## already stored on `night`). A day job is left alone, so the tutorial's
+## brighter street stays. Rigs, hazards, tracers and FX are not in this list.
 func _apply_night_tint() -> void:
-	night = not tutorial and Missions.is_night(spec)
-	var tint := T.COL_NIGHT_WORLD if night else Color.WHITE
+	if not night:
+		return
+	var tint := T.COL_NIGHT_WORLD
 	arena.modulate = tint
 	splats.modulate = tint
 	zombies.modulate = tint
@@ -402,7 +417,8 @@ func _apply_night_tint() -> void:
 
 
 func _start_banner() -> void:
-	hud.banner("%s  -  %s" % [Missions.label(spec), str(spec.name).to_upper()], _type_color(), 3.0)
+	var title := "%s  -  %s" % [Missions.label(spec), str(spec.name).to_upper()]
+	hud.banner(("NIGHT  -  " + title) if night else title, _type_color(), 3.0)
 
 
 ## Outer Blocks style only: the map bakes on a worker; the job waits behind a
@@ -446,6 +462,7 @@ func _configure_mission() -> void:
 	zombies.cap = cap
 	zombies.damage_mult = float(T.ENEMY_DAMAGE_BY_SKULL[skulls - 1])
 	zombies.set_mix(skulls, mission_type == "courier")
+	var hunter_time := T.NIGHT_HUNTER_SPAWN_TIME if night else T.HUNTER_SPAWN_TIME
 	var outrider_count := 0
 	var bulwark_count := 0
 	var gunner_count := 0
@@ -473,7 +490,7 @@ func _configure_mission() -> void:
 			for i in bulwark_count:
 				_events.append([T.BULWARK_SPAWN_TIME + 40.0 * i, "bulwark", T.BULWARK_SPAWN_KILLS if i == 0 else -1, false])
 			for i in hunter_count:
-				_events.append([T.HUNTER_SPAWN_TIME + 35.0 * i, "hunter", T.HUNTER_SPAWN_KILLS if i == 0 else -1, false])
+				_events.append([hunter_time + 35.0 * i, "hunter", T.HUNTER_SPAWN_KILLS if i == 0 else -1, false])
 			for i in outrider_count:
 				_events.append([T.OUTRIDER_SPAWN_TIME + 40.0 * i, "outrider", T.OUTRIDER_SPAWN_KILLS if i == 0 else -1, false])
 		"survive":
@@ -644,6 +661,8 @@ func _configure_mission() -> void:
 		zombies.spawn_budget = 0
 		zombies.start_count = 0
 		target_kills = 1 << 30
+	if night:
+		zombies.apply_night()   # speed, damage, start, ramp, packs, Tanks, bile, surge
 	# Patcher: one, rolled per job; it waits for an ally to work on.
 	use_patcher = Missions.has_patcher(spec)
 	patchers.append(PatcherRig.new())
@@ -692,12 +711,19 @@ func _physics_process(delta: float) -> void:
 func _process(_delta: float) -> void:
 	_pass_mark()
 	zombies.contagion = vehicle.has_sp("sp_contagion")
-	if vehicle.strip_pending > 0.0:
+	if vehicle.strip_pending > 0.0 and state != State.WRECKED:
 		scrap += vehicle.strip_pending   # Strip Mine
 		vehicle.strip_pending = 0.0
-	_refresh_hud()
+	# Bars, numbers and the status line at ~15 Hz (they allocate strings and
+	# arrays); the edge arrows track the camera, so they update every frame.
+	_hud_timer -= _delta
+	if _hud_timer <= 0.0:
+		_hud_timer = HUD_REFRESH
+		_refresh_hud()
+		hud.right_stick.set_gauges(vehicle.weapon_gauges())
+	else:
+		_refresh_threats()
 	_music_tick(_delta)
-	hud.right_stick.set_gauges(vehicle.weapon_gauges())
 	bullets.big_game = float(vehicle.crew_mod("big_game"))
 
 
@@ -1898,6 +1924,45 @@ func _on_optional_choice(yes: bool) -> void:
 	hud.banner("DETOUR  -  THE TRUCK'S HEADING FOR IT", T.COL_ORANGE, 2.0)
 
 
+## The Escort truck's HP share (0..1): what's left before it's wrecked.
+func truck_hp_ratio() -> float:
+	if truck == null or truck.is_wrecked:
+		return 0.0
+	return clampf(truck.hp / maxf(truck.hp_max, 1.0), 0.0, 1.0)
+
+
+## The truck took damage in the last T.TRUCK_HIT_WINDOW seconds.
+func truck_under_attack() -> bool:
+	return truck != null and not truck.is_wrecked and elapsed - truck_hit_at < T.TRUCK_HIT_WINDOW
+
+
+## The truck is outside the camera view.
+func truck_off_screen() -> bool:
+	if truck == null:
+		return false
+	var p := get_viewport().get_canvas_transform() * truck.global_position
+	return not get_viewport().get_visible_rect().has_point(p)
+
+
+## Escort: a pulsing warning while the truck's HP is low (playtest 15: it
+## went from "65%" to wrecked with no signal).
+func _truck_warning() -> void:
+	if truck == null:
+		return
+	# Playtest 2: hit while off-screen, with no cue but the % text.
+	if state == State.RUNNING and truck_under_attack() and truck_off_screen() and elapsed - _truck_banner_at > T.TRUCK_HIT_BANNER_EVERY:
+		_truck_banner_at = elapsed
+		hud.banner("TRUCK UNDER ATTACK", T.COL_UI_DANGER_TEXT, 1.6)
+	var low := state == State.RUNNING and not truck.is_wrecked and truck_hp_ratio() <= T.TRUCK_LOW_WARN
+	if low and not truck_alert:
+		truck_alert = true
+		hud.set_alert("TRUCK HP LOW  -  GET BACK TO IT")
+		camera.shake(0.2)
+	elif not low and truck_alert:
+		truck_alert = false
+		hud.set_alert("")
+
+
 ## The Escort truck's stat sheet at `skull_level`.
 static func truck_sheet(skull_level: int) -> Dictionary:
 	var mult := float(T.ENEMY_DAMAGE_BY_SKULL[clampi(skull_level, 1, 6) - 1])
@@ -1956,11 +2021,19 @@ func _refresh_hud() -> void:
 	for i in vehicle.abilities.size():
 		hud.set_ability_charge(i, vehicle.ability_charge(i))
 	hud.set_status_text(_status_line())
+	_truck_warning()
 	hud.set_lock_state(vehicle.lock_enabled, vehicle.lock_target != null)
+	_refresh_threats()
+
+
+func _refresh_threats() -> void:
 	# Edge arrows: specials always, the Courier's next stop, salvage, and the
 	# last few shamblers in a Clear.
-	var points := PackedVector2Array()
-	var colors := PackedColorArray()
+	var points := _threat_points
+	var colors := _threat_colors
+	var pulse := -1
+	points.clear()
+	colors.clear()
 	if state == State.RUNNING:
 		var to_screen := get_viewport().get_canvas_transform()
 		for h in hunters:
@@ -1988,11 +2061,13 @@ func _refresh_hud() -> void:
 		if mission_type == "escort" and truck != null and not truck.is_wrecked:
 			points.append(to_screen * truck.global_position)
 			colors.append(T.COL_TRUCK)
+			if truck_under_attack():
+				pulse = points.size() - 1   # playtest 2: its edge arrow pulses while it's hit
 		if mission_type == "clear" and zombies.remaining() <= T.STRAGGLER_ARROWS:
 			for p in zombies.active_positions():
 				points.append(to_screen * p)
 				colors.append(T.COL_ORANGE)
-	hud.set_threats(points, colors)
+	hud.set_threats(points, colors, pulse)
 
 
 func _status_line() -> String:
@@ -2018,9 +2093,12 @@ func _status_line() -> String:
 		"escort":
 			if truck == null:
 				return "ESCORT" + tail
-			var hp := roundi(truck.armor / truck.armor_max * 100.0)
+			# HP, not armor + HP: armor sits on four facings, so the old total kept
+			# counting an untouched side and read 65% when the truck was one bite
+			# from a wreck (playtest 15).
+			var hp := roundi(truck_hp_ratio() * 100.0)
 			var site := "SALVAGING %ds" % ceili(truck.work_left) if truck.working else "DRIVING"
-			return "ESCORT  SITE %d / %d   %s   TRUCK %d%%" % [mini(truck.site_index + 1, truck.sites.size()), truck.sites.size(), site, hp] + tail
+			return "ESCORT  SITE %d / %d   %s   TRUCK HP %d%%" % [mini(truck.site_index + 1, truck.sites.size()), truck.sites.size(), site, hp] + tail
 	return "CLEAR  %d / %d" % [kills, target_kills] + tail
 
 
@@ -2046,6 +2124,8 @@ func _type_color() -> Color:
 # --- Kills and drops -----------------------------------------------------------
 
 func _add_kill(points: int, rig := false) -> void:
+	if state == State.WRECKED:
+		return   # the rig's gone: kills behind the wreck pay nothing (hand playtest)
 	kills += 1
 	var mult := profile.salvage_mult() * float(vehicle.crew_mod("scrap"))
 	if rig:
@@ -2061,10 +2141,16 @@ func _add_kill(points: int, rig := false) -> void:
 		_succeed("BLOCK CLEARED", "", 1.0)
 
 
+## Night surge telegraph (PR #69): NIGHT_SURGE_WARN s before the horde frenzies.
+func _on_surge_warned() -> void:
+	if state == State.RUNNING:
+		hud.banner("THE HORDE STIRS", T.COL_ORANGE, T.NIGHT_SURGE_WARN + T.NIGHT_SURGE_TIME)
+
+
 func _on_zombie_killed(at: Vector2, kind: String) -> void:
 	splats.add(at)
 	fx.gore(at, (at - vehicle.global_position).normalized())
-	_add_kill(int(T.ZOMBIE_KINDS[kind].scrap))
+	_add_kill(Missions.night_kill_scrap(int(T.ZOMBIE_KINDS[kind].scrap), night))
 	match kind:
 		"tank":
 			hud.banner("TANK DOWN", T.COL_ORANGE, 1.8)
@@ -2120,6 +2206,8 @@ func _on_status_started(k: int) -> void:
 	profile.discover("hazards", "status_" + str(STATUS_IDS[k]))
 	if k == StatusBars.GOOP:
 		hazards.mark(vehicle)
+		# Say what it means (playtest 15: an unexplained GOOPED tag).
+		hud.banner("GOOPED!  ZOMBIES NEARBY RUSH YOU", T.STATUS_COLORS[StatusBars.GOOP], 2.5)
 
 
 ## A scrap crate at `at` (a Tank's), scaled like other caches.
@@ -2136,7 +2224,7 @@ func _on_hunter_died(at: Vector2, h: Hunter) -> void:
 	_on_hunter_let_go()
 	var how := {"crushed": "HUNTER CRUSHED", "scraped": "HUNTER SCRAPED OFF", "rammed": "HUNTER RUN DOWN", "mine": "HUNTER BLOWN UP"}
 	hud.banner(how.get(h.last_hit_cause, "HUNTER DOWN"), T.COL_HUNTER, 1.8)
-	_add_kill(T.HUNTER_SCRAP)
+	_add_kill(Missions.night_kill_scrap(T.HUNTER_SCRAP, night))
 
 
 func _on_hunter_let_go() -> void:
@@ -2516,7 +2604,7 @@ func _succeed(title: String, detail: String, pay_mult: float) -> void:
 	# The job's done: anything still on the ground gets hauled home.
 	for p in pickups.get_children():
 		_take_salvage(p as Pickup)
-	var pay := roundi(int(spec.reward) * pay_mult)
+	var pay := roundi(Missions.night_pay(int(spec.reward), spec) * pay_mult)
 	var reward_part := _mission_reward_schematic(pay_mult)
 	var ids := _pending_ids()
 	if reward_part != "":
@@ -2528,7 +2616,7 @@ func _succeed(title: String, detail: String, pay_mult: float) -> void:
 	bank_report = profile.bank_run(int(scrap) + pay, ids)
 	profile.finish_day()
 	# After the day ends, so tonight doesn't count toward anyone's rest.
-	var crew_lines := profile.bank_crew(roundi(skulls * T.PUSH_XP) if pushed else skulls, _rest_ids(), bool(vehicle.crew_mod("triage")), vehicle.has_sp("sp_clean_bandage"))
+	var crew_lines := profile.bank_crew(roundi(skulls * T.PUSH_XP) if pushed else skulls, _rest_ids(), bool(vehicle.crew_mod("triage")), vehicle.has_sp("sp_clean_bandage"), T.NIGHT_XP_MULT if night else 1.0)
 	var lines := "Job pay +%d    Kill scrap +%d    Time %s" % [pay, int(scrap), _clock(elapsed)]
 	if detail != "":
 		lines = detail + "\n" + lines
@@ -2692,7 +2780,7 @@ func _on_wrecked() -> void:
 	var aboard: Array[String] = []
 	for m in profile.seated_crew():
 		aboard.append(str(m.name))
-	var penalty := profile.record_wreck()
+	profile.record_wreck()
 	var deposit := 0
 	if vehicle.has_sp("sp_safe_deposit") and gold_rush_scrap >= 1.0:
 		deposit = int(gold_rush_scrap)   # Safe Deposit: Gold Rush scrap survives the wreck
@@ -2714,8 +2802,6 @@ func _on_wrecked() -> void:
 			lines += "\nThey may turn up at the Saloon again: %s." % ", ".join(back)
 	if not saved.is_empty():
 		lines += "\nLast Rites: %s pulled through, resting %d days." % [", ".join(saved), T.LAST_RITES_REST]
-	if penalty > 0:
-		lines += "\nWreck penalty: -%d scrap." % penalty
 	if deposit > 0:
 		lines += "\nSafe Deposit: %d Gold Rush scrap kept." % deposit
 	if scrap >= 1.0 or not salvage.is_empty():
@@ -2725,6 +2811,10 @@ func _on_wrecked() -> void:
 		lines += "."
 	await _wreck_sequence(aboard)
 	hud.show_result("WRECKED", lines, "BACK TO THE YARD", T.COL_ORANGE)
+	# Freeze the fight behind the result (hand playtest: it kept running and the
+	# horde kept chewing). The overlay runs while paused; leaving unpauses (_exit_tree).
+	if is_inside_tree():
+		get_tree().paused = true
 
 
 class CourierMarkers extends Node2D:

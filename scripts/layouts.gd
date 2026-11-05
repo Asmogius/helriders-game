@@ -486,8 +486,16 @@ static func ids_for(job_type: String) -> Array[String]:
 
 
 ## The layout a board job gets, from its seed (Comms and the mission agree).
-static func pick(job_type: String, job_seed: int) -> String:
+## `districts`: only layouts from these districts (the ones open); empty = any.
+static func pick(job_type: String, job_seed: int, districts: Array = []) -> String:
 	var ids := ids_for(job_type)
+	if not districts.is_empty():
+		var open: Array[String] = []
+		for id in ids:
+			if districts.has(str(LAYOUTS[id].get("district", ""))):
+				open.append(id)
+		if not open.is_empty():
+			ids = open
 	if ids.is_empty():
 		return DEFAULT
 	var rng := RandomNumberGenerator.new()

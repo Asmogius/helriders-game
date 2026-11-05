@@ -21,6 +21,7 @@ var right_stick: ThumbStick
 var _root: Control
 var _armor_bar: ArmorBar
 var _hp_value: Label
+var _hp_shown := -1   # the HP % on _hp_value (redrawn only when it changes)
 var _rig_icon: RigIcon
 var _status_strip: StatusStrip
 var _power_bar: PowerBar
@@ -358,13 +359,7 @@ func press_ability(index: int) -> void:
 
 
 func set_armor(ratio: float) -> void:
-	_armor_bar.set_ratio(ratio)
-	if _hp_value != null:
-		var text := str(clampi(roundi(ratio * 100.0), 0, 100))
-		_hp_value.text = text
-		# Keep the number readable on a phone strip (~120 px wide).
-		var f := UI.font()
-		_hp_value.add_theme_font_size_override("font_size", UI.fit_size(f, text, 110.0, 22, 16))
+	_armor_bar.set_ratio(ratio)   # the number beside it is HP (set_defense)
 
 
 ## The rig icon (§14): shield ring, each facing's plate, the HP block. All
@@ -373,10 +368,13 @@ func set_defense(shield_ratio: float, facings: PackedFloat32Array, hp_ratio: flo
 	_rig_icon.set_values(shield_ratio, facings, hp_ratio)
 	_armor_bar.set_shield(shield_ratio)   # V6.4 shield rail on the armor gauge
 	if _hp_value != null:
-		var text := str(clampi(roundi(hp_ratio * 100.0), 0, 100))
-		_hp_value.text = text
-		var f := UI.font()
-		_hp_value.add_theme_font_size_override("font_size", UI.fit_size(f, text, 110.0, 22, 16))
+		var pct := clampi(roundi(hp_ratio * 100.0), 0, 100)
+		if pct != _hp_shown:   # a font override relayouts the label: only on change
+			_hp_shown = pct
+			var text := str(pct)
+			_hp_value.text = text
+			# Keep the number readable on a phone strip (~120 px wide).
+			_hp_value.add_theme_font_size_override("font_size", UI.fit_size(UI.font(), text, 110.0, 22, 16))
 
 
 ## Status buildup (0..100 per bar) and seconds left on each active status
@@ -430,8 +428,14 @@ func set_status_text(text: String) -> void:
 
 
 ## Screen-space positions (and colors) of threats to point at when off-screen.
-func set_threats(points: PackedVector2Array, colors: PackedColorArray) -> void:
+## `pulse`: index of an arrow to pulse (the Escort truck under attack), or -1.
+func set_threats(points: PackedVector2Array, colors: PackedColorArray, pulse := -1) -> void:
+	_arrows.pulse = pulse
 	_arrows.set_points(points, colors)
+
+
+func threat_pulse() -> int:
+	return _arrows.pulse
 
 
 ## Lock state as the game sees it (on/off, and whether something is locked).
@@ -510,8 +514,9 @@ func show_result(title: String, subtitle: String, button_text: String, accent: C
 		c.queue_free()
 	_button.text = button_text
 	_overlay.visible = true
+	_overlay.process_mode = Node.PROCESS_MODE_ALWAYS   # usable when the mission pauses behind it (wreck)
 	_overlay.modulate.a = 0.0
-	create_tween().tween_property(_overlay, "modulate:a", 1.0, 0.35)
+	_overlay.create_tween().tween_property(_overlay, "modulate:a", 1.0, 0.35)   # on the overlay: runs while paused
 	preload("res://scripts/ui_transitions.gd").tick_numbers(_subtitle)   # V6.5: counters tick up
 
 
@@ -762,12 +767,18 @@ class LockButton extends Control:
 
 class ThreatArrows extends Control:
 	## Chevrons on the screen edge pointing at off-screen threats.
+	const T := preload("res://scripts/tuning.gd")
 	const MARGIN := 48.0
 	var points := PackedVector2Array()
 	var colors := PackedColorArray()
+	var pulse := -1   # this arrow pulses (bigger, with a ring)
+
+	func _process(_delta: float) -> void:
+		if pulse >= 0:
+			queue_redraw()
 
 	func set_points(value: PackedVector2Array, tint: PackedColorArray) -> void:
-		if value.is_empty() and points.is_empty():
+		if value.is_empty() and points.is_empty() and pulse < 0:
 			return
 		points = value
 		colors = tint
@@ -787,6 +798,12 @@ class ThreatArrows extends Control:
 			var tip := center + dir * minf(tx, ty)
 			var side := dir.orthogonal() * 12.0
 			var color := colors[i] if i < colors.size() else Color(1, 0.5, 0.2)
+			if i == pulse:
+				var t := 0.5 + 0.5 * sin(float(Time.get_ticks_msec()) * 0.015)
+				var s := 1.4 + 0.5 * t
+				draw_arc(tip, 22.0 + 10.0 * t, 0.0, TAU, 24, Color(T.COL_UI_DANGER_TEXT, 0.9 - 0.5 * t), 3.0)
+				draw_colored_polygon(PackedVector2Array([tip + dir * 14.0 * s, tip - dir * 8.0 * s + side * s, tip - dir * 8.0 * s - side * s]), Color(color, 1.0))
+				continue
 			draw_colored_polygon(PackedVector2Array([tip + dir * 14.0, tip - dir * 8.0 + side, tip - dir * 8.0 - side]), Color(color, 0.85))
 
 
@@ -1085,6 +1102,9 @@ class StatusStrip extends Control:
 	var build := PackedFloat32Array([0, 0, 0, 0, 0, 0])
 	var left := PackedFloat32Array([0, 0, 0, 0, 0, 0])
 	var showing := false
+	## Short "what it does" tags (numbers in tuning.gd).
+	const HINTS := {"BURNING": "fire damage", "CORRODED": "takes more damage", "TOXIC": "HP drain",
+		"GOOPED": "zombies rush you"}
 
 	func set_values(new_build: PackedFloat32Array, new_left: PackedFloat32Array) -> void:
 		var changed := false
@@ -1114,7 +1134,10 @@ class StatusStrip extends Control:
 			var tx := 76.0
 			if _icons.draw(self, str(UI.STATUS_ICONS[k]), Rect2(74, y - 2, 12, 12), c if on else Color(c, 0.7)):
 				tx = 90.0
-			draw_string(font, Vector2(tx, y + 8), str(T.STATUS_NAMES[k]), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, c if on else Color(c, 0.7))
+			var label := str(T.STATUS_NAMES[k])
+			if on and HINTS.has(label):
+				label += "  " + str(HINTS[label])   # what it does, while it's on
+			draw_string(font, Vector2(tx, y + 8), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, c if on else Color(c, 0.7))
 			y += 13.0
 
 

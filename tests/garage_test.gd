@@ -40,7 +40,9 @@ func _process(_delta: float) -> bool:
 	if frame == 3:
 		_run_checks()
 	if frame == 4:
-		# No job yet: DEPLOY sends you to Comms instead of launching.
+		# No job yet: the DEPLOY button is off (playtest P2-1); deploy() itself
+		# still sends you to Comms instead of launching.
+		_check(garage._deploy.disabled, "DEPLOY is disabled with no job taken")
 		garage.deploy()
 		_check(garage._comms.visible and garage.is_inside_tree() and current_scene == null, "DEPLOY without a job opens Comms")
 		var cards := garage._comms._cards.get_children().size()
@@ -48,6 +50,7 @@ func _process(_delta: float) -> bool:
 		garage._comms.select(0)
 		_check(garage._comms.take_selected() and profile.has_mission(), "TAKE JOB sets the mission")
 		_check(not garage._comms.visible and garage._job.text.begins_with("JOB:"), "taking a job returns to the Garage with the job shown")
+		_check(not garage._deploy.disabled, "DEPLOY is enabled once a job is taken")
 		garage.deploy()
 	if frame == 30:
 		var mission := current_scene
@@ -64,7 +67,7 @@ func _run_checks() -> void:
 	# --- New game ----------------------------------------------------------------
 	_check(profile.has_rig() and profile.scrap == 60, "new game: starter rig and 60 scrap")
 	_check(profile.schematics.size() == 7, "new game: the seven starter schematics")
-	_check(not garage._deploy.disabled, "DEPLOY is available with a complete rig")
+	_check(profile.has_rig() and profile.deploy_block() == "", "a complete rig is ready to DEPLOY (the button waits for a job)")
 	var visible_tags := garage._tags.filter(func(t: Control) -> bool: return t.visible).size()
 	_check(visible_tags == 10, "Scrap Frame shows 10 slots (3 core, 3 armor, 1 weapon, 2 internal, 1 utility)")
 	var seated := profile.seated_crew()
@@ -258,7 +261,7 @@ func _run_checks() -> void:
 	var roster := profile.crew.size()
 	var penalty := profile.record_wreck()
 	print("  lost build worth %d, wreck penalty %d" % [value, penalty])
-	_check(penalty == roundi(value * 0.25) and profile.scrap == before - penalty, "a wreck costs 25% of the lost build's value")
+	_check(penalty == 0 and profile.scrap == before, "a wreck costs no scrap (the rig and crew are the loss)")
 	_check(aboard >= 2 and profile.crew.size() == roster - aboard and profile.seated_crew().is_empty(), "a wreck kills the seated crew; the Inn's crew survive")
 	garage._refresh()
 	_check(not profile.has_rig() and garage._deploy.disabled, "a wreck leaves no rig; DEPLOY is off")
@@ -271,7 +274,7 @@ func _run_checks() -> void:
 	_check(garage._rebuild.text == "STARTER RIG  FREE" and not garage._rebuild.disabled, "can't afford your build: a free starter is offered")
 	_check(garage.rebuild() and profile.has_rig() and profile.scrap == 10, "the starter rig costs nothing")
 	profile.scrap = 3
-	_check(profile.record_wreck() == 3 and profile.scrap == 0, "the penalty never takes you below zero")
+	_check(profile.record_wreck() == 0 and profile.scrap == 3, "a wreck leaves a broke player's scrap alone")
 	_check(profile.schematics.has("outrider_twin_guns"), "schematics survive a wreck")
 	_check(profile.apply_loadout(Parts.STARTER_LOADOUT) and profile.has_rig(), "broke and wrecked, you can still roll out")
 
