@@ -3,31 +3,34 @@
   1280,
   720
  ],
- "scale": 3.4,
- "tilt_deg": 30.0,
+ "camera": "near-isometric ~52\u00b0 (S=8,TOP=5,FRONT=10,SIDE=4) \u2014 identical to saloon_v2 concept C",
+ "tilt_note": "Not garage TILT 30\u00b0. Matches approved concepts/saloon_v2/saloon_c_*.png.",
+ "sun": "upper-left \u2192 hard shadows down-right",
+ "night": "#512b11 world grade; fire/lanterns untinted on lights plate",
  "background": "res://art/saloon/saloon_room.png",
  "lights": "res://art/saloon/saloon_room_lights.png",
- "lights_note": "Fireplace + lantern glow only. Composite above the world night grade; do not CanvasModulate this layer.",
+ "lights_note": "Fireplace + lantern glow. Composite above world night grade; do not CanvasModulate.",
+ "sprite_scale": 1.35,
  "seats": [
   {
    "id": "bar_left",
    "slot": 0,
    "pos": [
-    234,
-    136
+    215,
+    92
    ],
-   "z": 200,
+   "z": 424,
    "hit_rect": [
-    225,
-    128,
-    64,
-    80
+    203,
+    80,
+    153,
+    356
    ],
    "anchor": [
-    258,
-    157
+    284,
+    168
    ],
-   "card_side": "left",
+   "card_side": "right",
    "sprites": {
     "idle": "res://art/saloon/crew_bar_left_idle.png",
     "highlight": "res://art/saloon/crew_bar_left_highlight.png",
@@ -35,49 +38,24 @@
    }
   },
   {
-   "id": "bar_mid",
+   "id": "table_left",
    "slot": 1,
    "pos": [
-    421,
-    136
+    310,
+    217
    ],
-   "z": 200,
+   "z": 549,
    "hit_rect": [
-    412,
-    128,
-    64,
-    80
+    298,
+    205,
+    159,
+    356
    ],
    "anchor": [
-    445,
-    157
+    380,
+    293
    ],
-   "card_side": "left",
-   "sprites": {
-    "idle": "res://art/saloon/crew_bar_mid_idle.png",
-    "highlight": "res://art/saloon/crew_bar_mid_highlight.png",
-    "dim": "res://art/saloon/crew_bar_mid_dim.png"
-   }
-  },
-  {
-   "id": "table_left",
-   "slot": 2,
-   "pos": [
-    251,
-    333
-   ],
-   "z": 394,
-   "hit_rect": [
-    242,
-    325,
-    64,
-    77
-   ],
-   "anchor": [
-    275,
-    351
-   ],
-   "card_side": "left",
+   "card_side": "right",
    "sprites": {
     "idle": "res://art/saloon/crew_table_left_idle.png",
     "highlight": "res://art/saloon/crew_table_left_highlight.png",
@@ -86,30 +64,56 @@
   },
   {
    "id": "table_mid",
-   "slot": 3,
+   "slot": 2,
    "pos": [
-    394,
-    306
+    422,
+    209
    ],
-   "z": 370,
+   "z": 527,
    "hit_rect": [
-    385,
-    298,
-    64,
-    80
+    410,
+    197,
+    159,
+    342
    ],
    "anchor": [
-    418,
-    327
+    492,
+    273
    ],
-   "card_side": "left",
+   "card_side": "right",
    "sprites": {
     "idle": "res://art/saloon/crew_table_mid_idle.png",
     "highlight": "res://art/saloon/crew_table_mid_highlight.png",
     "dim": "res://art/saloon/crew_table_mid_dim.png"
    }
+  },
+  {
+   "id": "table_right",
+   "slot": 3,
+   "pos": [
+    646,
+    209
+   ],
+   "z": 527,
+   "hit_rect": [
+    634,
+    197,
+    159,
+    342
+   ],
+   "anchor": [
+    716,
+    273
+   ],
+   "card_side": "left",
+   "sprites": {
+    "idle": "res://art/saloon/crew_table_right_idle.png",
+    "highlight": "res://art/saloon/crew_table_right_highlight.png",
+    "dim": "res://art/saloon/crew_table_right_dim.png"
+   }
   }
  ],
+ "card_side_rule": "Per seat: opens away from the figure. Left/center \u2192 right. Fireplace stays clear.",
  "ui_colours_needed": {
   "PANEL": "#181d20",
   "PANEL_BODY": "#24292f",
@@ -126,5 +130,5 @@
   "RARITY_MYTHIC": "#c4473f",
   "NIGHT_WORLD": "#512b11"
  },
- "ui_colours_note": "Do not add these to tuning.gd from this PR. UI #68 (or follow-up) owns the palette constants."
+ "ui_colours_note": "Do not add these to tuning.gd from this PR."
 }
