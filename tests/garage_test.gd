@@ -261,7 +261,7 @@ func _run_checks() -> void:
 	var roster := profile.crew.size()
 	var penalty := profile.record_wreck()
 	print("  lost build worth %d, wreck penalty %d" % [value, penalty])
-	_check(penalty == roundi(value * 0.25) and profile.scrap == before - penalty, "a wreck costs 25% of the lost build's value")
+	_check(penalty == 0 and profile.scrap == before, "a wreck costs no scrap (the rig and crew are the loss)")
 	_check(aboard >= 2 and profile.crew.size() == roster - aboard and profile.seated_crew().is_empty(), "a wreck kills the seated crew; the Inn's crew survive")
 	garage._refresh()
 	_check(not profile.has_rig() and garage._deploy.disabled, "a wreck leaves no rig; DEPLOY is off")
@@ -274,7 +274,7 @@ func _run_checks() -> void:
 	_check(garage._rebuild.text == "STARTER RIG  FREE" and not garage._rebuild.disabled, "can't afford your build: a free starter is offered")
 	_check(garage.rebuild() and profile.has_rig() and profile.scrap == 10, "the starter rig costs nothing")
 	profile.scrap = 3
-	_check(profile.record_wreck() == 3 and profile.scrap == 0, "the penalty never takes you below zero")
+	_check(profile.record_wreck() == 0 and profile.scrap == 3, "a wreck leaves a broke player's scrap alone")
 	_check(profile.schematics.has("outrider_twin_guns"), "schematics survive a wreck")
 	_check(profile.apply_loadout(Parts.STARTER_LOADOUT) and profile.has_rig(), "broke and wrecked, you can still roll out")
 

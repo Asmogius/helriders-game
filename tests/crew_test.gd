@@ -312,7 +312,7 @@ func _check_old_crew() -> void:
 	profile.persist = true
 	profile.save_path = "user://helriders_crew_test.json"
 	var file := FileAccess.open(profile.save_path, FileAccess.WRITE)
-	file.store_string(JSON.stringify({"version": 3, "scrap": 90, "schematics": ["scrap_frame"], "rig": Parts.STARTER_LOADOUT, "day": 4,
+	file.store_string(JSON.stringify({"version": 1, "scrap": 90, "schematics": ["scrap_frame"], "rig": Parts.STARTER_LOADOUT, "day": 4,
 		"crew": [{"id": 1, "name": "Mae Voss", "role": "driver", "rarity": "Common", "xp": 3.0, "rest": 0, "seated": true},
 			{"id": 2, "name": "Jo Kade", "role": "gunner", "rarity": "Uncommon", "xp": 0.0, "rest": 1, "seated": false}],
 		"next_crew_id": 3}))
