@@ -2,7 +2,7 @@
 """V2 style sample: the Workshop bay as a voxel diorama (P6 Garage).
 
 Built from voxels and rendered once with voxel_render.render_frame at the rig
-tilt (30 deg), 1 px per voxel. The garage shows the rig at RIG_SCALE 3.4, so the
+tilt (45 deg), 1 px per voxel. The garage shows the rig at RIG_SCALE 3.4, so the
 room is displayed at the same 3.4x: one room voxel = one rig voxel on screen.
 
 Writes art/garage/:

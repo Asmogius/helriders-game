@@ -18,7 +18,7 @@ Draft for review; nothing in the game uses these sprites yet.
    3 shades each (lit top, mid, dark side). Light colours (cyan, orange, enemy red,
    elite gold) give off their own light and never shade.
 4. **Renderer** (`tools/art/voxel_render.py`, Python + numpy + Pillow): straight-on
-   (orthographic) view, camera tilted 30 degrees off straight-down, z-buffered, no
+   (orthographic) view, camera tilted 45 degrees off straight-down, z-buffered, no
    anti-aliasing, 1 px near-black outline all round.
 5. **Sheets**: **32 headings** (11.25 degrees each), 8 columns x 4 rows; frame i =
    heading i x 11.25 degrees clockwise from +x. Frames are square (Scrap Frame 90 px,
@@ -74,8 +74,8 @@ godot --headless --path . -s res://tests/art_sheet_test.gd
 - **Overcharge on turrets:** turret art shows a white-hot glow at its `muzzle` point.
 - **Captures:** `tools/art/capture_mission.gd` and `tools/art/capture_showcase.gd` take screenshots under Xvfb.
 
-## Decided (Cameron, 2026-11-03)
-30 degree tilt; 32 headings; tuning.gd colours with 3 shades; 1 px per voxel with
+## Decided (Cameron, 2026-11-04: Ebbtide standard)
+45 degree tilt (was 30, changed to match Ebbtide's high oblique camera; every Art sheet re-rendered); 32 headings; tuning.gd colours with 3 shades; 1 px per voxel with
 finer models at ~64x36 on screen; near-black outline all round; separate chunk sheets
 for the wreck.
 
