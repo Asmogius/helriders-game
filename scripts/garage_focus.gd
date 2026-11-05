@@ -103,7 +103,7 @@ func _draw_line() -> void:
 	var gt := line.get_global_transform().affine_inverse()
 	for k in p.size():
 		p[k] = gt * p[k]
-	var c := Color(T.COL_ORANGE, line_alpha)
+	var c := Color(T.COL_UI_ACCENT, line_alpha)
 	line.draw_polyline(p, Color(T.COL_GARAGE_FOCUS_EDGE, T.COL_GARAGE_FOCUS_EDGE.a * line_alpha), 6.0)   # dark edge: reads on any floor
 	line.draw_polyline(p, c, 3.0)
 	line.draw_circle(p[0], 5.0, c)
@@ -184,7 +184,7 @@ func _process(delta: float) -> void:
 				o.name = "FocusOutline"
 				var sm := ShaderMaterial.new()
 				sm.shader = _shader
-				sm.set_shader_parameter("tint", T.COL_ORANGE)
+				sm.set_shader_parameter("tint", T.COL_UI_ACCENT)
 				o.material = sm
 				o.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 				o.show_behind_parent = true
@@ -199,7 +199,7 @@ func _process(delta: float) -> void:
 		_overlay.frame = _target.frame
 		_overlay.centered = _target.centered
 		_overlay.offset = _target.offset
-		_overlay.modulate = Color(T.COL_ORANGE, 0.45 + 0.2 * sin(_t * 5.0))
+		_overlay.modulate = Color(T.COL_UI_ACCENT, 0.45 + 0.2 * sin(_t * 5.0))
 		for o in _outline:
 			o.texture = _target.texture
 			o.hframes = _target.hframes

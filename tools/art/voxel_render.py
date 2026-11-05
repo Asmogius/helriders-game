@@ -17,7 +17,7 @@ A model has:
   python3 tools/art/voxel_render.py
   python3 tools/art/voxel_render.py --vox f.vox --name thing
 """
-import argparse, json, math, os, shutil, struct, sys
+import argparse, json, math, os, re, shutil, struct, sys
 import numpy as np
 from PIL import Image
 
@@ -37,7 +37,13 @@ LIGHT = np.array([-0.45, -0.55, 0.70])  # from upper-left of the screen, above
 # shadows fall down-right; on screen that is (+0.643, +0.786 * cos(tilt)) px per voxel of height.
 SHADOW_DIR = (-LIGHT[0] / LIGHT[2], -LIGHT[1] / LIGHT[2])
 SHADOW_RGB = (20, 11, 6)   # near-black warm; the game draws the sheet at SHADOW_ALPHA
-SHADOW_ALPHA = 0.5
+# Peak opacity at the contact (Cameron, 2026-11-05: stronger than the old 0.5).
+# The sheet itself is solid there and eases toward the far cast; this multiplies it.
+SHADOW_ALPHA = 0.82
+CONTACT_Z = 2.0       # voxels this close to the ground stamp the crisp contact
+CAST_FALLOFF = 14.0   # screen voxels over which the cast eases off the contact
+FAR_SHEET = 215       # sheet alpha (0-255) at the far end of the cast, before SHADOW_ALPHA
+FAR_LIP = 0.58        # outer pixel of the cast, once it has left the contact
 # Garage-preview HD set (--garage-hd): the player's chassis and weapon sheets.
 GARAGE_HD = ["scrap_frame", "bulwark_frame", "courier_frame", "pintle_turret", "burst_turret", "rivet_gun",
              "flame_sprayer", "arc_projector", "harpoon", "mortar", "acid_lobber"]
@@ -201,10 +207,26 @@ def shadow_canvas(shape, ppv=PX_PER_VOXEL):
     return 2 * int(math.ceil((r + shape[2] * math.hypot(*SHADOW_DIR)) * ppv)) + 4
 
 
+def _dist_from(contact, limit):
+    """Pixel distance to the nearest True cell, capped at `limit`."""
+    d = np.where(contact, 0, limit).astype(np.int16)
+    for _ in range(int(limit)):
+        p = np.pad(d, 1, constant_values=limit)
+        neigh = np.minimum(np.minimum(p[:-2, 1:-1], p[2:, 1:-1]), np.minimum(p[1:-1, :-2], p[1:-1, 2:]))
+        diag = np.minimum(np.minimum(p[:-2, :-2], p[:-2, 2:]), np.minimum(p[2:, :-2], p[2:, 2:]))
+        d = np.minimum(d, np.minimum(neigh + 1, diag + 1))
+    return d
+
+
 def render_shadow(grid, heading_deg, ppv=PX_PER_VOXEL, tilt=TILT_DEG, canvas=None):
     """Baked cast shadow: every voxel projected along the sun onto the ground
-    (z = 0), then seen through the tilted camera. Opaque SHADOW_RGB silhouette;
-    the frame centre is the footprint centre at ground level, like the sprite."""
+    (z = 0), then seen through the tilted camera. SHADOW_RGB silhouette.
+
+    Voxels within CONTACT_Z of the ground (the footprint, plus one screen voxel
+    around it) are solid and hard-edged. Farther along the cast the sheet alpha
+    eases toward FAR_SHEET, and the outer pixel of that tail is a softer lip.
+    The frame centre is the footprint centre at ground level, like the sprite.
+    The game multiplies the sheet by SHADOW_ALPHA."""
     sx, sy, sz = grid.shape
     a, t = math.radians(heading_deg), math.radians(tilt)
     ca, sa, ct = math.cos(a), math.sin(a), math.cos(t)
@@ -213,6 +235,9 @@ def render_shadow(grid, heading_deg, ppv=PX_PER_VOXEL, tilt=TILT_DEG, canvas=Non
     o = (np.arange(k) + 0.5) / k
     du, dv, dw = [g.ravel() for g in np.meshgrid(o, o, o)]
     v = np.argwhere(grid > 0).astype(float)
+    out = np.zeros((H, W, 4), np.uint8)
+    if len(v) == 0:
+        return out
     x = (v[:, None, 0] + du[None]) - sx / 2.0
     y = (v[:, None, 1] + dv[None]) - sy / 2.0
     z = v[:, None, 2] + dw[None]
@@ -220,11 +245,34 @@ def render_shadow(grid, heading_deg, ppv=PX_PER_VOXEL, tilt=TILT_DEG, canvas=Non
     gx, gy = wx + z * SHADOW_DIR[0], wy + z * SHADOW_DIR[1]
     ix = np.floor(gx * ppv + W / 2).astype(int).ravel()
     iy = np.floor(gy * ct * ppv + H / 2).astype(int).ravel()
+    zz = z.ravel()
     ok = (ix >= 0) & (ix < W) & (iy >= 0) & (iy < H)
-    m = np.zeros((H, W), bool)
-    m[iy[ok], ix[ok]] = True
-    out = np.zeros((H, W, 4), np.uint8)
-    out[m] = SHADOW_RGB + (255,)
+    min_z = np.full((H, W), 1e9, np.float32)
+    np.minimum.at(min_z, (iy[ok], ix[ok]), zz[ok])
+    covered = min_z < 1e8
+    contact = covered & (min_z <= CONTACT_Z)
+    reach = int(math.ceil((CAST_FALLOFF + 4) * ppv))
+    if contact.any():
+        dist = _dist_from(contact, reach).astype(np.float32)
+    else:
+        dist = np.full((H, W), float(ppv * 4), np.float32)
+    crisp = float(ppv)  # one screen voxel past the footprint stays full
+    tnorm = np.clip((dist - crisp) / (CAST_FALLOFF * ppv), 0.0, 1.0)
+    tnorm = tnorm * tnorm * (3.0 - 2.0 * tnorm)
+    sheet = (1.0 - tnorm) * 255.0 + tnorm * FAR_SHEET
+    up = np.zeros_like(covered); up[1:] = covered[:-1]
+    dn = np.zeros_like(covered); dn[:-1] = covered[1:]
+    lf = np.zeros_like(covered); lf[:, 1:] = covered[:, :-1]
+    rt = np.zeros_like(covered); rt[:, :-1] = covered[:, 1:]
+    boundary = covered & ~(up & dn & lf & rt)
+    far_lip = boundary & (dist >= crisp + 2.0 * ppv)
+    sheet = np.where(far_lip, sheet * FAR_LIP, sheet)
+    sheet = np.where(covered, sheet, 0.0)
+    m = sheet > 0
+    out[m, 0] = SHADOW_RGB[0]
+    out[m, 1] = SHADOW_RGB[1]
+    out[m, 2] = SHADOW_RGB[2]
+    out[m, 3] = np.clip(np.rint(sheet[m]), 0, 255).astype(np.uint8)
     return out
 
 
@@ -275,6 +323,21 @@ def render_model(name, model, colors, outdir, directions=DIRECTIONS, ppv=PX_PER_
     meta["sheet"] = f"{name}__core.png" if layers else f"{name}.png"
     save_sheet([render_frame(core, colors, h, ppv, canvas=canvas, hd=hd) for h in heads], os.path.join(outdir, meta["sheet"]))
     meta["composite"] = f"{name}.png"
+    # Lights sheet: only the emissive pixels of the hull sheet (colours that
+    # never shade: cyan, orange, enemy red, elite gold). The night grade tints
+    # the hull but not this child, so lights stay bright at night.
+    if not hd:
+        lit = np.array([shade(c, 2)[:3] for c in colors if shade(c, 0)[:3] == shade(c, 2)[:3] and len(c) > 3 and c[3] > 0])
+        if len(lit):
+            core_img = np.array(Image.open(os.path.join(outdir, meta["sheet"])).convert("RGBA"))
+            m = (core_img[..., 3] > 0) & (core_img[..., :3][:, :, None, :] == lit[None, None]).all(-1).any(-1)
+            if m.any():
+                li = np.zeros_like(core_img)
+                li[m] = core_img[m]
+                fn = f"{name}__lights.png"
+                Image.fromarray(li).save(os.path.join(outdir, fn))
+                write_import(os.path.join(outdir, fn))
+                meta["lights"] = {"sheet": fn}
     # Baked cast shadow (hulls only: a model with a "chassis" chunk stands on the
     # ground; turrets and weapons sit on a deck, and the hull's shadow covers them).
     if "chassis" in chunks:
@@ -382,6 +445,36 @@ detect_3d/compress_to=0
 """)
 
 
+def _patch_shadow_alpha(json_path, alpha):
+    """Replace only the recorded shadow alpha. Leaves the rest of the sheet json alone."""
+    text = open(json_path).read()
+    new, n = re.subn(
+        r'("shadow"\s*:\s*\{[^}]*?"alpha"\s*:\s*)([0-9.]+)',
+        lambda m: m.group(1) + f"{alpha:.2f}".rstrip("0").rstrip("."),
+        text, count=1)
+    if n != 1:
+        raise SystemExit(f"shadow alpha not found in {json_path}")
+    if new != text:
+        open(json_path, "w").write(new)
+
+
+def rebake_shadows(pairs, outdir, ppv):
+    """Rewrite `<name>__shadow.png` and the alpha recorded in its json. Hulls only."""
+    directions = DIRECTIONS
+    heads = [i * 360.0 / directions for i in range(directions)]
+    for name, (model, _colors) in pairs:
+        if "chassis" not in model.chunks:
+            continue
+        shape = next(iter(model.chunks.values())).shape
+        core = union(model.chunks.values())
+        sgrid = union([core] + [union(model.layers[d]["pieces"].values()) for d in model.defaults if d in model.layers])
+        sc = shadow_canvas(shape, ppv)
+        fn = f"{name}__shadow.png"
+        save_sheet([render_shadow(sgrid, h, ppv, canvas=sc) for h in heads], os.path.join(outdir, fn))
+        _patch_shadow_alpha(os.path.join(outdir, f"{name}.json"), SHADOW_ALPHA)
+        print("shadow", name, sc)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--vox")
@@ -390,7 +483,18 @@ def main():
     ap.add_argument("--directions", type=int, default=DIRECTIONS)
     ap.add_argument("--garage-hd", action="store_true",
                     help="garage preview sheets only: 2 px/voxel, soft light + AO, into art/sprites_hd/")
+    ap.add_argument("--shadows-only", action="store_true",
+                    help="rebake hull __shadow.png sheets and their meta alpha; leave every other sheet")
     a = ap.parse_args()
+    if a.shadows_only:
+        import models
+        if a.garage_hd:
+            out = os.path.join(HERE, "..", "..", "art", "sprites_hd")
+            all_models = models.ALL()
+            rebake_shadows([(n, all_models[n]) for n in GARAGE_HD], out, ppv=2)
+        else:
+            rebake_shadows(list(models.ALL().items()), a.out, ppv=1)
+        return
     if a.garage_hd:
         import models
         out = os.path.join(HERE, "..", "..", "art", "sprites_hd")

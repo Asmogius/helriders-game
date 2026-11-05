@@ -1483,11 +1483,14 @@
  "defaults": [],
  "sheet": "outrider__core.png",
  "composite": "outrider.png",
+ "lights": {
+  "sheet": "outrider__lights.png"
+ },
  "shadow": {
   "sheet": "outrider__shadow.png",
   "frame_w": 114,
   "frame_h": 114,
-  "alpha": 0.5,
+  "alpha": 0.82,
   "sun": [
    -0.45,
    -0.55,

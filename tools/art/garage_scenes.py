@@ -38,6 +38,7 @@ C = {
     "steel": PALETTE["steel"], "steel_dark": PALETTE["steel_dark"], "rust": PALETTE["rust"],
     "tyre": PALETTE["tyre"], "glass": PALETTE["glass"],
     "cyan": PALETTE["cyan"], "orange": PALETTE["orange"], "white_hot": PALETTE["white_hot"],
+    "ui_gold": (225, 180, 65),  # COL_UI_ACCENT #e1b441 — turntable UI markers only
 }
 # Now in tuning.gd as COL_GARAGE_* (PR #42); keep both in step:
 SAMPLE_COLOURS = {
@@ -46,7 +47,7 @@ SAMPLE_COLOURS = {
     "GARAGE_OIL": (24, 23, 24),
     "GARAGE_PEGBOARD": (74, 60, 44),
     "GARAGE_WALL": (46, 48, 52),        # corrugated sheet
-    "GARAGE_STREET_NIGHT": (30, 34, 44),# outside the roll-up door
+    "GARAGE_STREET_NIGHT": (42, 53, 80), # outside the roll-up door (#2a3550, = COL_NIGHT_WORLD)
     "GARAGE_GAS_RED": (110, 40, 34),    # welding cylinders (muted, not enemy red)
 }
 C.update({k.lower(): v for k, v in SAMPLE_COLOURS.items()})
@@ -126,8 +127,8 @@ def build(X, Y=240, Z=78):
     tyre_stack(g, 40, 30, 2)
     box(g, X - 70, X - 40, 12, 26, 0, 14, "steel_dark")
     box(g, X - 69, X - 41, 13, 25, 14, 15, "rust")
-    # floor pad (the old lift, quieter): dark disc, thin steel rim, a few cyan
-    # marker dots instead of the busy hazard ring
+    # floor pad (the old lift, quieter): dark disc, thin steel rim, a few gold
+    # marker dots (UI accent; was cyan) instead of the busy hazard ring
     cyl(g, mid, ly, 44, 1, 3, "steel_dark")
     cyl(g, mid, ly, 42, 3, 4, "steel_dark")
     for a in range(0, 360, 2):
@@ -135,7 +136,7 @@ def build(X, Y=240, Z=78):
         box(g, int(x), int(x) + 1, int(y), int(y) + 1, 4, 5, "steel")
     for a in (0, 90, 180, 270):
         x = mid + 39 * math.cos(math.radians(a)); y = ly + 39 * math.sin(math.radians(a))
-        box(g, int(x), int(x) + 2, int(y), int(y) + 2, 4, 5, "cyan")
+        box(g, int(x), int(x) + 2, int(y), int(y) + 2, 4, 5, "ui_gold")
     # one overhead tube on the back wall, centred over the rig (the light source)
     box(g, mid - 30, mid + 30, 9, 11, 70, 72, "cyan")
     box(g, mid - 32, mid + 32, 8, 9, 69, 73, "steel_dark")

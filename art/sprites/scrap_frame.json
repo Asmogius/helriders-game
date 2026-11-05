@@ -9531,11 +9531,14 @@
  ],
  "sheet": "scrap_frame__core.png",
  "composite": "scrap_frame.png",
+ "lights": {
+  "sheet": "scrap_frame__lights.png"
+ },
  "shadow": {
   "sheet": "scrap_frame__shadow.png",
   "frame_w": 126,
   "frame_h": 126,
-  "alpha": 0.5,
+  "alpha": 0.82,
   "sun": [
    -0.45,
    -0.55,

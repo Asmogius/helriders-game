@@ -9791,11 +9791,14 @@
  ],
  "sheet": "raider_frame__core.png",
  "composite": "raider_frame.png",
+ "lights": {
+  "sheet": "raider_frame__lights.png"
+ },
  "shadow": {
   "sheet": "raider_frame__shadow.png",
   "frame_w": 122,
   "frame_h": 122,
-  "alpha": 0.5,
+  "alpha": 0.82,
   "sun": [
    -0.45,
    -0.55,

@@ -672,5 +672,8 @@
  "layers": {},
  "defaults": [],
  "sheet": "scrapper_turret.png",
- "composite": "scrapper_turret.png"
+ "composite": "scrapper_turret.png",
+ "lights": {
+  "sheet": "scrapper_turret__lights.png"
+ }
 }

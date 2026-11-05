@@ -10723,11 +10723,14 @@
  ],
  "sheet": "bulwark_frame__core.png",
  "composite": "bulwark_frame.png",
+ "lights": {
+  "sheet": "bulwark_frame__lights.png"
+ },
  "shadow": {
   "sheet": "bulwark_frame__shadow.png",
   "frame_w": 138,
   "frame_h": 138,
-  "alpha": 0.5,
+  "alpha": 0.82,
   "sun": [
    -0.45,
    -0.55,

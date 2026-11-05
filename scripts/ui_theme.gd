@@ -1,35 +1,51 @@
 extends RefCounted
-## Shared look for menu screens (Garage and the other stations): dark steel
-## panels, phone-sized text, cyan/orange accents. Apply with `control.theme`.
+## Shared look for menu screens (Garage and the other stations): charcoal
+## panels, phone-sized text, gold accent (Ebbtide). Apply with `control.theme`.
 
 const T := preload("res://scripts/tuning.gd")
 
-const TEXT := Color(0.88, 0.86, 0.82)
-const TEXT_DIM := Color(0.6, 0.59, 0.56)
-const PANEL := Color(0.085, 0.085, 0.095, 0.97)
-const PANEL_EDGE := Color(0.26, 0.27, 0.29)
-const GOOD := Color(0.45, 0.85, 0.5)
-const BAD := Color(0.95, 0.38, 0.3)
+# Aliases into tuning.gd COL_UI_* so every screen reads one palette.
+const TEXT := T.COL_UI_TEXT
+const TEXT_DIM := T.COL_UI_TEXT_DIM
+const PANEL := T.COL_UI_PANEL
+const PANEL_EDGE := T.COL_UI_BORDER
+const GOOD := T.COL_UI_OK_TEXT
+const BAD := T.COL_UI_DANGER_TEXT
+const ACCENT := T.COL_UI_ACCENT
+const ACCENT_HOVER := T.COL_UI_ACCENT_HOVER
+const PANEL_ALT := T.COL_UI_PANEL_ALT
+const PANEL_DEEP := T.COL_UI_DEEP
+const HEADER := T.COL_UI_HEADER
+const DANGER := T.COL_UI_DANGER
+const OK := T.COL_UI_OK
 
 
-# --- Fonts (P7 / V6.1) -----------------------------------------------------------
-# Black Ops One (SIL OFL 1.1, see docs/ART_CREDITS.md), the owner's pick for the
-# whole interface. If the file is missing the engine font stays (fallback rule).
+# --- Fonts (P7 / V6.1 + Ebbtide body) -------------------------------------------
+# Black Ops One for titles and big numbers; Inter for body text (both SIL OFL
+# 1.1, see docs/ART_CREDITS.md). Missing files keep the engine font (fallback).
 const FONT_PATH := "res://art/ui/fonts/BlackOpsOne-Regular.ttf"
+const FONT_BODY_PATH := "res://art/ui/fonts/Inter-Regular.ttf"
 
 
-## The interface font, or the engine default if the art file is missing.
+## Display font (Black Ops One): titles, HP value, weapon / ability labels.
 static func font() -> Font:
 	if ResourceLoader.exists(FONT_PATH):
 		return load(FONT_PATH)
 	return ThemeDB.fallback_font
 
 
+## Body font (Inter): default theme font for labels, hints, card body text.
+static func font_body() -> Font:
+	if ResourceLoader.exists(FONT_BODY_PATH):
+		return load(FONT_BODY_PATH)
+	return font()   # fall back to the display font, then the engine default
+
+
 ## Makes every Control and every custom _draw that asks ThemeDB.fallback_font
-## use the interface font. Runs once, from the first make() (garage, menus) or
+## use the body font. Runs once, from the first make() (garage, menus) or
 ## the fight HUD's _ready, whichever comes first; later calls do nothing.
 static func apply_fonts() -> void:
-	var f := font()
+	var f := font_body()
 	if ThemeDB.fallback_font == f:
 		return   # already applied
 	ThemeDB.fallback_font = f
@@ -69,16 +85,16 @@ static func icons() -> RefCounted:
 static func make() -> Theme:
 	apply_fonts()
 	var th := Theme.new()
-	th.default_font = font()
-	th.default_font_size = 22
+	th.default_font = font_body()
+	th.default_font_size = 18
 	th.set_color("font_color", "Label", TEXT)
 	th.set_color("font_outline_color", "Label", Color(0, 0, 0, 0.8))
 	th.set_constant("outline_size", "Label", 4)
 
-	th.set_stylebox("normal", "Button", skin("button_normal", box(Color(0.13, 0.13, 0.145), PANEL_EDGE, 2)))
-	th.set_stylebox("hover", "Button", skin("button_hover", box(Color(0.16, 0.16, 0.175), PANEL_EDGE, 2)))
-	th.set_stylebox("pressed", "Button", skin("button_pressed", box(Color(0.22, 0.14, 0.08), T.COL_ORANGE, 2)))
-	th.set_stylebox("disabled", "Button", skin("button_disabled", box(Color(0.1, 0.1, 0.105), Color(0.18, 0.18, 0.19), 2)))
+	th.set_stylebox("normal", "Button", skin("button_normal", box(PANEL_ALT, PANEL_EDGE, 2)))
+	th.set_stylebox("hover", "Button", skin("button_hover", box(Color(HEADER.r, HEADER.g, HEADER.b, 0.95), ACCENT, 2)))
+	th.set_stylebox("pressed", "Button", skin("button_pressed", box(HEADER, ACCENT, 2)))
+	th.set_stylebox("disabled", "Button", skin("button_disabled", box(PANEL_DEEP, Color(PANEL_EDGE, 0.5), 2)))
 	th.set_stylebox("focus", "Button", StyleBoxEmpty.new())
 	th.set_color("font_color", "Button", TEXT)
 	th.set_color("font_hover_color", "Button", Color.WHITE)
@@ -128,18 +144,43 @@ static func box(fill: Color, border: Color, width: int) -> StyleBoxFlat:
 	return b
 
 
-## An accent button (Deploy): orange border and bold text.
-static func accent(button: Button, color: Color) -> void:
-	button.add_theme_stylebox_override("normal", box(Color(0.16, 0.11, 0.07), color, 3))
-	button.add_theme_stylebox_override("hover", box(Color(0.2, 0.13, 0.08), color, 3))
-	button.add_theme_stylebox_override("pressed", box(Color(0.32, 0.18, 0.08), color, 3))
-	button.add_theme_color_override("font_color", color.lightened(0.3))
+## Gold outline accent (tabs, selected rows). Prefer primary()/ghost() for actions.
+static func accent(button: Button, color: Color = ACCENT) -> void:
+	button.add_theme_stylebox_override("normal", box(HEADER, color, 2))
+	button.add_theme_stylebox_override("hover", box(Color(HEADER.r * 1.15, HEADER.g * 1.15, HEADER.b * 1.1, 1.0), ACCENT_HOVER if color == ACCENT else color.lightened(0.1), 2))
+	button.add_theme_stylebox_override("pressed", box(Color(0.20, 0.16, 0.10), color, 2))
+	button.add_theme_color_override("font_color", color.lightened(0.2))
+
+
+## Primary action (DEPLOY / LEVEL UP / EQUIP / TAKE): filled gold, dark text.
+static func primary(button: Button) -> void:
+	var fill := ACCENT
+	var hover := ACCENT_HOVER
+	var pressed := Color(0.75, 0.58, 0.18)
+	var ink := PANEL_DEEP   # dark text on gold
+	button.add_theme_stylebox_override("normal", box(fill, fill, 0))
+	button.add_theme_stylebox_override("hover", box(hover, hover, 0))
+	button.add_theme_stylebox_override("pressed", box(pressed, pressed, 0))
+	button.add_theme_color_override("font_color", ink)
+	button.add_theme_color_override("font_hover_color", ink)
+	button.add_theme_color_override("font_pressed_color", ink)
+
+
+## Secondary / ghost action: charcoal fill, gold hairline, light text.
+static func ghost(button: Button) -> void:
+	button.add_theme_stylebox_override("normal", box(PANEL_ALT, PANEL_EDGE, 2))
+	button.add_theme_stylebox_override("hover", box(HEADER, ACCENT, 2))
+	button.add_theme_stylebox_override("pressed", box(PANEL_DEEP, ACCENT, 2))
+	button.add_theme_color_override("font_color", TEXT)
+	button.add_theme_color_override("font_hover_color", ACCENT_HOVER)
 
 
 static func label(text: String, size := 22, color := TEXT) -> Label:
 	var l := Label.new()
 	l.text = text
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Titles / big numbers stay on Black Ops One; body text uses Inter.
+	l.add_theme_font_override("font", font() if size >= 26 else font_body())
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", color)
 	return l
@@ -147,7 +188,7 @@ static func label(text: String, size := 22, color := TEXT) -> Label:
 
 ## Color of a lit skull: orange for most jobs, red for the top two levels.
 static func skull_color(skulls: int) -> Color:
-	return BAD if skulls >= 5 else T.COL_ORANGE
+	return BAD if skulls >= 5 else ACCENT
 
 
 ## A small skull icon (job difficulty). `lit` false draws an empty outline.

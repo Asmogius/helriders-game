@@ -92,7 +92,7 @@ func _process(_delta: float) -> bool:
 		_check(not rig.is_overloaded() and rig.mobility() == 1.0, "starter rig runs at full mobility with lock on")
 		shots_mark = main.bullets.shots_fired
 	if frame > 200 and frame < 1200:
-		main.hud.left_stick.output = Vector2.RIGHT.rotated(frame * 0.01) * 0.6
+		main.hud.left_stick.output = Vector2.RIGHT.rotated(frame * 0.01) * 0.35   # gentler circle so the (slower, DRAFT) horde catches up
 		main.hud.right_stick.output = Vector2.ZERO
 		if rig.lock_target != null:
 			lock_frames += 1
@@ -420,7 +420,7 @@ func _process(_delta: float) -> bool:
 		_check(main.hud.result_text().contains("Salvage lost"), "results card reports lost salvage")
 		var profile: Node = root.get_node("Profile")
 		_check(not profile.call("has_rig"), "the wreck destroyed the rig")
-		_check(main.hud.result_text().contains("Wreck penalty"), "results card shows the wreck penalty")
+		_check(not main.hud.result_text().contains("Wreck penalty"), "results card no longer mentions a wreck penalty")
 		var cost_ms := (Time.get_ticks_usec() - started_usec) / 1000.0 / (frame - 30)
 		print("  avg CPU cost %.2f ms/frame (headless, no rendering, this machine)" % cost_ms)
 		_finish()
@@ -429,7 +429,7 @@ func _process(_delta: float) -> bool:
 
 func _check_loadouts(rig: Vehicle) -> void:
 	var starter := Loadout.build(Parts.STARTER_LOADOUT)
-	_check(is_equal_approx(starter.max_speed, 560.0) and is_equal_approx(starter.acceleration, 640.0)
+	_check(is_equal_approx(starter.max_speed, 495.0) and is_equal_approx(starter.acceleration, 560.0)
 		and float(starter.hp) == 150.0 and float(starter.front) == 80.0 and float(starter.side) == 80.0 and float(starter.rear) == 80.0 and float(starter.shield) == 30.0,
 		"starter parts add up: HP 150, Scrap Plating 80 on every facing, a 30 shield")
 	_check(float(starter.lock_range) == 0.0 and int(starter.power_draw) == 100 and int(starter.weight) == 95, "the starter (with its Junk Emitter) runs 100 / 100 power, 95 / 100 weight, no LOCK")

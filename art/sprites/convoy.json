@@ -2154,11 +2154,14 @@
  "defaults": [],
  "sheet": "convoy__core.png",
  "composite": "convoy.png",
+ "lights": {
+  "sheet": "convoy__lights.png"
+ },
  "shadow": {
   "sheet": "convoy__shadow.png",
   "frame_w": 158,
   "frame_h": 158,
-  "alpha": 0.5,
+  "alpha": 0.82,
   "sun": [
    -0.45,
    -0.55,

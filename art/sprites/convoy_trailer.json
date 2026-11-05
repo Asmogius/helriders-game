@@ -1209,11 +1209,14 @@
  "defaults": [],
  "sheet": "convoy_trailer.png",
  "composite": "convoy_trailer.png",
+ "lights": {
+  "sheet": "convoy_trailer__lights.png"
+ },
  "shadow": {
   "sheet": "convoy_trailer__shadow.png",
   "frame_w": 128,
   "frame_h": 128,
-  "alpha": 0.5,
+  "alpha": 0.82,
   "sun": [
    -0.45,
    -0.55,

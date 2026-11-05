@@ -1751,11 +1751,14 @@
  "defaults": [],
  "sheet": "sludger__core.png",
  "composite": "sludger.png",
+ "lights": {
+  "sheet": "sludger__lights.png"
+ },
  "shadow": {
   "sheet": "sludger__shadow.png",
   "frame_w": 132,
   "frame_h": 132,
-  "alpha": 0.5,
+  "alpha": 0.82,
   "sun": [
    -0.45,
    -0.55,

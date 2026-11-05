@@ -9531,11 +9531,14 @@
  ],
  "sheet": "courier_frame__core.png",
  "composite": "courier_frame.png",
+ "lights": {
+  "sheet": "courier_frame__lights.png"
+ },
  "shadow": {
   "sheet": "courier_frame__shadow.png",
   "frame_w": 130,
   "frame_h": 130,
-  "alpha": 0.5,
+  "alpha": 0.82,
   "sun": [
    -0.45,
    -0.55,

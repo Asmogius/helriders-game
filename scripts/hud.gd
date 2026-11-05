@@ -20,6 +20,8 @@ var right_stick: ThumbStick
 
 var _root: Control
 var _armor_bar: ArmorBar
+var _hp_value: Label
+var _hp_shown := -1   # the HP % on _hp_value (redrawn only when it changes)
 var _rig_icon: RigIcon
 var _status_strip: StatusStrip
 var _power_bar: PowerBar
@@ -35,6 +37,7 @@ var pause_button: Button
 var tip: Label                     # the tutorial's instructions
 var _hint: Label
 var _banner: Label
+var _banner_bg: ColorRect
 var _banner_tween: Tween
 var _alert: Label
 var _overlay: Control
@@ -70,6 +73,19 @@ func _ready() -> void:
 	_armor_bar.size = Vector2(300, 16)
 	_root.add_child(_armor_bar)
 
+	# Big HP number (Black Ops One), fitted to the strip beside the bar on a phone HUD.
+	_hp_value = Label.new()
+	_hp_value.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_hp_value.add_theme_font_override("font", UI.font())
+	_hp_value.add_theme_font_size_override("font_size", 22)
+	_hp_value.add_theme_color_override("font_color", Color(0.92, 0.9, 0.86))
+	_hp_value.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+	_hp_value.add_theme_constant_override("outline_size", 4)
+	_hp_value.position = Vector2(404, 10)
+	_hp_value.size = Vector2(120, 32)
+	_hp_value.text = "100"
+	_root.add_child(_hp_value)
+
 	_power_bar = PowerBar.new()
 	_power_bar.position = Vector2(94, 38)
 	_power_bar.size = Vector2(300, 8)
@@ -88,7 +104,18 @@ func _ready() -> void:
 	_fps.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_root.add_child(_fps)
 
-	_banner = _centered_label(30, T.COL_ORANGE, 96.0)
+	_banner_bg = ColorRect.new()
+	_banner_bg.color = T.COL_UI_PANEL
+	_banner_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_banner_bg.anchor_left = 0.5
+	_banner_bg.anchor_right = 0.5
+	_banner_bg.offset_left = -420.0
+	_banner_bg.offset_right = 420.0
+	_banner_bg.offset_top = 84.0
+	_banner_bg.offset_bottom = 132.0
+	_banner_bg.modulate.a = 0.0
+	_root.add_child(_banner_bg)
+	_banner = _centered_label(30, T.COL_UI_ACCENT, 96.0)
 	_banner.modulate.a = 0.0
 	_alert = _centered_label(26, T.COL_ENEMY, 140.0)
 	_alert.visible = false
@@ -143,7 +170,7 @@ func _ready() -> void:
 	pause_button.add_theme_font_size_override("font_size", 28)
 	pause_button.pressed.connect(func() -> void: pause_pressed.emit())
 	_root.add_child(pause_button)
-	tip = _label(26, Color(1.0, 0.92, 0.7))
+	tip = _label(26, T.COL_UI_TEXT)
 	tip.anchor_left = 0.5
 	tip.anchor_right = 0.5
 	tip.offset_left = -430.0
@@ -332,7 +359,7 @@ func press_ability(index: int) -> void:
 
 
 func set_armor(ratio: float) -> void:
-	_armor_bar.set_ratio(ratio)
+	_armor_bar.set_ratio(ratio)   # the number beside it is HP (set_defense)
 
 
 ## The rig icon (§14): shield ring, each facing's plate, the HP block. All
@@ -340,6 +367,14 @@ func set_armor(ratio: float) -> void:
 func set_defense(shield_ratio: float, facings: PackedFloat32Array, hp_ratio: float) -> void:
 	_rig_icon.set_values(shield_ratio, facings, hp_ratio)
 	_armor_bar.set_shield(shield_ratio)   # V6.4 shield rail on the armor gauge
+	if _hp_value != null:
+		var pct := clampi(roundi(hp_ratio * 100.0), 0, 100)
+		if pct != _hp_shown:   # a font override relayouts the label: only on change
+			_hp_shown = pct
+			var text := str(pct)
+			_hp_value.text = text
+			# Keep the number readable on a phone strip (~120 px wide).
+			_hp_value.add_theme_font_size_override("font_size", UI.fit_size(UI.font(), text, 110.0, 22, 16))
 
 
 ## Status buildup (0..100 per bar) and seconds left on each active status
@@ -393,8 +428,14 @@ func set_status_text(text: String) -> void:
 
 
 ## Screen-space positions (and colors) of threats to point at when off-screen.
-func set_threats(points: PackedVector2Array, colors: PackedColorArray) -> void:
+## `pulse`: index of an arrow to pulse (the Escort truck under attack), or -1.
+func set_threats(points: PackedVector2Array, colors: PackedColorArray, pulse := -1) -> void:
+	_arrows.pulse = pulse
 	_arrows.set_points(points, colors)
+
+
+func threat_pulse() -> int:
+	return _arrows.pulse
 
 
 ## Lock state as the game sees it (on/off, and whether something is locked).
@@ -413,15 +454,32 @@ func is_lock_button_visible() -> bool:
 
 
 ## A short message that fades out (enemy inbound, salvage picked up...).
-func banner(text: String, color: Color, seconds := 2.5) -> void:
+func banner(text: String, color: Color = T.COL_UI_ACCENT, seconds := 2.5) -> void:
+	# Ebbtide toast: charcoal plate + gold ink. Threat / injury reds stay red.
+	var ink := _banner_ink(color)
 	_banner.text = text
-	_banner.add_theme_color_override("font_color", color)
+	_banner.add_theme_color_override("font_color", ink)
 	if _banner_tween != null:
 		_banner_tween.kill()
 	_banner.modulate.a = 1.0
+	if _banner_bg != null:
+		_banner_bg.modulate.a = 0.92
 	_banner_tween = create_tween()
 	_banner_tween.tween_interval(seconds)
 	_banner_tween.tween_property(_banner, "modulate:a", 0.0, 0.6)
+	if _banner_bg != null:
+		_banner_tween.parallel().tween_property(_banner_bg, "modulate:a", 0.0, 0.6)
+
+
+## Gold for chrome toasts; keep enemy / injury / danger reds.
+func _banner_ink(color: Color) -> Color:
+	if color == T.COL_ENEMY or color == T.COL_HUNTER or color == T.COL_UI_DANGER \
+			or color == T.COL_UI_DANGER_TEXT or color == UI.BAD:
+		return color
+	# Red-family custom colours (injury flashes, etc.).
+	if color.r > 0.7 and color.g < 0.5 and color.b < 0.5:
+		return color
+	return T.COL_UI_ACCENT
 
 
 ## A warning that stays (and pulses) until cleared with an empty string.
@@ -456,8 +514,9 @@ func show_result(title: String, subtitle: String, button_text: String, accent: C
 		c.queue_free()
 	_button.text = button_text
 	_overlay.visible = true
+	_overlay.process_mode = Node.PROCESS_MODE_ALWAYS   # usable when the mission pauses behind it (wreck)
 	_overlay.modulate.a = 0.0
-	create_tween().tween_property(_overlay, "modulate:a", 1.0, 0.35)
+	_overlay.create_tween().tween_property(_overlay, "modulate:a", 1.0, 0.35)   # on the overlay: runs while paused
 	preload("res://scripts/ui_transitions.gd").tick_numbers(_subtitle)   # V6.5: counters tick up
 
 
@@ -506,7 +565,7 @@ func show_choice(speaker: String, text: String, yes_text: String, no_text: Strin
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 16)
 	column.add_child(row)
-	for pick: Array in [[yes_text, true, T.COL_ORANGE], [no_text, false, Color(0.75, 0.75, 0.72)]]:
+	for pick: Array in [[yes_text, true, T.COL_UI_ACCENT], [no_text, false, T.COL_UI_TEXT_DIM]]:
 		var b := Button.new()
 		b.text = str(pick[0])
 		b.focus_mode = Control.FOCUS_NONE
@@ -594,7 +653,7 @@ func _build_overlay() -> void:
 	column.add_theme_constant_override("separation", 18)
 	center.add_child(column)
 
-	_title = _label(72, T.COL_ORANGE)
+	_title = _label(72, T.COL_UI_ACCENT)
 	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	column.add_child(_title)
 
@@ -611,9 +670,10 @@ func _build_overlay() -> void:
 	_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_button.add_theme_font_size_override("font_size", 30)
 	_button.add_theme_color_override("font_color", Color(0.95, 0.93, 0.88))
-	_button.add_theme_stylebox_override("normal", _box(Color(0.12, 0.12, 0.13), T.COL_ORANGE))
-	_button.add_theme_stylebox_override("hover", _box(Color(0.16, 0.16, 0.17), T.COL_ORANGE))
-	_button.add_theme_stylebox_override("pressed", _box(Color(0.3, 0.16, 0.07), T.COL_ORANGE))
+	_button.add_theme_stylebox_override("normal", _box(T.COL_UI_ACCENT, T.COL_UI_ACCENT))
+	_button.add_theme_stylebox_override("hover", _box(T.COL_UI_ACCENT_HOVER, T.COL_UI_ACCENT_HOVER))
+	_button.add_theme_stylebox_override("pressed", _box(Color(0.75, 0.58, 0.18), Color(0.75, 0.58, 0.18)))
+	_button.add_theme_color_override("font_color", T.COL_UI_DEEP)
 	_button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 	_button.pressed.connect(func() -> void: restart_requested.emit())
 	column.add_child(_button)
@@ -622,6 +682,8 @@ func _build_overlay() -> void:
 func _label(font_size: int, color: Color) -> Label:
 	var label := Label.new()
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Titles / big numbers: Black Ops One; body copy: Inter.
+	label.add_theme_font_override("font", UI.font() if font_size >= 26 else UI.font_body())
 	label.add_theme_font_size_override("font_size", font_size)
 	label.add_theme_color_override("font_color", color)
 	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
@@ -686,7 +748,7 @@ class LockButton extends Control:
 	func _draw() -> void:
 		var c := size * 0.5
 		var r := minf(size.x, size.y) * 0.5 - 4.0
-		var accent := T.COL_ORANGE if on else Color(0.7, 0.68, 0.64)
+		var accent := T.COL_UI_ACCENT if on else Color(0.55, 0.54, 0.52)
 		draw_circle(c, r, Color(0.0, 0.0, 0.0, 0.55 if on else 0.35))
 		draw_arc(c, r - 6.0, 0.0, TAU, 40, Color(1, 1, 1, 0.07), 2.0)   # V6.4 inner bevel
 		draw_arc(c, r, 0.0, TAU, 40, Color(accent, 0.9 if on else 0.5), 4.0 if on else 2.5)
@@ -698,20 +760,25 @@ class LockButton extends Control:
 			draw_line(p, p - Vector2(0.0, corner.y * 9.0), accent, 3.0)
 		if on and has_target:
 			draw_circle(c, 5.0, accent)
-		var font := ThemeDB.fallback_font
-		UI.draw_fit(self, font, Vector2(0.0, size.y + 18.0), "LOCK", HORIZONTAL_ALIGNMENT_CENTER, size.x, 18, Color(accent, 0.9))
+		UI.draw_fit(self, UI.font(), Vector2(0.0, size.y + 18.0), "LOCK", HORIZONTAL_ALIGNMENT_CENTER, size.x, 18, Color(accent, 0.9))
 		if pad_badge != "":
 			PadGlyph.draw(self, Vector2(size.x - 8.0, 8.0), pad_badge)
 
 
 class ThreatArrows extends Control:
 	## Chevrons on the screen edge pointing at off-screen threats.
+	const T := preload("res://scripts/tuning.gd")
 	const MARGIN := 48.0
 	var points := PackedVector2Array()
 	var colors := PackedColorArray()
+	var pulse := -1   # this arrow pulses (bigger, with a ring)
+
+	func _process(_delta: float) -> void:
+		if pulse >= 0:
+			queue_redraw()
 
 	func set_points(value: PackedVector2Array, tint: PackedColorArray) -> void:
-		if value.is_empty() and points.is_empty():
+		if value.is_empty() and points.is_empty() and pulse < 0:
 			return
 		points = value
 		colors = tint
@@ -731,6 +798,12 @@ class ThreatArrows extends Control:
 			var tip := center + dir * minf(tx, ty)
 			var side := dir.orthogonal() * 12.0
 			var color := colors[i] if i < colors.size() else Color(1, 0.5, 0.2)
+			if i == pulse:
+				var t := 0.5 + 0.5 * sin(float(Time.get_ticks_msec()) * 0.015)
+				var s := 1.4 + 0.5 * t
+				draw_arc(tip, 22.0 + 10.0 * t, 0.0, TAU, 24, Color(T.COL_UI_DANGER_TEXT, 0.9 - 0.5 * t), 3.0)
+				draw_colored_polygon(PackedVector2Array([tip + dir * 14.0 * s, tip - dir * 8.0 * s + side * s, tip - dir * 8.0 * s - side * s]), Color(color, 1.0))
+				continue
 			draw_colored_polygon(PackedVector2Array([tip + dir * 14.0, tip - dir * 8.0 + side, tip - dir * 8.0 - side]), Color(color, 0.85))
 
 
@@ -781,8 +854,8 @@ class AbilityButton extends Control:
 		var c := size * 0.5
 		var r := minf(size.x, size.y) * 0.5 - 4.0
 		var is_ready := charge <= 0.0 and not disabled
-		var accent: Color = {"patch": Color(0.45, 0.9, 0.5), "hard_line": T.COL_CYAN, "overcharge": Color(1.0, 0.92, 0.7)}.get(kind, T.COL_ORANGE)
-		var tint := accent if is_ready else Color(0.6, 0.58, 0.55)
+		# Ebbtide: one accent. Gold when ready, dim grey on cooldown; icons tell abilities apart.
+		var tint := T.COL_UI_ACCENT if is_ready else Color(0.55, 0.54, 0.52)
 		if disabled:
 			tint = Color(0.42, 0.4, 0.38)
 		draw_circle(c, r, Color(0.0, 0.0, 0.0, 0.5))
@@ -836,11 +909,11 @@ class AbilityButton extends Control:
 					c + Vector2(-5, 20), c + Vector2(10, -4), c + Vector2(1, -4)]), tint)
 		if disabled:
 			draw_line(c + Vector2(-r * 0.6, -r * 0.6), c + Vector2(r * 0.6, r * 0.6), T.COL_ENEMY, 3.0)
-		var font := ThemeDB.fallback_font
 		var label: String = LABELS.get(kind, kind.to_upper())
 		if disabled:
 			label = "INJURED"
-		UI.draw_fit(self, font, Vector2(-8.0, size.y + 18.0), label, HORIZONTAL_ALIGNMENT_CENTER, size.x + 16.0, 15, Color(tint, 0.9))
+		# Black Ops One + fit_size: longest labels ("HARD LINE", "OVERCHARGE") must fit a phone thumb button.
+		UI.draw_fit(self, UI.font(), Vector2(-8.0, size.y + 18.0), label, HORIZONTAL_ALIGNMENT_CENTER, size.x + 16.0, 15, Color(tint, 0.9))
 		if pad_badge != "":
 			PadGlyph.draw(self, Vector2(size.x - 8.0, 8.0), pad_badge)
 
@@ -881,7 +954,7 @@ class CrewButton extends Control:
 	func _draw() -> void:
 		var c := size * 0.5
 		var r := minf(size.x, size.y) * 0.5 - 4.0
-		var tint := Color(0.95, 0.93, 0.88) if cooldown <= 0.0 else Color(0.55, 0.53, 0.5)
+		var tint := T.COL_UI_ACCENT if cooldown <= 0.0 else Color(0.55, 0.53, 0.5)
 		draw_circle(c, r, Color(0, 0, 0, 0.5))
 		draw_arc(c, r - 6.0, 0.0, TAU, 40, Color(1, 1, 1, 0.07), 2.0)   # V6.4 inner bevel
 		if cooldown > 0.02:
@@ -900,9 +973,8 @@ class CrewButton extends Control:
 			draw_circle(p, 6.0, tint)
 			draw_rect(Rect2(p + Vector2(-6.0, 7.0), Vector2(12.0, 7.0)), tint)
 		if has_ready and cooldown <= 0.0:
-			draw_circle(c + Vector2(r * 0.65, -r * 0.65), 8.0, T.COL_ORANGE)
-		var font := ThemeDB.fallback_font
-		UI.draw_fit(self, font, Vector2(-8.0, size.y + 18.0), "CREW", HORIZONTAL_ALIGNMENT_CENTER, size.x + 16.0, 15, Color(tint, 0.9))
+			draw_circle(c + Vector2(r * 0.65, -r * 0.65), 8.0, T.COL_UI_ACCENT)
+		UI.draw_fit(self, UI.font(), Vector2(-8.0, size.y + 18.0), "CREW", HORIZONTAL_ALIGNMENT_CENTER, size.x + 16.0, 15, Color(tint, 0.9))
 		if pad_badge != "":
 			PadGlyph.draw(self, Vector2(size.x - 8.0, 8.0), pad_badge)
 
@@ -956,7 +1028,7 @@ class CrewWheel extends Control:
 		draw_line(c + Vector2(-12, -12), c + Vector2(12, 12), Color(0.85, 0.83, 0.78), 3.0)
 		draw_line(c + Vector2(-12, 12), c + Vector2(12, -12), Color(0.85, 0.83, 0.78), 3.0)
 		if hover >= 0 and hover < entries.size():
-			draw_arc(slice_pos(hover), SLICE + 6.0, 0.0, TAU, 32, T.COL_CYAN, 4.0)   # controller pick
+			draw_arc(slice_pos(hover), SLICE + 6.0, 0.0, TAU, 32, T.COL_UI_ACCENT, 4.0)   # controller pick
 		for i in entries.size():
 			var e := entries[i]
 			var p := slice_pos(i)
@@ -986,6 +1058,7 @@ class PowerBar extends Control:
 	## Thin bar under armor: power in use / engine output. Overload (power or
 	## weight) spills past the end in orange with a label.
 	const T := preload("res://scripts/tuning.gd")
+	const UI := preload("res://scripts/ui_theme.gd")
 	var used := 0.0
 	var output := 0.0
 	var weight := 0.0
@@ -1008,15 +1081,16 @@ class PowerBar extends Control:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0, 0, 0, 0.55))
 		var inner := size.x - 4.0
 		var fill := minf(used / output, 1.0) * inner
-		var color := T.COL_ORANGE if over or heavy else Color(0.95, 0.85, 0.4)
+		var color := T.COL_UI_DANGER_TEXT if over or heavy else T.COL_UI_ACCENT
 		draw_rect(Rect2(Vector2(2, 2), Vector2(fill, size.y - 4.0)), color)
-		var font := ThemeDB.fallback_font
+		var font := UI.font()   # Black Ops: power / overload readout
 		var text := "PWR %d/%d" % [roundi(used), roundi(output)]
 		if heavy:
 			text += "  WT %d/%d" % [roundi(weight), roundi(capacity)]
 		if over or heavy:
 			text += "  OVERLOAD"
-		draw_string(font, Vector2(size.x + 10.0, size.y + 1.0), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, color)
+		# Fit on a phone-width HUD (bar is 300 px; leave room beside it).
+		UI.draw_fit(self, font, Vector2(size.x + 10.0, size.y + 1.0), text, HORIZONTAL_ALIGNMENT_LEFT, 360.0, 16, color)
 
 
 class StatusStrip extends Control:
@@ -1028,6 +1102,9 @@ class StatusStrip extends Control:
 	var build := PackedFloat32Array([0, 0, 0, 0, 0, 0])
 	var left := PackedFloat32Array([0, 0, 0, 0, 0, 0])
 	var showing := false
+	## Short "what it does" tags (numbers in tuning.gd).
+	const HINTS := {"BURNING": "fire damage", "CORRODED": "takes more damage", "TOXIC": "HP drain",
+		"GOOPED": "zombies rush you"}
 
 	func set_values(new_build: PackedFloat32Array, new_left: PackedFloat32Array) -> void:
 		var changed := false
@@ -1057,7 +1134,10 @@ class StatusStrip extends Control:
 			var tx := 76.0
 			if _icons.draw(self, str(UI.STATUS_ICONS[k]), Rect2(74, y - 2, 12, 12), c if on else Color(c, 0.7)):
 				tx = 90.0
-			draw_string(font, Vector2(tx, y + 8), str(T.STATUS_NAMES[k]), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, c if on else Color(c, 0.7))
+			var label := str(T.STATUS_NAMES[k])
+			if on and HINTS.has(label):
+				label += "  " + str(HINTS[label])   # what it does, while it's on
+			draw_string(font, Vector2(tx, y + 8), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, c if on else Color(c, 0.7))
 			y += 13.0
 
 
@@ -1085,7 +1165,7 @@ class RigIcon extends Control:
 			return Color(0.25, 0.25, 0.27, 0.6)   # nothing fitted
 		if v <= 0.0:
 			return Color(0.45, 0.12, 0.1)          # stripped
-		return T.COL_ORANGE.lerp(T.COL_CYAN, clampf(v * 1.4 - 0.2, 0.0, 1.0)).darkened(0.35 * (1.0 - v))
+		return T.COL_UI_TEXT.darkened(0.45 * (1.0 - clampf(v, 0.0, 1.0)))
 
 	func _draw() -> void:
 		var c := size * 0.5
@@ -1093,10 +1173,11 @@ class RigIcon extends Control:
 		var bh := 34.0
 		var body := Rect2(c - Vector2(bw, bh) * 0.5, Vector2(bw, bh))
 		# Shield ring.
+		# Shield arc is HUD chrome (not the player's cyan world glow) → gold.
 		if shield >= 0.0:
-			draw_arc(c, 34.0, 0.0, TAU, 40, Color(T.COL_SHIELD, 0.18), 4.0)
+			draw_arc(c, 34.0, 0.0, TAU, 40, Color(T.COL_UI_ACCENT, 0.18), 4.0)
 			if shield > 0.0:
-				draw_arc(c, 34.0, -PI / 2.0, -PI / 2.0 + TAU * shield, 40, Color(T.COL_SHIELD, 0.9), 4.0)
+				draw_arc(c, 34.0, -PI / 2.0, -PI / 2.0 + TAU * shield, 40, Color(T.COL_UI_ACCENT, 0.9), 4.0)
 		# HP: the body block drains from the top.
 		draw_rect(body, Color(0.08, 0.08, 0.09, 0.9))
 		var fill := clampf(hp, 0.0, 1.0)
@@ -1112,7 +1193,7 @@ class RigIcon extends Control:
 
 class ArmorBar extends Control:
 	## V6.4: a gauge, not a strip: a bevelled steel housing, 10 segments, a
-	## needle tick at the edge of the fill, and the shield as a thin cyan rail
+	## needle tick at the edge of the fill, and the shield as a thin gold rail
 	## along the top. Redraws only when a value changes.
 	const T := preload("res://scripts/tuning.gd")
 	const SEGMENTS := 10
@@ -1136,7 +1217,7 @@ class ArmorBar extends Control:
 		draw_rect(Rect2(Vector2(-3, -3), Vector2(size.x + 6, 1)), Color(0.42, 0.43, 0.45, 0.9))
 		draw_rect(Rect2(Vector2(-3, size.y + 2), Vector2(size.x + 6, 1)), Color(0.06, 0.06, 0.07, 0.9))
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0, 0, 0, 0.7))
-		var fill := T.COL_CYAN if ratio > 0.35 else T.COL_ORANGE
+		var fill := T.COL_UI_TEXT if ratio > 0.35 else T.COL_UI_DANGER_TEXT
 		var inner := Rect2(Vector2(2, 2), size - Vector2(4, 4))
 		var seg_w := inner.size.x / SEGMENTS
 		var lit := inner.size.x * ratio
@@ -1150,8 +1231,8 @@ class ArmorBar extends Control:
 				draw_rect(Rect2(x0, inner.position.y, seg_w - 1.0, inner.size.y), Color(fill, 0.08))
 		if ratio > 0.0 and ratio < 1.0:   # needle at the edge of the fill
 			draw_rect(Rect2(inner.position.x + lit - 1.0, -2, 2, size.y + 4), Color(1, 1, 1, 0.85))
-		if shield >= 0.0:   # shield rail on the housing's top edge
-			draw_rect(Rect2(Vector2(-3, -3), Vector2((size.x + 6) * shield, 2)), Color(0.55, 0.85, 1.0, 0.95))
+		if shield >= 0.0:   # shield rail on the housing's top edge (gold chrome)
+			draw_rect(Rect2(Vector2(-3, -3), Vector2((size.x + 6) * shield, 2)), Color(T.COL_UI_ACCENT, 0.95))
 
 
 ## The tutorial's instruction line ("" hides it).
