@@ -523,6 +523,10 @@ const TRUCK := {
 	"lock_range": 0.0,
 }
 const COL_TRUCK := Color(0.45, 0.85, 0.5)
+const COL_TRUCK_BODY := Color(0.56, 0.62, 0.44)   # lighter than the street so it reads (playtest 15)
+const TRUCK_LOW_WARN := 0.35   # HUD warns (pulsing) when the truck's HP drops to this share
+const TRUCK_HIT_WINDOW := 1.0  # "under attack" this long after a hit (edge arrow pulses)
+const TRUCK_HIT_BANNER_EVERY := 4.0   # off-screen TRUCK UNDER ATTACK banner at most this often
 
 # Oil (the Scrapper's slicks and your Oil Slick utility): rigs on it keep
 # SLIME_GRIP, zombies in it move at OIL_ZOMBIE_SPEED.
@@ -535,7 +539,7 @@ const COL_OIL := Color(0.05, 0.05, 0.06, 0.6)
 const START_SCRAP := 60
 const SCHEMATIC_DROP_CHANCE := 0.5     # a wrecked Outrider drops a schematic, else a scrap cache
 const SCRAP_CACHE := 20                # scrap in a cache crate
-const WRECK_PENALTY := 0.25            # a wreck costs this x the lost build's value in scrap
+const WRECK_PENALTY := 0.0             # no scrap penalty: losing the rig and crew is the cost (Cameron 2026-11-05; was 0.25)
 const PRESET_COUNT := 3
 const PRESET_NAME_MAX := 18     # characters in a preset's name
 const BOARD_SIZE := 3                  # missions on the Comms board each day

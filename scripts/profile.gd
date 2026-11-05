@@ -512,8 +512,8 @@ func bank_run(run_scrap: int, salvaged: Array[String], cleared := true) -> Dicti
 	return {"scrap": run_scrap, "unlocked": unlocked}
 
 
-## Wrecked: the rig and every part on it are gone, everyone seated dies, and
-## you pay a scrap penalty scaled to what the build was worth. Returns the
+## Wrecked: the rig and every part on it are gone and everyone seated dies.
+## The scrap penalty (T.WRECK_PENALTY x build value) is 0 now. Returns the
 ## penalty paid.
 func record_wreck() -> int:
 	record.wrecks = int(record.wrecks) + 1

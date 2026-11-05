@@ -428,8 +428,14 @@ func set_status_text(text: String) -> void:
 
 
 ## Screen-space positions (and colors) of threats to point at when off-screen.
-func set_threats(points: PackedVector2Array, colors: PackedColorArray) -> void:
+## `pulse`: index of an arrow to pulse (the Escort truck under attack), or -1.
+func set_threats(points: PackedVector2Array, colors: PackedColorArray, pulse := -1) -> void:
+	_arrows.pulse = pulse
 	_arrows.set_points(points, colors)
+
+
+func threat_pulse() -> int:
+	return _arrows.pulse
 
 
 ## Lock state as the game sees it (on/off, and whether something is locked).
@@ -761,12 +767,18 @@ class LockButton extends Control:
 
 class ThreatArrows extends Control:
 	## Chevrons on the screen edge pointing at off-screen threats.
+	const T := preload("res://scripts/tuning.gd")
 	const MARGIN := 48.0
 	var points := PackedVector2Array()
 	var colors := PackedColorArray()
+	var pulse := -1   # this arrow pulses (bigger, with a ring)
+
+	func _process(_delta: float) -> void:
+		if pulse >= 0:
+			queue_redraw()
 
 	func set_points(value: PackedVector2Array, tint: PackedColorArray) -> void:
-		if value.is_empty() and points.is_empty():
+		if value.is_empty() and points.is_empty() and pulse < 0:
 			return
 		points = value
 		colors = tint
@@ -786,6 +798,12 @@ class ThreatArrows extends Control:
 			var tip := center + dir * minf(tx, ty)
 			var side := dir.orthogonal() * 12.0
 			var color := colors[i] if i < colors.size() else Color(1, 0.5, 0.2)
+			if i == pulse:
+				var t := 0.5 + 0.5 * sin(float(Time.get_ticks_msec()) * 0.015)
+				var s := 1.4 + 0.5 * t
+				draw_arc(tip, 22.0 + 10.0 * t, 0.0, TAU, 24, Color(T.COL_UI_DANGER_TEXT, 0.9 - 0.5 * t), 3.0)
+				draw_colored_polygon(PackedVector2Array([tip + dir * 14.0 * s, tip - dir * 8.0 * s + side * s, tip - dir * 8.0 * s - side * s]), Color(color, 1.0))
+				continue
 			draw_colored_polygon(PackedVector2Array([tip + dir * 14.0, tip - dir * 8.0 + side, tip - dir * 8.0 - side]), Color(color, 0.85))
 
 
@@ -1084,6 +1102,9 @@ class StatusStrip extends Control:
 	var build := PackedFloat32Array([0, 0, 0, 0, 0, 0])
 	var left := PackedFloat32Array([0, 0, 0, 0, 0, 0])
 	var showing := false
+	## Short "what it does" tags (numbers in tuning.gd).
+	const HINTS := {"BURNING": "fire damage", "CORRODED": "takes more damage", "TOXIC": "HP drain",
+		"GOOPED": "zombies rush you"}
 
 	func set_values(new_build: PackedFloat32Array, new_left: PackedFloat32Array) -> void:
 		var changed := false
@@ -1113,7 +1134,10 @@ class StatusStrip extends Control:
 			var tx := 76.0
 			if _icons.draw(self, str(UI.STATUS_ICONS[k]), Rect2(74, y - 2, 12, 12), c if on else Color(c, 0.7)):
 				tx = 90.0
-			draw_string(font, Vector2(tx, y + 8), str(T.STATUS_NAMES[k]), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, c if on else Color(c, 0.7))
+			var label := str(T.STATUS_NAMES[k])
+			if on and HINTS.has(label):
+				label += "  " + str(HINTS[label])   # what it does, while it's on
+			draw_string(font, Vector2(tx, y + 8), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, c if on else Color(c, 0.7))
 			y += 13.0
 
 
