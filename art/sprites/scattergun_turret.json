@@ -672,5 +672,8 @@
  "layers": {},
  "defaults": [],
  "sheet": "scattergun_turret.png",
- "composite": "scattergun_turret.png"
+ "composite": "scattergun_turret.png",
+ "lights": {
+  "sheet": "scattergun_turret__lights.png"
+ }
 }

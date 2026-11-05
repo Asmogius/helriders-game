@@ -1483,6 +1483,9 @@
  "defaults": [],
  "sheet": "outrider__core.png",
  "composite": "outrider.png",
+ "lights": {
+  "sheet": "outrider__lights.png"
+ },
  "shadow": {
   "sheet": "outrider__shadow.png",
   "frame_w": 114,
