@@ -76,6 +76,7 @@ var presets: Array = []             # loadout dictionaries or null
 var preset_names: Array = []        # the player's name for each preset ("" = P1, P2...)
 var upgrades := _no_upgrades()
 var levels := {}                    # schematic id -> Research level (absent = 1)
+var basic_hires := {}               # free Saloon hires taken today, per role (keeps the offer stable)
 var research_today := 0             # levels bought today (daily cap)
 var record := {"runs": 0, "clears": 0, "wrecks": 0}
 var day := 1
@@ -408,6 +409,7 @@ func finish_day() -> void:
 		m.rest = maxi(int(m.rest) - 1, 0)
 	day += 1
 	research_today = 0
+	basic_hires = {}
 	active_mission = {}
 	board = Missions.make_board(day, board_size(), int(upgrades.get("quality", 0)), board_district(), int(record.clears))
 	_advance_lost()
@@ -627,9 +629,10 @@ func roster_full() -> bool:
 	return crew.size() >= roster_cap()
 
 
-## The free Saloon hire fits up to one past the roster cap.
+## The free Saloon hire respects the roster cap too (retest: free Drivers
+## pushed it to 7/6). A full roster with no Driver frees a bunk at the Inn.
 func can_hire_basic() -> bool:
-	return crew.size() < roster_cap() + 1
+	return not roster_full()
 
 
 ## Why crew member `m` can't be seated on this frame, or "".
@@ -859,7 +862,9 @@ func hire_offer(index: int) -> bool:
 ## adds (same seed), so the Saloon card can show their name and specialty.
 func basic_offer(role: String) -> Dictionary:
 	var rng := RandomNumberGenerator.new()
-	rng.seed = hash("helriders-basic-%d-%d" % [day, next_crew_id])
+	# Same person all day until they're hired (retest: the free Driver changed
+	# with every hire, paid ones too, since next_crew_id moved).
+	rng.seed = hash("helriders-basic-%d-%s-%d" % [day, role, int(basic_hires.get(role, 0))])
 	var m := Crew.make(role, "Common", rng)
 	m.xp = hire_start_xp(m)
 	m["price"] = 0
@@ -870,6 +875,7 @@ func hire_basic(role: String) -> bool:
 	if not can_hire_basic() or not Crew.ROLES.has(role):
 		return false
 	var m := _add_crew(basic_offer(role))
+	basic_hires[role] = int(basic_hires.get(role, 0)) + 1
 	_auto_seat(m)
 	save_game()
 	changed.emit()
@@ -1342,6 +1348,7 @@ func save_data() -> Dictionary:
 		"upgrades": upgrades,
 		"levels": levels,
 		"research_today": research_today,
+		"basic_hires": basic_hires,
 		"record": record,
 		"notice": notice,
 		"day": day,
@@ -1458,6 +1465,7 @@ const _SAVE_TYPES := {
 	"saloon_day": TYPE_FLOAT, "exp_board": TYPE_ARRAY, "exp_board_day": TYPE_FLOAT, "expeditions": TYPE_ARRAY,
 	"expedition_reports": TYPE_ARRAY, "discovered": TYPE_DICTIONARY, "lost": TYPE_ARRAY,
 	"rehire_pool": TYPE_ARRAY, "rehire_day": TYPE_FLOAT, "rehire_pick": TYPE_FLOAT, "rehire_taken": TYPE_BOOL,
+	"basic_hires": TYPE_DICTIONARY,
 }
 
 
@@ -1559,6 +1567,12 @@ func apply_data(data: Dictionary) -> bool:
 			if lv > 1:
 				levels[id] = lv
 	research_today = maxi(_int(data.get("research_today", 0)), 0)
+	basic_hires = {}
+	var bh: Variant = data.get("basic_hires", {})
+	if bh is Dictionary:
+		for r: Variant in bh:
+			if Crew.ROLES.has(str(r)) and (bh[r] is float or bh[r] is int):
+				basic_hires[str(r)] = clampi(int(bh[r]), 0, 1000)
 	var saved_record: Dictionary = data.get("record", {})
 	for key: String in record:
 		record[key] = _int(saved_record.get(key, 0))

@@ -293,8 +293,9 @@ func _check_saloon() -> void:
 	hurt.rest = 2
 	hurt.seated = false   # injured crew go to the Inn
 	_check(profile.deploy_block() != "", "full roster, the Driver resting: can't deploy")
-	_check(profile.hire_basic("driver") and profile.crew.size() == profile.roster_cap() + 1, "the free Driver joins anyway, one over the cap")
-	_check(not profile.hire_basic("gunner"), "but only one over")
+	_check(not profile.hire_basic("driver") and profile.crew.size() == profile.roster_cap(), "the free Driver respects the cap too (retest: 7/6)")
+	var spare: Dictionary = profile.crew[profile.crew.size() - 1]
+	_check(profile.dismiss(int(spare.id)) and profile.hire_basic("driver") and profile.crew.size() == profile.roster_cap(), "free a bunk at the Inn and the free Driver joins")
 	profile.scrap = 100000
 	profile.ensure_saloon()
 	_check(profile.saloon.is_empty() or not profile.hire_offer(0), "paid hires wait until someone leaves")
