@@ -8,6 +8,8 @@ extends SceneTree
 
 const ProfileScript := preload("res://scripts/profile.gd")
 const Missions := preload("res://scripts/missions.gd")
+const GameMenu := preload("res://scripts/game_menu.gd")
+const TEST_SAVE := "user://qp4_hub_test_save.json"
 
 var profile: ProfileScript
 var frame := 0
@@ -58,20 +60,51 @@ func _process(_delta: float) -> bool:
 			s.propagate_notification(Node.NOTIFICATION_WM_GO_BACK_REQUEST)
 		4:
 			_check(s != null and s.name == "Title", "the phone's back button returns to the title")
-			s.campaign_button.pressed.emit()
+			s.quickplay_button.pressed.emit()
 		5:
+			_check(s != null and s.name == "QuickplayHub", "back on the hub for Esc")
+			var esc := InputEventAction.new()
+			esc.action = "ui_cancel"
+			esc.pressed = true
+			Input.parse_input_event(esc)
+		6:
+			_check(s != null and s.name == "Title", "Esc (ui_cancel) returns to the title")
+			s.campaign_button.pressed.emit()
+		7:
 			_check(s != null and s.name == "Garage", "CAMPAIGN still reaches the garage")
 			_check(profile.scrap == scrap0 and profile.day == day0, "the hub never changes campaign scrap or day")
+			# Garage MENU -> BACK TO TITLE saves, then lands on the title.
+			var m: Node = s.open_menu()
+			var btn := _find_button(m, "BACK TO TITLE")
+			_check(btn != null, "garage MENU has BACK TO TITLE")
+			DirAccess.remove_absolute(TEST_SAVE)
+			profile.save_path = TEST_SAVE
+			profile.persist = true
+			if btn != null:
+				btn.pressed.emit()
+		8:
+			_check(FileAccess.file_exists(TEST_SAVE), "BACK TO TITLE saved the game first")
+			profile.persist = false
+			profile.save_path = "user://helriders_save.json"
+			DirAccess.remove_absolute(TEST_SAVE)
+			DirAccess.remove_absolute(TEST_SAVE + ".bak")
+			_check(s != null and s.name == "Title", "BACK TO TITLE lands on the title")
+			# A pending job hides the button (ABANDON JOB covers that path).
 			# Mid-job quit: the title steps aside and the garage resumes the job.
 			profile.active_mission = Missions.make("clear", 1, 7)
 			profile.run_active = true
+			var gm := GameMenu.new()
+			gm.setup(profile, false)
+			root.add_child(gm)
+			_check(_find_button(gm, "BACK TO TITLE") == null, "a pending job hides BACK TO TITLE")
+			gm.free()
 			change_scene_to_file("res://scenes/title.tscn")
-		6:
+		9:
 			_check(s == null or s.name != "Title" or not s.is_inside_tree(), "a pending job skips the title")
 			_check(s != null and s.name in ["Garage", "Mission"], "the title hands a pending job to the garage, which resumes it (got %s)" % (s.name if s else "null"))
 			profile.run_active = false
 			profile.active_mission = {}
-		7:
+		10:
 			for f in failures:
 				print("FAIL: ", f)
 			print("QUICKPLAY HUB TEST PASSED" if failures.is_empty() else "QUICKPLAY HUB TEST FAILED")
@@ -84,3 +117,10 @@ func _process(_delta: float) -> bool:
 func _check(ok: bool, what: String) -> void:
 	if not ok:
 		failures.append(what)
+
+
+func _find_button(n: Node, text: String) -> Button:
+	for c in n.find_children("*", "Button", true, false):
+		if (c as Button).text == text:
+			return c
+	return null

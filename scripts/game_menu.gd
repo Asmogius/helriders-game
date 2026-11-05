@@ -17,6 +17,7 @@ const Parts := preload("res://scripts/parts.gd")
 const Codex := preload("res://scripts/codex.gd")
 const ProfileScript := preload("res://scripts/profile.gd")
 const PadScript := preload("res://scripts/pad.gd")
+const TITLE_SCENE := "res://scenes/title.tscn"
 
 var profile: ProfileScript
 var in_job := false
@@ -105,6 +106,13 @@ func restart() -> bool:
 	return true
 
 
+## Garage MENU (QP4): save, then the title screen.
+func back_to_title() -> void:
+	profile.save_game()
+	get_tree().paused = false
+	get_tree().change_scene_to_file(TITLE_SCENE)
+
+
 func quit_game() -> void:
 	get_tree().quit()
 
@@ -159,6 +167,8 @@ func _main_page() -> void:
 	_button("DATABASE", show_page.bind("database"))
 	if not in_job:
 		_button("TUTORIAL", func() -> void: tutorial_requested.emit())
+	if not in_job and not in_tutorial and not profile.resume_job():
+		_button("BACK TO TITLE", back_to_title)   # QP4; a pending job leaves via ABANDON JOB (#97)
 	_button("QUIT GAME", quit_game)
 	if not in_job:
 		_button("CLOSE", close, T.COL_UI_ACCENT)
