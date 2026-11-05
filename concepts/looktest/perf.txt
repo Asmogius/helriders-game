@@ -1,0 +1,8 @@
+looktest capture
+light_cap_now=4
+day_before.png draw_calls=22 lights=0
+day_after.png draw_calls=26 lights=4
+day_after_dof.png draw_calls=26 lights=4
+night_before.png draw_calls=22 lights=0
+night_after.png draw_calls=26 lights=4
+dof_on_last=false
