@@ -835,13 +835,21 @@ func hire_offer(index: int) -> bool:
 ## owner: it can be hired even with a full roster, up to one over the cap
 ## (so an injured lone Driver never leaves you stuck: days only pass on jobs).
 ## While over the cap, nothing else joins until someone leaves.
+## The free Common `role` hire on offer right now: exactly who hire_basic()
+## adds (same seed), so the Saloon card can show their name and specialty.
+func basic_offer(role: String) -> Dictionary:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("helriders-basic-%d-%d" % [day, next_crew_id])
+	var m := Crew.make(role, "Common", rng)
+	m.xp = hire_start_xp(m)
+	m["price"] = 0
+	return m
+
+
 func hire_basic(role: String) -> bool:
 	if not can_hire_basic() or not Crew.ROLES.has(role):
 		return false
-	var rng := RandomNumberGenerator.new()
-	rng.seed = hash("helriders-basic-%d-%d" % [day, next_crew_id])
-	var m := _add_crew(Crew.make(role, "Common", rng))
-	m.xp = hire_start_xp(m)
+	var m := _add_crew(basic_offer(role))
 	_auto_seat(m)
 	save_game()
 	changed.emit()
