@@ -226,12 +226,12 @@ func _run_checks() -> void:
 	saloon.select(1)
 	_check(profile.crew.size() == T.ROSTER_SIZE and not saloon.hire_selected(), "the roster holds 6: paid hires stop there")
 	saloon.select(3)
-	_check(saloon.hire_selected() and profile.crew.size() == T.ROSTER_SIZE + 1 and not saloon.hire_selected(), "the free hire can go one over (never stuck without a Driver), no further")
+	_check(not saloon.hire_selected() and profile.crew.size() == T.ROSTER_SIZE and saloon._block(3) == "ROSTER FULL", "the free hire stops at the cap too (retest: 7/6)")
 	var spare: Dictionary = profile.crew[profile.crew.size() - 1]
 	garage.show_tab("INN")
 	inn.select(int(spare.id))
-	_check(not inn.dismiss_selected() and profile.crew.size() == T.ROSTER_SIZE + 1, "DISMISS asks first")
-	_check(inn.dismiss_selected() and profile.crew.size() == T.ROSTER_SIZE, "a second tap dismisses")
+	_check(not inn.dismiss_selected() and profile.crew.size() == T.ROSTER_SIZE, "DISMISS asks first")
+	_check(inn.dismiss_selected() and profile.crew.size() == T.ROSTER_SIZE - 1, "a second tap dismisses")
 	garage.show_tab("GARAGE")
 
 	# --- Upgrades -------------------------------------------------------------------
