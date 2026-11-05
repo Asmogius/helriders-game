@@ -70,6 +70,11 @@ const COL_OB_PAVE := Color(0.36, 0.35, 0.33)            # sidewalk slabs (tiles.
 const COL_OB_SIDING := Color(0.45, 0.43, 0.38)          # house siding (buildings.py)
 const COL_OB_ROOF := Color(0.3, 0.25, 0.23)             # shingles (buildings.py)
 const COL_OB_GRADE := Color(1.0, 0.96, 0.88)            # warm colour grade, a modulate (arena.gd)
+# Training Run readability (playtest 06/07): the arena is lifted (a modulate
+# over 1 brightens; fine under gl_compatibility) and zombies get a pale disc.
+const COL_TUTORIAL_GRADE := Color(1.75, 1.7, 1.6)
+const COL_TUTORIAL_ZOMBIE_GLOW := Color(0.95, 0.88, 0.7, 0.28)
+const COL_TUTORIAL_ZOMBIE_RING := Color(1.0, 0.82, 0.45, 0.9)
 const COL_OB_MOTE := Color(0.86, 0.82, 0.62, 0.55)      # seed fluff motes (map_ambient.gd)
 
 # P2 Effects: explosions and tracers (V4.3/V4.4; PR #33). Additive lights.
