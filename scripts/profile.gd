@@ -108,12 +108,20 @@ var rehire_taken := false           # hired today
 var roll_override := -1.0           # tests: 0..1 replaces every expedition/Last Rites roll
 var luck := RandomNumberGenerator.new()  # expedition and Last Rites rolls
 var _ready_state := false           # set once a game is loaded or started
+var _applying := false              # apply_data() running: hold saves until it's done
+## The save on disk can't be used safely (from a newer build): nothing is
+## written over it this session; the garage shows `notice`.
+var save_locked := false
 
 
 func _ready() -> void:
 	# Tests may have started a game before the autoload is ready; keep it.
 	if not _ready_state and not load_game():
+		var why := notice   # a broken or newer save's notice survives the fresh start
 		new_game()
+		if why != "":
+			notice = why
+			save_game()
 	load_settings()
 	# The app was closed during a mission: the garage sends you straight back
 	# into the same job, the fight reset (resume_job()). Nothing is lost.
@@ -1295,7 +1303,7 @@ func load_preset(index: int) -> bool:
 # --- Save file -----------------------------------------------------------------------
 
 func save_game() -> void:
-	if not persist:
+	if not persist or save_locked or _applying:
 		return
 	var data := save_data()
 	# Write a temp file, then swap it in, keeping the last good save as .bak:
@@ -1305,8 +1313,15 @@ func save_game() -> void:
 	if file == null:
 		push_warning("Profile: can't write save (%s)" % FileAccess.get_open_error())
 		return
-	file.store_string(JSON.stringify(data, "\t"))
+	var wrote := file.store_string(JSON.stringify(data, "\t"))
+	file.flush()
+	var err := file.get_error()
 	file.close()
+	if not wrote or err != OK:
+		# Disk full or a short write: keep the good save, drop the bad temp.
+		push_warning("Profile: save write failed (%s); keeping the previous save" % error_string(err))
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(tmp))
+		return
 	if FileAccess.file_exists(save_path):
 		_move(save_path, save_path + ".bak")
 	if _move(tmp, save_path) != OK:
@@ -1354,25 +1369,69 @@ func save_data() -> Dictionary:
 func load_game() -> bool:
 	if not persist:
 		return false
+	save_locked = false
 	if not FileAccess.file_exists(save_path) and FileAccess.file_exists(save_path + ".tmp"):
 		_move(save_path + ".tmp", save_path)   # died between write and swap
 	if not FileAccess.file_exists(save_path) and not FileAccess.file_exists(save_path + ".bak"):
 		return false
-	var data := read_save(save_path)
-	if data.is_empty():
-		# Unreadable: fall back to the previous save, and keep the broken file
-		# aside (never overwrite it) so nothing is lost for good.
-		var backup := read_save(save_path + ".bak")
-		if FileAccess.file_exists(save_path):
-			_move(save_path, save_path + ".broken")
-		if backup.is_empty():
-			push_warning("Profile: save file unreadable, starting fresh")
-			notice = "Your save couldn't be read, so this is a fresh start. The old file is kept as helriders_save.json.broken."
+	# A save from a newer build: don't load it (we'd drop what we don't know)
+	# and never write over it; the player keeps it for the newer build.
+	for path: String in [save_path, save_path + ".bak"]:
+		if save_version(path) > SAVE_VERSION:
+			save_locked = true
+			notice = "This save is from a newer version of the game (save v%d, this build reads v%d). It was left untouched; update the game to keep playing it. Nothing you do now is saved." % [save_version(path), SAVE_VERSION]
+			push_warning("Profile: save is from a newer version; not loading or overwriting it")
 			return false
-		var ok := apply_data(backup)
-		notice = "Your last save couldn't be read; loaded the one before it."
-		return ok
-	return apply_data(data)
+	var data := read_save(save_path)
+	if not data.is_empty() and _apply_safely(data):
+		return true
+	# Unreadable, or it failed to load: keep a copy aside (never overwritten)
+	# and fall back to the previous save.
+	var kept := ""
+	if FileAccess.file_exists(save_path):
+		kept = _keep_broken(save_path)
+	var backup := read_save(save_path + ".bak")
+	if not backup.is_empty() and _apply_safely(backup):
+		if FileAccess.file_exists(save_path):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(save_path))   # copied aside above
+		_move(save_path + ".bak", save_path)
+		notice = "Your last save couldn't be read; loaded the one before it. The unreadable file is kept as %s." % kept.get_file()
+		return true
+	if FileAccess.file_exists(save_path + ".bak"):
+		_keep_broken(save_path + ".bak")
+	push_warning("Profile: save file unreadable, starting fresh")
+	notice = "Your save couldn't be read, so this is a fresh start. The old file is kept as %s." % (kept.get_file() if kept != "" else "a .broken copy")
+	return false
+
+
+## apply_data that always clears the save hold, even if it stops partway.
+func _apply_safely(data: Dictionary) -> bool:
+	var ok: Variant = apply_data(data)
+	_applying = false
+	return ok is bool and ok
+
+
+## Copy `path` to `<save>.broken-<date>-<time>` (a new name every time, never
+## over an earlier copy). Returns the copy's path.
+func _keep_broken(path: String) -> String:
+	var stamp := Time.get_datetime_string_from_system().replace(":", "").replace("-", "").replace("T", "-")
+	var out := "%s.broken-%s" % [save_path, stamp]
+	var n := 1
+	while FileAccess.file_exists(out):
+		n += 1
+		out = "%s.broken-%s-%d" % [save_path, stamp, n]
+	DirAccess.copy_absolute(ProjectSettings.globalize_path(path), ProjectSettings.globalize_path(out))
+	return out
+
+
+## The `version` a save file says it is (0 if missing or unreadable).
+static func save_version(path: String) -> int:
+	if not FileAccess.file_exists(path):
+		return 0
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+	if not parsed is Dictionary:
+		return 0
+	return _int((parsed as Dictionary).get("version", 0))
 
 
 static func _move(from: String, to: String) -> Error:
@@ -1415,10 +1474,55 @@ static func sanitize_save(data: Dictionary) -> Dictionary:
 	return out
 
 
+## Safe casts for loaded data: a value of the wrong type (a list where a
+## number belongs, inf, a string) gives `def` instead of a script error that
+## would abort the load halfway (bug hunt: that wiped saves).
+const MAX_SCRAP := 1000000000
+const _NUM_CAP := 1.0e15
+
+
+static func _float(v: Variant, def := 0.0) -> float:
+	match typeof(v):
+		TYPE_INT, TYPE_BOOL:
+			return float(v)
+		TYPE_FLOAT:
+			var f: float = v
+			if is_nan(f):
+				return def
+			return clampf(f, -_NUM_CAP, _NUM_CAP)
+		TYPE_STRING:
+			var t: String = v
+			return clampf(t.to_float(), -_NUM_CAP, _NUM_CAP) if t.is_valid_float() else def
+	return def
+
+
+static func _int(v: Variant, def := 0) -> int:
+	if typeof(v) == TYPE_INT:
+		return v
+	if typeof(v) == TYPE_FLOAT or typeof(v) == TYPE_STRING or typeof(v) == TYPE_BOOL:
+		var f := _float(v, NAN)
+		return def if is_nan(f) else int(f)
+	return def
+
+
+static func _bool(v: Variant, def := false) -> bool:
+	match typeof(v):
+		TYPE_BOOL:
+			return v
+		TYPE_INT, TYPE_FLOAT:
+			return _float(v) != 0.0
+	return def
+
+
+static func _arr(v: Variant) -> Array:
+	return v if v is Array else []
+
+
 ## Load the game from a save_data() dictionary (the file, or a snapshot).
 func apply_data(data: Dictionary) -> bool:
 	_ready_state = true
-	scrap = int(data.get("scrap", T.START_SCRAP))
+	_applying = true   # no saves until the whole file is in (ensure_board/ensure_saloon save)
+	scrap = clampi(_int(data.get("scrap", T.START_SCRAP), T.START_SCRAP), 0, MAX_SCRAP)   # 1e400 parses as inf
 	schematics.clear()
 	for id: Variant in data.get("schematics", []):
 		if Parts.CATALOG.has(str(id)):
@@ -1426,8 +1530,8 @@ func apply_data(data: Dictionary) -> bool:
 	storage = {}
 	var saved_storage: Dictionary = data.get("storage", {})
 	for id: String in saved_storage:
-		if Parts.CATALOG.has(id) and int(saved_storage[id]) > 0:
-			storage[id] = int(saved_storage[id])
+		if Parts.CATALOG.has(id) and _int(saved_storage[id]) > 0:
+			storage[id] = _int(saved_storage[id])
 	rig = _clean_loadout(data.get("rig", {}))
 	plan = _clean_loadout(data.get("plan", {}))
 	presets = []
@@ -1445,28 +1549,28 @@ func apply_data(data: Dictionary) -> bool:
 	var saved_upgrades: Dictionary = data.get("upgrades", {})
 	upgrades = _no_upgrades()
 	for key: String in upgrades:
-		upgrades[key] = clampi(int(saved_upgrades.get(key, 0)), 0, (T.UPGRADES[key].costs as Array).size())
+		upgrades[key] = clampi(_int(saved_upgrades.get(key, 0)), 0, (T.UPGRADES[key].costs as Array).size())
 	# Saves from before Research load with every schematic at level 1.
 	levels = {}
 	var saved_levels: Dictionary = data.get("levels", {})
 	for id: String in saved_levels:
 		if Parts.CATALOG.has(id):
-			var lv := clampi(int(saved_levels[id]), 1, Parts.max_level(Parts.get_part(id)))
+			var lv := clampi(_int(saved_levels[id]), 1, Parts.max_level(Parts.get_part(id)))
 			if lv > 1:
 				levels[id] = lv
-	research_today = maxi(int(data.get("research_today", 0)), 0)
+	research_today = maxi(_int(data.get("research_today", 0)), 0)
 	var saved_record: Dictionary = data.get("record", {})
 	for key: String in record:
-		record[key] = int(saved_record.get(key, 0))
+		record[key] = _int(saved_record.get(key, 0))
 	notice = str(data.get("notice", ""))
-	day = maxi(1, int(data.get("day", 1)))
+	day = clampi(_int(data.get("day", 1), 1), 1, 1000000)
 	board = []
 	for m: Variant in data.get("board", []):
 		var clean := _clean_mission(m, int(record.clears))
 		if not clean.is_empty():
 			board.append(clean)
 	active_mission = _clean_mission(data.get("active_mission", {}), int(record.clears))
-	run_active = bool(data.get("run_active", false))
+	run_active = _bool(data.get("run_active", false))
 	discovered = {}
 	var saved_found: Dictionary = data.get("discovered", {})
 	for cat: String in saved_found:
@@ -1482,24 +1586,24 @@ func apply_data(data: Dictionary) -> bool:
 			var m := _clean_member(raw)
 			if not m.is_empty():
 				crew.append(m)
-		next_crew_id = maxi(int(data.get("next_crew_id", 1)), 1)
+		next_crew_id = maxi(_int(data.get("next_crew_id", 1)), 1)
 		for m: Dictionary in crew:
-			next_crew_id = maxi(next_crew_id, int(m.id) + 1)
+			next_crew_id = maxi(next_crew_id, _int(m.id) + 1)
 		saloon = []
 		for raw: Variant in data.get("saloon", []):
 			var offer := _clean_member(raw)
 			if not offer.is_empty() and raw is Dictionary:
-				offer["price"] = int((raw as Dictionary).get("price", T.CREW_PRICES[offer.rarity]))
-				offer["hired"] = bool((raw as Dictionary).get("hired", false))
-				offer.xp = float((raw as Dictionary).get("xp", 0.0))
+				offer["price"] = _int((raw as Dictionary).get("price", T.CREW_PRICES[offer.rarity]))
+				offer["hired"] = _bool((raw as Dictionary).get("hired", false))
+				offer.xp = _float((raw as Dictionary).get("xp", 0.0))
 				saloon.append(offer)
-		saloon_day = int(data.get("saloon_day", 0))
+		saloon_day = _int(data.get("saloon_day", 0))
 		lost = []
 		for raw: Variant in data.get("lost", []):
 			var m := _clean_member(raw)
 			if not m.is_empty() and raw is Dictionary:
 				m.seated = false
-				m["back_in"] = maxi(int((raw as Dictionary).get("back_in", 1)), 1)
+				m["back_in"] = maxi(_int((raw as Dictionary).get("back_in", 1)), 1)
 				lost.append(m)
 		rehire_pool = []
 		for raw: Variant in data.get("rehire_pool", []):
@@ -1507,22 +1611,22 @@ func apply_data(data: Dictionary) -> bool:
 			if not m.is_empty():
 				m.seated = false
 				rehire_pool.append(m)
-		rehire_day = int(data.get("rehire_day", 0))
-		rehire_pick = int(data.get("rehire_pick", -1))
-		rehire_taken = bool(data.get("rehire_taken", false))
+		rehire_day = _int(data.get("rehire_day", 0))
+		rehire_pick = _int(data.get("rehire_pick", -1))
+		rehire_taken = _bool(data.get("rehire_taken", false))
 	else:
 		# A save from before crew: the starter pair joins, seated.
 		_starter_crew()
 		_fit_seats()
 	ensure_saloon()
 	# Expeditions (saves from before them have none).
-	exp_board_day = int(data.get("exp_board_day", 0))
-	wreck_day = int(data.get("wreck_day", 0))
+	exp_board_day = _int(data.get("exp_board_day", 0))
+	wreck_day = _int(data.get("wreck_day", 0))
 	exp_board = []
 	for raw: Variant in data.get("exp_board", []):
 		var e := _clean_expedition(raw)
 		if not e.is_empty():
-			e["taken"] = bool((raw as Dictionary).get("taken", false))
+			e["taken"] = _bool((raw as Dictionary).get("taken", false))
 			exp_board.append(e)
 	expeditions = []
 	for raw: Variant in data.get("expeditions", []):
@@ -1531,18 +1635,19 @@ func apply_data(data: Dictionary) -> bool:
 			continue
 		var d: Dictionary = raw
 		var team: Array = []
-		for id: Variant in d.get("team", []):
-			if not member(int(id)).is_empty():
-				team.append(int(id))
+		for id: Variant in _arr(d.get("team", [])):
+			if not member(_int(id)).is_empty():
+				team.append(_int(id))
 		if team.is_empty():
 			continue
 		e["team"] = team
-		e["days_left"] = clampi(int(d.get("days_left", 1)), 1, 3)
-		e["odds"] = clampf(float(d.get("odds", T.EXPEDITION_ODDS)), 0.0, 1.0)
+		e["days_left"] = clampi(_int(d.get("days_left", 1)), 1, 3)
+		e["odds"] = clampf(_float(d.get("odds", T.EXPEDITION_ODDS)), 0.0, 1.0)
 		expeditions.append(e)
 	expedition_reports = []
 	for line: Variant in data.get("expedition_reports", []):
 		expedition_reports.append(str(line))
+	_applying = false
 	return true
 
 
@@ -1555,8 +1660,8 @@ static func _clean_expedition(raw: Variant) -> Dictionary:
 		bonus = ""
 	return {
 		"name": str(d.get("name", "Expedition")),
-		"skulls": clampi(int(d.get("skulls", 1)), 1, T.MAX_SKULLS),
-		"days": clampi(int(d.get("days", 1)), 1, 3),
+		"skulls": clampi(_int(d.get("skulls", 1)), 1, T.MAX_SKULLS),
+		"days": clampi(_int(d.get("days", 1)), 1, 3),
 		"bonus": bonus,
 	}
 
@@ -1571,24 +1676,24 @@ static func _clean_member(raw: Variant) -> Dictionary:
 	if not Crew.CLASSES.has(role) or not Crew.RARITIES.has(rarity):
 		return {}
 	var out := {
-		"id": int(d.get("id", 0)),
+		"id": _int(d.get("id", 0)),
 		"name": str(d.get("name", "Crew")),
 		"role": role,
 		"specialty": str(d.get("specialty", "")),
 		"rarity": rarity,
-		"xp": maxf(float(d.get("xp", 0.0)), 0.0),
+		"xp": maxf(_float(d.get("xp", 0.0)), 0.0),
 		"perks": [],
 		"perk_offer": [],
-		"rest": maxi(int(d.get("rest", 0)), 0),
-		"seated": bool(d.get("seated", false)),
+		"rest": maxi(_int(d.get("rest", 0)), 0),
+		"seated": _bool(d.get("seated", false)),
 	}
 	# Crew from before specialties keep their ability: Wheelman, Gunslinger.
 	out.specialty = Crew.specialty(out)
 	var pool := Crew.perk_known(out)
-	for p: Variant in d.get("perks", []):
+	for p: Variant in _arr(d.get("perks", [])):
 		if pool.has(str(p)) and not (out.perks as Array).has(str(p)):
 			(out.perks as Array).append(str(p))
-	for p: Variant in d.get("perk_offer", []):
+	for p: Variant in _arr(d.get("perk_offer", [])):
 		if pool.has(str(p)):
 			(out.perk_offer as Array).append(str(p))
 	return out
@@ -1605,16 +1710,16 @@ static func _clean_mission(raw: Variant, clears := 0) -> Dictionary:
 		return {}
 	# Saves from before skulls rated jobs threat 1-3 (1 skull = threat 1,
 	# 6 skulls = threat 3).
-	var skulls := int(d.get("skulls", 0))
+	var skulls := _int(d.get("skulls", 0))
 	if skulls <= 0:
-		skulls = [1, 3, 6][clampi(int(d.get("threat", 1)), 1, 3) - 1]
+		skulls = [1, 3, 6][clampi(_int(d.get("threat", 1)), 1, 3) - 1]
 	var out := {
 		"id": str(d.get("id", "")),
 		"type": type,
 		"skulls": clampi(skulls, 1, T.MAX_SKULLS),
 		"name": str(d.get("name", "")),
-		"seed": int(d.get("seed", 1)),
-		"reward": int(d.get("reward", 0)),
+		"seed": _int(d.get("seed", 1)),
+		"reward": _int(d.get("reward", 0)),
 	}
 	if Layouts.LAYOUTS.has(str(d.get("layout", ""))):
 		out["layout"] = str(d.layout)
@@ -1639,18 +1744,18 @@ static func _clean_loadout(raw: Variant) -> Dictionary:
 		var old := str(d.armor)
 		d = d.duplicate()
 		d["armor_front"] = old
-		var front_only := bool(Parts.get_part(old).get("front_only", false))
+		var front_only := _bool(Parts.get_part(old).get("front_only", false))
 		d["armor_sides"] = "" if front_only else old
 		d["armor_rear"] = "" if front_only else old
 	for key in SINGLE_SLOTS:
 		var id := str(d.get(key, ""))
 		out[key] = id if Parts.CATALOG.has(id) else ""
 	for key in ["armor_sides", "armor_rear"]:
-		if bool(Parts.get_part(str(out[key])).get("front_only", false)):
+		if _bool(Parts.get_part(str(out[key])).get("front_only", false)):
 			out[key] = ""
 	for key in LIST_SLOTS:
 		var list: Array = []
-		for id: Variant in d.get(key, []):
+		for id: Variant in _arr(d.get(key, [])):
 			if Parts.CATALOG.has(str(id)):
 				list.append(str(id))
 		out[key] = list
