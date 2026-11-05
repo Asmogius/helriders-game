@@ -11,6 +11,7 @@ extends Control
 const T := preload("res://scripts/tuning.gd")
 const UI := preload("res://scripts/ui_theme.gd")
 const Crew := preload("res://scripts/crew.gd")
+const Codex := preload("res://scripts/codex.gd")
 const CrewCard := preload("res://scripts/crew_card.gd")
 const ProfileScript := preload("res://scripts/profile.gd")
 const UpgradePanel := preload("res://scripts/upgrade_panel.gd")
@@ -29,6 +30,8 @@ var _dismiss: Button
 var _empty: Label
 var _perk: Button
 var _picker: Control
+var _info: Control                 # the perk / crew help popup (playtest: perks weren't explained)
+var _details: Button
 var _confirm_dismiss := -1
 var _away: Label
 var _expeditions: Control
@@ -65,6 +68,9 @@ func _ready() -> void:
 	UI.primary(_perk)
 	_perk.pressed.connect(open_perk_picker)
 	bar.add_child(_perk)
+	_details = _button("DETAILS", 150)
+	_details.pressed.connect(open_details)
+	bar.add_child(_details)
 	_dismiss = _button("DISMISS", 170)
 	_dismiss.pressed.connect(dismiss_selected)
 	bar.add_child(_dismiss)
@@ -159,6 +165,7 @@ func refresh() -> void:
 	_seat.text = "UNSEAT" if not sel.is_empty() and bool(sel.seated) else "SEAT"
 	_dismiss.disabled = sel.is_empty() or profile.is_away(sel)
 	_perk.visible = not sel.is_empty() and Crew.perks_due(sel) > 0
+	_details.visible = not sel.is_empty()
 	_dismiss.text = PadScript.hint("TAP AGAIN", "PRESS AGAIN") if _confirm_dismiss == selected_id and selected_id >= 0 else "DISMISS"
 	var hints: Array[String] = []
 	if profile.crew.is_empty():
@@ -293,7 +300,7 @@ func _perk_card(m: Dictionary, perk: String, card_size: Vector2) -> Button:
 	var card := Button.new()
 	card.focus_mode = Control.FOCUS_NONE
 	card.custom_minimum_size = card_size
-	card.pressed.connect(pick_perk.bind(perk))
+	card.pressed.connect(show_perk_info.bind(perk))   # first the full explanation, then PICK
 	var box := VBoxContainer.new()
 	box.set_anchors_preset(Control.PRESET_FULL_RECT)
 	box.offset_left = 20.0
@@ -328,12 +335,103 @@ func _perk_tier(m: Dictionary, perk: String) -> String:
 
 func pick_perk(perk: String) -> bool:
 	var ok := profile.choose_perk(selected_id, perk)
+	close_info()
 	close_perk_picker()
 	refresh()
 	return ok
 
 
+## A perk card was tapped: what the perk does in full, with PICK and BACK.
+func show_perk_info(perk: String) -> Control:
+	var m := profile.member(selected_id)
+	if m.is_empty():
+		return null
+	var kind := Crew.perk_kind(m, perk)
+	return _open_info(Crew.perk_name(perk).to_upper(), "%s PERK" % kind.to_upper(), Crew.perk_explain(perk, m),
+		[["PICK THIS PERK", pick_perk.bind(perk), true], ["BACK", close_info, false]])
+
+
+## DETAILS: the selected crew member's passive, ability and perks, explained.
+func open_details() -> Control:
+	var m := profile.member(selected_id)
+	if m.is_empty():
+		return null
+	var a := Crew.ability(m)
+	var lines: Array[String] = []
+	lines.append("PASSIVE (always on while seated): " + Crew.passive_text(m))
+	var timing := ("lasts %s s, ready every %d s" % [str(snappedf(float(a.time), 0.1)), roundi(float(a.cooldown))]) if float(a.time) > 0.0 else "ready every %d s" % roundi(float(a.cooldown))
+	lines.append("")
+	lines.append("ABILITY: %s (%s). %s Fire it from the crew wheel in a fight." % [Crew.ability_name(m), timing, Crew.ability_text(m)])
+	var perks: Array = m.get("perks", [])
+	lines.append("")
+	if perks.is_empty():
+		lines.append("PERKS: none yet. Every 3rd level they pick 1 of 3 (rarity sets how many picks they ever get).")
+	else:
+		lines.append("PERKS:")
+		for p: String in perks:
+			var first := Crew.perk_explain(p, m).split("\n")[0]
+			lines.append("  %s - %s" % [Crew.perk_name(p).to_upper(), first])
+	if bool(m.get("injured", false)):
+		lines.append("")
+		lines.append("INJURED: resting at the Inn. Injured crew can't be seated until they're well.")
+	return _open_info(str(m.name).to_upper(), "%s %s - %s, LEVEL %d" % [str(m.rarity).to_upper(), Crew.role_name(m).to_upper(), Crew.specialty_name(m).to_upper(), Crew.level(m)],
+		"\n".join(lines), [["CLOSE", close_info, true]])
+
+
+func _open_info(title: String, sub: String, body: String, buttons: Array) -> Control:
+	close_info()
+	_info = Control.new()
+	_info.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_info.add_to_group("pad_modal")   # controller: focus stays here, Circle closes it
+	_info.set_meta("pad_close", close_info)
+	add_child(_info)
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.6)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_info.add_child(dim)
+	var panel := PanelContainer.new()
+	panel.set_anchors_preset(Control.PRESET_CENTER)
+	panel.custom_minimum_size = Vector2(minf(760.0, size.x - 48.0), 0)
+	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
+	_info.add_child(panel)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 12)
+	panel.add_child(box)
+	box.add_child(UI.label(title, 30, T.COL_UI_ACCENT))
+	box.add_child(UI.label(sub, 16, UI.TEXT_DIM))
+	var words := Codex.status_glossary(body)
+	if words != "":
+		body += "\n\n" + words   # what SLICK, TOXIC... mean, from the Database
+	var text := UI.label(body, 21, UI.TEXT)
+	text.autowrap_mode = TextServer.AUTOWRAP_WORD
+	text.custom_minimum_size = Vector2(panel.custom_minimum_size.x - 32.0, 0)
+	box.add_child(text)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	box.add_child(row)
+	for b: Array in buttons:
+		var btn := _button(str(b[0]), 220)
+		btn.custom_minimum_size.y = 56
+		if bool(b[2]):
+			UI.primary(btn)
+		btn.pressed.connect(b[1] as Callable)
+		row.add_child(btn)
+	return _info
+
+
+func close_info() -> void:
+	if _info != null:
+		_info.queue_free()
+		_info = null
+
+
+func is_showing_info() -> bool:
+	return _info != null
+
+
 func close_perk_picker() -> void:
+	close_info()
 	if _picker != null:
 		_picker.queue_free()
 		_picker = null

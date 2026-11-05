@@ -72,7 +72,9 @@ static func entries(category: String) -> Array:
 			for role: String in Crew.CLASSES:
 				for spec: String in Crew.SPECIALTIES[role]:
 					var a: Dictionary = Crew.ABILITIES.get(spec, {})
-					out.append([spec, "%s (%s)" % [str(a.get("name", spec)), str(Crew.ROLE_NAMES[role])], "Ability: %s." % str(a.get("ability", "-"))])
+					var kind := str(a.get("kind", ""))
+					out.append([spec, "%s (%s)" % [str(a.get("name", spec)), str(Crew.ROLE_NAMES[role])],
+						"Passive: %s  Ability, %s: %s" % [str(Crew.PASSIVE_TEXT.get(role, "")), str(a.get("ability", "-")), str(Crew.ABILITY_TEXT.get(kind, ""))]])
 		"enemies":
 			out = ENEMIES.duplicate()
 		"hazards":
@@ -108,3 +110,13 @@ static func _part_text(p: Dictionary) -> String:
 	if p.has("armor"):
 		bits.append("armor %d" % int(p.armor))
 	return ", ".join(bits) + "."
+
+
+## Status words in `text` (SLICK, TOXIC...) with what each means, one line
+## each, from the HAZARDS entries. "" when none appear.
+static func status_glossary(text: String) -> String:
+	var out: Array[String] = []
+	for h: Array in HAZARDS:
+		if str(h[0]).begins_with("status_") and text.contains(str(h[1])):
+			out.append("%s: %s" % [str(h[1]), str(h[2])])
+	return "\n".join(out)

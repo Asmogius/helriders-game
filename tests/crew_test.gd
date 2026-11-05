@@ -334,7 +334,28 @@ func _check_inn_picker() -> void:
 	_check(inn._perk.visible, "the Inn shows PICK PERK for a crew member with a perk waiting")
 	_check(inn.open_perk_picker() and inn.is_picking_perk(), "PICK PERK opens three perk cards")
 	var offer := profile.perk_offer(m)
-	_check(inn.pick_perk(offer[1]) and not inn.is_picking_perk() and Crew.has_perk(m, offer[1]) and not inn._perk.visible, "tapping a card takes the perk")
+	_check(inn.show_perk_info(offer[1]) != null and inn.is_showing_info() and not Crew.has_perk(m, offer[1]), "tapping a perk card explains it first (nothing picked yet)")
+	_check(inn.pick_perk(offer[1]) and not inn.is_picking_perk() and not inn.is_showing_info() and Crew.has_perk(m, offer[1]) and not inn._perk.visible, "PICK THIS PERK takes the perk")
+	_check(inn._details.visible and inn.open_details() != null and inn.is_showing_info(), "DETAILS explains the selected crew member")
+	inn.close_info()
+	# Every specialty's ability and every perk it can offer has plain help text.
+	var missing: Array[String] = []
+	for role: String in Crew.SPECIALTIES:
+		for spec: String in Crew.SPECIALTIES[role]:
+			var mm := {"role": role, "specialty": spec, "rarity": "Mythic", "perks": [], "xp": 0.0}
+			if Crew.ability_text(mm) == "":
+				missing.append("ability of " + spec)
+			if Crew.passive_text(mm) == "":
+				missing.append("passive of " + role)
+			var tiers: Dictionary = Crew.SPECIALTY_PERKS.get(spec, {})
+			for tier: String in tiers:
+				for pk: String in tiers[tier]:
+					if Crew.perk_text(pk) == "" or Crew.perk_explain(pk, mm).length() < 20:
+						missing.append(pk)
+	for pk: String in Crew.SHARED_PERKS:
+		if Crew.perk_explain(pk, m).length() < 20:
+			missing.append(pk)
+	_check(missing.is_empty(), "every ability, passive and perk has help text (missing: %s)" % ", ".join(missing))
 	inn.queue_free()
 	profile.new_game()
 

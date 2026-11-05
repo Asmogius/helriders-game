@@ -606,6 +606,96 @@ static func roll_perk_offer(member: Dictionary) -> Array[String]:
 	return out
 
 
+# --- Plain-language help (playtest: perks and abilities weren't explained) ------------
+# What each crew ability does, in a sentence. Numbers are Common's; rarity makes
+# them stronger. Text only: the rules live in ABILITIES and vehicle.gd.
+const ABILITY_TEXT := {
+	"hard_line": "For a few seconds the rig steers much sharper and grips the road hard (Epic and up: faster too).",
+	"floor_it": "A burst of speed: top speed +35% and acceleration +50% for 3 s.",
+	"bootleg": "Snaps the rig round to face where you're steering (or spins it about), keeping its speed.",
+	"overcharge": "Guns fire faster and hit harder for a few seconds.",
+	"deadeye": "For 5 s bullets fly 50% faster and deal 25% more damage.",
+	"piercing": "For 5 s every bullet passes through up to 3 zombies.",
+	"field_repair": "Welds 30 armor back onto the most damaged side and throws off latched Hunters.",
+	"mark": "Tags the nearest Hunter or enemy rig: it takes 30% more damage for 6 s.",
+	"flare": "Lights up a wide area for 5 s: enemies in it are slowed 40% and take 20% more damage.",
+	"tune_up": "For 6 s: top speed +15%, fire rate +15%, and the shield recharges without waiting.",
+	"power_divert": "For 6 s your spare power becomes extra shield. An overloaded rig has none to spare.",
+	"miasma": "A toxic cloud around the rig for 6 s that builds TOXIC on everything inside it.",
+	"scrap_drones": "Launches 2 small drones that fly with you for 10 s and shoot nearby enemies.",
+	"field_dressing": "Patches up one injured crew member mid-fight so they're back in action. Needs someone injured.",
+	"magnet": "Pulls in all the salvage lying within 900 px.",
+	"gold_rush": "For 6 s every kill pays triple scrap.",
+	"brace": "For 3 s the rig takes 60% less damage and rams 50% harder.",
+	"shockwave": "A blast around the rig: 40 damage to everything close, and zombies are shoved away.",
+	"cook_off": "For 5 s your shots also set targets burning, and barrels you hit blow 50% bigger.",
+	"static_burst": "An electric burst (450 px) that builds shock (STUNNED) on enemies and knocks their shields out for 4 s.",
+	"chain_drag": "Hooks the nearest enemy rig on a chain for 3 s and drags it; you ram 40% harder meanwhile.",
+}
+# What each class's passive does (always on while they're seated and well).
+const PASSIVE_TEXT := {
+	"driver": "Sharper turning and more grip.",
+	"gunner": "Less weapon spread and faster turret aim (Epic and up: longer lock range too).",
+	"mechanic": "The rig takes less damage.",
+	"spotter": "Utility cooldowns are shorter.",
+	"engineer": "More power output from the engine.",
+	"medic": "Seated crew are less likely to be injured.",
+	"scavenger": "More scrap from kills and better schematic odds.",
+	"bruiser": "Rams hit harder and the rig takes less ram damage.",
+}
+
+
+static func ability_text(member: Dictionary) -> String:
+	return str(ABILITY_TEXT.get(str(ABILITIES.get(specialty(member), {}).get("kind", "")), ""))
+
+
+static func passive_text(member: Dictionary) -> String:
+	return str(PASSIVE_TEXT.get(str(member.get("role", "")), ""))
+
+
+## "Minor", "Major", "Signature", "Shared" or "Class": where a perk comes from.
+static func perk_kind(member: Dictionary, perk: String) -> String:
+	if SHARED_PERKS.has(perk):
+		return "Shared"
+	var tiers: Dictionary = SPECIALTY_PERKS.get(specialty(member), {})
+	for tier: String in tiers:
+		if (tiers[tier] as Array).has(perk):
+			return tier.capitalize()
+	return "Class"
+
+
+## The full help text for a perk on this crew member: what it does, and what
+## it builds on (their ability or passive), in plain words.
+static func perk_explain(perk: String, member: Dictionary) -> String:
+	var ability := ability_name(member)
+	var lines: Array[String] = []
+	match perk:
+		"veteran":
+			lines.append("Makes this crew member's passive 25% stronger.")
+			lines.append("Their passive: %s" % passive_text(member))
+		"quick_hands":
+			lines.append("%s comes back 20%% sooner after each use." % ability)
+		"endurance":
+			lines.append("%s lasts 30%% longer. (No effect on instant abilities.)" % ability)
+		"tough":
+			lines.append("When a big hit injures someone, this crew member is half as likely to be the one hurt. If they are hurt, they rest 1 day less at the Inn.")
+		_:
+			lines.append(perk_text(perk) + ".")
+	if ability != "" and perk != "veteran" and perk != "tough":
+		lines.append("")
+		lines.append("%s (their ability, fired from the crew wheel in a fight): %s" % [ability, ability_text(member)])
+	var kind := perk_kind(member, perk)
+	lines.append("")
+	match kind:
+		"Shared":
+			lines.append("A shared perk: any class can get it.")
+		"Class":
+			lines.append("A %s perk." % role_name(member))
+		_:
+			lines.append("A %s %s perk. Perks are kept for good once picked." % [kind, specialty_name(member)])
+	return "\n".join(lines)
+
+
 static func perk_name(perk: String) -> String:
 	return str(PERKS.get(perk, SPECIALTY_PERK_NAMES.get(perk, [perk, ""]))[0])
 
