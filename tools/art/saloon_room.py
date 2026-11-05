@@ -93,21 +93,48 @@ def main():
     for f in glob.glob(os.path.join(OUT, "crew_*.png*")):
         os.remove(f)
 
-    sc_bg, light = build_C(False)
-    img_bg, own_bg, em_bg, oy = sc_bg.render(light)
-    graded_bg = grade_with_glow(img_bg, em_bg)
-    room = Image.fromarray(np.clip(graded_bg, 0, 255).astype(np.uint8), "RGB").convert("RGBA")
-    lights = lights_overlay(em_bg, np.clip(img_bg, 0, 255))
-    room_path = os.path.join(OUT, "saloon_room.png")
-    lights_path = os.path.join(OUT, "saloon_room_lights.png")
-    room.save(room_path); lights.save(lights_path)
-    write_import(room_path); write_import(lights_path)
-
+    # Render FULL scene with hireables once — keeps figure cast-shadows on the floor
+    # (concept look). Background = full grade with hireable pixels cleared.
     sc_full, light = build_C(True)
     img_full, own_full, em_full, oy = sc_full.render(light)
     graded = grade_with_glow(img_full, em_full)
     body = (own_full > 0) & ~em_full
     graded[body, :3] = np.clip(graded[body, :3] * 1.40 + 14.0, 0, 255)
+
+    # Room backdrop: same pixels, but punch out hireables (own>0) to transparency
+    room_rgba = np.concatenate([
+        np.clip(graded, 0, 255).astype(np.uint8),
+        np.full((*graded.shape[:2], 1), 255, np.uint8),
+    ], -1)
+    room_rgba[own_full > 0, 3] = 0
+    # Fill punched holes with nearby floor colour so stools under sitters don't gap
+    # (sitters cover stool tops; without them a hole appears). Sample from own==0.
+    hole = own_full > 0
+    if hole.any():
+        floor = (~hole) & (img_full.sum(-1) > 10)
+        # simple: paint night-graded floor mean under holes
+        fill = np.array([0x3a, 0x1e, 0x0c, 255], np.uint8)
+        # better: dilate floor into holes
+        from PIL import ImageFilter as _IF
+        mask_inv = Image.fromarray((~hole).astype(np.uint8) * 255)
+        # For each hole pixel, leave transparent — game composites sprites on top.
+        # Stool tops under sitters: restore from a no-hireable render.
+        sc_bg, light_bg = build_C(False)
+        img_bg, _, em_bg, _ = sc_bg.render(light_bg)
+        graded_bg = grade_with_glow(img_bg, em_bg)
+        room_rgba[hole, :3] = np.clip(graded_bg[hole], 0, 255).astype(np.uint8)
+        room_rgba[hole, 3] = 255
+
+    room = Image.fromarray(room_rgba, "RGBA")
+    lights = lights_overlay(em_full, np.clip(img_full, 0, 255))
+    room_path = os.path.join(OUT, "saloon_room.png")
+    lights_path = os.path.join(OUT, "saloon_room_lights.png")
+    room.convert("RGB").save(room_path)  # opaque backdrop for Godot
+    # re-save as RGB (game expects opaque room plate; sprites layer on top)
+    Image.fromarray(np.clip(np.where(hole[..., None], graded_bg, graded), 0, 255).astype(np.uint8), "RGB").save(room_path)
+    lights.save(lights_path)
+    write_import(room_path); write_import(lights_path)
+
     rgba = np.concatenate([
         np.clip(graded, 0, 255).astype(np.uint8),
         np.where(own_full > 0, 255, 0).astype(np.uint8)[..., None],
