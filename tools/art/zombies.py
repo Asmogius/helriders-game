@@ -3,7 +3,7 @@
 
 One humanoid voxel model (14x10x18 voxels, x = forward, y = left-right,
 z = up), posed per frame, rendered with voxel_render.render_frame at the same
-30 deg tilt, 1 px per voxel, near-black outline and 3-step shading as the rigs.
+45 deg tilt, 1 px per voxel, near-black outline and 3-step shading as the rigs.
 16 headings; Shambler: 4-frame shamble + 2-frame lunge + hit-flash, in 6
 clothing palettes. Tank: the same body built at ~2x with heavier proportions:
 4-frame walk, 2-frame roar (wind-up), charge, stumble, hit-flash.
@@ -153,18 +153,20 @@ def render_rows(rows, n_head, P):
             cols = cols + [FLASH + (255,)]
             g = gi
         out.append([render_frame(g, cols, i * 360.0 / n_head, canvas=canvas) for i in range(n_head)])
-    # Crop every frame to one tight square, symmetric about the centre (the
-    # ground point stays the frame centre).
-    m = 0
+    # Crop every frame to one tight rectangle, symmetric about the centre (the
+    # ground point stays the frame centre). Not square: at the 45 deg tilt a
+    # standing body is taller than it is wide, and squares overflow 2048 px.
+    mx = my = 0
     c = canvas // 2
     for row in out:
         for f in row:
             ys, xs = np.nonzero(f[..., 3])
             if len(xs):
-                m = max(m, abs(xs - c).max(), abs(ys - c).max())
-    m = int(m) + 1
-    out = [[f[c - m:c + m, c - m:c + m] for f in row] for row in out]
-    return out, int(2 * m)
+                mx = max(mx, abs(xs - c).max())
+                my = max(my, abs(ys - c).max())
+    mx, my = int(mx) + 1, int(my) + 1
+    out = [[f[c - my:c + my, c - mx:c + mx] for f in row] for row in out]
+    return out, (int(2 * mx), int(2 * my))
 
 
 def build():
@@ -197,29 +199,29 @@ def build():
     # atlas stays under 2048 px both ways (safe for GLES3 phones).
     Wd = 2048
     placed, y = [], 0
-    for kind, fr, cv, names, variants in blocks:
+    for kind, fr, (cv, chh), names, variants in blocks:
         cols = max(1, Wd // (cv * HEADINGS))
         per_col = math.ceil(len(fr) / cols)
         rows = {}
         for r in range(len(fr)):
             c, rr = divmod(r, per_col)
-            rows[names[r]] = [c * cv * HEADINGS, y + rr * cv]
-        placed.append((kind, fr, cv, names, variants, rows))
-        y += per_col * cv
+            rows[names[r]] = [c * cv * HEADINGS, y + rr * chh]
+        placed.append((kind, fr, (cv, chh), names, variants, rows))
+        y += per_col * chh
     Ht = y
-    Wd = max(r[0] + cv * HEADINGS for _, _, cv, _, _, rows in placed for r in rows.values())
+    Wd = max(r[0] + cv[0] * HEADINGS for _, _, cv, _, _, rows in placed for r in rows.values())
     assert Wd <= 2048 and Ht <= 2048, (Wd, Ht)
     atlas = Image.new("RGBA", (Wd, Ht))
     meta = {"texture": "zombies.png", "headings": HEADINGS, "kinds": {}, "sample_colours": SAMPLE_COLOURS}
-    for kind, fr, cv, names, variants, rows in placed:
+    for kind, fr, (cv, chh), names, variants, rows in placed:
         for r, row in enumerate(fr):
             x0, y0 = rows[names[r]]
             for h, img in enumerate(row):
                 atlas.paste(Image.fromarray(img), (x0 + h * cv, y0))
-        meta["kinds"][kind] = {"frame_w": cv, "frame_h": cv, "rows": rows, "variants": variants}
+        meta["kinds"][kind] = {"frame_w": cv, "frame_h": chh, "rows": rows, "variants": variants}
         for n, (x0, y0) in rows.items():   # P0 art_atlas.gd regions: "<kind>/<row>/<heading>"
             for h in range(HEADINGS):
-                meta.setdefault("regions", {})["%s/%s/%d" % (kind, n, h)] = [x0 + h * cv, y0, cv, cv]
+                meta.setdefault("regions", {})["%s/%s/%d" % (kind, n, h)] = [x0 + h * cv, y0, cv, chh]
     os.makedirs(OUT, exist_ok=True)
     p = os.path.join(OUT, "zombies.png")
     atlas.save(p)
