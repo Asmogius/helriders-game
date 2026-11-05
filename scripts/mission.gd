@@ -2082,7 +2082,7 @@ func _refresh_hud() -> void:
 	_refresh_threats()
 
 
-## Power overload cue (DRAFT): a banner when systems go offline or come back.
+## Power overload cue: a banner when systems go offline or come back.
 ## Minimal on purpose: UI's HUD rework should fold it into the rig diagram.
 func _power_offline_cue() -> void:
 	var now := 2 if vehicle.shield_offline() else (1 if vehicle.utilities_offline() else 0)

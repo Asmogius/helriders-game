@@ -44,50 +44,50 @@ const CATALOG := {
 	"scrap_frame": {
 		"name": "Scrap Frame", "category": "Chassis", "rarity": "Common", "cost": 50, "power": 15.0,
 		"hardpoints": 1, "utility_slots": 1, "internal_slots": 2, "weight_capacity": 100.0,
-		"hp": 150.0, "max_speed": 495.0, "reverse_speed": 200.0, "coast": 280.0, "turn_rate": 3.05,  # DRAFT slower rigs (pending Cameron)
+		"hp": 150.0, "max_speed": 495.0, "reverse_speed": 200.0, "coast": 280.0, "turn_rate": 3.05,
 		"body": [64.0, 36.0], "seats": ["driver", "gunner", "open"],
 	},
 	"courier_frame": {
 		"name": "Courier Frame", "category": "Chassis", "rarity": "Uncommon", "cost": 90, "power": 12.0,
 		"hardpoints": 1, "utility_slots": 2, "internal_slots": 1, "weight_capacity": 80.0,
-		"hp": 105.0, "max_speed": 535.0, "reverse_speed": 220.0, "coast": 260.0, "turn_rate": 3.4,  # DRAFT slower rigs (pending Cameron)
+		"hp": 105.0, "max_speed": 535.0, "reverse_speed": 220.0, "coast": 260.0, "turn_rate": 3.4,
 		"body": [66.0, 32.0], "seats": ["driver", "open"],
 	},
 	"bulwark_frame": {
 		"name": "Bulwark Frame", "category": "Chassis", "rarity": "Rare", "cost": 180, "power": 20.0,
 		"hardpoints": 2, "utility_slots": 1, "internal_slots": 2, "weight_capacity": 160.0,
-		"hp": 270.0, "max_speed": 440.0, "reverse_speed": 185.0, "coast": 300.0, "turn_rate": 2.7,  # DRAFT slower rigs (pending Cameron)
+		"hp": 270.0, "max_speed": 440.0, "reverse_speed": 185.0, "coast": 300.0, "turn_rate": 2.7,
 		"body": [76.0, 42.0], "seats": ["driver", "gunner", "open", "open"],
 	},
 	# Content proposal 01 (approved by the owner 2026-11-03).
 	"raider_frame": {
 		"name": "Raider Frame", "category": "Chassis", "rarity": "Uncommon", "cost": 120, "power": 14.0,
 		"hardpoints": 2, "utility_slots": 1, "internal_slots": 1, "weight_capacity": 90.0,
-		"hp": 125.0, "max_speed": 520.0, "reverse_speed": 210.0, "coast": 270.0, "turn_rate": 3.25,  # DRAFT slower rigs (pending Cameron)
+		"hp": 125.0, "max_speed": 520.0, "reverse_speed": 210.0, "coast": 270.0, "turn_rate": 3.25,
 		"body": [66.0, 34.0], "seats": ["driver", "gunner", "open"],
 	},
 	"hauler_frame": {
 		"name": "Hauler Frame", "category": "Chassis", "rarity": "Epic", "cost": 320, "power": 22.0,
 		"hardpoints": 2, "utility_slots": 2, "internal_slots": 3, "weight_capacity": 200.0,
-		"hp": 320.0, "max_speed": 415.0, "reverse_speed": 175.0, "coast": 310.0, "turn_rate": 2.45,  # DRAFT slower rigs (pending Cameron)
+		"hp": 320.0, "max_speed": 415.0, "reverse_speed": 175.0, "coast": 310.0, "turn_rate": 2.45,
 		"body": [82.0, 44.0], "seats": ["driver", "gunner", "open", "open", "open"],
 	},
 	# --- Engines: acceleration and the power budget -------------------------------
 	"junk_v6": {
 		"name": "Junk V6", "category": "Engine", "rarity": "Common", "cost": 40, "power": 0.0, "weight": 20.0,
-		"power_output": 115.0, "acceleration": 560.0,  # power 115 approved by the owner with the overload rule (#113); acceleration DRAFT slower rigs (pending Cameron)
+		"power_output": 115.0, "acceleration": 560.0,  # power 115 approved with the overload rule (#113); acceleration from the slower-rigs pass (approved)
 	},
 	"turbo_four": {
 		"name": "Turbo Four", "category": "Engine", "rarity": "Uncommon", "cost": 70, "power": 0.0, "weight": 15.0,
-		"power_output": 90.0, "acceleration": 670.0,  # DRAFT slower rigs (pending Cameron)
+		"power_output": 90.0, "acceleration": 670.0,
 	},
 	"patched_v8": {
 		"name": "Patched V8", "category": "Engine", "rarity": "Uncommon", "cost": 80, "power": 0.0, "weight": 25.0,
-		"power_output": 125.0, "acceleration": 550.0,  # DRAFT slower rigs (pending Cameron)
+		"power_output": 125.0, "acceleration": 550.0,
 	},
 	"diesel_block": {
 		"name": "Diesel Block", "category": "Engine", "rarity": "Rare", "cost": 160, "power": 0.0, "weight": 35.0,
-		"power_output": 150.0, "acceleration": 510.0,  # DRAFT slower rigs (pending Cameron)
+		"power_output": 150.0, "acceleration": 510.0,
 	},
 	# --- Drive: grip, braking, handling ------------------------------------------
 	"street_wheels": {

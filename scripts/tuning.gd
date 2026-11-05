@@ -245,7 +245,7 @@ const ELITE_SCRAP := 40            # kill scrap for the Elite itself
 
 # Courier par times: route length along the nav grid / speed, plus a pause
 # per checkpoint. Silver and bronze stretch the gold time.
-const COURIER_PAR_SPEED := 335.0   # DRAFT (was 380.0, pending Cameron)
+const COURIER_PAR_SPEED := 335.0   # slower-rigs pass, approved (was 380.0)
 const COURIER_PAR_PER_CHECKPOINT := 0.5   # gold is ~1.2-1.4x a perfect autopilot line
 const COURIER_SILVER := 1.3
 const COURIER_BRONZE := 1.7
@@ -268,7 +268,7 @@ const STRAGGLER_ARROWS := 6    # point at the last N shamblers
 
 # --- Shambler ------------------------------------------------------------------
 const SHAMBLER_HP := 40.0
-const SHAMBLER_SPEED := 75.0   # DRAFT (was 85.0, pending Cameron)
+const SHAMBLER_SPEED := 75.0   # slower-rigs pass, approved (was 85.0)
 const SHAMBLER_RADIUS := 13.0
 const SHAMBLER_DPS := 3.0        # chip damage per zombie in contact
 const SHAMBLER_SEPARATION := 34.0
@@ -279,10 +279,10 @@ const SHAMBLER_SEPARATION := 34.0
 # it takes (rams and mines always do full); "knock" scales how far hits push it.
 const ZOMBIE_KINDS := {
 	"shambler": {"hp": SHAMBLER_HP, "speed": SHAMBLER_SPEED, "radius": SHAMBLER_RADIUS, "dps": SHAMBLER_DPS, "bullet": 1.0, "knock": 1.0, "scrap": SCRAP_PER_KILL},
-	"brute": {"hp": 200.0, "speed": 62.0, "radius": 19.0, "dps": 8.0, "bullet": 0.5, "knock": 0.3, "scrap": 6},  # DRAFT slower rigs (pending Cameron)
-	"tank": {"hp": 450.0, "speed": 66.0, "radius": 25.0, "dps": 8.0, "bullet": 0.5, "knock": 0.1, "scrap": 15},  # DRAFT slower rigs (pending Cameron)
-	"boomer": {"hp": 60.0, "speed": 53.0, "radius": 16.0, "dps": 0.0, "bullet": 1.0, "knock": 0.8, "scrap": 3},  # DRAFT slower rigs (pending Cameron)
-	"slimer": {"hp": 70.0, "speed": 84.0, "radius": 14.0, "dps": 3.0, "bullet": 1.0, "knock": 1.0, "scrap": 3},  # DRAFT slower rigs (pending Cameron)
+	"brute": {"hp": 200.0, "speed": 62.0, "radius": 19.0, "dps": 8.0, "bullet": 0.5, "knock": 0.3, "scrap": 6},
+	"tank": {"hp": 450.0, "speed": 66.0, "radius": 25.0, "dps": 8.0, "bullet": 0.5, "knock": 0.1, "scrap": 15},
+	"boomer": {"hp": 60.0, "speed": 53.0, "radius": 16.0, "dps": 0.0, "bullet": 1.0, "knock": 0.8, "scrap": 3},
+	"slimer": {"hp": 70.0, "speed": 84.0, "radius": 14.0, "dps": 3.0, "bullet": 1.0, "knock": 1.0, "scrap": 3},
 }
 # Share of each horde by skulls 1-6 (the rest are Shamblers). Tanks are
 # capped per mission instead. Courier jobs only get Slimers and Boomers.
@@ -325,17 +325,17 @@ const COL_BILE := Color(0.75, 0.8, 0.2, 0.28)
 
 # --- Hunter --------------------------------------------------------------------
 const HUNTER_HP := 60.0
-const HUNTER_SPEED := 250.0          # kept (Cameron, PR #82); outrun it at full throttle (starter rig does 495, DRAFT)
+const HUNTER_SPEED := 250.0          # kept (Cameron, PR #82); outrun it at full throttle (starter rig does 495)
 const HUNTER_RADIUS := 12.0
 const HUNTER_POUNCE_RANGE := 180.0
 const HUNTER_WINDUP := 0.35          # telegraph before the leap
 const HUNTER_POUNCE_SPEED := 640.0   # kept at its old speed (Cameron, PR #82)
 const HUNTER_POUNCE_TIME := 0.4
 const HUNTER_DPS := 8.0              # while latched on the hull
-const HUNTER_CRUSH_SPEED := 175.0    # DRAFT (was 200.0, PR pending Cameron) - hit a wall this hard on its side: dead
-const HUNTER_SCRAPE_SPEED := 125.0   # DRAFT (was 140.0, PR pending Cameron) - grind it along a wall this fast...
+const HUNTER_CRUSH_SPEED := 175.0    # slower-rigs pass, approved (was 200.0) - hit a wall this hard on its side: dead
+const HUNTER_SCRAPE_SPEED := 125.0   # slower-rigs pass, approved (was 140.0) - grind it along a wall this fast...
 const HUNTER_SCRAPE_DPS := 120.0     # ...and it takes this much per second
-const HUNTER_JOLT_SPEED := 280.0     # DRAFT (was 320.0, PR pending Cameron) - any crash this hard throws it off
+const HUNTER_JOLT_SPEED := 280.0     # slower-rigs pass, approved (was 320.0) - any crash this hard throws it off
 const HUNTER_SPAWN_TIME := 25.0      # seconds into the mission, or...
 const HUNTER_SPAWN_KILLS := 10       # ...after this many kills
 const HUNTER_SCRAP := 10
@@ -430,7 +430,7 @@ const SCRAPPER_SPAWN_KILLS := 20    # ...after this many kills
 const HARPOON_REEL_TO := 200.0      # reels in to this length...
 const HARPOON_REEL_SPEED := 100.0   # ...this fast (px/s)
 const HARPOON_POP_HIT := 0.15       # share of a rig's max taken in 1 s that pops it
-const HARPOON_POP_CRASH := 335.0    # DRAFT (was 380.0, PR pending Cameron) - wall crash speed that pops it
+const HARPOON_POP_CRASH := 335.0    # slower-rigs pass, approved (was 380.0) - wall crash speed that pops it
 # Mortar: lobs shells over buildings (walls don't stop them). The right
 # stick's push sets the distance (300-1200 px, shown as a landing circle) and
 # it fires while held; LOCK aims at where the target will be. Blast damage
@@ -451,7 +451,7 @@ const PATCHER_HOOK_RANGE := 450.0   # how far it can throw the hook
 const PATCHER_REPAIR := 12.0        # armor/s to the ally's most damaged facing
 const PATCHER_REHOOK := 3.0         # wind-up before a hook flies
 const PATCHER_POP_HIT := 0.15       # share of a rig's max taken in 1 s that pops it
-const PATCHER_POP_CRASH := 335.0    # DRAFT (was 380.0, PR pending Cameron) - wall crash speed that pops it
+const PATCHER_POP_CRASH := 335.0    # slower-rigs pass, approved (was 380.0) - wall crash speed that pops it
 const PATCHER_POP_RAM := 300.0      # your speed across the cable that cuts it
 const PATCHER_REVIVE_TIME := 4.0
 const PATCHER_REVIVE_TO := 0.10     # share of max HP and armor a revived rig gets
@@ -502,12 +502,12 @@ const ESCORT_SITE_RADIUS := 90.0
 # (agreed with the owner, audit 2026-11-04).
 const TRUCK := {
 	"name": "Salvage Truck",
-	"max_speed": 230.0,  # DRAFT slower rigs (pending Cameron)
-	"reverse_speed": 130.0,  # DRAFT slower rigs (pending Cameron)
-	"acceleration": 260.0,  # DRAFT slower rigs (pending Cameron)
+	"max_speed": 230.0,
+	"reverse_speed": 130.0,
+	"acceleration": 260.0,
 	"brake": 1300.0,
 	"coast": 300.0,
-	"turn_rate": 1.8,  # DRAFT slower rigs (pending Cameron)
+	"turn_rate": 1.8,
 	"grip": 8.0,
 	"armor": 400.0,            # total of the layers below
 	"hp": 120.0, "front": 70.0, "side": 70.0, "rear": 70.0,
@@ -642,7 +642,7 @@ const RACING_LINE_ADD := 0.5
 # Agreed with the owner (2026-11-04; first drafted by the Grok content bots):
 const CLEAR_OUT_PUSH := 2.0          # Shockwave knockback x2 with Clear Out
 const JUGGERNAUT_FLING := 0.8        # the rammed rig is thrown at 1.8x the impact speed
-const SLINGSHOT_SPEED := 220.0       # DRAFT (was 250.0, PR pending Cameron) - "at speed" = over 250 px/s when Chain Drag ends
+const SLINGSHOT_SPEED := 220.0       # slower-rigs pass, approved (was 250.0) - "at speed" = over 250 px/s when Chain Drag ends
 const SLINGSHOT_FLING := 1.0         # the flung rig gets 100% of your velocity
 const SLINGSHOT_TIME := 1.5          # a wall crash within 1.5 s counts as the RAM
 const TAIL_SWIPE_TIME := 0.6         # "while swinging" = 0.6 s after the Bootleg Turn
@@ -725,7 +725,7 @@ const OUTRIDER_DRIFT_KICK := 0.5       # its break-off turn slides: grip cut for
 const OUTRIDER_DRIFT_GRIP := 0.3       # ...to this share
 const BULWARK_SCREEN_RANGE := 400.0    # it body-blocks for a Gunner Rig or Patcher this close
 const BULWARK_SCREEN_GAP := 160.0      # standing this far out from the ally, toward you
-const DRIFT_SIDE_SPEED := 140.0   # DRAFT (was 160.0, pending Cameron)
+const DRIFT_SIDE_SPEED := 140.0   # slower-rigs pass, approved (was 160.0)
 const DRIFT_MIN_FWD := 150.0
 const DRIFT_MIN_TIME := 0.4
 const OVERLOAD_HEAT := 0.75
@@ -837,12 +837,12 @@ const OVERLOAD_MIN_MOBILITY := 0.5   # never worse than this
 # mount: 0 = turret (aims independently), 1 = fixed (aims with the vehicle).
 const OUTRIDER := {
 	"name": "Outrider",
-	"max_speed": 530.0,        # faster than the starter rig: it flanks you; DRAFT slower rigs
-	"reverse_speed": 230.0,  # DRAFT slower rigs (pending Cameron)
-	"acceleration": 620.0,  # DRAFT slower rigs (pending Cameron)
+	"max_speed": 530.0,        # faster than the starter rig: it flanks you
+	"reverse_speed": 230.0,
+	"acceleration": 620.0,
 	"brake": 1500.0,
 	"coast": 280.0,
-	"turn_rate": 3.25,  # DRAFT slower rigs (pending Cameron)
+	"turn_rate": 3.25,
 	"grip": 6.5,
 	"armor": 260.0,            # total of the layers below (§14 table)
 	"hp": 100.0, "front": 40.0, "side": 40.0, "rear": 40.0,
@@ -861,12 +861,12 @@ const OUTRIDER := {
 
 const GUNNER := {
 	"name": "Gunner Rig",
-	"max_speed": 440.0,  # DRAFT slower rigs (pending Cameron)
-	"reverse_speed": 230.0,  # DRAFT slower rigs (pending Cameron)
-	"acceleration": 530.0,  # DRAFT slower rigs (pending Cameron)
+	"max_speed": 440.0,
+	"reverse_speed": 230.0,
+	"acceleration": 530.0,
 	"brake": 1500.0,
 	"coast": 280.0,
-	"turn_rate": 2.7,  # DRAFT slower rigs (pending Cameron)
+	"turn_rate": 2.7,
 	"grip": 7.0,
 	"armor": 345.0,            # total of the layers below (§14 table; was 340)
 	"hp": 120.0, "front": 60.0, "side": 55.0, "rear": 55.0,
@@ -888,12 +888,12 @@ const GUNNER := {
 
 const SCRAPPER := {
 	"name": "Scrapper",
-	"max_speed": 510.0,  # DRAFT slower rigs (pending Cameron)
-	"reverse_speed": 230.0,  # DRAFT slower rigs (pending Cameron)
-	"acceleration": 600.0,  # DRAFT slower rigs (pending Cameron)
+	"max_speed": 510.0,
+	"reverse_speed": 230.0,
+	"acceleration": 600.0,
 	"brake": 1500.0,
 	"coast": 280.0,
-	"turn_rate": 3.15,  # DRAFT slower rigs (pending Cameron)
+	"turn_rate": 3.15,
 	"grip": 6.5,
 	"armor": 230.0,            # total of the layers below (§14 table; was 200)
 	"hp": 90.0, "front": 35.0, "side": 35.0, "rear": 35.0,
@@ -910,12 +910,12 @@ const SCRAPPER := {
 
 const PATCHER := {
 	"name": "Patcher",
-	"max_speed": 475.0,  # DRAFT slower rigs (pending Cameron)
-	"reverse_speed": 220.0,  # DRAFT slower rigs (pending Cameron)
-	"acceleration": 560.0,  # DRAFT slower rigs (pending Cameron)
+	"max_speed": 475.0,
+	"reverse_speed": 220.0,
+	"acceleration": 560.0,
 	"brake": 1500.0,
 	"coast": 280.0,
-	"turn_rate": 2.95,  # DRAFT slower rigs (pending Cameron)
+	"turn_rate": 2.95,
 	"grip": 6.5,
 	"armor": 170.0,            # total of the layers below (§14 table)
 	"hp": 80.0, "front": 30.0, "side": 30.0, "rear": 30.0,
@@ -932,12 +932,12 @@ const PATCHER := {
 
 const SCRAPPER_GUNNER := {
 	"name": "Scrapper Gunner",
-	"max_speed": 510.0,  # DRAFT slower rigs (pending Cameron)
-	"reverse_speed": 230.0,  # DRAFT slower rigs (pending Cameron)
-	"acceleration": 600.0,  # DRAFT slower rigs (pending Cameron)
+	"max_speed": 510.0,
+	"reverse_speed": 230.0,
+	"acceleration": 600.0,
 	"brake": 1500.0,
 	"coast": 280.0,
-	"turn_rate": 3.15,  # DRAFT slower rigs (pending Cameron)
+	"turn_rate": 3.15,
 	"grip": 6.5,
 	"armor": 290.0,            # total of the layers below
 	"hp": 110.0, "front": 45.0, "side": 45.0, "rear": 45.0,
@@ -955,12 +955,12 @@ const SCRAPPER_GUNNER := {
 
 const CONVOY := {
 	"name": "Convoy Lead",
-	"max_speed": 370.0,  # DRAFT slower rigs (pending Cameron)
-	"reverse_speed": 160.0,  # DRAFT slower rigs (pending Cameron)
-	"acceleration": 330.0,  # DRAFT slower rigs (pending Cameron)
+	"max_speed": 370.0,
+	"reverse_speed": 160.0,
+	"acceleration": 330.0,
 	"brake": 1300.0,
 	"coast": 300.0,
-	"turn_rate": 1.35,          # a wide circle: get beside or behind it; DRAFT slower rigs
+	"turn_rate": 1.35,          # a wide circle: get beside or behind it
 	"grip": 8.0,
 	"armor": 650.0,            # total of the layers below (agreed with the owner)
 	"hp": 200.0, "front": 250.0, "side": 70.0, "rear": 60.0,   # the plow is a very heavy front plate
@@ -979,12 +979,12 @@ const CONVOY := {
 
 const CONVOY_TRAILER := {
 	"name": "Convoy Trailer",
-	"max_speed": 370.0,  # DRAFT slower rigs (pending Cameron)
-	"reverse_speed": 160.0,  # DRAFT slower rigs (pending Cameron)
-	"acceleration": 330.0,  # DRAFT slower rigs (pending Cameron)
+	"max_speed": 370.0,
+	"reverse_speed": 160.0,
+	"acceleration": 330.0,
 	"brake": 1300.0,
 	"coast": 300.0,
-	"turn_rate": 1.35,  # DRAFT slower rigs (pending Cameron)
+	"turn_rate": 1.35,
 	"grip": 8.0,
 	"armor": 350.0,            # total of the layers below (agreed with the owner; was 300)
 	"hp": 120.0, "front": 50.0, "side": 65.0, "rear": 50.0,
@@ -1002,12 +1002,12 @@ const CONVOY_TRAILER := {
 
 const BULWARK := {
 	"name": "Bulwark",
-	"max_speed": 380.0,        # slower than you: out-run it, out-turn it; DRAFT slower rigs
-	"reverse_speed": 175.0,  # DRAFT slower rigs (pending Cameron)
-	"acceleration": 370.0,  # DRAFT slower rigs (pending Cameron)
+	"max_speed": 380.0,        # slower than you: out-run it, out-turn it
+	"reverse_speed": 175.0,
+	"acceleration": 370.0,
 	"brake": 1400.0,
 	"coast": 300.0,
-	"turn_rate": 1.7,          # 109 deg/s; DRAFT slower rigs
+	"turn_rate": 1.7,          # 109 deg/s
 	"grip": 8.0,
 	"armor": 520.0,            # total of the layers below (§14 table)
 	"hp": 180.0, "front": 180.0, "side": 55.0, "rear": 50.0,   # a very heavy front plate
@@ -1057,8 +1057,8 @@ const TORCHER_SCRAP := 30
 const TORCHER_SCRAP_CACHE := 30
 const TORCHER := {
 	"name": "Torcher",
-	"max_speed": 475.0, "reverse_speed": 220.0, "acceleration": 560.0, "brake": 1500.0, "coast": 280.0,  # DRAFT slower rigs (pending Cameron)
-	"turn_rate": 2.9, "grip": 6.5,  # DRAFT slower rigs (pending Cameron)
+	"max_speed": 475.0, "reverse_speed": 220.0, "acceleration": 560.0, "brake": 1500.0, "coast": 280.0,
+	"turn_rate": 2.9, "grip": 6.5,
 	"armor": 250.0,            # total of the layers below
 	"hp": 110.0, "front": 60.0, "side": 45.0, "rear": 35.0,   # the fuel tank on the back
 	"resist": [45.0, 85.0, 45.0, 50.0, 45.0, 50.0],
@@ -1090,8 +1090,8 @@ const SLUDGER_SCRAP := 35
 const SLUDGER_SCRAP_CACHE := 35
 const SLUDGER := {
 	"name": "Sludger",
-	"max_speed": 415.0, "reverse_speed": 200.0, "acceleration": 460.0, "brake": 1400.0, "coast": 290.0,  # DRAFT slower rigs (pending Cameron)
-	"turn_rate": 2.35, "grip": 7.0,  # DRAFT slower rigs (pending Cameron)
+	"max_speed": 415.0, "reverse_speed": 200.0, "acceleration": 460.0, "brake": 1400.0, "coast": 290.0,
+	"turn_rate": 2.35, "grip": 7.0,
 	"armor": 305.0,
 	"hp": 130.0, "front": 55.0, "side": 55.0, "rear": 45.0,
 	"resist": [40.0, 45.0, 85.0, 60.0, 60.0, 85.0],
