@@ -2,13 +2,15 @@ extends SceneTree
 ## Regression test: one blast that kills several zombies must hit every zombie
 ## in range. Deaths remove zombies from the director's list straight away, so a
 ## loop over the live list used to skip the zombie after each kill.
-## Covers the Tail Swipe (vehicle.gd) and Powder Keg (mission.gd _rig_wreck_perks).
+## Covers a barrel blast, the Tail Swipe (vehicle.gd), the Powder Keg burst
+## (mission.gd _rig_wreck_perks) and point-blank shots on latched Hunters.
 ##
 ## Run:  godot --headless --fixed-fps 60 --path . -s res://tests/kill_loops_test.gd
 
 const Mission := preload("res://scripts/mission.gd")
 const Missions := preload("res://scripts/missions.gd")
 const Crew := preload("res://scripts/crew.gd")
+const HunterScript := preload("res://scripts/hunter.gd")
 
 const SPOT := Vector2(1600, 1200)
 const COUNT := 5
@@ -16,6 +18,8 @@ const COUNT := 5
 var main: Mission
 var frame := 0
 var failures: Array[String] = []
+var barrel_pack := []
+var barrel: Node2D
 
 
 func _initialize() -> void:
@@ -81,7 +85,18 @@ func _process(_delta: float) -> bool:
 		for z in main.zombies.active_zombies():
 			z.call("take_hit", 100.0, Vector2.ZERO, "shot")
 		_check(_alive(pack) == 0, "killing while looping active_zombies() reaches every zombie")
-	if frame == 8:
+	if frame == 10:
+		# --- Barrel: one explosive barrel, a pack beside it ---
+		barrel = main.barrels[0]
+		barrel.set("kind", "explosive")
+		barrel.global_position = SPOT + Vector2(-600, 300)
+		barrel_pack = _pack(barrel.global_position + Vector2(30, 0))
+	if frame == 13:   # physics has seen the moved bodies
+		_check(barrel_pack.size() == COUNT and bool(barrel.get("active")), "barrel and %d zombies placed" % COUNT)
+		barrel.call("explode")
+		_check(_alive(barrel_pack) == 0, "one barrel blast kills all %d zombies beside it (%d left)" % [COUNT, _alive(barrel_pack)])
+		_latched_hunters()
+	if frame == 16:
 		if failures.is_empty():
 			print("KILL LOOPS TEST PASSED")
 			quit(0)
@@ -90,6 +105,32 @@ func _process(_delta: float) -> bool:
 				print("TEST FAILED: " + f)
 			quit(1)
 	return false
+
+
+## Two Hunters latched on the hull: point-blank shots take them off one by one
+## and the hull list ends empty (a kill drops a Hunter from `latched`).
+func _latched_hunters() -> void:
+	var rig := main.vehicle
+	var hs: Array = []
+	for h in main.hunters:
+		hs.append(h)
+	while hs.size() < 2:
+		var extra: Node2D = HunterScript.new()
+		extra.set("target", rig)
+		main.add_child(extra)
+		hs.append(extra)
+	for i in 2:
+		var h: Node2D = hs[i]
+		h.call("activate", rig.global_position + Vector2(40, -20 + 40 * i))
+		h.call("_latch")
+		h.set("hp", 0.01)
+	_check(rig.latched.size() == 2, "two Hunters latched on the hull (%d)" % rig.latched.size())
+	var w: Dictionary = (rig.gun_stats[0] as Dictionary).duplicate()
+	for i in 2:
+		var h: Node2D = hs[i]
+		rig.call("_shoot", w, rig.global_position, (h.global_position - rig.global_position).normalized())
+	_check(not bool(hs[0].get("active")) and not bool(hs[1].get("active")), "point-blank shots kill both latched Hunters")
+	_check(rig.latched.is_empty(), "the hull is clear after both die")
 
 
 func _check(ok: bool, what: String) -> void:
