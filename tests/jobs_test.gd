@@ -195,7 +195,7 @@ func _check_tables() -> void:
 	_check(ok, "Retrieve with every cache pays ~1.3x a Clear")
 	_check(T.MISSIONS.escort.reward == T.MISSIONS.survive.reward, "Escort pays like Survive")
 	_check(T.MISSIONS.retrieve.caches == [3, 3, 4, 4, 5, 5] and T.MISSIONS.escort.sites == [2, 2, 3, 3, 3, 3], "caches 3/3/4/4/5/5, sites 2/2/3/3/3/3")
-	_check(float(T.TRUCK.armor) == 400.0 and float(T.TRUCK.max_speed) == 260.0, "the truck: 400 armor, speed 260")
+	_check(float(T.TRUCK.armor) == 400.0 and float(T.TRUCK.max_speed) == 230.0, "the truck: 400 armor, speed 230")
 	_check(Missions.threats_text(Missions.make("retrieve", 4, 5)).contains("4 caches (1 deep"), "Comms: Retrieve lists its caches")
 	_check(Missions.threats_text(Missions.make("escort", 5, 5)).contains("3 salvage sites"), "Comms: Escort lists its sites")
 	var board := Missions.make_board(1, 6, 0)
