@@ -387,6 +387,12 @@ func _draw_art() -> void:
 	var fw: float = info.frame_w
 	var fh: float = info.frame_h
 	draw_set_transform(Vector2.ZERO, -rotation, Vector2.ONE)   # sheets carry the heading; never rotate them
+	var sd: Dictionary = info.get("shadow", {})
+	if not sd.is_empty():   # baked cast shadow (same sun as the rigs), same atlas: still one batch
+		var sw: float = sd.frame_w
+		var sh: float = sd.frame_h
+		var sa: float = sd.get("alpha", 0.5)
+		(_art().atlas as RefCounted).draw(self, "%s/shadow/%d" % [kind, art_heading()], Rect2(Vector2(-sw, -sh) * 0.5, Vector2(sw, sh)), Color(1.0, 1.0, 1.0, sa))
 	(_art().atlas as RefCounted).draw(self, "%s/%s/%d" % [kind, art_row(), art_heading()], Rect2(Vector2(-fw, -fh) * 0.5, Vector2(fw, fh)))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
