@@ -132,7 +132,6 @@ const SPAWN_MIN_DISTANCE := 850.0  # keep spawns off-screen
 # --- Missions -------------------------------------------------------------------
 # Defaults (a 3-skull Clear); missions.gd scales these per type and skulls.
 const CLEAR_SHAMBLERS := 38    # shamblers in the block
-const CLEAR_TARGET := CLEAR_SHAMBLERS + 2  # + one Hunter + one Outrider
 const ZOMBIE_START := 12       # alive at the start
 const ZOMBIE_CAP := 28         # design cap is 25-30 alive at once
 const ZOMBIE_RAMP_SECONDS := 4.0  # +1 allowed alive every N seconds
@@ -526,8 +525,6 @@ const COL_TRUCK := Color(0.45, 0.85, 0.5)
 
 # Oil (the Scrapper's slicks and your Oil Slick utility): rigs on it keep
 # SLIME_GRIP, zombies in it move at OIL_ZOMBIE_SPEED.
-const OIL_RADIUS := 70.0            # 140 wide
-const OIL_TIME_SCRAPPER := 15.0
 const OIL_ZOMBIE_SPEED := 0.5
 const COL_OIL := Color(0.05, 0.05, 0.06, 0.6)
 
