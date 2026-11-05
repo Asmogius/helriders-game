@@ -68,7 +68,7 @@ func _draw() -> void:
 		fill = Color(0.2, 0.13, 0.08)
 	draw_rect(Rect2(Vector2.ZERO, size), fill)
 	if selected:   # inside the rarity frame, so both show
-		draw_rect(Rect2(Vector2(4, 4), size - Vector2(8, 8)), T.COL_ORANGE, false, 3.0)
+		draw_rect(Rect2(Vector2(4, 4), size - Vector2(8, 8)), T.COL_UI_ACCENT, false, 3.0)
 	var a := 0.5 if dim else 1.0
 	var w := size.x - 32.0
 	var role_color := Crew.role_color(member)
@@ -86,7 +86,7 @@ func _draw() -> void:
 	draw_string(font, Vector2(74, 62), "%s - %s" % [member.rarity, Crew.specialty_name(member)], HORIZONTAL_ALIGNMENT_LEFT, w - 58, 14, Color(rarity, a))
 	if Crew.perks_due(member) > 0:
 		var badge := Rect2(size.x - 104.0, 14.0, 92.0, 22.0)
-		draw_rect(badge, T.COL_ORANGE)
+		draw_rect(badge, T.COL_UI_ACCENT)
 		draw_string(font, badge.position + Vector2(0, 16), "PERK READY", HORIZONTAL_ALIGNMENT_CENTER, badge.size.x, 13, Color(0.08, 0.08, 0.09))
 	draw_string(font, Vector2(16, 98), str(member.name), HORIZONTAL_ALIGNMENT_LEFT, w, 22, Color(UI.TEXT, a))
 	# Level and XP.
@@ -94,7 +94,7 @@ func _draw() -> void:
 	draw_string(font, Vector2(16, 126), "LEVEL %d / %d" % [lv, Crew.max_level(member)], HORIZONTAL_ALIGNMENT_LEFT, w, 15, Color(UI.TEXT_DIM, a))
 	var bar := Rect2(16, 134, w, 8)
 	draw_rect(bar, Color(0, 0, 0, 0.5))
-	draw_rect(Rect2(bar.position, Vector2(bar.size.x * Crew.level_progress(member), bar.size.y)), Color(T.COL_CYAN, 0.8 * a))
+	draw_rect(Rect2(bar.position, Vector2(bar.size.x * Crew.level_progress(member), bar.size.y)), Color(T.COL_UI_ACCENT, 0.8 * a))
 	# What they do, two lines.
 	var text := Crew.summary(member)
 	var halves := text.split("    ")
@@ -107,6 +107,6 @@ func _draw() -> void:
 		var names: Array[String] = []
 		for p: String in perks:
 			names.append(Crew.perk_name(p))
-		draw_string(font, Vector2(16, y + 6.0), "PERKS  " + ", ".join(names), HORIZONTAL_ALIGNMENT_LEFT, w, 13, Color(T.COL_CYAN, 0.9 * a))
+		draw_string(font, Vector2(16, y + 6.0), "PERKS  " + ", ".join(names), HORIZONTAL_ALIGNMENT_LEFT, w, 13, Color(T.COL_UI_ACCENT, 0.9 * a))
 	if status != "":
 		draw_string(font, Vector2(16, size.y - 16), status, HORIZONTAL_ALIGNMENT_LEFT, w, 17, status_color)

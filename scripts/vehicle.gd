@@ -43,6 +43,7 @@ var body_wid := 36.0
 
 # Final stats (filled from a stats dictionary, see apply_stats).
 var max_speed := 0.0
+var _drive_want := 0.0   # forward speed the throttle asks for this tick (zombie shove)
 var reverse_speed := 0.0
 var acceleration := 0.0
 var brake := 0.0
@@ -1030,9 +1031,11 @@ func _drive(delta: float) -> void:
 
 	# An overloaded power plant can't deliver full speed or acceleration.
 	var power := mobility()
+	_drive_want = 0.0
 	if throttle > 0.0:
 		var spiked := T.SPIKE_RIG_SPEED if spike_left > 0.0 else 1.0
 		var target := throttle * max_speed * power * crew_speed * spiked * (0.75 if neuro_left > 0.0 else 1.0)   # Neurotoxin
+		_drive_want = target
 		var rate := acceleration * power * crew_accel if fwd_speed < target else coast
 		if fwd_speed < 0.0:
 			rate = brake
@@ -1067,6 +1070,24 @@ func _resolve_collisions(pre_velocity: Vector2) -> void:
 		var impact := -pre_velocity.dot(collision.get_normal())
 		if other is Hostile:
 			var hostile := other as Hostile
+			if impact < RAM_MIN_SPEED and not already_hit.has(hostile) and hostile.has_method("shove"):
+				# Too slow to ram: push the zombie aside so a packed horde (a
+				# Slimer swarm) can't pin the rig (hand playtest 0.1.75). The push
+				# follows how hard the rig is driving (not its stalled speed), on
+				# a smooth ramp: a near-stopped rig stays held.
+				var ahead := Vector2.RIGHT.rotated(rotation)
+				var to_z := hostile.global_position - global_position
+				var ramp := smoothstep(T.SHOVE_RAMP.x, T.SHOVE_RAMP.y, _drive_want)
+				if ramp > 0.0 and to_z.dot(ahead) > -body_len * 0.5:   # anything from the rig's middle forward
+					already_hit.append(hostile)
+					# Mostly sideways off the rig's line (straight ahead would just
+					# pack the horde tighter), a little forward.
+					var lateral := to_z - ahead * to_z.dot(ahead)
+					if lateral.length_squared() < 1.0:
+						lateral = ahead.orthogonal() * (1.0 if hostile.get_instance_id() % 2 == 0 else -1.0)
+					var speed := ramp * (_drive_want + T.SHOVE_CLEAR)
+					hostile.call("shove", (lateral.normalized() * 0.9 + ahead * 0.3).normalized() * speed)
+				continue
 			if already_hit.has(hostile) or impact < RAM_MIN_SPEED:
 				continue
 			already_hit.append(hostile)

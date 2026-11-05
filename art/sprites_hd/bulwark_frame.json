@@ -4312,7 +4312,7 @@
   "sheet": "bulwark_frame__shadow.png",
   "frame_w": 272,
   "frame_h": 272,
-  "alpha": 0.5,
+  "alpha": 0.82,
   "sun": [
    -0.45,
    -0.55,

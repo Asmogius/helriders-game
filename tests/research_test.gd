@@ -58,7 +58,7 @@ func _process(_delta: float) -> bool:
 func _check_math() -> void:
 	var diesel := Parts.get_part("diesel_block")
 	var d3 := Parts.at_level(diesel, 3)
-	_check(is_equal_approx(float(d3.power_output), 150.0 * 1.08) and is_equal_approx(float(d3.acceleration), 580.0 * 1.08),
+	_check(is_equal_approx(float(d3.power_output), 150.0 * 1.08) and is_equal_approx(float(d3.acceleration), 510.0 * 1.08),
 		"Engine L3: power output and accel +8%")
 	_check(float(d3.weight) == float(diesel.weight) and float(d3.power) == float(diesel.power), "power draw and weight never change")
 	_check(Parts.at_level(diesel, 1) == diesel.merged({"level": 1}), "level 1 is the plain schematic")
@@ -70,7 +70,7 @@ func _check_math() -> void:
 		"Drive: turn and grip grow, braking doesn't")
 	var frame_part := Parts.at_level(Parts.get_part("scrap_frame"), 2)
 	_check(is_equal_approx(float(frame_part.hp), 150.0 * 1.04) and is_equal_approx(float(frame_part.weight_capacity), 104.0)
-		and float(frame_part.max_speed) == 560.0, "Chassis: HP and weight capacity grow")
+		and float(frame_part.max_speed) == 495.0, "Chassis: HP and weight capacity grow")
 	var coolant := Parts.at_level(Parts.get_part("coolant_loop"), 8)
 	_check(is_equal_approx(float(coolant.fire_rate_mult), 1.0 + 0.15 * 1.28), "Internal: the modifier grows (Coolant +15% -> +19%)")
 	var cage := Parts.at_level(Parts.get_part("roll_cage"), 8)

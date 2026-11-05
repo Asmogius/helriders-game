@@ -19,6 +19,7 @@ var nav: NavGrid
 var hazards: GroundHazards
 var mix := {}                            # kind -> share of each pack (set_mix)
 var tanks_left := 0                      # Tanks still to come this job
+var highlight := false                   # Training Run: zombies get a bright ring so new players see them
 var alt_target: Node2D                   # Escort: the truck; each zombie goes for the nearer one
 var bait: Node2D                         # a GOOPED enemy rig (proposal 01): zombies near it go for it
 var bait_left := 0.0
@@ -94,8 +95,11 @@ func active_positions() -> PackedVector2Array:
 	return out
 
 
+## A copy of the live list: a kill removes the zombie from `_active` at once
+## (died -> _on_zombie_died), so callers that damage while looping would skip
+## the zombie after each kill if they walked `_active` itself.
 func active_zombies() -> Array[Zombie]:
-	return _active
+	return _active.duplicate()
 
 
 ## Shamblers still to kill: alive now plus not yet spawned.
@@ -232,6 +236,7 @@ func spawn_at(at: Vector2, kind := "shambler") -> Zombie:
 		if not candidate.active:
 			candidate.activate(at, kind)
 			candidate.damage_mult = damage_mult
+			candidate.highlight = highlight
 			_active.append(candidate)
 			return candidate
 	return null

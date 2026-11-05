@@ -42,6 +42,7 @@ var charge_dir := Vector2.ZERO
 var charge_hits := 0         # tests and feedback
 
 var _stats: Dictionary = T.ZOMBIE_KINDS.shambler
+var highlight := false     # Training Run: a light ring under it (the director sets it)
 var damage_mult := 1.0     # the skull's enemy damage (the director sets it)
 var _circle: CircleShape2D
 var _shape: CollisionShape2D
@@ -289,6 +290,15 @@ func is_stumbling() -> bool:
 	return kind == "tank" and charge == Charge.STUMBLE
 
 
+## The player's rig pushing through slowly (vehicle.gd): knocked aside, no damage.
+func shove(v: Vector2) -> void:
+	if not active:
+		return
+	global_position += v * get_physics_process_delta_time()   # out of the way this tick
+	if _knock.length_squared() < v.length_squared():
+		_knock = v
+
+
 func _on_hit(_damage: float, impulse: Vector2) -> void:
 	_knock += impulse * float(_stats.knock)
 	_flash = 1.0
@@ -307,6 +317,7 @@ var art_pose_override := ""      # captures and tests: force a pose row (e.g. "l
 var _art_t := 0.0                # walk cycle phase, advanced by distance walked
 var _art_last := Vector2.ZERO
 var _art_key := -1
+var _art_override_drawn := ""   # art_pose_override at the last redraw (tests, captures)
 
 
 static func _art() -> Dictionary:
@@ -364,6 +375,25 @@ func art_row() -> String:
 	return pose
 
 
+## The frame art_row() would pick, as a small int (0-9), so _process can tell
+## when to redraw without building strings every frame. Shambler variants are
+## fixed per zombie, so they don't need to be in it.
+func art_pose_index() -> int:
+	if _flash > 0.5:
+		return 4
+	if art_pose_override != "":
+		return 9
+	if kind == "tank":
+		match charge:
+			Charge.WINDUP:
+				return 5 + (int(Time.get_ticks_msec() / 125) % 2)
+			Charge.CHARGE:
+				return 7
+			Charge.STUMBLE:
+				return 8
+	return int(_art_t) % 4
+
+
 func art_heading() -> int:
 	var n: int = int(art_atlas().get("headings", 16))
 	return posmod(int(round(global_rotation / (TAU / float(n)))), n)
@@ -376,9 +406,10 @@ func _process(_delta: float) -> void:
 		texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_art_t += position.distance_to(_art_last) / (6.0 if kind == "shambler" else 10.0)   # one frame per 6/10 px walked
 	_art_last = position
-	var key := art_heading() * 64 + art_row().hash() % 64
-	if key != _art_key:
+	var key := art_heading() * 16 + art_pose_index()
+	if key != _art_key or art_pose_override != _art_override_drawn:
 		_art_key = key
+		_art_override_drawn = art_pose_override
 		queue_redraw()
 
 
@@ -387,11 +418,22 @@ func _draw_art() -> void:
 	var fw: float = info.frame_w
 	var fh: float = info.frame_h
 	draw_set_transform(Vector2.ZERO, -rotation, Vector2.ONE)   # sheets carry the heading; never rotate them
+	var sd: Dictionary = info.get("shadow", {})
+	if not sd.is_empty():   # baked cast shadow (same sun as the rigs), same atlas: still one batch
+		var sw: float = sd.frame_w
+		var sh: float = sd.frame_h
+		var sa: float = sd.get("alpha", 0.5)
+		(_art().atlas as RefCounted).draw(self, "%s/shadow/%d" % [kind, art_heading()], Rect2(Vector2(-sw, -sh) * 0.5, Vector2(sw, sh)), Color(1.0, 1.0, 1.0, sa))
 	(_art().atlas as RefCounted).draw(self, "%s/%s/%d" % [kind, art_row(), art_heading()], Rect2(Vector2(-fw, -fh) * 0.5, Vector2(fw, fh)))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 func _draw() -> void:
+	if highlight:
+		# Training Run readability (playtest 06/07): a pale ground disc and ring
+		# so a dark zombie on a dark street reads at a glance.
+		draw_circle(Vector2.ZERO, radius + 9.0, T.COL_TUTORIAL_ZOMBIE_GLOW)
+		draw_arc(Vector2.ZERO, radius + 9.0, 0.0, TAU, 20, T.COL_TUTORIAL_ZOMBIE_RING, 2.0)
 	if has_art():
 		_draw_art()
 		draw_status(radius + 4.0)

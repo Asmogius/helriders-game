@@ -66,6 +66,10 @@ var mission_override := {}
 ## Tests: ride with these crew (crew.gd dictionaries) instead of the seated ones.
 var crew_override: Array = []
 
+const HUD_REFRESH := 1.0 / 15.0   # seconds between HUD bar/number refreshes
+var _hud_timer := 0.0
+var _threat_points := PackedVector2Array()   # reused each frame (edge arrows)
+var _threat_colors := PackedColorArray()
 var loading_map := false        # start held (tree paused) while the styled map bakes
 var _load_layer: CanvasLayer
 var _restarting := false         # RESTART keeps the baked map cached; leaving drops it
@@ -244,6 +248,10 @@ func _ready() -> void:
 		var dice := RandomNumberGenerator.new()
 		dice.seed = 7
 		vehicle.set_crew([Crew.make("driver", "Common", dice), Crew.make("gunner", "Common", dice)])
+		# Readability for first-timers (playtest 06/07): a brighter street and
+		# ringed zombies, so the "point at a zombie" step is obvious.
+		arena.modulate = T.COL_TUTORIAL_GRADE
+		zombies.highlight = true
 	else:
 		var loadout: Dictionary = profile.rig if profile.has_rig() else Parts.STARTER_LOADOUT
 		vehicle.apply_stats(profile.build_stats(loadout))
@@ -676,12 +684,19 @@ func _physics_process(delta: float) -> void:
 func _process(_delta: float) -> void:
 	_pass_mark()
 	zombies.contagion = vehicle.has_sp("sp_contagion")
-	if vehicle.strip_pending > 0.0:
+	if vehicle.strip_pending > 0.0 and state != State.WRECKED:
 		scrap += vehicle.strip_pending   # Strip Mine
 		vehicle.strip_pending = 0.0
-	_refresh_hud()
+	# Bars, numbers and the status line at ~15 Hz (they allocate strings and
+	# arrays); the edge arrows track the camera, so they update every frame.
+	_hud_timer -= _delta
+	if _hud_timer <= 0.0:
+		_hud_timer = HUD_REFRESH
+		_refresh_hud()
+		hud.right_stick.set_gauges(vehicle.weapon_gauges())
+	else:
+		_refresh_threats()
 	_music_tick(_delta)
-	hud.right_stick.set_gauges(vehicle.weapon_gauges())
 	bullets.big_game = float(vehicle.crew_mod("big_game"))
 
 
@@ -1941,10 +1956,16 @@ func _refresh_hud() -> void:
 		hud.set_ability_charge(i, vehicle.ability_charge(i))
 	hud.set_status_text(_status_line())
 	hud.set_lock_state(vehicle.lock_enabled, vehicle.lock_target != null)
+	_refresh_threats()
+
+
+func _refresh_threats() -> void:
 	# Edge arrows: specials always, the Courier's next stop, salvage, and the
 	# last few shamblers in a Clear.
-	var points := PackedVector2Array()
-	var colors := PackedColorArray()
+	var points := _threat_points
+	var colors := _threat_colors
+	points.clear()
+	colors.clear()
 	if state == State.RUNNING:
 		var to_screen := get_viewport().get_canvas_transform()
 		for h in hunters:
@@ -2030,6 +2051,8 @@ func _type_color() -> Color:
 # --- Kills and drops -----------------------------------------------------------
 
 func _add_kill(points: int, rig := false) -> void:
+	if state == State.WRECKED:
+		return   # the rig's gone: kills behind the wreck pay nothing (hand playtest)
 	kills += 1
 	var mult := profile.salvage_mult() * float(vehicle.crew_mod("scrap"))
 	if rig:
@@ -2709,6 +2732,10 @@ func _on_wrecked() -> void:
 		lines += "."
 	await _wreck_sequence(aboard)
 	hud.show_result("WRECKED", lines, "BACK TO THE YARD", T.COL_ORANGE)
+	# Freeze the fight behind the result (hand playtest: it kept running and the
+	# horde kept chewing). The overlay runs while paused; leaving unpauses (_exit_tree).
+	if is_inside_tree():
+		get_tree().paused = true
 
 
 class CourierMarkers extends Node2D:
