@@ -251,6 +251,27 @@ func _check_districts() -> void:
 		for m: Dictionary in Missions.make_board(d, 3, 0, "midtown"):
 			seen[int(m.skulls)] = true
 	_check(seen.has(5), "Midtown boards reach 5 skulls")
+	# PLAYTEST_REPORT P1-1 repro: district score 600 (Core open) used to leave
+	# the Profile's board capped at 4 skulls. Every extracted part, levelled up.
+	for id: String in Parts.CATALOG:
+		if not Parts.STARTER_SCHEMATICS.has(id) and not p.schematics.has(id):
+			p.schematics.append(id)
+	var lv := 1
+	while p.district_score() < 600 and lv < 50:
+		lv += 1
+		for id: String in p.schematics:
+			p.levels[id] = lv
+	_check(p.district_score() >= 600 and p.board_district() == "core", "score %d opens Core for the board (%s)" % [p.district_score(), p.board_district()])
+	var top := 0
+	var low := 6
+	for d in range(1, 41):
+		p.day = d
+		p.board = []
+		p.ensure_board()
+		for m: Dictionary in p.board:
+			top = maxi(top, int(m.skulls))
+			low = mini(low, int(m.skulls))
+	_check(top == 6 and low >= 4, "with Core open the Profile's boards roll 4-6 skulls (seen %d-%d over 40 days)" % [low, top])
 	p.free()
 
 
