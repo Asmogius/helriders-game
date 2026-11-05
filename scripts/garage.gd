@@ -617,6 +617,9 @@ func _refresh() -> void:
 		var m := profile.active_mission
 		var level := Missions.skulls(m)
 		_job.text = "JOB:  %s  -  %s     %d SKULL%s     PAYS %d" % [Missions.label(m), str(m.name), level, "" if level == 1 else "S", int(m.reward)]
+	elif int(profile.record.runs) == 0 and not profile.tour_active:
+		# Playtest #7: a fresh save points at the Tutorial before a real COMMS job.
+		_job.text = "New here? Open MENU → TUTORIAL for a free Training Run (no day kept). Or open COMMS for today's job."
 	else:
 		_job.text = "No job taken. Open COMMS to pick today's job."
 	_job.visible = selected < 0
