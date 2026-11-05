@@ -90,6 +90,7 @@ func _run_checks() -> void:
 	_check(seated.size() == 2 and seated[0].role == "driver" and seated[1].role == "gunner" and seated[0].rarity == "Common", "new game: a free Common Driver and Gunner, seated")
 	_check(garage._crew_line.visible and garage._crew_line.text.contains("DRIVER") and garage._crew_line.text.contains(str(seated[1].name)), "the crew line under the rig names the seats")
 	_check(profile.deploy_block() == "", "Driver and Gunner seated: nothing blocks DEPLOY")
+	_check(garage._job.text.contains("TUTORIAL") and garage._job.text.contains("COMMS"), "fresh save points at the Tutorial before COMMS")
 	var with_crew := garage._built(profile.rig)
 	_check(float(with_crew.turn_rate) > float(Loadout.build(profile.rig).turn_rate), "the stat sheet includes the Driver's turn bonus")
 
