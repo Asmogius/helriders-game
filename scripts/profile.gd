@@ -330,6 +330,7 @@ func apply_loadout(target: Dictionary) -> bool:
 	var cost := build_cost(target)
 	if cost > scrap:
 		return false
+	var was_empty := not has_rig()
 	var have := _on_hand()
 	for id in parts_in(target):
 		if int(have.get(id, 0)) > 0:
@@ -344,6 +345,8 @@ func apply_loadout(target: Dictionary) -> bool:
 	if is_complete(rig):
 		plan = rig.duplicate(true)
 	_fit_seats()
+	if was_empty:
+		fill_empty_seats()   # rebuilt after a wreck: crew hired meanwhile climb aboard
 	save_game()
 	changed.emit()
 	return true
@@ -692,6 +695,15 @@ func _fit_seats() -> void:
 			free -= 1
 		else:
 			m.seated = false
+
+
+## Every empty seat the frame has takes a free crew member of that class
+## (roster order; not resting or away). Seated crew are never swapped.
+## Playtest 2 #10: hires made with no rig (after a wreck) stayed in the Inn.
+func fill_empty_seats() -> void:
+	for m: Dictionary in crew:
+		if not bool(m.seated):
+			_auto_seat(m)
 
 
 ## A fresh hire takes an empty seat for their class, if the frame has one.
