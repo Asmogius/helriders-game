@@ -358,8 +358,27 @@ func press_ability(index: int) -> void:
 		_ability_buttons[index].press()
 
 
+## The top gauge and the big number beside it: the rig's remaining durability
+## (armor + HP, 0..1). Both always show the same value; the rig icon keeps the
+## separate plates and HP block. (Playtest 2 #12: the number used to be HP
+## while the bar was armor, so the bar halved while the number read 100.)
 func set_armor(ratio: float) -> void:
-	_armor_bar.set_ratio(ratio)   # the number beside it is HP (set_defense)
+	_armor_bar.set_ratio(ratio)
+	if _hp_value != null:
+		var pct := clampi(roundi(_armor_bar.ratio * 100.0), 0, 100)
+		if pct == 0 and _armor_bar.ratio > 0.0:
+			pct = 1   # still alive: never read 0 before the wreck
+		if pct != _hp_shown:   # a font override relayouts the label: only on change
+			_hp_shown = pct
+			var text := str(pct)
+			_hp_value.text = text
+			# Keep the number readable on a phone strip (~120 px wide).
+			_hp_value.add_theme_font_size_override("font_size", UI.fit_size(UI.font(), text, 110.0, 22, 16))
+
+
+## Test hook: the gauge's fill (0..1) and the number shown beside it.
+func durability_readout() -> Dictionary:
+	return {"bar": _armor_bar.ratio, "number": int(_hp_value.text)}
 
 
 ## The rig icon (§14): shield ring, each facing's plate, the HP block. All
@@ -367,14 +386,6 @@ func set_armor(ratio: float) -> void:
 func set_defense(shield_ratio: float, facings: PackedFloat32Array, hp_ratio: float) -> void:
 	_rig_icon.set_values(shield_ratio, facings, hp_ratio)
 	_armor_bar.set_shield(shield_ratio)   # V6.4 shield rail on the armor gauge
-	if _hp_value != null:
-		var pct := clampi(roundi(hp_ratio * 100.0), 0, 100)
-		if pct != _hp_shown:   # a font override relayouts the label: only on change
-			_hp_shown = pct
-			var text := str(pct)
-			_hp_value.text = text
-			# Keep the number readable on a phone strip (~120 px wide).
-			_hp_value.add_theme_font_size_override("font_size", UI.fit_size(UI.font(), text, 110.0, 22, 16))
 
 
 ## Status buildup (0..100 per bar) and seconds left on each active status
