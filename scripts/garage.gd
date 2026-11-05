@@ -636,7 +636,7 @@ func _refresh() -> void:
 	_power_meter.set_values(float(built.power_draw), float(built.power_output), float(built.weight), float(built.weight_capacity))
 	_power_meter.visible = has_rig and selected < 0
 
-	_deploy.disabled = not has_rig
+	_deploy.disabled = not has_rig or not profile.has_mission()   # pick a job in Comms first
 	var target := rebuild_target()
 	var rebuild_cost := profile.build_cost(target)
 	_rebuild.visible = not has_rig
