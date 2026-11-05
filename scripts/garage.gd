@@ -289,7 +289,8 @@ func deploy() -> void:
 		show_tab("INN")
 		toast(block, 3.5)
 		return
-	get_tree().change_scene_to_file(MISSION_SCENE)
+	# Ebbtide: short push-in on the rig, then charcoal fade into the fight.
+	preload("res://scripts/ui_transitions.gd").deploy_to_fight(self, MISSION_SCENE)
 
 
 ## Rig stats for `loadout` with the seated crew's passives folded in.
