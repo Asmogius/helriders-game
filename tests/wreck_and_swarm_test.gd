@@ -15,6 +15,8 @@ const Saloon := preload("res://scripts/saloon.gd")
 
 const SPOT := Vector2(1600, 1200)
 const PIN_TIME := 150   # frames (2.5 s at 60 fps)
+const SLOW_SPEED := 60.0   # a slow rig, well under the old ~260 px/s shove threshold
+const CRAWL_SPEED := 5.0   # near stopped: the pack holds it
 
 var main: Mission
 var profile: Node
@@ -25,6 +27,30 @@ var start := Vector2.ZERO
 var hired_names: Array[String] = []
 var scrap_at_result := 0.0
 var zombie_pos := Vector2.ZERO
+var full_speed := 0.0
+
+
+## 15 Slimers (huge HP) packed ahead of a rig at SPOT; `speed` caps the rig's
+## top speed (-1 = its own).
+func _swarm_ahead(speed: float) -> void:
+	var rig := main.vehicle
+	if full_speed == 0.0:
+		full_speed = rig.max_speed
+	main.zombies.clear_all()
+	main.zombies.spawn_budget = 0
+	main.hud.left_stick.output = Vector2.ZERO
+	rig.velocity = Vector2.ZERO
+	rig.max_speed = full_speed if speed < 0.0 else speed
+	rig.global_position = SPOT + Vector2(0, 700.0 * step)
+	rig.rotation = 0.0
+	rig.armor_max = 1000000.0
+	rig.armor = rig.armor_max
+	for row in 3:
+		for col in 5:
+			var z: Node2D = main.zombies.spawn_at(rig.global_position + Vector2.RIGHT * (70.0 + row * 30.0) + Vector2(0, (col - 2) * 30.0), "slimer")
+			if z != null:
+				z.set("hp", 1000000.0)
+	start = rig.global_position
 
 
 func _initialize() -> void:
@@ -60,30 +86,28 @@ func _process(_delta: float) -> bool:
 	frame += 1
 	var rig := main.vehicle
 	match step:
-		0:  # --- 1: a pack of Slimers right in front of the rig ---
+		0, 1, 2:  # --- 1: a pack of Slimers in front: full speed, slow, near-stopped ---
+			var speed: float = [-1.0, SLOW_SPEED, CRAWL_SPEED][step]
 			if frame == 5:
-				main.zombies.clear_all()
-				main.zombies.spawn_budget = 0
-				rig.global_position = SPOT
-				rig.rotation = 0.0
-				rig.armor_max = 1000000.0
-				rig.armor = rig.armor_max
-				var fwd := Vector2.RIGHT
-				for row in 3:
-					for col in 5:
-						var z: Node2D = main.zombies.spawn_at(SPOT + fwd * (70.0 + row * 30.0) + Vector2(0, (col - 2) * 30.0), "slimer")
-						if z != null:
-							z.set("hp", 1000000.0)
-				start = rig.global_position
+				_swarm_ahead(speed)
 			if frame > 5:
 				main.hud.left_stick.output = Vector2.RIGHT   # stick held toward the pack (full throttle)
 			if frame == 5 + PIN_TIME:
 				var moved := rig.global_position.distance_to(start)
-				print("  rig moved %.0f px through the Slimer pack in 2.5 s" % moved)
-				_check(moved > 120.0, "the rig shoves through a Slimer pack (%.0f px in 2.5 s, was ~17)" % moved)
 				main.hud.left_stick.output = Vector2.ZERO
+				match step:
+					0:
+						print("  full speed: rig moved %.0f px through the Slimer pack in 2.5 s" % moved)
+						_check(moved > 120.0, "the rig shoves through a Slimer pack (%.0f px in 2.5 s, was ~17)" % moved)
+					1:
+						print("  %.0f px/s rig: moved %.0f px through the pack in 2.5 s" % [SLOW_SPEED, moved])
+						_check(moved > 0.5 * SLOW_SPEED * 2.5, "a slow rig (%.0f px/s) still pushes through (%.0f px, want > %.0f)" % [SLOW_SPEED, moved, 0.5 * SLOW_SPEED * 2.5])
+					2:
+						print("  %.0f px/s rig: moved %.0f px against the pack in 2.5 s" % [CRAWL_SPEED, moved])
+						_check(moved < 12.0, "a near-stopped rig (%.0f px/s) stays held by the pack (%.0f px)" % [CRAWL_SPEED, moved])
+						rig.max_speed = full_speed
 				_next()
-		1:  # --- 2 and 3: wreck the rig ---
+		3:  # --- 2 and 3: wreck the rig ---
 			if frame == 2:
 				main.zombies.clear_all()
 				var z: Node2D = main.zombies.spawn_at(rig.global_position + Vector2(300, 0), "shambler")
