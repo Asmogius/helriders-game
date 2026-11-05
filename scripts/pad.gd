@@ -465,4 +465,4 @@ class FocusRing extends Control:
 		if target == null or not is_instance_valid(target) or not target.is_visible_in_tree():
 			return
 		var r := target.get_global_rect().grow(4.0)
-		draw_rect(r, T.COL_CYAN, false, 3.0)
+		draw_rect(r, T.COL_UI_ACCENT, false, 3.0)

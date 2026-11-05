@@ -102,7 +102,7 @@ func _ready() -> void:
 	_fps.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_root.add_child(_fps)
 
-	_banner = _centered_label(30, T.COL_ORANGE, 96.0)
+	_banner = _centered_label(30, T.COL_UI_ACCENT, 96.0)
 	_banner.modulate.a = 0.0
 	_alert = _centered_label(26, T.COL_ENEMY, 140.0)
 	_alert.visible = false
@@ -157,7 +157,7 @@ func _ready() -> void:
 	pause_button.add_theme_font_size_override("font_size", 28)
 	pause_button.pressed.connect(func() -> void: pause_pressed.emit())
 	_root.add_child(pause_button)
-	tip = _label(26, Color(1.0, 0.92, 0.7))
+	tip = _label(26, T.COL_UI_TEXT)
 	tip.anchor_left = 0.5
 	tip.anchor_right = 0.5
 	tip.offset_left = -430.0
@@ -531,7 +531,7 @@ func show_choice(speaker: String, text: String, yes_text: String, no_text: Strin
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 16)
 	column.add_child(row)
-	for pick: Array in [[yes_text, true, T.COL_ORANGE], [no_text, false, Color(0.75, 0.75, 0.72)]]:
+	for pick: Array in [[yes_text, true, T.COL_UI_ACCENT], [no_text, false, T.COL_UI_TEXT_DIM]]:
 		var b := Button.new()
 		b.text = str(pick[0])
 		b.focus_mode = Control.FOCUS_NONE
@@ -619,7 +619,7 @@ func _build_overlay() -> void:
 	column.add_theme_constant_override("separation", 18)
 	center.add_child(column)
 
-	_title = _label(72, T.COL_ORANGE)
+	_title = _label(72, T.COL_UI_ACCENT)
 	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	column.add_child(_title)
 
@@ -636,9 +636,10 @@ func _build_overlay() -> void:
 	_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_button.add_theme_font_size_override("font_size", 30)
 	_button.add_theme_color_override("font_color", Color(0.95, 0.93, 0.88))
-	_button.add_theme_stylebox_override("normal", _box(Color(0.12, 0.12, 0.13), T.COL_ORANGE))
-	_button.add_theme_stylebox_override("hover", _box(Color(0.16, 0.16, 0.17), T.COL_ORANGE))
-	_button.add_theme_stylebox_override("pressed", _box(Color(0.3, 0.16, 0.07), T.COL_ORANGE))
+	_button.add_theme_stylebox_override("normal", _box(T.COL_UI_ACCENT, T.COL_UI_ACCENT))
+	_button.add_theme_stylebox_override("hover", _box(T.COL_UI_ACCENT_HOVER, T.COL_UI_ACCENT_HOVER))
+	_button.add_theme_stylebox_override("pressed", _box(Color(0.75, 0.58, 0.18), Color(0.75, 0.58, 0.18)))
+	_button.add_theme_color_override("font_color", T.COL_UI_DEEP)
 	_button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 	_button.pressed.connect(func() -> void: restart_requested.emit())
 	column.add_child(_button)
@@ -713,7 +714,7 @@ class LockButton extends Control:
 	func _draw() -> void:
 		var c := size * 0.5
 		var r := minf(size.x, size.y) * 0.5 - 4.0
-		var accent := T.COL_ORANGE if on else Color(0.7, 0.68, 0.64)
+		var accent := T.COL_UI_ACCENT if on else Color(0.55, 0.54, 0.52)
 		draw_circle(c, r, Color(0.0, 0.0, 0.0, 0.55 if on else 0.35))
 		draw_arc(c, r - 6.0, 0.0, TAU, 40, Color(1, 1, 1, 0.07), 2.0)   # V6.4 inner bevel
 		draw_arc(c, r, 0.0, TAU, 40, Color(accent, 0.9 if on else 0.5), 4.0 if on else 2.5)
@@ -807,8 +808,8 @@ class AbilityButton extends Control:
 		var c := size * 0.5
 		var r := minf(size.x, size.y) * 0.5 - 4.0
 		var is_ready := charge <= 0.0 and not disabled
-		var accent: Color = {"patch": Color(0.45, 0.9, 0.5), "hard_line": T.COL_CYAN, "overcharge": Color(1.0, 0.92, 0.7)}.get(kind, T.COL_ORANGE)
-		var tint := accent if is_ready else Color(0.6, 0.58, 0.55)
+		# Ebbtide: one accent. Gold when ready, dim grey on cooldown; icons tell abilities apart.
+		var tint := T.COL_UI_ACCENT if is_ready else Color(0.55, 0.54, 0.52)
 		if disabled:
 			tint = Color(0.42, 0.4, 0.38)
 		draw_circle(c, r, Color(0.0, 0.0, 0.0, 0.5))
@@ -907,7 +908,7 @@ class CrewButton extends Control:
 	func _draw() -> void:
 		var c := size * 0.5
 		var r := minf(size.x, size.y) * 0.5 - 4.0
-		var tint := Color(0.95, 0.93, 0.88) if cooldown <= 0.0 else Color(0.55, 0.53, 0.5)
+		var tint := T.COL_UI_ACCENT if cooldown <= 0.0 else Color(0.55, 0.53, 0.5)
 		draw_circle(c, r, Color(0, 0, 0, 0.5))
 		draw_arc(c, r - 6.0, 0.0, TAU, 40, Color(1, 1, 1, 0.07), 2.0)   # V6.4 inner bevel
 		if cooldown > 0.02:
@@ -926,7 +927,7 @@ class CrewButton extends Control:
 			draw_circle(p, 6.0, tint)
 			draw_rect(Rect2(p + Vector2(-6.0, 7.0), Vector2(12.0, 7.0)), tint)
 		if has_ready and cooldown <= 0.0:
-			draw_circle(c + Vector2(r * 0.65, -r * 0.65), 8.0, T.COL_ORANGE)
+			draw_circle(c + Vector2(r * 0.65, -r * 0.65), 8.0, T.COL_UI_ACCENT)
 		UI.draw_fit(self, UI.font(), Vector2(-8.0, size.y + 18.0), "CREW", HORIZONTAL_ALIGNMENT_CENTER, size.x + 16.0, 15, Color(tint, 0.9))
 		if pad_badge != "":
 			PadGlyph.draw(self, Vector2(size.x - 8.0, 8.0), pad_badge)
@@ -981,7 +982,7 @@ class CrewWheel extends Control:
 		draw_line(c + Vector2(-12, -12), c + Vector2(12, 12), Color(0.85, 0.83, 0.78), 3.0)
 		draw_line(c + Vector2(-12, 12), c + Vector2(12, -12), Color(0.85, 0.83, 0.78), 3.0)
 		if hover >= 0 and hover < entries.size():
-			draw_arc(slice_pos(hover), SLICE + 6.0, 0.0, TAU, 32, T.COL_CYAN, 4.0)   # controller pick
+			draw_arc(slice_pos(hover), SLICE + 6.0, 0.0, TAU, 32, T.COL_UI_ACCENT, 4.0)   # controller pick
 		for i in entries.size():
 			var e := entries[i]
 			var p := slice_pos(i)
@@ -1034,7 +1035,7 @@ class PowerBar extends Control:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0, 0, 0, 0.55))
 		var inner := size.x - 4.0
 		var fill := minf(used / output, 1.0) * inner
-		var color := T.COL_ORANGE if over or heavy else Color(0.95, 0.85, 0.4)
+		var color := T.COL_UI_DANGER_TEXT if over or heavy else T.COL_UI_ACCENT
 		draw_rect(Rect2(Vector2(2, 2), Vector2(fill, size.y - 4.0)), color)
 		var font := UI.font()   # Black Ops: power / overload readout
 		var text := "PWR %d/%d" % [roundi(used), roundi(output)]
@@ -1112,7 +1113,7 @@ class RigIcon extends Control:
 			return Color(0.25, 0.25, 0.27, 0.6)   # nothing fitted
 		if v <= 0.0:
 			return Color(0.45, 0.12, 0.1)          # stripped
-		return T.COL_ORANGE.lerp(T.COL_CYAN, clampf(v * 1.4 - 0.2, 0.0, 1.0)).darkened(0.35 * (1.0 - v))
+		return T.COL_UI_TEXT.darkened(0.45 * (1.0 - clampf(v, 0.0, 1.0)))
 
 	func _draw() -> void:
 		var c := size * 0.5
@@ -1163,7 +1164,7 @@ class ArmorBar extends Control:
 		draw_rect(Rect2(Vector2(-3, -3), Vector2(size.x + 6, 1)), Color(0.42, 0.43, 0.45, 0.9))
 		draw_rect(Rect2(Vector2(-3, size.y + 2), Vector2(size.x + 6, 1)), Color(0.06, 0.06, 0.07, 0.9))
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0, 0, 0, 0.7))
-		var fill := T.COL_CYAN if ratio > 0.35 else T.COL_ORANGE
+		var fill := T.COL_UI_TEXT if ratio > 0.35 else T.COL_UI_DANGER_TEXT
 		var inner := Rect2(Vector2(2, 2), size - Vector2(4, 4))
 		var seg_w := inner.size.x / SEGMENTS
 		var lit := inner.size.x * ratio

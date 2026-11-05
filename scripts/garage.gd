@@ -155,7 +155,7 @@ func _ready() -> void:
 		panel.visible = false
 		add_child(panel)
 
-	_toast = UI.label("", 22, T.COL_ORANGE)
+	_toast = UI.label("", 22, T.COL_UI_ACCENT)
 	_toast.z_index = 12   # above overlays and the menu
 	_toast.anchor_right = 1.0
 	_toast.offset_top = 100.0
@@ -253,7 +253,7 @@ func choose(id: String) -> bool:
 		return false
 	_preview = id
 	toast("Fitted: " + (str(Parts.get_part(id).name) if id != "" else "slot emptied"), 2.2,
-		UI.rarity_color(str(Parts.get_part(id).rarity)) if id != "" else T.COL_ORANGE)
+		UI.rarity_color(str(Parts.get_part(id).rarity)) if id != "" else T.COL_UI_ACCENT)
 	return true
 
 
@@ -337,7 +337,7 @@ func slot_anchor(i: int) -> Vector2:
 	return slot.anchor
 
 
-func toast(text: String, seconds := 2.2, color := T.COL_ORANGE) -> void:
+func toast(text: String, seconds := 2.2, color := T.COL_UI_ACCENT) -> void:
 	_toast.text = text
 	_toast.add_theme_color_override("font_color", color)
 	if _toast_tween != null:
@@ -421,7 +421,7 @@ func _build_rig_area() -> void:
 	_crew_line.pressed.connect(func() -> void: show_tab("INN"))
 	add_child(_crew_line)
 
-	_job = UI.label("", 20, T.COL_ORANGE)
+	_job = UI.label("", 20, T.COL_UI_ACCENT)
 	_job.anchor_right = 1.0
 	_job.anchor_top = 1.0
 	_job.anchor_bottom = 1.0
@@ -437,7 +437,7 @@ func _build_rig_area() -> void:
 	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(_hint)
 
-	_no_rig = UI.label("NO RIG", 30, T.COL_ORANGE)
+	_no_rig = UI.label("NO RIG", 30, T.COL_UI_ACCENT)
 	_no_rig.anchor_left = 0.5
 	_no_rig.anchor_right = 0.5
 	_no_rig.offset_left = -250.0
@@ -449,7 +449,7 @@ func _build_rig_area() -> void:
 
 
 func _build_top_bar() -> void:
-	_scrap_label = UI.label("", 30, T.COL_ORANGE)
+	_scrap_label = UI.label("", 30, T.COL_UI_ACCENT)
 	_scrap_label.position = Vector2(24, 14)
 	add_child(_scrap_label)
 
@@ -466,18 +466,20 @@ func _build_top_bar() -> void:
 
 	var menu_button := _button("MENU", 120)
 	menu_button.pressed.connect(open_menu)
+	UI.ghost(menu_button)
 	bar.add_child(menu_button)
 	var presets := _button("PRESETS", 150)
 	presets.pressed.connect(_open_presets)
+	UI.ghost(presets)
 	bar.add_child(presets)
 	# Rig upgrades (fabrication / loot / salvage) moved to RESEARCH (Cameron); UI hosts them there.
 	_rebuild = _button("REBUILD", 200)
 	_rebuild.pressed.connect(rebuild)
-	UI.accent(_rebuild, T.COL_CYAN)
+	UI.ghost(_rebuild)
 	bar.add_child(_rebuild)
 	_deploy = _button("DEPLOY", 180)
 	_deploy.pressed.connect(deploy)
-	UI.accent(_deploy, T.COL_ORANGE)
+	UI.primary(_deploy)
 	bar.add_child(_deploy)
 
 	_stats_label = UI.label("", 19, UI.TEXT)
@@ -672,7 +674,7 @@ func _refresh_crew_line() -> void:
 	var tail := "    PERK READY  >" if waiting > 0 else "    >"
 	_crew_line.text = "CREW    " + "    ".join(bits) + tail
 	var blocked := profile.has_rig() and profile.deploy_block() != ""
-	var color := UI.BAD if blocked else T.COL_CYAN
+	var color := UI.BAD if blocked else T.COL_UI_ACCENT
 	for state: String in ["font_color", "font_hover_color", "font_pressed_color"]:
 		_crew_line.add_theme_color_override(state, color)
 
@@ -683,15 +685,15 @@ func _stats_items(s: Dictionary) -> Array:
 	var items: Array = [
 		["hp", "HP", str(int(s.get("hp", 0.0))), UI.GOOD],
 		["armor", "ARMOR", "%d/%d/%d" % [int(s.get("front", 0.0)), int(s.get("side", 0.0)), int(s.get("rear", 0.0))], UI.TEXT_DIM],
-		["shield", "SHIELD", str(int(s.get("shield", 0.0))), T.COL_CYAN],
+		["shield", "SHIELD", str(int(s.get("shield", 0.0))), T.COL_UI_ACCENT],
 		["speed", "SPEED", str(roundi(float(s.max_speed) * m)), UI.TEXT_DIM],
 		["accel", "ACCEL", str(roundi(float(s.acceleration) * m)), UI.TEXT_DIM],
-		["dps", "DPS", str(roundi(Loadout.total_dps(s))), T.COL_ORANGE],
+		["dps", "DPS", str(roundi(Loadout.total_dps(s))), T.COL_UI_ACCENT],
 		["lock", "LOCK", str(int(s.lock_range)) if float(s.lock_range) > 0.0 else "NONE", UI.TEXT_DIM],
 	]
 	var over := StatSheet.overload_cause(s)
 	if over != "":
-		items.append(["power", "", over, T.COL_ORANGE])
+		items.append(["power", "", over, T.COL_UI_ACCENT])
 	return items
 
 
@@ -847,7 +849,7 @@ func _style_card(card: PartCard) -> void:
 	var again := PadScript.hint("TAP AGAIN:  ", "PRESS AGAIN:  ") if card.selected else ""
 	if card.installed:
 		card.status = "INSTALLED"
-		card.status_color = T.COL_CYAN
+		card.status_color = T.COL_UI_ACCENT
 	elif card.cost > profile.scrap:
 		card.status = "NEED %d SCRAP" % card.cost
 		card.status_color = UI.BAD
@@ -856,7 +858,7 @@ func _style_card(card: PartCard) -> void:
 		card.status_color = UI.GOOD
 	else:
 		card.status = again + "BUILD  %d SCRAP" % card.cost
-		card.status_color = T.COL_ORANGE
+		card.status_color = T.COL_UI_ACCENT
 	card.queue_redraw()
 
 
@@ -1015,7 +1017,7 @@ func _open_overlay(title: String, body: Control) -> void:
 	column.add_theme_constant_override("separation", 14)
 	panel.add_child(column)
 	var head := HBoxContainer.new()
-	var title_label := UI.label(title, 28, T.COL_ORANGE)
+	var title_label := UI.label(title, 28, T.COL_UI_ACCENT)
 	title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(title_label)
 	var close := _button("CLOSE", 120)
@@ -1040,7 +1042,7 @@ func _open_presets() -> void:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 10)
 		var p := profile.preset(i)
-		var name_label := UI.label(profile.preset_name(i), 22, T.COL_CYAN)
+		var name_label := UI.label(profile.preset_name(i), 22, T.COL_UI_ACCENT)
 		name_label.custom_minimum_size = Vector2(200, 0)
 		name_label.clip_text = true
 		row.add_child(name_label)
@@ -1090,7 +1092,7 @@ func open_rename(index: int) -> void:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
 	var done := _button("DONE", 160)
-	UI.accent(done, T.COL_CYAN)
+	UI.ghost(done)
 	done.pressed.connect(finish_rename.bind(index))
 	row.add_child(done)
 	var cancel := _button("CANCEL", 160)
@@ -1125,7 +1127,7 @@ func _summary(loadout: Dictionary) -> String:
 func _open_upgrades() -> void:
 	var body := VBoxContainer.new()
 	body.add_theme_constant_override("separation", 12)
-	body.add_child(UI.label("Scrap  %d" % profile.scrap, 22, T.COL_ORANGE))
+	body.add_child(UI.label("Scrap  %d" % profile.scrap, 22, T.COL_UI_ACCENT))
 	for key: String in RigUpgrades.KEYS:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 14)
@@ -1136,7 +1138,7 @@ func _open_upgrades() -> void:
 		row.add_child(info)
 		var level := profile.upgrade_level(key)
 		var max_level: int = (T.UPGRADES[key].costs as Array).size()
-		row.add_child(UI.label("LV %d/%d" % [level, max_level], 22, T.COL_CYAN))
+		row.add_child(UI.label("LV %d/%d" % [level, max_level], 22, T.COL_UI_ACCENT))
 		var cost := profile.upgrade_cost(key)
 		var buy := _button("MAXED" if cost < 0 else "BUY  %d" % cost, 170)
 		buy.disabled = cost < 0 or cost > profile.scrap
@@ -1188,7 +1190,7 @@ func _on_tab(tab_name: String) -> void:
 func _highlight_tab(tab_name: String) -> void:
 	for tab in _tab_buttons:
 		if tab.text == tab_name:
-			UI.accent(tab, T.COL_CYAN)
+			UI.accent(tab, T.COL_UI_ACCENT)
 		else:
 			for state: String in ["normal", "hover", "pressed"]:
 				tab.remove_theme_stylebox_override(state)
@@ -1223,10 +1225,10 @@ class SlotTag extends Button:
 
 	func accent() -> Color:
 		if active:
-			return T.COL_ORANGE
+			return T.COL_UI_ACCENT
 		if empty and required:
 			return UI.BAD
-		return T.COL_CYAN
+		return T.COL_UI_ACCENT
 
 	func _draw() -> void:
 		var font := get_theme_default_font()
@@ -1298,7 +1300,7 @@ class PartCard extends Button:
 			draw_rect(Rect2(0, 0, size.x, 5), rarity_color)
 			draw_rect(Rect2(Vector2.ZERO, size), Color(rarity_color, 0.35), false, 2.0)
 		if selected:   # inside the rarity frame, so both show
-			draw_rect(Rect2(Vector2(4, 4), size - Vector2(8, 8)), T.COL_ORANGE, false, 3.0)
+			draw_rect(Rect2(Vector2(4, 4), size - Vector2(8, 8)), T.COL_UI_ACCENT, false, 3.0)
 		var dim := 0.45 if disabled else 1.0
 		var tx := 12.0
 		if category != "" and _icons.draw(self, category, Rect2(12, 14, 20, 20), Color(rarity_color, dim)):
@@ -1349,9 +1351,9 @@ class Callouts extends Control:
 			var from := Vector2(r.end.x, r.get_center().y) if int(slots[i].side) == 0 else Vector2(r.position.x, r.get_center().y)
 			var to: Vector2 = rig.to_global(g.call("slot_anchor", i))
 			var on := i == selected
-			var c := T.COL_ORANGE if on else Color(T.COL_CYAN, 0.35)
+			var c := T.COL_UI_ACCENT if on else Color(T.COL_UI_BORDER, 0.7)
 			if rings_only:
-				draw_arc(to, 9.0 if on else 6.0, 0.0, TAU, 20, Color(c, 1.0) if on else Color(T.COL_CYAN, 0.8), 2.5 if on else 2.0)
+				draw_arc(to, 9.0 if on else 6.0, 0.0, TAU, 20, Color(c, 1.0) if on else Color(T.COL_UI_BORDER, 0.85), 2.5 if on else 2.0)
 				continue
 			var elbow := Vector2(lerpf(from.x, to.x, 0.3), from.y)
 			draw_line(from, elbow, c, 2.0 if on else 1.5)
@@ -1469,7 +1471,7 @@ class StatSheet extends Control:
 		var font := get_theme_default_font()
 		draw_rect(Rect2(Vector2.ZERO, size), UI.PANEL)
 		draw_rect(Rect2(Vector2.ZERO, size), UI.PANEL_EDGE, false, 2.0)
-		draw_string(font, Vector2(16, 28), title, HORIZONTAL_ALIGNMENT_LEFT, size.x - 32.0, 17, T.COL_ORANGE)
+		draw_string(font, Vector2(16, 28), title, HORIZONTAL_ALIGNMENT_LEFT, size.x - 32.0, 17, T.COL_UI_ACCENT)
 		var col_w := (size.x - 56.0) / 2.0
 		if single_column and headline:   # V2.3 sample: one small box, 5 headline stats
 			col_w = size.x - 32.0
@@ -1575,8 +1577,8 @@ class PowerMeter extends Control:
 	func _draw() -> void:
 		var gap := 24.0
 		var w := (size.x - gap) * 0.5
-		_bar(Rect2(0, 0, w, size.y), "POWER LOAD", used, output, Color(0.95, 0.85, 0.4))
-		_bar(Rect2(w + gap, 0, w, size.y), "WEIGHT LOAD", weight, capacity, Color(0.7, 0.78, 0.85))
+		_bar(Rect2(0, 0, w, size.y), "POWER LOAD", used, output, T.COL_UI_ACCENT)
+		_bar(Rect2(w + gap, 0, w, size.y), "WEIGHT LOAD", weight, capacity, UI.TEXT)
 
 	func _bar(area: Rect2, label: String, value: float, limit: float, tint: Color) -> void:
 		if limit <= 0.0:
@@ -1640,8 +1642,8 @@ class FloorGrid extends Control:
 			y += step
 		var c := Vector2(size.x * 0.5, 290.0)
 		draw_circle(c, 150.0, Color(0, 0, 0, 0.25))
-		draw_arc(c, 150.0, 0.0, TAU, 64, Color(T.COL_CYAN, 0.18), 2.0)
-		draw_arc(c, 158.0, 0.0, TAU, 64, Color(T.COL_ORANGE, 0.12), 1.0)
+		draw_arc(c, 150.0, 0.0, TAU, 64, Color(T.COL_UI_ACCENT, 0.22), 2.0)
+		draw_arc(c, 158.0, 0.0, TAU, 64, Color(T.COL_UI_BORDER, 0.35), 1.0)
 
 
 ## The garage's menu: settings, the Database, quit.
