@@ -1,12 +1,15 @@
 extends Control
-## The menu: pause in a job (RESUME, RESTART JOB, SETTINGS, DATABASE, QUIT
-## GAME) or the garage's MENU button (SETTINGS, DATABASE, QUIT GAME, CLOSE).
-## Agreed with the owner: there's no way back to the garage mid-job; a quit
-## or a closed app drops you back into the same job at relaunch, the fight
-## reset. It keeps running while the game is paused.
+## The menu: pause in a job (RESUME, RESTART JOB, ABANDON JOB, SETTINGS,
+## DATABASE, QUIT GAME) or the garage's MENU button (SETTINGS, DATABASE, QUIT
+## GAME, CLOSE). ABANDON JOB (two taps; playtest 2 #7) gives the job up and
+## goes back to the garage: like a failed job the day passes with no pay, and
+## nothing picked up comes home, but the rig and crew are kept (not a wreck).
+## A quit or a closed app still drops you back into the same job at relaunch,
+## the fight reset. It keeps running while the game is paused.
 
 signal resumed
 signal restart_requested
+signal abandon_requested
 signal closed
 signal tutorial_requested
 signal leave_requested
@@ -24,6 +27,7 @@ var in_tutorial := false     # the Training Run: LEAVE TUTORIAL instead of a res
 var page := "main"            # main / settings / database
 var category := "parts"       # Database tab
 var restart_armed := false    # RESTART JOB needs a second tap
+var abandon_armed := false    # so does ABANDON JOB
 var _focus_action := ""       # Controller page: the row last picked
 
 var _panel: PanelContainer
@@ -105,6 +109,18 @@ func restart() -> bool:
 	return true
 
 
+## ABANDON JOB: the first tap arms it, the second gives the job up.
+func abandon() -> bool:
+	if not in_job or in_tutorial:
+		return false
+	if not abandon_armed:
+		abandon_armed = true
+		show_page("main")
+		return false
+	abandon_requested.emit()
+	return true
+
+
 func quit_game() -> void:
 	get_tree().quit()
 
@@ -153,6 +169,8 @@ func _main_page() -> void:
 	if in_job:
 		_button("RESUME", resume, T.COL_UI_ACCENT)
 		_button(PadScript.hint("TAP AGAIN TO RESTART THE JOB", "PRESS AGAIN TO RESTART THE JOB") if restart_armed else "RESTART JOB", restart, T.COL_UI_ACCENT if restart_armed else Color.TRANSPARENT)
+	if in_job and not in_tutorial:
+		_button(PadScript.hint("TAP AGAIN TO ABANDON (DAY PASSES, NO PAY)", "PRESS AGAIN TO ABANDON (DAY PASSES, NO PAY)") if abandon_armed else "ABANDON JOB", abandon, T.COL_UI_DANGER_TEXT if abandon_armed else Color.TRANSPARENT)
 	if in_tutorial:
 		_button("LEAVE TUTORIAL", func() -> void: leave_requested.emit())
 	_button("SETTINGS", show_page.bind("settings"))
@@ -166,7 +184,7 @@ func _main_page() -> void:
 	if in_tutorial:
 		note_text = "The Training Run uses a loaner rig and crew. Nothing here counts and nothing can be lost."
 	elif in_job:
-		note_text = "Quitting or closing the app mid-job puts you back into the same job next time, the fight reset."
+		note_text = "ABANDON JOB: back to the garage with your rig and crew; the day passes, no pay, nothing picked up is kept. Quitting or closing the app mid-job puts you back into the same job next time, the fight reset."
 	else:
 		note_text = "TUTORIAL: a guided Training Run on a loaner rig, then a tour of the garage. Costs no day; nothing is kept."
 	var note := UI.label(note_text, 18, UI.TEXT_DIM)
