@@ -142,8 +142,11 @@ func active_positions() -> PackedVector2Array:
 	return out
 
 
+## A copy of the live list: a kill removes the zombie from `_active` at once
+## (died -> _on_zombie_died), so callers that damage while looping would skip
+## the zombie after each kill if they walked `_active` itself.
 func active_zombies() -> Array[Zombie]:
-	return _active
+	return _active.duplicate()
 
 
 ## Shamblers still to kill: alive now plus not yet spawned.
