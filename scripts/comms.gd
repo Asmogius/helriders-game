@@ -223,11 +223,22 @@ func _open_upgrades() -> void:
 		var max_level: int = (T.UPGRADES[key].costs as Array).size()
 		row.add_child(UI.label("LV %d/%d" % [level, max_level], 22, T.COL_UI_ACCENT))
 		var cost := profile.upgrade_cost(key)
-		var buy := _button("MAXED" if cost < 0 else "BUY  %d" % cost, 170)
-		buy.disabled = cost < 0 or cost > profile.scrap
-		buy.pressed.connect(func() -> void:
-			profile.buy_upgrade(key)
-			_open_upgrades())
+		var short := cost > profile.scrap
+		var label := "MAXED" if cost < 0 else ("NEED %d SCRAP" % cost if short else "BUY  %d" % cost)
+		var buy := _button(label, 190)
+		if cost < 0 or short:
+			buy.disabled = true
+			UI.ghost(buy)
+			buy.add_theme_color_override("font_color", UI.BAD if short else UI.TEXT_DIM)
+			buy.add_theme_color_override("font_disabled_color", UI.BAD if short else UI.TEXT_DIM)
+		else:
+			UI.primary(buy)
+			buy.pressed.connect(func() -> void:
+				if not profile.buy_upgrade(key):
+					return
+				_open_upgrades())
+		if short:
+			row.add_child(UI.label("Not enough scrap", 16, UI.BAD))
 		row.add_child(buy)
 		column.add_child(row)
 

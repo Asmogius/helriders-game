@@ -48,6 +48,21 @@ func _process(_delta: float) -> bool:
 		_check(garage._comms.visible and garage.is_inside_tree() and current_scene == null, "DEPLOY without a job opens Comms")
 		var cards := garage._comms._cards.get_children().size()
 		_check(cards == profile.board_size(), "Comms shows today's board (%d jobs)" % cards)
+		# Playtest #11: unaffordable Comms upgrade looks disabled and says so.
+		profile.scrap = 60
+		garage._comms._open_upgrades()
+		var buy_btns: Array = []
+		for b: Node in garage._comms._upgrades.find_children("*", "Button", true, false):
+			var bt := b as Button
+			if bt.text.begins_with("NEED") or bt.text.begins_with("BUY"):
+				buy_btns.append(bt)
+		_check(buy_btns.size() >= 1 and buy_btns[0].disabled and buy_btns[0].text.begins_with("NEED"), "unaffordable BUY is disabled with NEED N SCRAP")
+		var note := false
+		for l: Node in garage._comms._upgrades.find_children("*", "Label", true, false):
+			if (l as Label).text == "Not enough scrap":
+				note = true
+		_check(note, "unaffordable upgrade shows 'Not enough scrap'")
+		garage._comms._close_upgrades()
 		garage._comms.select(0)
 		_check(garage._comms.take_selected() and profile.has_mission(), "TAKE JOB sets the mission")
 		_check(not garage._comms.visible and garage._job.text.begins_with("JOB:"), "taking a job returns to the Garage with the job shown")
