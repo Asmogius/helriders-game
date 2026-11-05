@@ -307,6 +307,7 @@ var art_pose_override := ""      # captures and tests: force a pose row (e.g. "l
 var _art_t := 0.0                # walk cycle phase, advanced by distance walked
 var _art_last := Vector2.ZERO
 var _art_key := -1
+var _art_override_drawn := ""   # art_pose_override at the last redraw (tests, captures)
 
 
 static func _art() -> Dictionary:
@@ -364,6 +365,25 @@ func art_row() -> String:
 	return pose
 
 
+## The frame art_row() would pick, as a small int (0-9), so _process can tell
+## when to redraw without building strings every frame. Shambler variants are
+## fixed per zombie, so they don't need to be in it.
+func art_pose_index() -> int:
+	if _flash > 0.5:
+		return 4
+	if art_pose_override != "":
+		return 9
+	if kind == "tank":
+		match charge:
+			Charge.WINDUP:
+				return 5 + (int(Time.get_ticks_msec() / 125) % 2)
+			Charge.CHARGE:
+				return 7
+			Charge.STUMBLE:
+				return 8
+	return int(_art_t) % 4
+
+
 func art_heading() -> int:
 	var n: int = int(art_atlas().get("headings", 16))
 	return posmod(int(round(global_rotation / (TAU / float(n)))), n)
@@ -376,9 +396,10 @@ func _process(_delta: float) -> void:
 		texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_art_t += position.distance_to(_art_last) / (6.0 if kind == "shambler" else 10.0)   # one frame per 6/10 px walked
 	_art_last = position
-	var key := art_heading() * 64 + art_row().hash() % 64
-	if key != _art_key:
+	var key := art_heading() * 16 + art_pose_index()
+	if key != _art_key or art_pose_override != _art_override_drawn:
 		_art_key = key
+		_art_override_drawn = art_pose_override
 		queue_redraw()
 
 
