@@ -7,8 +7,10 @@ extends RefCounted
 ##   type     "clear" | "survive" | "hunt" | "courier"
 ##   skulls   1..6 difficulty (1 easiest)
 ##   name     flavor name ("Pharmacy Siege"); for Hunt, the Elite's name
-##   seed     drives anything random in the run (Courier route)
+##   seed     drives anything random in the run (Courier route, night roll)
 ##   reward   scrap paid on success, before Courier time tiers
+##   district the board's district (night weights). Layout art can differ.
+##   night    rolled once from the seed. The garage day-cycle does not set it.
 
 const T := preload("res://scripts/tuning.gd")
 const Layouts := preload("res://scripts/layouts.gd")
@@ -28,7 +30,7 @@ static func make_board(day: int, count: int, quality: int, district := "outer_bl
 	var board: Array = []
 	for i in count:
 		var type: String = types[i % types.size()]
-		var job := make(type, _roll_skulls(band, rng), rng.randi(), quality, day, i)
+		var job := make(type, _roll_skulls(band, rng), rng.randi(), quality, day, i, district)
 		job["layout"] = Layouts.pick(type, int(job.seed))
 		board.append(job)
 	return board
@@ -55,11 +57,12 @@ static func _roll_skulls(band: Vector2i, rng: RandomNumberGenerator) -> int:
 	return band.y
 
 
-static func make(type: String, level: int, mission_seed: int, quality := 0, day := 0, index := 0) -> Dictionary:
+static func make(type: String, level: int, mission_seed: int, quality := 0, day := 0, index := 0, district := "outer_blocks") -> Dictionary:
 	var info: Dictionary = T.MISSIONS[type]
 	var names: Array = T.MISSION_NAMES[type]
 	level = clampi(level, 1, T.MAX_SKULLS)
 	var base: int = (info.reward as Array)[level - 1]
+	district = normalize_district(district)
 	return {
 		"id": "d%d_%d" % [day, index],
 		"type": type,
@@ -67,7 +70,70 @@ static func make(type: String, level: int, mission_seed: int, quality := 0, day 
 		"name": str(names[absi(mission_seed) % names.size()]),
 		"seed": mission_seed,
 		"reward": roundi(base * (1.0 + float(T.UPGRADES.quality.per_level) * quality)),
+		"district": district,
+		"night": roll_night(type, level, district, mission_seed),
 	}
+
+
+# --- Night (per job, from the seed; the garage day-cycle does not drive it) ---
+# District weight, then a job rule. Courier and Escort replace the district.
+# Outer Blocks stays day except 4-skull Survive and Hunt. Core is night.
+# Survive and Hunt lean night by the same +25% (the only lean Cameron set).
+# Clear and Retrieve keep the district weight. Expeditions are off-map.
+# Tutorial jobs are day; the mission forces that, this roll is for board jobs.
+const DISTRICT_NIGHT := {
+	"outer_blocks": 0.0,
+	"midtown": 0.35,
+	"industrial": 0.60,
+	"core": 1.0,
+}
+const NIGHT_LEAN := 0.25          # Survive and Hunt, added to the district weight
+const NIGHT_COURIER := 0.5        # ~50/50 in every district, including Core
+const NIGHT_ESCORT_SKULLS := 5    # Escort is night only at 5-6 skulls, then certain
+
+
+static func normalize_district(district: String) -> String:
+	return district if DISTRICT_NIGHT.has(district) else "outer_blocks"
+
+
+## Chance this job is at night, before the seed roll. 0 and 1 never roll.
+static func night_chance(type: String, skulls: int, district: String) -> float:
+	var level := clampi(skulls, 1, T.MAX_SKULLS)
+	district = normalize_district(district)
+	if type == "courier":
+		return NIGHT_COURIER
+	if type == "escort":
+		return 1.0 if level >= NIGHT_ESCORT_SKULLS else 0.0
+	if district == "outer_blocks":
+		return 1.0 if level == 4 and (type == "survive" or type == "hunt") else 0.0
+	if district == "core":
+		return 1.0
+	var chance := float(DISTRICT_NIGHT[district])
+	if type == "survive" or type == "hunt":
+		chance += NIGHT_LEAN
+	return clampf(chance, 0.0, 1.0)
+
+
+## Stable for the job's seed, so a restart of the same job stays day or night.
+static func roll_night(type: String, skulls: int, district: String, mission_seed: int) -> bool:
+	var chance := night_chance(type, skulls, district)
+	if chance <= 0.0:
+		return false
+	if chance >= 1.0:
+		return true
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("helriders-night-%d" % mission_seed)
+	return rng.randf() < chance
+
+
+## The flag stored on the job, or a fresh roll when an old save has none.
+## A tutorial job is day even if the dict says night.
+static func is_night(mission: Dictionary) -> bool:
+	if bool(mission.get("tutorial", false)):
+		return false
+	if mission.has("night"):
+		return bool(mission.night)
+	return roll_night(str(mission.get("type", "")), skulls(mission), str(mission.get("district", "outer_blocks")), int(mission.get("seed", 0)))
 
 
 ## Does this job bring a Convoy Lead? Rolled from the job's seed, so the

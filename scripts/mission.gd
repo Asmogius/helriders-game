@@ -72,6 +72,7 @@ var _restarting := false         # RESTART keeps the baked map cached; leaving d
 var spec := {}                   # the mission being run
 var mission_type := "clear"
 var skulls := 3                  # difficulty, 1 to 6
+var night := false               # this job's world grade (T.COL_NIGHT_WORLD). FX stay white.
 
 var arena: Arena
 var splats: Splats
@@ -300,6 +301,7 @@ func _ready() -> void:
 	camera.target = vehicle
 	reticle.rig = vehicle
 	markers.mission = self
+	_apply_night_tint()
 
 	# Tree order is also physics order:
 	# inputs (here) -> zombies -> player rig -> enemy rigs -> hunters -> bullets.
@@ -383,6 +385,20 @@ func _ready() -> void:
 	else:
 		_start_banner()
 	_refresh_hud()
+
+
+## Night multiplies the world only: the map, ground stains, zombies and
+## Hunters. Rig lights, the truck, barrels, hazards, tracers, muzzle flashes
+## and the FX drawer stay Color.WHITE. T.COL_NIGHT_WORLD is a multiply.
+## The garage day-cycle does not call this. Tutorial is always day.
+func _apply_night_tint() -> void:
+	night = not tutorial and Missions.is_night(spec)
+	var tint := T.COL_NIGHT_WORLD if night else Color.WHITE
+	arena.modulate = tint
+	splats.modulate = tint
+	zombies.modulate = tint
+	for h: Hunter in hunters:
+		h.modulate = tint
 
 
 func _start_banner() -> void:

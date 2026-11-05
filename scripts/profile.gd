@@ -1584,9 +1584,18 @@ static func _clean_mission(raw: Variant) -> Dictionary:
 		"name": str(d.get("name", "")),
 		"seed": int(d.get("seed", 1)),
 		"reward": int(d.get("reward", 0)),
+		"district": Missions.normalize_district(str(d.get("district", "outer_blocks"))),
 	}
 	if Layouts.LAYOUTS.has(str(d.get("layout", ""))):
 		out["layout"] = str(d.layout)
+	# Old saves have no night flag. Roll it from the seed so a resumed job
+	# stays put. A stored flag wins, so a job already rolled does not re-roll.
+	if bool(d.get("tutorial", false)):
+		out["night"] = false
+	elif d.has("night"):
+		out["night"] = bool(d.night)
+	else:
+		out["night"] = Missions.roll_night(type, int(out.skulls), str(out.district), int(out.seed))
 	return out
 
 
