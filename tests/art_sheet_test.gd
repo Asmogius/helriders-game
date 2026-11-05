@@ -276,8 +276,14 @@ func _check_shadows() -> void:
 ## child (emissive pixels) doesn't; Color.WHITE switches it back off.
 func _check_night() -> void:
 	var NG := preload("res://scripts/night_grade.gd")
+	var Tuning := preload("res://scripts/tuning.gd")
+	var want := Color8(0x2a, 0x35, 0x50)
+	check(NG.night_colour().is_equal_approx(want), "night colour is #2a3550")
+	check(Tuning.COL_NIGHT_WORLD.is_equal_approx(want), "COL_NIGHT_WORLD is #2a3550")
+	check(Tuning.COL_GARAGE_STREET_NIGHT == Tuning.COL_NIGHT_WORLD, "garage street night aliases the world night")
 	var g: Color = NG.world_grade()
-	check(g.r > g.g and g.g > g.b and g.r <= 1.0, "night grade is orange-brown")
+	check(is_equal_approx(g.r, 42.0 / 96.0) and is_equal_approx(g.g, 53.0 / 89.0) and is_equal_approx(g.b, 1.0), "night grade is cool blue over #60594f")
+	check(g.b > g.g and g.g > g.r, "night grade is bluer than it is red")
 	var holder := Node2D.new()
 	var s: Sprite2D = DS.new()
 	s.load_meta("res://art/sprites/bulwark.json")

@@ -1,6 +1,7 @@
 extends SceneTree
 ## Ebbtide plan phase 2 sample (needs a display; not headless):
-##   xvfb-run -s "-screen 0 1280x720x24" godot --rendering-driver opengl3 --path . -s res://tools/art/capture_night_sample.gd -- out.png [day]
+##   xvfb-run -s "-screen 0 1280x720x24" godot --rendering-driver opengl3 --path . -s res://tools/art/capture_night_sample.gd -- out.png [day|512b11]
+## A hex (no hash) grades toward that night average instead of COL_NIGHT_WORLD.
 ## The fight with a few Shamblers, a Tank, an enemy Bulwark (red lights) and an
 ## explosion. Night: NightGrade on rigs, zombies and fx (Art's part). The map
 ## gets the same grade as a plain modulate here ONLY as a preview of Maps'
@@ -11,6 +12,7 @@ const NightGrade := preload("res://scripts/night_grade.gd")
 var _frames := 0
 var _out := "user://night_sample.png"
 var _day := false
+var _hex := ""
 var _m: Node
 
 
@@ -18,7 +20,10 @@ func _init() -> void:
 	var args := OS.get_cmdline_user_args()
 	if args.size() > 0:
 		_out = args[0]
-	_day = args.size() > 1 and args[1] == "day"
+	if args.size() > 1 and args[1] == "day":
+		_day = true
+	elif args.size() > 1:
+		_hex = args[1]
 	change_scene_to_file.call_deferred("res://scenes/mission.tscn")
 
 
@@ -39,7 +44,7 @@ func _process(_delta: float) -> bool:
 		if b != null:
 			b.set_physics_process(false)
 	if _frames == 60:
-		var g := Color.WHITE if _day else NightGrade.world_grade()
+		var g := Color.WHITE if _day else (_grade())
 		_m.fx.set_night(g)
 		NightGrade.apply_rig(_m.vehicle, g)
 		for r in _m.rigs.get_children():
@@ -54,3 +59,9 @@ func _process(_delta: float) -> bool:
 		print("saved ", _out)
 		quit()
 	return false
+
+
+func _grade() -> Color:
+	if _hex == "":
+		return NightGrade.world_grade()
+	return NightGrade.grade_for(Color.html(_hex))
