@@ -166,6 +166,8 @@ var _empty_warned := false
 # Escort: the salvage truck, its sites and the driver's optional detour.
 var truck: FriendlyTruck
 var truck_alert := false   # the low-HP warning is up
+var truck_hit_at := -100.0  # elapsed when the truck last took damage
+var _truck_banner_at := -100.0
 var optional_site := Vector2.INF
 var optional_offered := false
 var optional_taken := false
@@ -362,6 +364,7 @@ func _ready() -> void:
 		elite.wrecked.connect(_on_elite_wrecked)
 	if truck != null:
 		truck.wrecked.connect(_on_truck_lost)
+		truck.damaged.connect(func(_a: float) -> void: truck_hit_at = elapsed)
 		truck.site_reached.connect(_on_site_reached)
 		truck.site_done.connect(_on_site_done)
 		hud.choice_made.connect(_on_optional_choice)
@@ -1901,11 +1904,28 @@ func truck_hp_ratio() -> float:
 	return clampf(truck.hp / maxf(truck.hp_max, 1.0), 0.0, 1.0)
 
 
+## The truck took damage in the last T.TRUCK_HIT_WINDOW seconds.
+func truck_under_attack() -> bool:
+	return truck != null and not truck.is_wrecked and elapsed - truck_hit_at < T.TRUCK_HIT_WINDOW
+
+
+## The truck is outside the camera view.
+func truck_off_screen() -> bool:
+	if truck == null:
+		return false
+	var p := get_viewport().get_canvas_transform() * truck.global_position
+	return not get_viewport().get_visible_rect().has_point(p)
+
+
 ## Escort: a pulsing warning while the truck's HP is low (playtest 15: it
 ## went from "65%" to wrecked with no signal).
 func _truck_warning() -> void:
 	if truck == null:
 		return
+	# Playtest 2: hit while off-screen, with no cue but the % text.
+	if state == State.RUNNING and truck_under_attack() and truck_off_screen() and elapsed - _truck_banner_at > T.TRUCK_HIT_BANNER_EVERY:
+		_truck_banner_at = elapsed
+		hud.banner("TRUCK UNDER ATTACK", T.COL_UI_DANGER_TEXT, 1.6)
 	var low := state == State.RUNNING and not truck.is_wrecked and truck_hp_ratio() <= T.TRUCK_LOW_WARN
 	if low and not truck_alert:
 		truck_alert = true
@@ -1984,6 +2004,7 @@ func _refresh_threats() -> void:
 	# last few shamblers in a Clear.
 	var points := _threat_points
 	var colors := _threat_colors
+	var pulse := -1
 	points.clear()
 	colors.clear()
 	if state == State.RUNNING:
@@ -2013,11 +2034,13 @@ func _refresh_threats() -> void:
 		if mission_type == "escort" and truck != null and not truck.is_wrecked:
 			points.append(to_screen * truck.global_position)
 			colors.append(T.COL_TRUCK)
+			if truck_under_attack():
+				pulse = points.size() - 1   # playtest 2: its edge arrow pulses while it's hit
 		if mission_type == "clear" and zombies.remaining() <= T.STRAGGLER_ARROWS:
 			for p in zombies.active_positions():
 				points.append(to_screen * p)
 				colors.append(T.COL_ORANGE)
-	hud.set_threats(points, colors)
+	hud.set_threats(points, colors, pulse)
 
 
 func _status_line() -> String:

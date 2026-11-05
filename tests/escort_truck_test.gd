@@ -3,7 +3,8 @@ extends SceneTree
 ## the truck's HP (what wrecks it), not armor + HP across all four facings; a
 ## pulsing warning at low HP; GOOPED is explained on screen; a GOOPED player
 ## pulls the frenzied horde nearby off the truck (it used to rush the truck at
-## frenzy speed); the truck keeps its 230 top speed.
+## frenzy speed); a hit while off-screen pulses its edge arrow and says
+## TRUCK UNDER ATTACK; the truck keeps its 230 top speed.
 ##
 ## Run:  godot --headless --fixed-fps 60 --path . -s res://tests/escort_truck_test.gd
 
@@ -69,6 +70,17 @@ func _process(_delta: float) -> bool:
 	if frame == 150:
 		var z: Node2D = mark.z
 		_check(z.global_position.distance_to(rig.global_position) < float(mark.zd) - 20.0, "GOOPED: the horde near you rushes you, not the truck")
+		main.zombies.clear_all()
+		truck.global_position = rig.global_position + Vector2(1600, 0)
+	if frame == 160:
+		_check(main.hud.threat_pulse() < 0, "the truck's arrow is calm while it isn't hit")
+		truck.take_damage(5.0, Vector2.RIGHT)
+	if frame == 175:
+		_check(main.hud.threat_pulse() >= 0, "hit off-screen: the truck's edge arrow pulses")
+		var banner := main.hud.get("_banner") as Label
+		_check(banner.text == "TRUCK UNDER ATTACK" and banner.modulate.a > 0.5, "hit off-screen: TRUCK UNDER ATTACK banner")
+	if frame == 260:
+		_check(main.hud.threat_pulse() < 0, "the pulse stops a second after the last hit")
 		_finish()
 	return false
 
