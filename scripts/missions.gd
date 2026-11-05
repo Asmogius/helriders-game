@@ -19,10 +19,10 @@ const TYPES := ["clear", "survive", "hunt", "courier", "retrieve", "escort"]
 ## Today's board: `count` missions, covering as many types as fit, skulls
 ## rolled inside the district's band (T.DISTRICTS) and weighted toward its
 ## easier middle. `quality` (Better Leads level) raises pay.
-static func make_board(day: int, count: int, quality: int, district := "outer_blocks") -> Array:
+static func make_board(day: int, count: int, quality: int, district := "outer_blocks", clears := 0) -> Array:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash("helriders-board-%d" % day)
-	var types: Array = TYPES.duplicate()
+	var types: Array = unlocked_types(clears)
 	_shuffle(types, rng)
 	var band := skull_band(district)
 	var open := districts_through(district)
@@ -33,6 +33,18 @@ static func make_board(day: int, count: int, quality: int, district := "outer_bl
 		job["layout"] = Layouts.pick(type, int(job.seed), open)
 		board.append(job)
 	return board
+
+
+## Job types open after `clears` successful jobs (T.JOB_UNLOCK_CLEARS), in
+## TYPES order. Clear is always open, so a board can always fill its slots.
+static func unlocked_types(clears: int) -> Array:
+	var open: Array = []
+	for type: String in TYPES:
+		if clears >= int(T.JOB_UNLOCK_CLEARS.get(type, 0)):
+			open.append(type)
+	if open.is_empty():
+		open.append("clear")
+	return open
 
 
 ## District ids from the first up to `district` (the ones a board in it may

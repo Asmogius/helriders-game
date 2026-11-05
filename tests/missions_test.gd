@@ -182,12 +182,12 @@ func _check_bulwark_tables() -> void:
 
 func _check_board() -> void:
 	_check(profile.board.size() == 3 and profile.day == 1, "day 1 board has three jobs")
-	var again := Missions.make_board(1, 3, 0)
+	var again := Missions.make_board(1, 3, 0, "outer_blocks", 0)
 	_check(str(again) == str(profile.board), "the board is the same every time you look that day")
 	var types := {}
 	for m: Dictionary in profile.board:
 		types[m.type] = true
-	_check(types.size() == 3, "three different job types on the board")
+	_check(types.size() == Missions.unlocked_types(0).size(), "a new game's board shows every unlocked job type")
 	var in_band := true
 	var seen := {}
 	for d in range(1, 41):

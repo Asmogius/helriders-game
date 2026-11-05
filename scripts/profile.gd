@@ -142,7 +142,7 @@ func new_game() -> void:
 	day = 1
 	active_mission = {}
 	run_active = false
-	board = Missions.make_board(day, board_size(), 0, board_district())
+	board = Missions.make_board(day, board_size(), 0, board_district(), int(record.clears))
 	_starter_crew()
 	saloon_day = 0
 	ensure_saloon()
@@ -374,7 +374,7 @@ func board_size() -> int:
 
 func ensure_board() -> void:
 	if board.size() != board_size():
-		board = Missions.make_board(day, board_size(), int(upgrades.get("quality", 0)), board_district())
+		board = Missions.make_board(day, board_size(), int(upgrades.get("quality", 0)), board_district(), int(record.clears))
 
 
 func choose_mission(index: int) -> void:
@@ -398,7 +398,7 @@ func finish_day() -> void:
 	day += 1
 	research_today = 0
 	active_mission = {}
-	board = Missions.make_board(day, board_size(), int(upgrades.get("quality", 0)), board_district())
+	board = Missions.make_board(day, board_size(), int(upgrades.get("quality", 0)), board_district(), int(record.clears))
 	_advance_lost()
 	ensure_saloon()
 	_advance_expeditions()
@@ -1225,7 +1225,7 @@ func buy_upgrade(key: String) -> bool:
 	upgrades[key] = upgrade_level(key) + 1
 	if key == "choices" or key == "quality":
 		# Same seed, so today's missions stay; more of them, or better paid.
-		board = Missions.make_board(day, board_size(), int(upgrades.quality), board_district())
+		board = Missions.make_board(day, board_size(), int(upgrades.quality), board_district(), int(record.clears))
 	if key == "back_room":
 		ensure_saloon()
 	if key == "seasoned_hands":

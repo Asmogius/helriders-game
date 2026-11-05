@@ -120,6 +120,8 @@ Permanent loss: only on vehicle destruction. Free Common basics (Driver, Gunner)
 
 Comms offers clearly labeled missions each day. Most are short single-zone fights. Specials appear less often.
 
+Job unlocks (Cameron 2026-11-05: "Limit the first few jobs to simple types and unlock the rest gradually"; counts DRAFT, `T.JOB_UNLOCK_CLEARS`): the board starts with Clear and Survive only; Courier opens after 1 successful job, Hunt after 2, Retrieve after 4 and Escort after 5. Until then the board repeats unlocked types to fill its slots. Old saves unlock whatever their saved clear count allows. Night jobs (PR #79) start at 3 clears, a clear on which no new type unlocks; Core Collapse is always night whatever the type.
+
 - Standard: Clear, Survive, Hunt.
 
 - Courier: Timed route. Better time = slightly better rewards. Fail time = no/reduced rewards. Generally lower combat risk.

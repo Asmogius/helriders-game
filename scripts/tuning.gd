@@ -543,6 +543,19 @@ const WRECK_PENALTY := 0.0             # no scrap penalty: losing the rig and cr
 const PRESET_COUNT := 3
 const PRESET_NAME_MAX := 18     # characters in a preset's name
 const BOARD_SIZE := 3                  # missions on the Comms board each day
+# Job types unlock by successful jobs (record.clears; Cameron 2026-11-05: "Limit
+# the first few jobs to simple types and unlock the rest gradually"). The board
+# only offers types whose count is met; it repeats types to fill its slots.
+# Clears are already saved, so old saves unlock whatever their count allows.
+# Night (PR #79) starts at NIGHT_MIN_CLEARS = 3; nothing new unlocks on that clear.
+const JOB_UNLOCK_CLEARS := {
+	"clear": 0,      # always (taught by the tutorial)
+	"survive": 0,    # always
+	"courier": 1,    # DRAFT
+	"hunt": 2,       # DRAFT
+	"retrieve": 4,   # DRAFT (introduces Extract-style exits)
+	"escort": 5,     # DRAFT
+}
 
 # Garage upgrade tracks: 3 levels each, bought with scrap.
 const UPGRADES := {
