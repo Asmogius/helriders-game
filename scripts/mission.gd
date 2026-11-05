@@ -165,6 +165,7 @@ var _rig_calls_made := 0
 var _empty_warned := false
 # Escort: the salvage truck, its sites and the driver's optional detour.
 var truck: FriendlyTruck
+var truck_alert := false   # the low-HP warning is up
 var optional_site := Vector2.INF
 var optional_offered := false
 var optional_taken := false
@@ -1893,6 +1894,28 @@ func _on_optional_choice(yes: bool) -> void:
 	hud.banner("DETOUR  -  THE TRUCK'S HEADING FOR IT", T.COL_ORANGE, 2.0)
 
 
+## The Escort truck's HP share (0..1): what's left before it's wrecked.
+func truck_hp_ratio() -> float:
+	if truck == null or truck.is_wrecked:
+		return 0.0
+	return clampf(truck.hp / maxf(truck.hp_max, 1.0), 0.0, 1.0)
+
+
+## Escort: a pulsing warning while the truck's HP is low (playtest 15: it
+## went from "65%" to wrecked with no signal).
+func _truck_warning() -> void:
+	if truck == null:
+		return
+	var low := state == State.RUNNING and not truck.is_wrecked and truck_hp_ratio() <= T.TRUCK_LOW_WARN
+	if low and not truck_alert:
+		truck_alert = true
+		hud.set_alert("TRUCK HP LOW  -  GET BACK TO IT")
+		camera.shake(0.2)
+	elif not low and truck_alert:
+		truck_alert = false
+		hud.set_alert("")
+
+
 ## The Escort truck's stat sheet at `skull_level`.
 static func truck_sheet(skull_level: int) -> Dictionary:
 	var mult := float(T.ENEMY_DAMAGE_BY_SKULL[clampi(skull_level, 1, 6) - 1])
@@ -1951,6 +1974,7 @@ func _refresh_hud() -> void:
 	for i in vehicle.abilities.size():
 		hud.set_ability_charge(i, vehicle.ability_charge(i))
 	hud.set_status_text(_status_line())
+	_truck_warning()
 	hud.set_lock_state(vehicle.lock_enabled, vehicle.lock_target != null)
 	_refresh_threats()
 
@@ -2019,9 +2043,12 @@ func _status_line() -> String:
 		"escort":
 			if truck == null:
 				return "ESCORT" + tail
-			var hp := roundi(truck.armor / truck.armor_max * 100.0)
+			# HP, not armor + HP: armor sits on four facings, so the old total kept
+			# counting an untouched side and read 65% when the truck was one bite
+			# from a wreck (playtest 15).
+			var hp := roundi(truck_hp_ratio() * 100.0)
 			var site := "SALVAGING %ds" % ceili(truck.work_left) if truck.working else "DRIVING"
-			return "ESCORT  SITE %d / %d   %s   TRUCK %d%%" % [mini(truck.site_index + 1, truck.sites.size()), truck.sites.size(), site, hp] + tail
+			return "ESCORT  SITE %d / %d   %s   TRUCK HP %d%%" % [mini(truck.site_index + 1, truck.sites.size()), truck.sites.size(), site, hp] + tail
 	return "CLEAR  %d / %d" % [kills, target_kills] + tail
 
 
@@ -2121,6 +2148,8 @@ func _on_status_started(k: int) -> void:
 	profile.discover("hazards", "status_" + str(STATUS_IDS[k]))
 	if k == StatusBars.GOOP:
 		hazards.mark(vehicle)
+		# Say what it means (playtest 15: an unexplained GOOPED tag).
+		hud.banner("GOOPED!  ZOMBIES NEARBY RUSH YOU", T.STATUS_COLORS[StatusBars.GOOP], 2.5)
 
 
 ## A scrap crate at `at` (a Tank's), scaled like other caches.

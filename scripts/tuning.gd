@@ -517,6 +517,8 @@ const TRUCK := {
 	"lock_range": 0.0,
 }
 const COL_TRUCK := Color(0.45, 0.85, 0.5)
+const COL_TRUCK_BODY := Color(0.56, 0.62, 0.44)   # lighter than the street so it reads (playtest 15)
+const TRUCK_LOW_WARN := 0.35   # HUD warns (pulsing) when the truck's HP drops to this share
 
 # Oil (the Scrapper's slicks and your Oil Slick utility): rigs on it keep
 # SLIME_GRIP, zombies in it move at OIL_ZOMBIE_SPEED.

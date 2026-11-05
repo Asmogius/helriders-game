@@ -142,6 +142,8 @@ func _steer(delta: float) -> void:
 		var chase: Node2D = target
 		if baited and zombie.position.distance_squared_to(bait.position) < mark_range2:
 			chase = bait
+		elif marked and zombie.position.distance_squared_to(player_goal) < mark_range2:
+			chase = target   # GOOPED you: the frenzied horde nearby rushes you, not the Escort truck
 		elif alt and zombie.position.distance_squared_to(alt_target.position) < zombie.position.distance_squared_to(player_goal):
 			chase = alt_target
 		var goal := chase.position

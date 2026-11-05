@@ -1083,6 +1083,9 @@ class StatusStrip extends Control:
 	var build := PackedFloat32Array([0, 0, 0, 0, 0, 0])
 	var left := PackedFloat32Array([0, 0, 0, 0, 0, 0])
 	var showing := false
+	## Short "what it does" tags (numbers in tuning.gd).
+	const HINTS := {"BURNING": "fire damage", "CORRODED": "takes more damage", "TOXIC": "HP drain",
+		"GOOPED": "zombies rush you"}
 
 	func set_values(new_build: PackedFloat32Array, new_left: PackedFloat32Array) -> void:
 		var changed := false
@@ -1112,7 +1115,10 @@ class StatusStrip extends Control:
 			var tx := 76.0
 			if _icons.draw(self, str(UI.STATUS_ICONS[k]), Rect2(74, y - 2, 12, 12), c if on else Color(c, 0.7)):
 				tx = 90.0
-			draw_string(font, Vector2(tx, y + 8), str(T.STATUS_NAMES[k]), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, c if on else Color(c, 0.7))
+			var label := str(T.STATUS_NAMES[k])
+			if on and HINTS.has(label):
+				label += "  " + str(HINTS[label])   # what it does, while it's on
+			draw_string(font, Vector2(tx, y + 8), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, c if on else Color(c, 0.7))
 			y += 13.0
 
 
