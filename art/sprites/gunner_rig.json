@@ -672,5 +672,8 @@
  "layers": {},
  "defaults": [],
  "sheet": "gunner_rig.png",
- "composite": "gunner_rig.png"
+ "composite": "gunner_rig.png",
+ "lights": {
+  "sheet": "gunner_rig__lights.png"
+ }
 }

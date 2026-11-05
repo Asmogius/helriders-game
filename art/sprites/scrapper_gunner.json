@@ -1483,5 +1483,23 @@
  "defaults": [],
  "sheet": "scrapper_gunner__core.png",
  "composite": "scrapper_gunner.png",
+ "lights": {
+  "sheet": "scrapper_gunner__lights.png"
+ },
+ "shadow": {
+  "sheet": "scrapper_gunner__shadow.png",
+  "frame_w": 112,
+  "frame_h": 112,
+  "alpha": 0.82,
+  "sun": [
+   -0.45,
+   -0.55,
+   0.7
+  ],
+  "dir": [
+   0.643,
+   0.786
+  ]
+ },
  "burnt": "scrapper_gunner__chassis_burnt.png"
 }
