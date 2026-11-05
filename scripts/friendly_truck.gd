@@ -61,6 +61,7 @@ func _physics_process(delta: float) -> void:
 
 
 func _think(delta: float) -> void:
+	queue_redraw()   # the ring pulses
 	drive_input = Vector2.ZERO
 	if is_done():
 		return
@@ -106,7 +107,13 @@ func _think(delta: float) -> void:
 func _draw() -> void:
 	var half_l := body_len * 0.5
 	var half_w := body_wid * 0.5
-	var body := Color(0.32, 0.36, 0.28)
+	var body := T.COL_TRUCK_BODY
+	if not is_wrecked:
+		# Readability (playtest 15): a pulsing friendly-green ring on the ground
+		# and a bright outline, so the truck stands out on a dark street.
+		var pulse := 0.5 + 0.5 * sin(float(Time.get_ticks_msec()) * 0.005)
+		draw_arc(Vector2.ZERO, half_l + 12.0, 0.0, TAU, 40, Color(T.COL_TRUCK, 0.35 + 0.3 * pulse), 3.0)
+		draw_rect(Rect2(-half_l - 2.0, -half_w - 2.0, body_len + 4.0, body_wid + 4.0), Color(T.COL_TRUCK, 0.9), false, 2.0)
 	if is_wrecked:
 		body = Color(0.1, 0.09, 0.085)
 	elif _flash > 0.0:
