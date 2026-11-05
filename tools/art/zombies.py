@@ -3,7 +3,7 @@
 
 One humanoid voxel model (14x10x18 voxels, x = forward, y = left-right,
 z = up), posed per frame, rendered with voxel_render.render_frame at the same
-30 deg tilt, 1 px per voxel, near-black outline and 3-step shading as the rigs.
+45 deg tilt, 1 px per voxel, near-black outline and 3-step shading as the rigs.
 16 headings; Shambler: 4-frame shamble + 2-frame lunge + hit-flash, in 6
 clothing palettes. Tank: the same body built at ~2x with heavier proportions:
 4-frame walk, 2-frame roar (wind-up), charge, stumble, hit-flash.
@@ -19,7 +19,7 @@ from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from voxel_render import render_frame, canvas_for, write_import  # noqa: E402
+from voxel_render import render_frame, canvas_for, write_import, render_shadow, shadow_canvas, SHADOW_ALPHA  # noqa: E402
 
 OUT = os.path.join(HERE, "..", "..", "art", "zombies")
 HEADINGS = 16
@@ -49,6 +49,12 @@ CLOTHES = [
 EYE = (190, 60, 40)                   # dull red eyes (not enemy-rig red, no glow)
 FLASH = (240, 232, 214)               # hit-flash (whole silhouette)
 TANK_SKIN_DARK = (84, 54, 50)
+# Ebbtide "dark mass" grade (Cameron 2026-11-04: zombies read as one dark mass):
+# applied to the rendered frames (not the palette), so tuning.gd colours stay put.
+# Each pixel is pulled MASS_DESAT toward its own grey, then scaled by MASS_DARK.
+# Eyes and the hit-flash keep their colour so hits and faces still read.
+MASS_DESAT = 0.45
+MASS_DARK = 0.68
 SAMPLE_COLOURS = {"ZOMBIE_CLOTH_%d" % i: list(c[0]) + list(c[1]) for i, c in enumerate(CLOTHES)}
 SAMPLE_COLOURS.update({"ZOMBIE_EYE": list(EYE), "ZOMBIE_FLASH": list(FLASH)})
 
@@ -142,6 +148,32 @@ def flash_of(g):
     return f
 
 
+def mass_grade(f):
+    f = f.copy()
+    rgb = f[..., :3].astype(float)
+    keep = (f[..., 3] == 0) | np.all(f[..., :3] == np.array(FLASH), -1)
+    for lv in (EYE,):
+        keep |= np.all(np.abs(rgb - np.array(lv)) < 60, -1) & (rgb[..., 0] > rgb[..., 1] + 60)
+    grey = rgb.mean(-1, keepdims=True)
+    g = (grey + (rgb - grey) * (1 - MASS_DESAT)) * MASS_DARK
+    f[..., :3] = np.where(keep[..., None], f[..., :3], np.clip(g, 0, 255).astype(np.uint8))
+    return f
+
+
+def shadow_frames(grid, n_head):
+    """Baked cast shadow of one pose (walk_0), same sun as the rigs, cropped
+    symmetric about the ground point."""
+    sc = shadow_canvas(grid.shape)
+    fr = [render_shadow(grid, i * 360.0 / n_head, canvas=sc) for i in range(n_head)]
+    c = sc // 2
+    mx = my = 0
+    for f in fr:
+        ys, xs = np.nonzero(f[..., 3])
+        mx, my = max(mx, abs(xs - c).max()), max(my, abs(ys - c).max())
+    mx, my = int(mx) + 1, int(my) + 1
+    return [f[c - my:c + my, c - mx:c + mx] for f in fr], (2 * mx, 2 * my)
+
+
 def render_rows(rows, n_head, P):
     """rows: list of grids (or ('flash', grid)). Returns (frames[row][h], canvas)."""
     canvas = max(canvas_for(r.shape) for r in rows)
@@ -152,19 +184,21 @@ def render_rows(rows, n_head, P):
             gi = np.where(g < 0, len(cols), g)
             cols = cols + [FLASH + (255,)]
             g = gi
-        out.append([render_frame(g, cols, i * 360.0 / n_head, canvas=canvas) for i in range(n_head)])
-    # Crop every frame to one tight square, symmetric about the centre (the
-    # ground point stays the frame centre).
-    m = 0
+        out.append([mass_grade(render_frame(g, cols, i * 360.0 / n_head, canvas=canvas)) for i in range(n_head)])
+    # Crop every frame to one tight rectangle, symmetric about the centre (the
+    # ground point stays the frame centre). Not square: at the 45 deg tilt a
+    # standing body is taller than it is wide, and squares overflow 2048 px.
+    mx = my = 0
     c = canvas // 2
     for row in out:
         for f in row:
             ys, xs = np.nonzero(f[..., 3])
             if len(xs):
-                m = max(m, abs(xs - c).max(), abs(ys - c).max())
-    m = int(m) + 1
-    out = [[f[c - m:c + m, c - m:c + m] for f in row] for row in out]
-    return out, int(2 * m)
+                mx = max(mx, abs(xs - c).max())
+                my = max(my, abs(ys - c).max())
+    mx, my = int(mx) + 1, int(my) + 1
+    out = [[f[c - my:c + my, c - mx:c + mx] for f in row] for row in out]
+    return out, (int(2 * mx), int(2 * my))
 
 
 def build():
@@ -180,6 +214,7 @@ def build():
     sh_rows.append(flash_of(humanoid(P, SH_SCALE, ZOMBIE, ZOMBIE_DARK, *CLOTHES[0], "walk", 0))); names.append("flash")
     fr, cv = render_rows(sh_rows, HEADINGS, P)
     blocks.append(("shambler", fr, cv, names, len(CLOTHES)))
+    shadows = [("shambler",) + shadow_frames(np.abs(sh_rows[0]), HEADINGS)]
     # Tank: ~2x, heavy
     P = Pal()
     t_rows, tn = [], []
@@ -193,33 +228,45 @@ def build():
     t_rows.append(flash_of(t_rows[0])); tn.append("flash")
     fr, cv = render_rows(t_rows, HEADINGS, P)
     blocks.append(("tank", fr, cv, tn, 1))
+    shadows.append(("tank",) + shadow_frames(np.abs(t_rows[0]), HEADINGS))
     # Pack: each row is a strip of 16 headings; strips fill two columns so the
     # atlas stays under 2048 px both ways (safe for GLES3 phones).
     Wd = 2048
     placed, y = [], 0
-    for kind, fr, cv, names, variants in blocks:
+    for kind, fr, (cv, chh), names, variants in blocks:
         cols = max(1, Wd // (cv * HEADINGS))
         per_col = math.ceil(len(fr) / cols)
         rows = {}
         for r in range(len(fr)):
             c, rr = divmod(r, per_col)
-            rows[names[r]] = [c * cv * HEADINGS, y + rr * cv]
-        placed.append((kind, fr, cv, names, variants, rows))
-        y += per_col * cv
+            rows[names[r]] = [c * cv * HEADINGS, y + rr * chh]
+        placed.append((kind, fr, (cv, chh), names, variants, rows))
+        y += per_col * chh
+    # Shadow strips (one per kind, 16 headings) under the body strips.
+    shadow_at = {}
+    for kind, sfr, (sw, shh) in shadows:
+        assert sw * HEADINGS <= Wd, (kind, sw)
+        shadow_at[kind] = (0, y, sw, shh, sfr)
+        y += shh
     Ht = y
-    Wd = max(r[0] + cv * HEADINGS for _, _, cv, _, _, rows in placed for r in rows.values())
+    Wd = max(r[0] + cv[0] * HEADINGS for _, _, cv, _, _, rows in placed for r in rows.values())
     assert Wd <= 2048 and Ht <= 2048, (Wd, Ht)
     atlas = Image.new("RGBA", (Wd, Ht))
     meta = {"texture": "zombies.png", "headings": HEADINGS, "kinds": {}, "sample_colours": SAMPLE_COLOURS}
-    for kind, fr, cv, names, variants, rows in placed:
+    for kind, fr, (cv, chh), names, variants, rows in placed:
         for r, row in enumerate(fr):
             x0, y0 = rows[names[r]]
             for h, img in enumerate(row):
                 atlas.paste(Image.fromarray(img), (x0 + h * cv, y0))
-        meta["kinds"][kind] = {"frame_w": cv, "frame_h": cv, "rows": rows, "variants": variants}
+        meta["kinds"][kind] = {"frame_w": cv, "frame_h": chh, "rows": rows, "variants": variants}
         for n, (x0, y0) in rows.items():   # P0 art_atlas.gd regions: "<kind>/<row>/<heading>"
             for h in range(HEADINGS):
-                meta.setdefault("regions", {})["%s/%s/%d" % (kind, n, h)] = [x0 + h * cv, y0, cv, cv]
+                meta.setdefault("regions", {})["%s/%s/%d" % (kind, n, h)] = [x0 + h * cv, y0, cv, chh]
+    for kind, (x0, y0, sw, shh, sfr) in shadow_at.items():
+        for h, img in enumerate(sfr):
+            atlas.paste(Image.fromarray(img), (x0 + h * sw, y0))
+            meta["regions"]["%s/shadow/%d" % (kind, h)] = [x0 + h * sw, y0, sw, shh]
+        meta["kinds"][kind]["shadow"] = {"frame_w": sw, "frame_h": shh, "alpha": SHADOW_ALPHA}
     os.makedirs(OUT, exist_ok=True)
     p = os.path.join(OUT, "zombies.png")
     atlas.save(p)
