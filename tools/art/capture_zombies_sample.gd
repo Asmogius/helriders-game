@@ -1,7 +1,7 @@
 extends SceneTree
 ## V3 style sample capture (needs a display; not headless):
 ##   xvfb-run -s "-screen 0 1280x720x24" godot --path . -s res://tools/art/capture_zombies_sample.gd -- out.png [before]
-## In the mission scene: a ring of Shamblers (all 6 clothing variants, walking
+## In the mission scene: a ring of Shamblers (the 3 clothing variants, walking
 ## toward the rig, two in the lunge pose, one hit-flashing) and three Tanks
 ## (walking, roaring in the wind-up, charging). "before": the code-drawn look.
 

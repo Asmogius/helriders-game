@@ -313,6 +313,8 @@ const ArtAtlas := preload("res://scripts/art_atlas.gd")   # P0 atlas loader
 const ZOMBIE_ATLAS := "res://art/zombies/zombies"         # .png + .json
 const ART_META := &"zombie_art"   # root meta: {"meta": kinds / poses / variants, "atlas": regions "<kind>/<row>/<heading>"}
 var art_pose_override := ""      # captures and tests: force a pose row (e.g. "lunge_1")
+var art_variant := -1            # <0: instance id; else shambler look, wrapped into the sheet
+var highlight := false           # Training Run (#89): pale disc + warm ring under the body
 var _art_t := 0.0                # walk cycle phase, advanced by distance walked
 var _art_last := Vector2.ZERO
 var _art_key := -1
@@ -369,9 +371,16 @@ func art_row() -> String:
 	if art_pose_override != "":
 		pose = art_pose_override
 	if kind == "shambler" and pose != "flash":
-		var info: Dictionary = art_atlas().kinds.shambler
-		return "v%d_%s" % [get_instance_id() % int(info.variants), pose]   # no RNG: seeded spawns stay put
+		return "v%d_%s" % [_shambler_variant(), pose]   # no RNG: seeded spawns stay put
 	return pose
+
+
+## Shambler look 0..variants-1. A stored index of 3-5 (the old 6-look sheet) wraps.
+func _shambler_variant() -> int:
+	var info: Dictionary = art_atlas().kinds.shambler
+	var n := maxi(int(info.get("variants", 1)), 1)
+	var i := art_variant if art_variant >= 0 else get_instance_id()
+	return posmod(i, n)
 
 
 ## The frame art_row() would pick, as a small int (0-9), so _process can tell
@@ -428,6 +437,18 @@ func _draw_art() -> void:
 
 
 func _draw() -> void:
+	if highlight:
+		# Training Run readability (#89): pale ground disc and warm ring. Colours
+		# match COL_TUTORIAL_ZOMBIE_GLOW / _RING when that pass is on main; the
+		# literals are the same values so this still draws if the constants
+		# have not landed. Real jobs leave highlight false.
+		var marks: Dictionary = (T as Script).get_script_constant_map()
+		var glow_v: Variant = marks.get("COL_TUTORIAL_ZOMBIE_GLOW", Color(0.95, 0.88, 0.7, 0.28))
+		var ring_v: Variant = marks.get("COL_TUTORIAL_ZOMBIE_RING", Color(1.0, 0.82, 0.45, 0.9))
+		var glow: Color = glow_v if glow_v is Color else Color(0.95, 0.88, 0.7, 0.28)
+		var ring: Color = ring_v if ring_v is Color else Color(1.0, 0.82, 0.45, 0.9)
+		draw_circle(Vector2.ZERO, radius + 9.0, glow)
+		draw_arc(Vector2.ZERO, radius + 9.0, 0.0, TAU, 20, ring, 2.0)
 	if has_art():
 		_draw_art()
 		draw_status(radius + 4.0)
