@@ -248,6 +248,10 @@ func _ready() -> void:
 		var dice := RandomNumberGenerator.new()
 		dice.seed = 7
 		vehicle.set_crew([Crew.make("driver", "Common", dice), Crew.make("gunner", "Common", dice)])
+		# Readability for first-timers (playtest 06/07): a brighter street and
+		# ringed zombies, so the "point at a zombie" step is obvious.
+		arena.modulate = T.COL_TUTORIAL_GRADE
+		zombies.highlight = true
 	else:
 		var loadout: Dictionary = profile.rig if profile.has_rig() else Parts.STARTER_LOADOUT
 		vehicle.apply_stats(profile.build_stats(loadout))
