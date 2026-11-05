@@ -19,6 +19,7 @@ var nav: NavGrid
 var hazards: GroundHazards
 var mix := {}                            # kind -> share of each pack (set_mix)
 var tanks_left := 0                      # Tanks still to come this job
+var highlight := false                   # Training Run: zombies get a bright ring so new players see them
 var alt_target: Node2D                   # Escort: the truck; each zombie goes for the nearer one
 var bait: Node2D                         # a GOOPED enemy rig (proposal 01): zombies near it go for it
 var bait_left := 0.0
@@ -237,6 +238,7 @@ func spawn_at(at: Vector2, kind := "shambler") -> Zombie:
 		if not candidate.active:
 			candidate.activate(at, kind)
 			candidate.damage_mult = damage_mult
+			candidate.highlight = highlight
 			_active.append(candidate)
 			return candidate
 	return null

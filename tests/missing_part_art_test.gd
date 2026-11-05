@@ -51,7 +51,7 @@ func _run() -> void:
 	for id: String in ["raider_frame", "hauler_frame"]:
 		check(Vehicle.art_path(id) != "", id + ": has a sheet")
 		var m := _meta(id)
-		check(m.get("directions", 0) == 32 and float(m.get("tilt_deg", 0)) == 30.0, id + ": 32 headings at 30 deg")
+		check(m.get("directions", 0) == 32 and float(m.get("tilt_deg", 0)) == 45.0, id + ": 32 headings at 45 deg")
 		for p in ["mount_a", "mount_b", "turret_mount", "nose_mount", "engine_mount", "ground_centre"]:
 			check((m.get("points", {}) as Dictionary).has(p), id + ": point " + p)
 		var v := _rig({"chassis": id})

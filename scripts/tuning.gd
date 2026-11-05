@@ -70,6 +70,11 @@ const COL_OB_PAVE := Color(0.36, 0.35, 0.33)            # sidewalk slabs (tiles.
 const COL_OB_SIDING := Color(0.45, 0.43, 0.38)          # house siding (buildings.py)
 const COL_OB_ROOF := Color(0.3, 0.25, 0.23)             # shingles (buildings.py)
 const COL_OB_GRADE := Color(1.0, 0.96, 0.88)            # warm colour grade, a modulate (arena.gd)
+# Training Run readability (playtest 06/07): the arena is lifted (a modulate
+# over 1 brightens; fine under gl_compatibility) and zombies get a pale disc.
+const COL_TUTORIAL_GRADE := Color(1.75, 1.7, 1.6)
+const COL_TUTORIAL_ZOMBIE_GLOW := Color(0.95, 0.88, 0.7, 0.28)
+const COL_TUTORIAL_ZOMBIE_RING := Color(1.0, 0.82, 0.45, 0.9)
 const COL_OB_MOTE := Color(0.86, 0.82, 0.62, 0.55)      # seed fluff motes (map_ambient.gd)
 
 # P2 Effects: explosions and tracers (V4.3/V4.4; PR #33). Additive lights.
@@ -90,9 +95,10 @@ const COL_GARAGE_FLOOR_LINE := Color(0.471, 0.408, 0.235)# painted bay lines (12
 const COL_GARAGE_OIL := Color(0.094, 0.09, 0.094)       # oil stains on the slab (24, 23, 24)
 const COL_GARAGE_PEGBOARD := Color(0.29, 0.235, 0.173)  # tool pegboard (74, 60, 44)
 const COL_GARAGE_WALL := Color(0.18, 0.188, 0.204)      # corrugated back wall (46, 48, 52)
-# The world-only night tint (#512b11), shared by every scene incl. the garage; FX stay unmodulated.
-const COL_NIGHT_WORLD := Color(0.318, 0.169, 0.067)
-const COL_GARAGE_STREET_NIGHT := COL_NIGHT_WORLD # street past the roll-up door (#512b11; was cool blue 30,34,44)
+# World-only night tint (#2a3550). Cooler and bluer than the old warm brown.
+# Lights, fire and the HUD stay untinted. Maps reads the same hex.
+const COL_NIGHT_WORLD := Color8(0x2a, 0x35, 0x50)
+const COL_GARAGE_STREET_NIGHT := COL_NIGHT_WORLD # street past the roll-up door (#2a3550)
 const COL_GARAGE_GAS_RED := Color(0.431, 0.157, 0.133)  # welding gas cylinders (110, 40, 34)
 const COL_GARAGE_DUST := Color(0.9, 0.88, 0.8)          # drifting dust motes, drawn at alpha 0.02-0.18 (230, 224, 204; garage_ambient.gd)
 const COL_GARAGE_SPARK := Color(1.0, 0.85, 0.5)         # weld sparks, alpha fades with life (255, 217, 128; garage_ambient.gd)
