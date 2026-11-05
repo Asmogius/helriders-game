@@ -60,6 +60,9 @@ So nobody is blocked, assume these; the owner can overrule any of them:
 Owner-approved look for HUD and menus (phase 0 palette; full restyle still V6.4+):
 - **Charcoal panels:** `#181d20` / `#24292f`, deepest `#131311`, warm header strip `#1e1b14`. Constants: `T.COL_UI_*` in `tuning.gd`, aliased in `ui_theme.gd`.
 - **One UI accent:** gold `#e1b441` (`COL_UI_ACCENT`). Cyan stays only for the player and world FX (`COL_CYAN`).
+- **Buttons:** `UI.primary()` (filled gold, dark text) for DEPLOY / LEVEL UP / EQUIP / TAKE; `UI.ghost()` outline for the rest.
+- **Ability rings:** gold when ready, dim grey on cooldown; icons distinguish abilities (no per-ability accent colours).
+- **Fight HP bar:** light text-colour segments (`#ccc8bc`), danger text when low — kept off the gold accent so chrome stays one colour.
 - **Fonts:** Black Ops One for titles and big numbers; a clean OFL body sans (Inter) for body text (separate PR).
 - **Rarity:** keep coloured borders (Common grey, Uncommon green, Rare blue, Epic purple, Legendary orange-leaning gold `#ff9a2a` distinct from accent gold, Mythic red).
 - **Transitions:** only the garage→fight push-in plus fade (do not expand scope).

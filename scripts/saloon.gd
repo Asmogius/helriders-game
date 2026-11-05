@@ -39,7 +39,7 @@ func _ready() -> void:
 	_title = UI.label("", 30, T.COL_UI_ACCENT)
 	_title.position = Vector2(24, 14)
 	add_child(_title)
-	_info = UI.label("", 22, T.COL_ORANGE)
+	_info = UI.label("", 22, T.COL_UI_ACCENT)
 	_info.position = Vector2(24, 54)
 	add_child(_info)
 
@@ -69,7 +69,7 @@ func _ready() -> void:
 	_hire.text = "HIRE"
 	_hire.focus_mode = Control.FOCUS_NONE
 	_hire.custom_minimum_size = Vector2(220, 0)
-	UI.accent(_hire, T.COL_ORANGE)
+	UI.primary(_hire)
 	_hire.pressed.connect(hire_selected)
 	bar.add_child(_hire)
 
@@ -118,7 +118,7 @@ func refresh() -> void:
 		var price := profile.hire_price(m)
 		if bool(m.get("rehire", false)):
 			card.status = "BACK  %d SCRAP" % price
-			card.status_color = T.COL_ORANGE if price <= profile.scrap else UI.BAD
+			card.status_color = T.COL_UI_ACCENT if price <= profile.scrap else UI.BAD
 		elif bool(m.get("hired", false)):
 			card.status = "HIRED"
 			card.status_color = T.COL_UI_ACCENT
@@ -128,7 +128,7 @@ func refresh() -> void:
 			card.status_color = UI.GOOD
 		else:
 			card.status = "%d SCRAP" % price
-			card.status_color = T.COL_ORANGE if price <= profile.scrap else UI.BAD
+			card.status_color = T.COL_UI_ACCENT if price <= profile.scrap else UI.BAD
 		card.pressed.connect(select.bind(i))
 		_cards.add_child(card)
 	var reason := _block(selected)

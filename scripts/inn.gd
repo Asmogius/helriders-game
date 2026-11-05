@@ -62,7 +62,7 @@ func _ready() -> void:
 	bar.add_theme_constant_override("separation", 10)
 	add_child(bar)
 	_perk = _button("PICK PERK", 190)
-	UI.accent(_perk, T.COL_ORANGE)
+	UI.primary(_perk)
 	_perk.pressed.connect(open_perk_picker)
 	bar.add_child(_perk)
 	_dismiss = _button("DISMISS", 170)
@@ -104,13 +104,13 @@ func _ready() -> void:
 	bottom.offset_bottom = -12.0
 	bottom.add_theme_constant_override("separation", 10)
 	add_child(bottom)
-	_away = UI.label("", 18, T.COL_ORANGE)
+	_away = UI.label("", 18, T.COL_UI_ACCENT)
 	_away.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_away.clip_text = true
 	_away.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	bottom.add_child(_away)
 	var exp_button := _button("EXPEDITIONS", 220)
-	UI.accent(exp_button, T.COL_ORANGE)
+	UI.primary(exp_button)
 	exp_button.pressed.connect(open_expeditions)
 	bottom.add_child(exp_button)
 	var up_button := _button("UPGRADES", 170)
@@ -184,7 +184,7 @@ func _status(card: CrewCard, m: Dictionary) -> void:
 		card.status_color = T.COL_UI_ACCENT
 	elif profile.is_away(m):
 		card.status = "AWAY  -  %s" % _days_left_text(m)
-		card.status_color = T.COL_ORANGE
+		card.status_color = T.COL_UI_ACCENT
 		card.dim = true
 	elif profile.is_resting(m):
 		card.status = "INJURED  -  RESTING %d DAY%s" % [int(m.rest), "" if int(m.rest) == 1 else "S"]
@@ -268,7 +268,7 @@ func open_perk_picker() -> bool:
 	bg.color = Color(0.075, 0.075, 0.085, 0.97)
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_picker.add_child(bg)
-	var title := UI.label("%s  -  PICK A PERK" % str(m.name).to_upper(), 30, T.COL_ORANGE)
+	var title := UI.label("%s  -  PICK A PERK" % str(m.name).to_upper(), 30, T.COL_UI_ACCENT)
 	title.position = Vector2(24, 14)
 	_picker.add_child(title)
 	var sub := "Level %d %s %s %s. Pick 1 of 3; you keep it for good." % [Crew.level(m), m.rarity, Crew.specialty_name(m), Crew.role_name(m)]
@@ -305,7 +305,7 @@ func _perk_card(m: Dictionary, perk: String, card_size: Vector2) -> Button:
 	var shared := Crew.SHARED_PERKS.has(perk)
 	UI.rarity_frame(card, UI.perk_rarity(_perk_tier(m, perk)))   # V1.3: perk tier colours
 	var parts: Array = [
-		[Crew.perk_name(perk).to_upper(), 26, T.COL_ORANGE],
+		[Crew.perk_name(perk).to_upper(), 26, T.COL_UI_ACCENT],
 		["ANY CLASS" if shared else "%s PERK" % Crew.role_name(m).to_upper(), 15, UI.TEXT_DIM if shared else Crew.role_color(m)],
 		[Crew.perk_text(perk), 21, UI.TEXT],
 	]
@@ -403,7 +403,7 @@ func _fill_expeditions() -> void:
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	bg.mouse_filter = Control.MOUSE_FILTER_STOP
 	_expeditions.add_child(bg)
-	var title := UI.label("EXPEDITIONS   -   DAY %d" % profile.day, 30, T.COL_ORANGE)
+	var title := UI.label("EXPEDITIONS   -   DAY %d" % profile.day, 30, T.COL_UI_ACCENT)
 	title.position = Vector2(24, 14)
 	_expeditions.add_child(title)
 	var close := _button("CLOSE", 140)
@@ -469,14 +469,14 @@ func _fill_expeditions() -> void:
 	right.add_child(odds_label)
 	var send := _button("SEND", 0)
 	send.custom_minimum_size = Vector2(0, 58)
-	UI.accent(send, T.COL_ORANGE)
+	UI.primary(send)
 	send.pressed.connect(send_selected)
 	right.add_child(send)
 	if trip >= 0 and trip < profile.exp_board.size():
 		var e: Dictionary = profile.exp_board[trip]
 		var odds := profile.expedition_odds(e, team)
 		odds_label.text = "TEAM LEVEL  %d  /  %d recommended      ODDS  %d%%" % [profile.team_level(team), ProfileScript.recommended_level(e), roundi(odds * 100.0)]
-		odds_label.add_theme_color_override("font_color", UI.GOOD if odds >= T.EXPEDITION_ODDS else (T.COL_ORANGE if odds >= 0.4 else UI.BAD))
+		odds_label.add_theme_color_override("font_color", UI.GOOD if odds >= T.EXPEDITION_ODDS else (T.COL_UI_ACCENT if odds >= 0.4 else UI.BAD))
 	var block := profile.send_block(trip, team)
 	send.disabled = block != ""
 	send.text = "SEND" if block == "" else block
@@ -506,7 +506,7 @@ func _trip_card(i: int) -> Button:
 	var extra := "SENT" if bool(e.taken) else ""
 	if str(e.bonus) != "":
 		extra = ("%s    " % extra if extra != "" else "") + "%s CHANCE %d%%" % [str(e.bonus).to_upper(), roundi(ProfileScript.bonus_chance(e) * 100.0)]
-	box.add_child(UI.label(extra, 17, T.COL_ORANGE if not bool(e.taken) else UI.TEXT_DIM))
+	box.add_child(UI.label(extra, 17, T.COL_UI_ACCENT if not bool(e.taken) else UI.TEXT_DIM))
 	return card
 
 

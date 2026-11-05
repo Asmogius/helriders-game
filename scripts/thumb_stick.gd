@@ -137,7 +137,7 @@ func _draw_rest(at: Vector2, accent: Color) -> void:
 
 func _draw() -> void:
 	var size := get_viewport_rect().size
-	var accent := T.COL_UI_ACCENT if left_side else T.COL_ORANGE
+	var accent := T.COL_UI_ACCENT
 	if _touch == -1:
 		if not enabled:
 			return

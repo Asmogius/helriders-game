@@ -136,13 +136,35 @@ static func box(fill: Color, border: Color, width: int) -> StyleBoxFlat:
 	return b
 
 
-## An accent button (Deploy / primary): gold border on a warm dark fill.
-## Pass T.COL_UI_ACCENT (or ACCENT) for the Ebbtide primary look.
+## Gold outline accent (tabs, selected rows). Prefer primary()/ghost() for actions.
 static func accent(button: Button, color: Color = ACCENT) -> void:
-	button.add_theme_stylebox_override("normal", box(HEADER, color, 3))
-	button.add_theme_stylebox_override("hover", box(Color(HEADER.r * 1.15, HEADER.g * 1.15, HEADER.b * 1.1, 1.0), ACCENT_HOVER if color == ACCENT else color.lightened(0.1), 3))
-	button.add_theme_stylebox_override("pressed", box(Color(0.20, 0.16, 0.10), color, 3))
-	button.add_theme_color_override("font_color", color.lightened(0.25))
+	button.add_theme_stylebox_override("normal", box(HEADER, color, 2))
+	button.add_theme_stylebox_override("hover", box(Color(HEADER.r * 1.15, HEADER.g * 1.15, HEADER.b * 1.1, 1.0), ACCENT_HOVER if color == ACCENT else color.lightened(0.1), 2))
+	button.add_theme_stylebox_override("pressed", box(Color(0.20, 0.16, 0.10), color, 2))
+	button.add_theme_color_override("font_color", color.lightened(0.2))
+
+
+## Primary action (DEPLOY / LEVEL UP / EQUIP / TAKE): filled gold, dark text.
+static func primary(button: Button) -> void:
+	var fill := ACCENT
+	var hover := ACCENT_HOVER
+	var pressed := Color(0.75, 0.58, 0.18)
+	var ink := PANEL_DEEP   # dark text on gold
+	button.add_theme_stylebox_override("normal", box(fill, fill, 0))
+	button.add_theme_stylebox_override("hover", box(hover, hover, 0))
+	button.add_theme_stylebox_override("pressed", box(pressed, pressed, 0))
+	button.add_theme_color_override("font_color", ink)
+	button.add_theme_color_override("font_hover_color", ink)
+	button.add_theme_color_override("font_pressed_color", ink)
+
+
+## Secondary / ghost action: charcoal fill, gold hairline, light text.
+static func ghost(button: Button) -> void:
+	button.add_theme_stylebox_override("normal", box(PANEL_ALT, PANEL_EDGE, 2))
+	button.add_theme_stylebox_override("hover", box(HEADER, ACCENT, 2))
+	button.add_theme_stylebox_override("pressed", box(PANEL_DEEP, ACCENT, 2))
+	button.add_theme_color_override("font_color", TEXT)
+	button.add_theme_color_override("font_hover_color", ACCENT_HOVER)
 
 
 static func label(text: String, size := 22, color := TEXT) -> Label:

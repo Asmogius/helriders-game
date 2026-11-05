@@ -52,7 +52,7 @@ func _ready() -> void:
 	_title = UI.label("", 30, T.COL_UI_ACCENT)
 	_title.position = Vector2(24, 14)
 	add_child(_title)
-	_info = UI.label("", 22, T.COL_ORANGE)
+	_info = UI.label("", 22, T.COL_UI_ACCENT)
 	_info.position = Vector2(24, 54)
 	add_child(_info)
 
@@ -119,7 +119,7 @@ func _ready() -> void:
 	column.add_child(_note)
 	_level_up = _button("LEVEL UP", 0)
 	_level_up.custom_minimum_size = Vector2(0, 58)
-	UI.accent(_level_up, T.COL_ORANGE)
+	UI.primary(_level_up)
 	_level_up.pressed.connect(level_selected)
 	column.add_child(_level_up)
 
@@ -233,7 +233,7 @@ func _make_row(id: String) -> Button:
 		color = UI.GOOD
 	else:
 		status = "NEXT  %d" % cost
-		color = T.COL_ORANGE if cost <= profile.scrap else UI.BAD
+		color = T.COL_UI_ACCENT if cost <= profile.scrap else UI.BAD
 	var st := UI.label(status, 15, color)
 	st.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	right.add_child(st)
@@ -351,10 +351,10 @@ func _build_rig_view() -> void:
 	column.add_theme_constant_override("separation", int(GAP))
 	_rig_view.add_child(column)
 	var head := HBoxContainer.new()
-	var title := UI.label("RIG UPGRADES", 30, T.COL_ORANGE)
+	var title := UI.label("RIG UPGRADES", 30, T.COL_UI_ACCENT)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(title)
-	_rig_scrap = UI.label("", 26, T.COL_ORANGE)
+	_rig_scrap = UI.label("", 26, T.COL_UI_ACCENT)
 	head.add_child(_rig_scrap)
 	column.add_child(head)
 	_rig_rows = VBoxContainer.new()
@@ -411,7 +411,7 @@ func refresh_rig() -> void:
 		buy.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		buy.disabled = cost < 0 or cost > profile.scrap
 		if not buy.disabled:
-			UI.accent(buy, T.COL_ORANGE)
+			UI.primary(buy)
 		buy.pressed.connect(buy_rig_upgrade.bind(key))
 		row.add_child(buy)
 		_rig_rows.add_child(row)
@@ -451,14 +451,14 @@ func open_upgrades() -> void:
 	column.add_theme_constant_override("separation", 14)
 	panel.add_child(column)
 	var head := HBoxContainer.new()
-	var title := UI.label("RESEARCH UPGRADES", 28, T.COL_ORANGE)
+	var title := UI.label("RESEARCH UPGRADES", 28, T.COL_UI_ACCENT)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(title)
 	var close := _button("CLOSE", 120)
 	close.pressed.connect(close_upgrades)
 	head.add_child(close)
 	column.add_child(head)
-	column.add_child(UI.label("Scrap  %d" % profile.scrap, 22, T.COL_ORANGE))
+	column.add_child(UI.label("Scrap  %d" % profile.scrap, 22, T.COL_UI_ACCENT))
 	var discount := float(T.UPGRADES.research_discount.per_level) * profile.upgrade_level("research_discount")
 	var effects := {
 		"research_discount": "Levels cost %d%% less" % roundi(discount * 100.0),

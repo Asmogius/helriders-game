@@ -152,7 +152,7 @@ func _main_page() -> void:
 	_title("PAUSED" if in_job else "MENU")
 	if in_job:
 		_button("RESUME", resume, T.COL_UI_ACCENT)
-		_button(PadScript.hint("TAP AGAIN TO RESTART THE JOB", "PRESS AGAIN TO RESTART THE JOB") if restart_armed else "RESTART JOB", restart, T.COL_ORANGE if restart_armed else Color.TRANSPARENT)
+		_button(PadScript.hint("TAP AGAIN TO RESTART THE JOB", "PRESS AGAIN TO RESTART THE JOB") if restart_armed else "RESTART JOB", restart, T.COL_UI_ACCENT if restart_armed else Color.TRANSPARENT)
 	if in_tutorial:
 		_button("LEAVE TUTORIAL", func() -> void: leave_requested.emit())
 	_button("SETTINGS", show_page.bind("settings"))
@@ -189,7 +189,7 @@ func _settings_page() -> void:
 		b.custom_minimum_size = Vector2(0, 58)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		if str(profile.settings.get("quality", "")) == q:
-			UI.accent(b, T.COL_ORANGE)
+			UI.accent(b, T.COL_UI_ACCENT)
 		b.pressed.connect(set_quality.bind(q))
 		row.add_child(b)
 	var shake := _button("SCREEN SHAKE: %s" % ("ON" if bool(profile.settings.get("shake", true)) else "OFF"), toggle_shake)
@@ -270,7 +270,7 @@ func _controller_page() -> void:
 		b.custom_minimum_size = Vector2(300, 54)
 		b.text = "PRESS A BUTTON..." if waiting == action else str(pad.call("button_name", action))
 		if waiting == action:
-			UI.accent(b, T.COL_ORANGE)
+			UI.accent(b, T.COL_UI_ACCENT)
 		b.pressed.connect(rebind.bind(action))
 		grid.add_child(b)
 		if action == _focus_action and bool(pad.get("active")):
@@ -320,7 +320,7 @@ func _database_page() -> void:
 		b.custom_minimum_size = Vector2(0, 52)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		if cat == category:
-			UI.accent(b, T.COL_ORANGE)
+			UI.accent(b, T.COL_UI_ACCENT)
 		b.pressed.connect(show_category.bind(cat))
 		tabs.add_child(b)
 	var scroll := ScrollContainer.new()

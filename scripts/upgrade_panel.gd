@@ -56,10 +56,10 @@ func rebuild() -> void:
 		_column.remove_child(c)
 		c.queue_free()
 	var head := HBoxContainer.new()
-	var title_label := UI.label(title, 28, T.COL_ORANGE)
+	var title_label := UI.label(title, 28, T.COL_UI_ACCENT)
 	title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(title_label)
-	head.add_child(UI.label("Scrap  %d    " % profile.scrap, 22, T.COL_ORANGE))
+	head.add_child(UI.label("Scrap  %d    " % profile.scrap, 22, T.COL_UI_ACCENT))
 	var close_button := _button("CLOSE", 120)
 	close_button.pressed.connect(close)
 	head.add_child(close_button)
