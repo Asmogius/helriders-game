@@ -85,9 +85,26 @@ func _process(_delta: float) -> bool:
 			if frame == 5:
 				_check(garage.tour != null and garage.tour.step == 0 and not garage.tour._next.visible, "the tour starts on the salvaged part, waiting for it to go on")
 				_check(not profile.persist and int(profile.storage.get(T.TUTORIAL_PART, 0)) == 1, "the tour runs on a sandbox copy with the part in storage")
+				# Playtest #2/#8: card sits above the footer (not over ARMOR FRONT) and names weight/overload.
+				var tour_r: Rect2 = garage.tour.get_global_rect()
+				var front_r: Rect2 = garage._tags[3].get_global_rect() if garage._tags.size() > 3 else Rect2()
+				_check(tour_r.position.y > 400.0, "tour card is on the lower half, clear of the slot row")
+				_check(not tour_r.intersects(front_r) or garage.tour.mouse_filter == Control.MOUSE_FILTER_IGNORE, "tour does not block ARMOR FRONT")
+				_check(garage.tour._text.text.contains("WEIGHT") and garage.tour._text.text.contains("OVERLOAD"), "tour step 0 explains weight and overload")
+				_check(garage.tour._text.text.contains("ARMOR"), "tour still names ARMOR FRONT")
 				garage.deploy()
 				_check(profile.tour_active, "no deploying mid-tour")
 				garage.open_slot(3)
+				# SPD/ACCEL deltas for a pure overload hit show % (match the OVERLOAD banner), not absolute -8.
+				var now_stats: Dictionary = garage._built(profile.rig)
+				var after_load: Dictionary = profile.with_part(profile.rig, "armor_front", 0, T.TUTORIAL_PART)
+				var after_stats: Dictionary = garage._built(after_load)
+				var deltas: Array = garage._deltas(now_stats, after_stats)
+				var spd := ""
+				for d: Array in deltas:
+					if str(d[0]).begins_with("SPD"):
+						spd = str(d[0])
+				_check(spd.contains("%"), "overload SPD delta is a percent matching the banner (%s)" % spd)
 				_check(garage.choose(T.TUTORIAL_PART) and str(profile.rig.armor_front) == T.TUTORIAL_PART, "fit it on ARMOR FRONT")
 			if frame == 7:
 				_check(garage.tour._next.visible, "fitted: NEXT shows")
