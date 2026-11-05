@@ -107,6 +107,7 @@ godot --headless --fixed-fps 60 --path . -s res://tests/transitions_test.gd # mu
 godot --headless --fixed-fps 60 --path . -s res://tests/kill_loops_test.gd   # must end "KILL LOOPS TEST PASSED" (one blast hits every zombie in range)
 godot --headless --fixed-fps 60 --path . -s res://tests/power_overload_test.gd # must end "POWER OVERLOAD TEST PASSED" (power overload takes utilities, then the shield, offline)
 godot --headless --fixed-fps 60 --path . -s res://tests/wreck_and_swarm_test.gd   # must end "WRECK AND SWARM TEST PASSED" (shove through a pack, wreck freezes the fight, free hires match their card)
+godot --headless --fixed-fps 60 --path . -s res://tests/escort_truck_test.gd # must end "ESCORT TRUCK TEST PASSED" (truck HP line, low-HP warning, GOOPED pulls the horde)
 godot --headless --fixed-fps 60 --path . -s res://tests/saloon_match_test.gd # must end "SALOON MATCH TEST PASSED" (every Saloon card is exactly who you hire)
 godot --headless --fixed-fps 60 --path . -s res://tests/tutorial_readability_test.gd # must end "TUTORIAL READABILITY TEST PASSED" (Training Run brightens the arena and rings zombies)
 ```
