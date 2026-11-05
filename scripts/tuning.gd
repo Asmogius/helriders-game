@@ -1135,3 +1135,11 @@ const MUSIC_DUCK_FADE := 0.3
 
 # --- Combat SFX (agreed with the owner 2026-11-04) -----------------------------------------------------
 const SFX_WINDUP_PITCH := [0.9, 1.25]   # Bulwark roar pitch at wind-up start / end
+
+# --- Shoving through a horde (hand playtest 0.1.75, Cameron 2026-11-05) -----------------------------
+# Below RAM speed the rig pushes zombies in front aside (no damage). How hard
+# follows the speed the throttle asks for, ramping in smoothly over SHOVE_RAMP
+# (px/s); below .x a near-stopped rig stays held. A shoved zombie moves off at
+# ramp * (asked speed + SHOVE_CLEAR), so it clears faster than it walks back.
+const SHOVE_RAMP := Vector2(5.0, 30.0)
+const SHOVE_CLEAR := 140.0
