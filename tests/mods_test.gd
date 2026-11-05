@@ -201,7 +201,7 @@ func _process(_delta: float) -> bool:
 			if frame == 2:
 				rig.global_position = SPOT
 				rig.rotation = 0.0
-				var o := main.spawn_outrider(SPOT + Vector2(600, 200))
+				var o := main.spawn_outrider(SPOT + Vector2(520, 175))   # closer: the Outrider is ~12% slower (DRAFT)
 				mark.o = o
 			if frame > 2:
 				rig.global_position = SPOT
