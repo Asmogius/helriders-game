@@ -169,11 +169,12 @@ static func district_index(district: String) -> int:
 	return 0
 
 
-## Chance this job is a night job, before gating. Courier is 50/50 anywhere.
+## Chance this job is a night job, before gating. Courier is 50/50 outside Core Collapse.
 static func night_chance(mission: Dictionary) -> float:
-	if str(mission.get("type", "")) == "courier":
-		return T.NIGHT_CHANCE_COURIER
-	return float(T.NIGHT_CHANCE_BY_DISTRICT[district_index(district_of(mission))])
+	var chance := float(T.NIGHT_CHANCE_BY_DISTRICT[district_index(district_of(mission))])
+	if str(mission.get("type", "")) == "courier" and chance < 1.0:
+		return T.NIGHT_CHANCE_COURIER   # 50/50 outside Core; Core Couriers stay always-night
+	return chance
 
 
 ## Rolls night from the job's seed (Comms, the mission and a relaunch agree).

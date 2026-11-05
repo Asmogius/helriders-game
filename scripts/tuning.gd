@@ -1139,14 +1139,14 @@ const SFX_WINDUP_PITCH := [0.9, 1.25]   # Bulwark roar pitch at wind-up start / 
 # --- Night (approved by the owner 2026-11-04, PR #69) -----------------------
 # Night is rolled per job from its seed and saved with the job. Only zombies
 # (Shamblers, variants, Hunters) change at night; enemy rigs stay the same.
-const COL_NIGHT := Color8(0x51, 0x2b, 0x11)   # #512b11, the night colour (Maps and UI own it)
+const COL_NIGHT := COL_NIGHT_WORLD   # #512b11, one night colour (Maps and UI own COL_NIGHT_WORLD)
 const NIGHT_CHANCE_BY_DISTRICT := [0.10, 0.35, 0.60, 1.0]   # by DISTRICTS index
-const NIGHT_CHANCE_COURIER := 0.5        # Courier jobs are 50/50 night in every district
+const NIGHT_CHANCE_COURIER := 0.5        # Courier jobs are 50/50 night outside Core Collapse (Core is always night)
 const NIGHT_MIN_SKULLS := 2              # never night at 1 skull...
 const NIGHT_MIN_CLEARS := 3              # ...or before the first 3 clears
-const NIGHT_ZOMBIE_SPEED_MULT := 1.15     # shambler 75 -> ~86 (base speeds from #82); still far below the starter rig (495)
+const NIGHT_ZOMBIE_SPEED_MULT := 1.10     # approved by Cameron 2026-11-05 (was 1.15); shambler 75 -> ~83, far below the starter rig (495)
 const NIGHT_HUNTER_SPEED_MULT := 1.10     # 250 -> 275
-const NIGHT_ZOMBIE_DPS_MULT := 1.10       # zombies and Hunters, on top of ENEMY_DAMAGE_BY_SKULL (approved 1.20, trimmed for the 85% floor)
+const NIGHT_ZOMBIE_DPS_MULT := 1.10       # approved by Cameron 2026-11-05; zombies and Hunters, on top of ENEMY_DAMAGE_BY_SKULL
 const NIGHT_ZOMBIE_HP_MULT := 1.0         # unchanged: faster and meaner, not spongier
 const NIGHT_ZOMBIE_START_BONUS := 4       # 12 -> 16 alive at start (still under the cap)
 const NIGHT_RAMP_SECONDS := 3.0           # vs ZOMBIE_RAMP_SECONDS 4.0 (job ramps scale alike)

@@ -71,7 +71,8 @@ func _check_rolls() -> void:
 		if _layout_in(d, "courier") == "":
 			continue
 		var got := _share(d, "courier")
-		_check(absf(got - 0.5) < 0.03, "%s Courier night share %.3f ~ 0.50" % [d, got])
+		var want_c := 1.0 if d == "core" else 0.5   # Core Couriers are always night
+		_check(absf(got - want_c) < 0.03, "%s Courier night share %.3f ~ %.2f" % [d, got, want_c])
 	_check(T.COL_NIGHT.to_html(false) == "512b11", "night colour is #512b11")
 
 
@@ -200,7 +201,7 @@ func _process(_delta: float) -> bool:
 			_check(z.bile_mark_range == T.NIGHT_BILE_MARK_RANGE, "bile draws from 650")
 			_check(z.cap <= T.ZOMBIE_CAP, "cap unchanged at night")
 			var zed := z.spawn_at(main.vehicle.global_position + Vector2(400, 0))
-			_check(zed != null and zed.speed >= T.SHAMBLER_SPEED * 0.8 * 1.15 - 0.01 and zed.speed <= T.SHAMBLER_SPEED * 1.2 * 1.15 + 0.01, "shambler speed x1.15")
+			_check(zed != null and zed.speed >= T.SHAMBLER_SPEED * 0.8 * T.NIGHT_ZOMBIE_SPEED_MULT - 0.01 and zed.speed <= T.SHAMBLER_SPEED * 1.2 * T.NIGHT_ZOMBIE_SPEED_MULT + 0.01, "shambler speed x NIGHT_ZOMBIE_SPEED_MULT")
 			_check(is_equal_approx(zed.hp, T.SHAMBLER_HP), "shambler HP unchanged")
 			var h: Variant = main.hunters[0]
 			_check(is_equal_approx(h.night_speed, T.NIGHT_HUNTER_SPEED_MULT) and is_equal_approx(h.damage_mult, dmg * T.NIGHT_ZOMBIE_DPS_MULT), "Hunter speed x1.1, damage x NIGHT_ZOMBIE_DPS_MULT")

@@ -11,7 +11,8 @@
 6. Only zombies (and Hunters) change at night. Enemy rigs stay the same.
 7. The headlight look waits on an Art mockup and isn't built. The night colour is #512b11 everywhere (`COL_NIGHT`); Maps and UI own the palette.
 8. Job cards show a night icon before the player takes the job.
-- Courier jobs are 50/50 night in every district (`NIGHT_CHANCE_COURIER`).
+- Courier jobs are 50/50 night outside Core Collapse (`NIGHT_CHANCE_COURIER`); Core Couriers are always night (Cameron, 2026-11-05).
+- 2026-11-05: `NIGHT_ZOMBIE_DPS_MULT` 1.10 approved; `NIGHT_ZOMBIE_SPEED_MULT` 1.10 approved (the code had 1.15; Head Dev's note said "from 1.05", which matched neither, so 1.15 -> 1.10 is the change made).
 - The night roll is saved with the job (`job.night`, kept by `_clean_mission` on load).
 
 ## Request
@@ -53,7 +54,7 @@ Zombies more dangerous and aggressive at night. Night is rolled per job, weighte
 # --- Night (proposal; DESIGN §14 pending) -----------------------------------
 # Chance a job rolls night, by DISTRICTS index.
 const NIGHT_CHANCE_BY_DISTRICT := [0.10, 0.35, 0.60, 1.0]   # Outer Blocks 10% (Cameron)
-const NIGHT_ZOMBIE_SPEED_MULT := 1.15     # shambler 85 -> ~98; still far below rig 560
+const NIGHT_ZOMBIE_SPEED_MULT := 1.10     # approved 2026-11-05 (was 1.15); shambler 75 -> ~83
 const NIGHT_HUNTER_SPEED_MULT := 1.10     # 250 -> 275
 const NIGHT_ZOMBIE_DPS_MULT := 1.10       # approved 1.20, trimmed for the 85% floor; shambler 3.0 -> 3.6, brute/tank 8 -> 9.6
 const NIGHT_ZOMBIE_HP_MULT := 1.0         # unchanged: night is faster/meaner, not spongier
