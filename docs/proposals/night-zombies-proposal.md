@@ -9,7 +9,7 @@
 4. The night pay bonus stacks on top of Core Collapse's pay.
 5. All four rewards stay: pay x1.3, kill scrap x1.25 rounded up, schematic chance +0.10, crew XP x1.25. XP goes through a new `xp_mult` argument on `Profile.bank_crew()`.
 6. Only zombies (and Hunters) change at night. Enemy rigs stay the same.
-7. The headlight look waits on an Art mockup and isn't built. The night colour is #512b11 everywhere (`COL_NIGHT`); Maps and UI own the palette.
+7. The headlight look waits on an Art mockup and isn't built. The night colour was #512b11; Art has since moved `COL_NIGHT_WORLD` to #2a3550 on main, and `COL_NIGHT` follows it. Maps, UI and Art own the palette.
 8. Job cards show a night icon before the player takes the job.
 - Courier jobs are 50/50 night outside Core Collapse (`NIGHT_CHANCE_COURIER`); Core Couriers are always night (Cameron, 2026-11-05).
 - 2026-11-05: `NIGHT_ZOMBIE_DPS_MULT` 1.10 approved; `NIGHT_ZOMBIE_SPEED_MULT` 1.10 approved (the code had 1.15; Head Dev's note said "from 1.05", which matched neither, so 1.15 -> 1.10 is the change made).
@@ -149,3 +149,14 @@ Day time-to-wreck is in the report's FOCUSED table. With the approved x1.20 dama
   Core Collapse        100%   late         9.4        8.7    92%          373           462       462
 ```
 Income per job is job pay plus Clear kill scrap, now counting Hunters, weighted over each district's skull band. "Expected" is day income blended with the district's night chance.
+
+## Final precedence (2026-11-05, Cameron: "Core is always night with no exceptions")
+1. Core Collapse: always night, every job type, above the tutorial, 1-skull and first-3-clears rules.
+2. Tutorial: day. (The tutorial has no layout and always runs in the Outer Blocks Crossroads, so it is never in Core.)
+3. 1 skull, or fewer than 3 clears: day.
+4. Escort: day below 5 skulls, night at 5-6.
+5. Courier: 50/50.
+6. Outer Blocks Survive and Hunt at 4 skulls: night.
+7. District chance (10/35/60%), +25% for Survive and Hunt, capped at 1.0.
+
+Old saves: a job with no `night` flag rolls once on load from `helriders-night-<seed>`. A saved flag wins, except in Core, which is always night.

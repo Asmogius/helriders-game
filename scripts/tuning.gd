@@ -1145,7 +1145,7 @@ const SFX_WINDUP_PITCH := [0.9, 1.25]   # Bulwark roar pitch at wind-up start / 
 # --- Night (approved by the owner 2026-11-04, PR #69) -----------------------
 # Night is rolled per job from its seed and saved with the job. Only zombies
 # (Shamblers, variants, Hunters) change at night; enemy rigs stay the same.
-const COL_NIGHT := COL_NIGHT_WORLD   # #512b11, one night colour (Maps and UI own COL_NIGHT_WORLD)
+const COL_NIGHT := COL_NIGHT_WORLD   # one night colour; Maps/UI/Art own COL_NIGHT_WORLD (main: #2a3550)
 const NIGHT_CHANCE_BY_DISTRICT := [0.10, 0.35, 0.60, 1.0]   # by DISTRICTS index
 const NIGHT_CHANCE_COURIER := 0.5        # Courier jobs are 50/50 night outside Core Collapse (Core is always night)
 const NIGHT_MIN_SKULLS := 2              # never night at 1 skull...

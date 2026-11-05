@@ -75,7 +75,7 @@ func _check_rolls() -> void:
 		var got := _share(d, "courier")
 		var want_c := 1.0 if d == "core" else 0.5   # Core Couriers are always night
 		_check(absf(got - want_c) < 0.03, "%s Courier night share %.3f ~ %.2f" % [d, got, want_c])
-	_check(T.COL_NIGHT.to_html(false) == "512b11", "night colour is #512b11")
+	_check(T.COL_NIGHT == T.COL_NIGHT_WORLD, "the night badge uses the world night colour (%s)" % T.COL_NIGHT_WORLD.to_html(false))
 
 
 func _check_gating() -> void:
@@ -83,10 +83,18 @@ func _check_gating() -> void:
 	var job := Missions.make("clear", 4, 99)
 	job["layout"] = core
 	_check(Missions.roll_night(job, 3), "Core 4 skulls after 3 clears: night")
-	_check(not Missions.roll_night(job, 2), "no night before the first 3 clears")
+	_check(Missions.roll_night(job, 2) and Missions.roll_night(job, 0), "Core is night even before the first 3 clears")
 	var one := Missions.make("clear", 1, 99)
 	one["layout"] = core
-	_check(not Missions.roll_night(one, 50), "no night at 1 skull")
+	_check(Missions.roll_night(one, 50), "a 1-skull Core job is night")
+	var mid1 := _job("clear", 1, "midtown")
+	_check(not Missions.roll_night(mid1, 50), "no night at 1 skull outside Core")
+	var mid2 := _job("clear", 4, "industrial")
+	var never := true
+	for sd in 200:
+		mid2.seed = sd
+		never = never and not Missions.roll_night(mid2, 2)
+	_check(never, "no night before the first 3 clears outside Core")
 	var any_night := false
 	for d in 30:
 		for j: Dictionary in Missions.make_board(d, 6, 0, "outer_blocks", 0):
@@ -147,10 +155,15 @@ func _check_job_rules() -> void:
 	var ob := _job("survive", 4, "outer_blocks")
 	_check(Missions.roll_night(ob, 3), "Outer Blocks 4-skull Survive rolls night")
 	var core1 := _job("courier", 1, "core")
-	_check(not Missions.roll_night(core1, 50), "a 1-skull Core Courier is still day")
+	_check(Missions.roll_night(core1, 0), "a 1-skull Core Courier before 3 clears is night (no exceptions)")
+	var core_tut := _job("clear", 1, "core")
+	core_tut["tutorial"] = true
+	core_tut["night"] = false
+	_check(Missions.roll_night(core_tut, 0) and Missions.is_night(core_tut), "Core outranks even the tutorial rule")
 	var tut := _job("clear", 4, "core")
 	tut["tutorial"] = true
-	_check(not Missions.roll_night(tut, 50), "the tutorial never rolls night")
+	tut["layout"] = _layout_in("industrial", "clear")
+	_check(not Missions.roll_night(tut, 50), "the tutorial never rolls night outside Core")
 	tut["night"] = true
 	_check(not Missions.is_night(tut), "the tutorial is day even if the flag says night")
 
@@ -166,10 +179,16 @@ func _check_fallback() -> void:
 	var c_loaded: Dictionary = profile.call("_clean_mission", JSON.parse_string(JSON.stringify(core)), 5)
 	_check(bool(c_loaded.get("night", false)), "an old Core job loads as night")
 	var gated: Dictionary = profile.call("_clean_mission", JSON.parse_string(JSON.stringify(core)), 0)
-	_check(not bool(gated.get("night", true)), "an old save before 3 clears loads as day")
+	_check(bool(gated.get("night", false)), "an old Core save before 3 clears still loads as night")
+	var ind := _job("clear", 4, "industrial", 4242)
+	ind.erase("night")
+	var ind_gated: Dictionary = profile.call("_clean_mission", JSON.parse_string(JSON.stringify(ind)), 0)
+	_check(not bool(ind_gated.get("night", true)), "an old non-Core save before 3 clears loads as day")
+	ind["night"] = not Missions.roll_night(ind, 5)
+	var kept: Dictionary = profile.call("_clean_mission", JSON.parse_string(JSON.stringify(ind)), 5)
+	_check(bool(kept.night) == bool(ind.night), "a saved night flag wins over the roll (outside Core)")
 	core["night"] = false
-	var kept: Dictionary = profile.call("_clean_mission", JSON.parse_string(JSON.stringify(core)), 5)
-	_check(not bool(kept.night), "a saved night flag wins over the roll")
+	_check(Missions.is_night(profile.call("_clean_mission", JSON.parse_string(JSON.stringify(core)), 5)), "a Core job saved as day still runs at night")
 
 
 func _check_surge() -> void:

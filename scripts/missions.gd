@@ -188,7 +188,8 @@ static func district_index(district: String) -> int:
 ##   3. Outer Blocks Survive / Hunt at NIGHT_OB_SURE_SKULLS (4): 1
 ##   4. District chance (NIGHT_CHANCE_BY_DISTRICT), + NIGHT_LEAN_SURVIVE_HUNT
 ##      for Survive / Hunt, capped at 1.0
-## The tutorial, 1 skull and the first 3 clears win over all of these.
+## roll_night() checks Core Collapse first (always night, no exceptions),
+## then the tutorial, 1 skull and the first 3 clears (day), then these.
 static func night_chance(mission: Dictionary) -> float:
 	var type := str(mission.get("type", ""))
 	var level := skulls(mission)
@@ -210,6 +211,8 @@ static func night_chance(mission: Dictionary) -> float:
 ## Rolls night from the job's seed (Comms, the mission and a relaunch agree).
 ## Never at 1 skull or before the player's first T.NIGHT_MIN_CLEARS clears.
 static func roll_night(mission: Dictionary, clears: int) -> bool:
+	if is_core(mission):
+		return true   # Core Collapse: always night, no exceptions (Cameron 2026-11-05)
 	if bool(mission.get("tutorial", false)) or skulls(mission) < T.NIGHT_MIN_SKULLS or clears < T.NIGHT_MIN_CLEARS:
 		return false
 	var rng := RandomNumberGenerator.new()
@@ -217,8 +220,15 @@ static func roll_night(mission: Dictionary, clears: int) -> bool:
 	return rng.randf() < night_chance(mission)
 
 
-## The tutorial is always day, whatever the dict says.
+## Core Collapse jobs (by layout): night with no exceptions.
+static func is_core(mission: Dictionary) -> bool:
+	return float(T.NIGHT_CHANCE_BY_DISTRICT[district_index(district_of(mission))]) >= 1.0
+
+
+## Core is always night; otherwise the tutorial is day; otherwise the saved roll.
 static func is_night(mission: Dictionary) -> bool:
+	if is_core(mission):
+		return true
 	if bool(mission.get("tutorial", false)):
 		return false
 	return bool(mission.get("night", false))
