@@ -89,6 +89,9 @@ func deflect(at: Vector2, normal: Vector2) -> void:
 
 
 func gore(at: Vector2, direction: Vector2) -> void:
+	var music := get_node_or_null("/root/MusicManager")
+	if music != null:
+		music.call("play_combat", "zombie_die")
 	for i in 9:
 		var dir := direction.rotated(randf_range(-1.2, 1.2)) if direction != Vector2.ZERO else Vector2.RIGHT.rotated(randf() * TAU)
 		var color := T.COL_ZOMBIE if i % 3 == 0 else T.COL_BLOOD

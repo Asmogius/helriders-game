@@ -72,6 +72,9 @@ func detonate(i: int) -> void:
 	detonations += 1
 	if fx != null:
 		fx.call("blast", at, _blast_shape.radius)
+	var music := get_node_or_null("/root/MusicManager")
+	if music != null:
+		music.call("play_combat", "explosion")
 	var space := get_world_2d().direct_space_state
 	for hit: Dictionary in space.intersect_shape(_blast, 32):
 		var body: Object = hit.collider

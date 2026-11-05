@@ -39,3 +39,16 @@ Same tool, same license (original, generated in-repo by `tools/audio/synth.py`).
 | audio/sfx/torcher_rupture.ogg | Torcher's fuel tank ruptures | 1.6 s | Pressure hiss, noise "whoomph" through a swelling filter, low boom, decaying fire crackle | Original, generated in-repo |
 | audio/sfx/acid_fire.ogg | Sludger lobs a shell | 0.45 s | Pitch-dropping sine "thunk" + noise pop, wobbling wet gurgle | Original, generated in-repo |
 | audio/sfx/acid_impact.ogg | Acid shell (or Acid Lobber glob) lands | 1.0 s | Low-passed wet splat, fizzing high-passed sizzle, random rising bubble blips | Original, generated in-repo |
+| audio/sfx/gun_light.ogg | Light guns: Pintle Turret, Twin Guns, Hood Guns, Burst Turret, enemy MGs | 0.16 s | High-passed noise snap into a low-passed blast and a falling 160 Hz body, saturated | Original, generated in-repo |
+| audio/sfx/gun_heavy.ogg | Heavy MG Turret | 0.22 s | As gun_light, darker and lower (95 Hz body), more drive | Original, generated in-repo |
+| audio/sfx/gun_scatter.ogg | Scattergun Turret | 0.45 s | Wide low boom plus five short pellet rattles, panned | Original, generated in-repo |
+| audio/sfx/gun_rivet.ogg | Rivet Gun | 0.3 s | Pneumatic noise punch and a metal clank | Original, generated in-repo |
+| audio/sfx/gun_flame.ogg | Flame Sprayer, Torcher (streams while firing) | 0.28 s | Low-passed noise whoosh with a swelling filter | Original, generated in-repo |
+| audio/sfx/gun_arc.ogg | Arc Projector | 0.18 s | Falling square-wave buzz with sparse crackle | Original, generated in-repo |
+| audio/sfx/harpoon_fire.ogg | Harpoon | 0.6 s | Pitched twang, a short crack, eight chain-link ticks | Original, generated in-repo |
+| audio/sfx/mortar_fire.ogg | Mortar launch | 0.55 s | Falling sine "thoomp" with a low noise puff | Original, generated in-repo |
+| audio/sfx/explosion.ogg | Shells, barrels and mines going off | 1.1 s | Kick boom plus low-passed noise, four scattered metal debris hits | Original, generated in-repo |
+| audio/sfx/reload.ogg | Player magazine runs dry and reloads | 0.35 s | Two dry metal clacks | Original, generated in-repo |
+| audio/sfx/overheat.ogg | Player heat gun overheats | 0.7 s | Venting high-passed hiss and a metal ping | Original, generated in-repo |
+| audio/sfx/hit_flesh.ogg | Bullet hits a zombie | 0.1 s | Soft low-passed noise thud with a 110 Hz knock | Original, generated in-repo |
+| audio/sfx/zombie_die.ogg | Zombie killed | 0.32 s | Squelchy low-passed splat and a falling gurgle | Original, generated in-repo |

@@ -77,6 +77,8 @@ func _process(_delta: float) -> bool:
 				_check(aim != Vector2.INF and absf(aim.distance_to(SPOT) - float(mark.want)) < 25.0, "the landing circle sits where the push puts it (%.0f px out, want %.0f; screen reach %.0f)" % [aim.distance_to(SPOT), float(mark.want), float(mark.reach)])
 			if frame == 3 + 150:
 				_check(main.shells.blasts >= 1 and main.shells.last_blast.distance_to(SPOT + Vector2(float(mark.want), 0)) < 30.0, "shells land on the circle")
+				var mm: Node = root.get_node("MusicManager")
+				_check(int(mm.sfx_counts.get("mortar_fire", 0)) >= 1 and int(mm.sfx_counts.get("explosion", 0)) >= 1, "the Mortar thumps and its shells go bang (sound)")
 				var z: Node = mark.z
 				_check(float(z.get("armor")) < float(mark.zhp) - 50.0, "the blast hurts what's under it (-%.0f)" % (float(mark.zhp) - float(z.get("armor"))))
 			if frame == 3 + 200:

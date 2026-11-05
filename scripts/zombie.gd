@@ -126,6 +126,10 @@ func take_hit(damage: float, impulse: Vector2, cause := "shot", dtype := "") -> 
 	var k := StatusBars.kind_of(dtype)
 	if k >= 0:
 		add_buildup(k, damage * T.STATUS_HIT_BUILDUP)
+	if cause == "shot" and dtype == "":
+		var music := get_node_or_null("/root/MusicManager")
+		if music != null:
+			music.call("play_combat", "hit_flesh")
 	if dtype == "fire":
 		damage *= T.FIRE_VS_ZOMBIES
 	if status.active(StatusBars.ACID):

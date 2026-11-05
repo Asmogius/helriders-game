@@ -30,8 +30,21 @@ const SFX := {
 	"torcher_rupture": "res://audio/sfx/torcher_rupture.ogg",
 	"acid_fire": "res://audio/sfx/acid_fire.ogg",
 	"acid_impact": "res://audio/sfx/acid_impact.ogg",
+	"gun_light": "res://audio/sfx/gun_light.ogg",
+	"gun_heavy": "res://audio/sfx/gun_heavy.ogg",
+	"gun_scatter": "res://audio/sfx/gun_scatter.ogg",
+	"gun_rivet": "res://audio/sfx/gun_rivet.ogg",
+	"gun_flame": "res://audio/sfx/gun_flame.ogg",
+	"gun_arc": "res://audio/sfx/gun_arc.ogg",
+	"harpoon_fire": "res://audio/sfx/harpoon_fire.ogg",
+	"mortar_fire": "res://audio/sfx/mortar_fire.ogg",
+	"explosion": "res://audio/sfx/explosion.ogg",
+	"reload": "res://audio/sfx/reload.ogg",
+	"overheat": "res://audio/sfx/overheat.ogg",
+	"hit_flesh": "res://audio/sfx/hit_flesh.ogg",
+	"zombie_die": "res://audio/sfx/zombie_die.ogg",
 }
-const SFX_VOICES := 6
+const SFX_VOICES := 12   # guns, hits and explosions overlap
 
 var mode := ""                      # "", "garage", "combat", "wreck"
 var intensity := 0                  # 0 low, 1 mid, 2 high
@@ -43,6 +56,7 @@ var _next_voice := 0
 var sfx_counts := {}                # id -> times played (tests)
 var _tweens := {}                   # player -> Tween
 var _sfx_cache := {}
+var _sfx_last := {}                 # id -> msec last played (SFX_MIN_GAP)
 var _last_raise := -100.0
 var _windup: AudioStreamPlayer      # Bulwark engine roar; pitch follows the wind-up
 var _windup_rig: Node = null
@@ -235,7 +249,25 @@ func play_sfx(id: String, volume_db := 0.0) -> void:
 	_next_voice = (_next_voice + 1) % _voices.size()
 	p.stream = _sfx_cache[id]
 	p.volume_db = volume_db
+	p.pitch_scale = 1.0
 	_play(p)
+
+
+## A combat sound that can come many times a second (shots, hits, deaths):
+## skipped if the same sound played less than T.SFX_MIN_GAP ago, with a small
+## random pitch so repeats don't sound canned. Returns true if it played.
+func play_combat(id: String, volume_db := 0.0) -> bool:
+	if not SFX.has(id):
+		return false
+	var now := Time.get_ticks_msec()
+	var gap := int(float(T.SFX_MIN_GAP.get(id, 0.05)) * 1000.0)
+	if now - int(_sfx_last.get(id, -100000)) < gap:
+		return false
+	_sfx_last[id] = now
+	play_sfx(id, volume_db)
+	var p := _voices[(_next_voice - 1 + _voices.size()) % _voices.size()]
+	p.pitch_scale = 1.0 + randf_range(-T.SFX_PITCH_JITTER, T.SFX_PITCH_JITTER)
+	return true
 
 
 ## Let go of streams and tweens on quit (headless runs report leaks otherwise).

@@ -74,6 +74,19 @@ func _run() -> void:
 	for id: String in ["bulwark_windup", "ram_impact", "torcher_rupture", "acid_fire", "acid_impact"]:
 		music.play_sfx(id)
 		_check(int(music.sfx_counts.get(id, 0)) >= 1, "%s plays on Effects" % id)
+	# Weapon and hit sounds (playtest): every mapped sound exists, and a fast
+	# gun is rate-limited instead of stacking every shot.
+	for id: String in T.WEAPON_SFX.values():
+		_check(MM.SFX.has(id), "weapon sound %s is registered" % id)
+	for id: String in ["gun_light", "hit_flesh", "zombie_die", "explosion", "reload", "overheat"]:
+		_check(MM.SFX.has(id), "%s is registered" % id)
+	var before := int(music.sfx_counts.get("gun_light", 0))
+	var played := 0
+	for k in 10:
+		if music.play_combat("gun_light"):
+			played += 1
+	_check(played == 1 and int(music.sfx_counts.get("gun_light", 0)) == before + 1, "ten shots in one instant play the gun once (rate limit, got %d)" % played)
+	_check(not music.play_combat("no_such_sound"), "an unknown combat sound is ignored")
 	music.play_sfx("results")
 	_check(music._voices.any(func(v: AudioStreamPlayer) -> bool: return v.stream != null and v.bus == "Effects"), "results cue plays on Effects")
 

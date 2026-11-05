@@ -86,6 +86,9 @@ func explode() -> void:
 	var reach := T.BARREL_BOOMER_RADIUS if kind == "boomer" else T.BARREL_RADIUS
 	if fx != null:
 		fx.call("blast", at, reach * 0.7)
+	var music := get_node_or_null("/root/MusicManager")
+	if music != null:
+		music.call("play_combat", "explosion")
 	match kind:
 		"slime":
 			if hazards != null:

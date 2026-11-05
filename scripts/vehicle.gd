@@ -1378,6 +1378,8 @@ func _spend(i: int) -> void:
 			keyword_pop("OVERLOAD")
 		if _heat[i] >= 1.0:
 			_heat[i] = 1.0
+			if not _overheated[i] and team == BulletPool.TEAM_PLAYER:
+				_sfx("overheat")
 			_overheated[i] = true
 
 
@@ -1426,6 +1428,8 @@ func _use_round(i: int) -> void:
 	_ammo[i] -= 1
 	if _ammo[i] <= 0:
 		_reload_left[i] = float(gun_stats[i].get("reload", 1.0))
+		if team == BulletPool.TEAM_PLAYER:
+			_sfx("reload")
 
 
 ## Mortar: the stick's direction aims the turret and its push sets the
@@ -1478,6 +1482,15 @@ func _mortar(i: int, w: Dictionary, delta: float, manual: bool, locked: bool, ca
 			_use_round(i)
 
 
+## A combat sound for this rig's weapons (rate-limited; enemies quieter).
+func _sfx(id: String) -> void:
+	if not is_inside_tree():
+		return
+	var music := get_node_or_null("/root/MusicManager")
+	if music != null:
+		music.call("play_combat", id, 0.0 if team == BulletPool.TEAM_PLAYER else T.SFX_ENEMY_DB)
+
+
 ## How far from `from` along `dir` the camera's view reaches, less `margin`
 ## (world units). Arcing weapons use it so the player's shells, and the
 ## landing circle, never go past what's on screen. Off-tree or with no view:
@@ -1527,7 +1540,10 @@ func _lob(w: Dictionary, from: Vector2, landing: Vector2, flight: float) -> bool
 			extra["etch"] = true
 	elif str(w.get("kind", "")) == "mortar" and has_mod("cluster_shell"):
 		extra = {"cluster": true}
-	return bool(shells.call("launch", from, landing, flight, damage, radius, team, dtype, extra))
+	var ok := bool(shells.call("launch", from, landing, flight, damage, radius, team, dtype, extra))
+	if ok and str(w.get("id", "")) != "sludger":   # the Sludger plays its own (sludger_rig._lob)
+		_sfx(str(T.WEAPON_SFX.get(str(w.get("id", "")), "mortar_fire")))
+	return ok
 
 
 func _show_aim(at: Vector2, i: int, w: Dictionary) -> void:
@@ -1544,6 +1560,7 @@ func _show_aim(at: Vector2, i: int, w: Dictionary) -> void:
 ## the first rig it meets, tethering it. Firing again lets go first.
 func _fire_harpoon(w: Dictionary, from: Vector2, direction: Vector2) -> void:
 	release_tether()
+	_sfx("harpoon_fire")
 	var reach := float(w.get("range", 600.0))
 	var to := from + direction * reach
 	var space := get_world_2d().direct_space_state
@@ -1658,6 +1675,7 @@ func _shoot(w: Dictionary, muzzle: Vector2, direction: Vector2) -> void:
 		bullets.fire(muzzle, dir * speed * randf_range(0.95, 1.05) if pellets > 1 else dir * speed, damage, team, pierce, dtype, 0.0, chain, rider, self,
 				_last_of_burst and has_sp("sp_shrapnel"), jumps)   # Shrapnel: the burst's last round splashes
 	bullets.next_style = -1   # P2 V4.3 tracer look: reset after the volley
+	_sfx(str(T.WEAPON_SFX.get(str(w.get("id", "")), "gun_light")))
 
 
 # ==== P2 V4.3 tracer looks (art/sample-fx) =========================================

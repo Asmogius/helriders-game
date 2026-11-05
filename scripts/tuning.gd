@@ -1158,6 +1158,20 @@ const MUSIC_DUCK_FADE := 0.3
 
 # --- Combat SFX (agreed with the owner 2026-11-04) -----------------------------------------------------
 const SFX_WINDUP_PITCH := [0.9, 1.25]   # Bulwark roar pitch at wind-up start / end
+# Weapon sounds (playtest: guns had none). Weapon id -> sfx id; others "gun_light".
+const WEAPON_SFX := {
+	"heavy_mg_turret": "gun_heavy", "scattergun_turret": "gun_scatter", "rivet_gun": "gun_rivet",
+	"flame_sprayer": "gun_flame", "arc_projector": "gun_arc", "torcher": "gun_flame",
+	"mortar": "mortar_fire", "harpoon": "harpoon_fire", "acid_lobber": "acid_fire",
+}
+# Shortest gap between two plays of one sound (s): fast guns and big hordes stay
+# readable instead of a wall of noise. Pitch jitter keeps repeats from sounding canned.
+const SFX_MIN_GAP := {
+	"gun_light": 0.07, "gun_heavy": 0.08, "gun_flame": 0.22, "gun_arc": 0.1, "gun_rivet": 0.12,
+	"hit_flesh": 0.05, "zombie_die": 0.06, "explosion": 0.08, "reload": 0.2, "overheat": 0.3,
+}
+const SFX_PITCH_JITTER := 0.06      # +-6% per play
+const SFX_ENEMY_DB := -7.0          # enemy guns sit under yours
 
 # --- Night (approved by the owner 2026-11-04, PR #69) -----------------------
 # Night is rolled per job from its seed and saved with the job. Only zombies

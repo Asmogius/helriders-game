@@ -403,3 +403,73 @@ for _ in range(7):  # bubble blips: fast upward chirps
     b = np.sin(2 * np.pi * np.cumsum(f0 * (1 + 2 * bt / bd)) / SR) * env(len(bt), 0.002, 0.01) * 0.25
     items.append((fade_tail(b), r.uniform(0.08, 0.7), r.uniform(-0.6, 0.6)))
 write_ogg("sfx/acid_impact.ogg", oneshot(L, items, 0.1, -19))
+
+# --- Weapons and hits pass (playtest: "guns need sound effects") -------------------
+# Short, dry and a little different each (the game also jitters pitch per shot).
+r = np.random.default_rng(61)
+
+
+def crack(rng, d, cut, body_hz, body_amt, drive=2.0):
+    """A gunshot: sharp noise crack into a pitched body thump, then a tail."""
+    tt = t_of(d); n = len(tt)
+    noise = rng.standard_normal(n)
+    snap = hp(noise, 1500) * np.exp(-tt / 0.006)
+    blast = lp(noise, cut) * np.exp(-tt / (d * 0.28))
+    body = np.sin(2 * np.pi * np.cumsum(body_hz * (1 + 1.5 * np.exp(-tt / 0.01))) / SR) * np.exp(-tt / (d * 0.22)) * body_amt
+    return fade_tail(sat(snap * 0.8 + blast + body, drive))
+
+
+# Light machine gun (Pintle Turret, Twin Guns, Hood Guns, Burst Turret, enemy MGs).
+write_ogg("sfx/gun_light.ogg", oneshot(0.16, [(crack(r, 0.14, 3500, 160, 0.7), 0, 0)], 0.05, -22))
+# Heavy MG: lower, chunkier.
+write_ogg("sfx/gun_heavy.ogg", oneshot(0.22, [(crack(r, 0.2, 2200, 95, 1.0, 2.4), 0, 0)], 0.06, -21))
+# Scattergun: a wide boom with a rattle of pellets.
+sg = crack(r, 0.38, 1800, 70, 1.2, 2.6)
+rattle = [(fade_tail(hp(r.standard_normal(int(0.01 * SR)), 2500) * 0.25), 0.02 + 0.012 * i, r.uniform(-0.5, 0.5)) for i in range(5)]
+write_ogg("sfx/gun_scatter.ogg", oneshot(0.45, [(sg, 0, 0)] + rattle, 0.1, -19))
+# Rivet gun: pneumatic punch and a metal clank.
+tt = t_of(0.12)
+pneu = lp(r.standard_normal(len(tt)), 2500) * np.exp(-tt / 0.02)
+write_ogg("sfx/gun_rivet.ogg", oneshot(0.3, [(fade_tail(sat(pneu, 1.5)), 0, 0), (metal(r, 0.7, 320, 0.18, 3000), 0.015, 0.1)], 0.08, -20))
+# Flame sprayer: a short roaring whoosh (played as a stream while firing).
+d = 0.28; tt = t_of(d)
+roar = lp(r.standard_normal(len(tt)), 900 + 700 * np.sin(np.pi * tt / d)) * np.sin(np.pi * tt / d) ** 0.6
+write_ogg("sfx/gun_flame.ogg", oneshot(d, [(fade_tail(sat(roar * 1.5, 1.4)), 0, 0)], 0.06, -22))
+# Arc projector: an electric zap (buzzing square sweep with crackle).
+d = 0.18; tt = t_of(d)
+f = 900 * np.exp(-tt / 0.06) + 220
+sq = np.sign(np.sin(2 * np.pi * np.cumsum(f) / SR)) * 0.4
+fizz = hp(r.standard_normal(len(tt)), 3500) * (r.random(len(tt)) > 0.85) * 0.6
+zap = (sq + fizz) * env(len(tt), 0.002, 0.05)
+write_ogg("sfx/gun_arc.ogg", oneshot(0.22, [(fade_tail(lp(zap, 7000)), 0, 0)], 0.05, -22))
+# Harpoon: a heavy twang and the chain paying out.
+d = 0.5; tt = t_of(d)
+twang = np.sin(2 * np.pi * np.cumsum(180 + 60 * np.exp(-tt / 0.05)) / SR) * np.exp(-tt / 0.12)
+chain = [(metal(r, 0.35, r.uniform(1800, 2600), 0.05, 6000), 0.05 + 0.035 * i, 0.2) for i in range(8)]
+write_ogg("sfx/harpoon_fire.ogg", oneshot(0.6, [(fade_tail(sat(twang, 1.8)), 0, 0), (crack(r, 0.1, 2000, 120, 0.5), 0, 0)] + chain, 0.1, -19))
+# Mortar: a deep hollow "thoomp".
+tt = t_of(0.5)
+thoomp = np.sin(2 * np.pi * np.cumsum(90 * np.exp(-tt / 0.1) + 45) / SR) * env(len(tt), 0.002, 0.12)
+puff = lp(r.standard_normal(len(tt)), 900) * np.exp(-tt / 0.05) * 0.6
+write_ogg("sfx/mortar_fire.ogg", oneshot(0.55, [(fade_tail(sat(thoomp + puff, 1.6)), 0, 0)], 0.12, -18))
+# Explosion: shells, barrels, mines.
+L = 1.1
+kb = kick(r, 1.3, 0.9); n = len(kb); tt = secs(n)
+bang = lp(sat(kb + 0.8 * lp(r.standard_normal(n) * np.exp(-tt / 0.22), 1200), 1.8), 3500)
+debris = [(metal(r, 0.3, None, 0.2, 2600), 0.06 + r.uniform(0, 0.4), r.uniform(-0.8, 0.8)) for _ in range(4)]
+write_ogg("sfx/explosion.ogg", oneshot(L, [(bang, 0, 0)] + debris, 0.2, -16))
+# Reload: two dry clacks.
+write_ogg("sfx/reload.ogg", oneshot(0.35, [(metal(r, 0.6, 700, 0.06, 5000), 0, -0.1), (metal(r, 0.8, 520, 0.08, 4500), 0.16, 0.1)], 0.04, -24))
+# Overheat: a venting hiss.
+d = 0.7; tt = t_of(d)
+vent = lp(hp(r.standard_normal(len(tt)), 2500), 8000) * np.minimum(tt / 0.02, 1) * np.exp(-tt / 0.25)
+write_ogg("sfx/overheat.ogg", oneshot(d, [(fade_tail(vent), 0, 0), (metal(r, 0.4, 880, 0.1, 4000), 0, 0)], 0.06, -22))
+# Bullet into a zombie: a soft wet thud.
+tt = t_of(0.09)
+thud = lp(r.standard_normal(len(tt)), 700) * np.exp(-tt / 0.015) + np.sin(2 * np.pi * 110 * tt) * np.exp(-tt / 0.02) * 0.6
+write_ogg("sfx/hit_flesh.ogg", oneshot(0.1, [(fade_tail(thud), 0, 0)], 0.02, -26))
+# Zombie down: a squelchy splat.
+tt = t_of(0.3)
+splat = lp(r.standard_normal(len(tt)), 1100) * env(len(tt), 0.002, 0.06)
+gl = np.sin(2 * np.pi * np.cumsum(240 - 140 * tt / 0.3) / SR) * env(len(tt), 0.01, 0.07) * 0.4
+write_ogg("sfx/zombie_die.ogg", oneshot(0.32, [(fade_tail(splat), 0, 0), (fade_tail(gl), 0.02, 0)], 0.05, -23))

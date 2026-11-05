@@ -111,6 +111,10 @@ func _blast(at: Vector2, r: float, damage: float, team: int, dtype: String, extr
 	last_blast = at
 	if fx != null:
 		fx.call("blast", at, r)
+	if dtype != "acid" and not extra.has("puddle_r") and not extra.has("buildup_kind"):   # acid and goop shells have their own
+		var music := get_node_or_null("/root/MusicManager")
+		if music != null:
+			music.call("play_combat", "explosion")
 	_shape.radius = r
 	_query.transform = Transform2D(0.0, at)
 	_query.collision_mask = T.LAYER_ZOMBIE | (T.LAYER_ENEMY if team == BulletPool.TEAM_PLAYER else T.LAYER_VEHICLE)
