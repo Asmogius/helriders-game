@@ -57,6 +57,7 @@ var sfx_counts := {}                # id -> times played (tests)
 var _tweens := {}                   # player -> Tween
 var _sfx_cache := {}
 var _sfx_last := {}                 # id -> msec last played (SFX_MIN_GAP)
+var _rng := RandomNumberGenerator.new()   # own dice: sound must never shift the game's seeded randomness
 var _last_raise := -100.0
 var _windup: AudioStreamPlayer      # Bulwark engine roar; pitch follows the wind-up
 var _windup_rig: Node = null
@@ -266,7 +267,7 @@ func play_combat(id: String, volume_db := 0.0) -> bool:
 	_sfx_last[id] = now
 	play_sfx(id, volume_db)
 	var p := _voices[(_next_voice - 1 + _voices.size()) % _voices.size()]
-	p.pitch_scale = 1.0 + randf_range(-T.SFX_PITCH_JITTER, T.SFX_PITCH_JITTER)
+	p.pitch_scale = 1.0 + _rng.randf_range(-T.SFX_PITCH_JITTER, T.SFX_PITCH_JITTER)
 	return true
 
 
