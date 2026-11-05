@@ -35,6 +35,7 @@ var pause_button: Button
 var tip: Label                     # the tutorial's instructions
 var _hint: Label
 var _banner: Label
+var _banner_bg: ColorRect
 var _banner_tween: Tween
 var _alert: Label
 var _overlay: Control
@@ -88,6 +89,17 @@ func _ready() -> void:
 	_fps.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_root.add_child(_fps)
 
+	_banner_bg = ColorRect.new()
+	_banner_bg.color = T.COL_UI_PANEL
+	_banner_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_banner_bg.anchor_left = 0.5
+	_banner_bg.anchor_right = 0.5
+	_banner_bg.offset_left = -420.0
+	_banner_bg.offset_right = 420.0
+	_banner_bg.offset_top = 84.0
+	_banner_bg.offset_bottom = 132.0
+	_banner_bg.modulate.a = 0.0
+	_root.add_child(_banner_bg)
 	_banner = _centered_label(30, T.COL_UI_ACCENT, 96.0)
 	_banner.modulate.a = 0.0
 	_alert = _centered_label(26, T.COL_ENEMY, 140.0)
@@ -413,15 +425,32 @@ func is_lock_button_visible() -> bool:
 
 
 ## A short message that fades out (enemy inbound, salvage picked up...).
-func banner(text: String, color: Color, seconds := 2.5) -> void:
+func banner(text: String, color: Color = T.COL_UI_ACCENT, seconds := 2.5) -> void:
+	# Ebbtide toast: charcoal plate + gold ink. Threat / injury reds stay red.
+	var ink := _banner_ink(color)
 	_banner.text = text
-	_banner.add_theme_color_override("font_color", color)
+	_banner.add_theme_color_override("font_color", ink)
 	if _banner_tween != null:
 		_banner_tween.kill()
 	_banner.modulate.a = 1.0
+	if _banner_bg != null:
+		_banner_bg.modulate.a = 0.92
 	_banner_tween = create_tween()
 	_banner_tween.tween_interval(seconds)
 	_banner_tween.tween_property(_banner, "modulate:a", 0.0, 0.6)
+	if _banner_bg != null:
+		_banner_tween.parallel().tween_property(_banner_bg, "modulate:a", 0.0, 0.6)
+
+
+## Gold for chrome toasts; keep enemy / injury / danger reds.
+func _banner_ink(color: Color) -> Color:
+	if color == T.COL_ENEMY or color == T.COL_HUNTER or color == T.COL_UI_DANGER \
+			or color == T.COL_UI_DANGER_TEXT or color == UI.BAD:
+		return color
+	# Red-family custom colours (injury flashes, etc.).
+	if color.r > 0.7 and color.g < 0.5 and color.b < 0.5:
+		return color
+	return T.COL_UI_ACCENT
 
 
 ## A warning that stays (and pulses) until cleared with an empty string.
@@ -1094,10 +1123,11 @@ class RigIcon extends Control:
 		var bh := 34.0
 		var body := Rect2(c - Vector2(bw, bh) * 0.5, Vector2(bw, bh))
 		# Shield ring.
+		# Shield arc is HUD chrome (not the player's cyan world glow) → gold.
 		if shield >= 0.0:
-			draw_arc(c, 34.0, 0.0, TAU, 40, Color(T.COL_SHIELD, 0.18), 4.0)
+			draw_arc(c, 34.0, 0.0, TAU, 40, Color(T.COL_UI_ACCENT, 0.18), 4.0)
 			if shield > 0.0:
-				draw_arc(c, 34.0, -PI / 2.0, -PI / 2.0 + TAU * shield, 40, Color(T.COL_SHIELD, 0.9), 4.0)
+				draw_arc(c, 34.0, -PI / 2.0, -PI / 2.0 + TAU * shield, 40, Color(T.COL_UI_ACCENT, 0.9), 4.0)
 		# HP: the body block drains from the top.
 		draw_rect(body, Color(0.08, 0.08, 0.09, 0.9))
 		var fill := clampf(hp, 0.0, 1.0)
@@ -1113,7 +1143,7 @@ class RigIcon extends Control:
 
 class ArmorBar extends Control:
 	## V6.4: a gauge, not a strip: a bevelled steel housing, 10 segments, a
-	## needle tick at the edge of the fill, and the shield as a thin cyan rail
+	## needle tick at the edge of the fill, and the shield as a thin gold rail
 	## along the top. Redraws only when a value changes.
 	const T := preload("res://scripts/tuning.gd")
 	const SEGMENTS := 10
@@ -1151,8 +1181,8 @@ class ArmorBar extends Control:
 				draw_rect(Rect2(x0, inner.position.y, seg_w - 1.0, inner.size.y), Color(fill, 0.08))
 		if ratio > 0.0 and ratio < 1.0:   # needle at the edge of the fill
 			draw_rect(Rect2(inner.position.x + lit - 1.0, -2, 2, size.y + 4), Color(1, 1, 1, 0.85))
-		if shield >= 0.0:   # shield rail on the housing's top edge
-			draw_rect(Rect2(Vector2(-3, -3), Vector2((size.x + 6) * shield, 2)), Color(0.55, 0.85, 1.0, 0.95))
+		if shield >= 0.0:   # shield rail on the housing's top edge (gold chrome)
+			draw_rect(Rect2(Vector2(-3, -3), Vector2((size.x + 6) * shield, 2)), Color(T.COL_UI_ACCENT, 0.95))
 
 
 ## The tutorial's instruction line ("" hides it).
