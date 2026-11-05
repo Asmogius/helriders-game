@@ -165,6 +165,7 @@ var _rig_calls_made := 0
 var _empty_warned := false
 # Escort: the salvage truck, its sites and the driver's optional detour.
 var truck: FriendlyTruck
+var power_offline := 0   # 0 fine, 1 utilities offline, 2 utilities + shield (power overload)
 var optional_site := Vector2.INF
 var optional_offered := false
 var optional_taken := false
@@ -1954,9 +1955,24 @@ func _refresh_hud() -> void:
 		_crew_state(i)
 	for i in vehicle.abilities.size():
 		hud.set_ability_charge(i, vehicle.ability_charge(i))
+		hud.set_ability_disabled(i, vehicle.utilities_offline())
+	_power_offline_cue()
 	hud.set_status_text(_status_line())
 	hud.set_lock_state(vehicle.lock_enabled, vehicle.lock_target != null)
 	_refresh_threats()
+
+
+## Power overload cue (DRAFT): a banner when systems go offline or come back.
+## Minimal on purpose: UI's HUD rework should fold it into the rig diagram.
+func _power_offline_cue() -> void:
+	var now := 2 if vehicle.shield_offline() else (1 if vehicle.utilities_offline() else 0)
+	if now == power_offline:
+		return
+	if now > power_offline:
+		hud.banner("POWER OVERLOAD  -  UTILITIES%s OFFLINE" % (" + SHIELD" if now == 2 else ""), T.COL_UI_DANGER_TEXT, 2.5)
+	elif now == 0:
+		hud.banner("POWER BACK  -  SYSTEMS ONLINE", T.COL_UI_ACCENT, 1.5)
+	power_offline = now
 
 
 func _refresh_threats() -> void:
