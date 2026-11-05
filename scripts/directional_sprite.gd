@@ -17,6 +17,9 @@ extends Sprite2D
 		_pick()
 
 var meta: Dictionary = {}
+## Baked cast shadow (meta "shadow", from voxel_render.py): a child drawn behind
+## this sprite at the same frame. Null when the sheet has none.
+var shadow: Sprite2D = null
 
 
 func _init() -> void:
@@ -59,9 +62,31 @@ func load_meta(path: String) -> bool:
 	directions = int(meta.directions)
 	columns = int(meta.columns)
 	texture = load(path.get_base_dir().path_join(String(meta.sheet)))
+	_load_shadow(path.get_base_dir())
 	_apply_grid()
 	_pick()
 	return true
+
+
+func _load_shadow(dir: String) -> void:
+	var sd: Dictionary = meta.get("shadow", {})
+	var p := dir.path_join(String(sd.get("sheet", "")))
+	if sd.is_empty() or not ResourceLoader.exists(p):
+		if shadow != null:
+			shadow.queue_free()
+			shadow = null
+		return
+	if shadow == null:
+		shadow = Sprite2D.new()
+		shadow.name = "Shadow"
+		shadow.show_behind_parent = true
+		shadow.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		add_child(shadow)
+	shadow.texture = load(p)
+	shadow.hframes = columns
+	shadow.vframes = int(ceil(directions / float(columns)))
+	var al: float = sd.get("alpha", 0.82)  # voxel_render.SHADOW_ALPHA; contact peak
+	shadow.modulate = Color(1.0, 1.0, 1.0, al)
 
 
 static func frame_for(h: float, dirs: int) -> int:
@@ -104,3 +129,5 @@ func _pick() -> void:
 	if hframes != columns:
 		_apply_grid()
 	frame = frame_for(heading, directions)
+	if shadow != null:
+		shadow.frame = frame
