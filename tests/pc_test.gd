@@ -138,6 +138,15 @@ func _process(_delta: float) -> bool:
 			main.kbm_fire_override = 0
 			var hud: Variant = main.get("hud")
 			_check(hud._ability_buttons[0].pad_badge == "Q" and hud._crew_button.pad_badge == "TAB" and str(hud._hint.text).begins_with("WASD"), "HUD shows key badges and the WASD control line")
+			# Playtest #4: PWR label under the bar (not over HP); banner below status.
+			var hp_r: Rect2 = hud._hp_value.get_rect()
+			hp_r.position = hud._hp_value.global_position
+			var pwr_r := Rect2(hud._power_bar.global_position, hud._power_bar.size)
+			var status_r := Rect2(hud._status.global_position, Vector2(800, 28))
+			var banner_r := Rect2(Vector2(hud._banner_bg.offset_left + 640, hud._banner_bg.offset_top), Vector2(840, 48))
+			_check(pwr_r.end.y <= status_r.position.y + 1.0, "PWR block sits above the status line")
+			_check(not pwr_r.intersects(hp_r), "PWR block does not cover the HP number")
+			_check(status_r.end.y <= hud._banner_bg.offset_top + 1.0, "status line sits above the mission title band")
 			_key(KEY_Q)
 			_check(float(main.vehicle.abilities[0].ready_in) > 0.0, "Q fires the first utility")
 			hud._lock_button.visible = true
