@@ -21,13 +21,12 @@ extends RefCounted
 ##
 ## Quickplay canvases (QP2): `blank_s`, `blank_m`, `blank_l` and `endless`.
 ## They list no jobs, so the campaign board never draws them. Until world-size
-## Q1, all four stay on T.WORLD_SIZE. The blanks are density tiers, not pixel
-## sizes: S keeps the most buildings (smallest open floor), M fewer, L the
-## fewest. They share one edge-road spawn rail. `endless` is the longer-session
-## shell on that same rail: still fewer buildings, plus an inner lap, spokes
-## and a cross so the drive loops. Real multi-size worlds are a follow-up.
-## Placeable caps (QP7: 40 px snap, 80 px option, ≤300 pieces, ≤24 spawners)
-## are not applied here.
+## Q1, all four stay on T.WORLD_SIZE. They are empty shells: no buildings,
+## props, roads, checkpoints, barrel spots, spawn points, chokes or blocks.
+## A blank bake must not inherit map geometry. Density tiers are the arena
+## rect only (S smallest, then M, L, then the Endless floor). Real multi-size
+## worlds are a follow-up. Placeable caps (QP7: 40 px snap, 80 px option,
+## ≤300 pieces, ≤24 spawners) are not applied here.
 
 const T := preload("res://scripts/tuning.gd")
 
@@ -484,11 +483,10 @@ const LAYOUTS := {
 		"blocks": [[Vector2(1100, 450), Vector2(36, 300), 0.0], [Vector2(2100, 1950), Vector2(36, 300), 0.0],
 			[Vector2(600, 800), Vector2(36, 260), 0.0], [Vector2(2600, 1600), Vector2(36, 260), 0.0]],
 	},
-	# --- QP2: Quickplay canvases. Same WORLD_SIZE. Density tiers, then the
-	# Endless shell. No jobs, so pick() / the daily board never see them.
-	# Shared edge rail (three spawns a side). Buildings stay inset so that
-	# rail stays open. blocks is empty: a variation must not barricade a
-	# blank canvas. ---
+	# --- QP2: Quickplay canvases. Same WORLD_SIZE, empty geometry. Density
+	# tiers are the arena rect (S < M < L < endless), not buildings. No jobs,
+	# so pick() / the daily board never see them. A variation must not add
+	# roads, spawns or barricades: LevelBake uses Layouts.build for these ids. ---
 	"blank_s": {
 		"name": "Small Yard",
 		"district": "quickplay",
@@ -497,31 +495,12 @@ const LAYOUTS := {
 		"chokes": [],
 		"jobs": [],
 		"start": Vector2(1600, 1200),
-		"buildings": [
-			Rect2(400, 360, 640, 320), Rect2(1280, 360, 640, 320), Rect2(2160, 360, 640, 320),
-			Rect2(400, 1720, 640, 320), Rect2(1280, 1720, 640, 320), Rect2(2160, 1720, 640, 320),
-			Rect2(400, 760, 280, 400), Rect2(400, 1240, 280, 400),
-			Rect2(2520, 760, 280, 400), Rect2(2520, 1240, 280, 400),
-		],
+		"buildings": [],
 		"props": [],
-		"roads": [Rect2(0, 0, 3200, 220), Rect2(0, 2180, 3200, 220), Rect2(0, 0, 220, 2400), Rect2(2980, 0, 220, 2400)],
-		"checkpoints": [
-			Vector2(160, 160), Vector2(800, 160), Vector2(1600, 160), Vector2(2400, 160), Vector2(3040, 160),
-			Vector2(160, 2240), Vector2(800, 2240), Vector2(1600, 2240), Vector2(2400, 2240), Vector2(3040, 2240),
-			Vector2(160, 700), Vector2(160, 1200), Vector2(160, 1700),
-			Vector2(3040, 700), Vector2(3040, 1200), Vector2(3040, 1700),
-			Vector2(1100, 1200), Vector2(1600, 1200), Vector2(2100, 1200), Vector2(1600, 900), Vector2(1600, 1500),
-		],
-		"barrel_spots": [
-			Vector2(1200, 1050), Vector2(1350, 1050), Vector2(1850, 1350), Vector2(2000, 1350),
-			Vector2(1100, 1450), Vector2(2100, 950),
-		],
-		"spawn_points": [
-			Vector2(80, 700), Vector2(80, 1200), Vector2(80, 1700),
-			Vector2(3120, 700), Vector2(3120, 1200), Vector2(3120, 1700),
-			Vector2(900, 80), Vector2(1600, 80), Vector2(2300, 80),
-			Vector2(900, 2320), Vector2(1600, 2320), Vector2(2300, 2320),
-		],
+		"roads": [],
+		"checkpoints": [],
+		"barrel_spots": [],
+		"spawn_points": [],
 		"blocks": [],
 	},
 	"blank_m": {
@@ -532,30 +511,12 @@ const LAYOUTS := {
 		"chokes": [],
 		"jobs": [],
 		"start": Vector2(1600, 1200),
-		"buildings": [
-			Rect2(480, 420, 520, 280), Rect2(2200, 420, 520, 280),
-			Rect2(480, 1700, 520, 280), Rect2(2200, 1700, 520, 280),
-			Rect2(1340, 420, 520, 200), Rect2(1340, 1780, 520, 200),
-		],
+		"buildings": [],
 		"props": [],
-		"roads": [Rect2(0, 0, 3200, 220), Rect2(0, 2180, 3200, 220), Rect2(0, 0, 220, 2400), Rect2(2980, 0, 220, 2400)],
-		"checkpoints": [
-			Vector2(160, 160), Vector2(800, 160), Vector2(1600, 160), Vector2(2400, 160), Vector2(3040, 160),
-			Vector2(160, 2240), Vector2(800, 2240), Vector2(1600, 2240), Vector2(2400, 2240), Vector2(3040, 2240),
-			Vector2(160, 700), Vector2(160, 1200), Vector2(160, 1700),
-			Vector2(3040, 700), Vector2(3040, 1200), Vector2(3040, 1700),
-			Vector2(1100, 1200), Vector2(1600, 1200), Vector2(2100, 1200), Vector2(1600, 900), Vector2(1600, 1500),
-		],
-		"barrel_spots": [
-			Vector2(1200, 1050), Vector2(1350, 1050), Vector2(1850, 1350), Vector2(2000, 1350),
-			Vector2(1100, 1450), Vector2(2100, 950),
-		],
-		"spawn_points": [
-			Vector2(80, 700), Vector2(80, 1200), Vector2(80, 1700),
-			Vector2(3120, 700), Vector2(3120, 1200), Vector2(3120, 1700),
-			Vector2(900, 80), Vector2(1600, 80), Vector2(2300, 80),
-			Vector2(900, 2320), Vector2(1600, 2320), Vector2(2300, 2320),
-		],
+		"roads": [],
+		"checkpoints": [],
+		"barrel_spots": [],
+		"spawn_points": [],
 		"blocks": [],
 	},
 	"blank_l": {
@@ -566,29 +527,12 @@ const LAYOUTS := {
 		"chokes": [],
 		"jobs": [],
 		"start": Vector2(1600, 1200),
-		"buildings": [
-			Rect2(520, 480, 360, 240), Rect2(2320, 480, 360, 240),
-			Rect2(520, 1680, 360, 240), Rect2(2320, 1680, 360, 240),
-		],
+		"buildings": [],
 		"props": [],
-		"roads": [Rect2(0, 0, 3200, 220), Rect2(0, 2180, 3200, 220), Rect2(0, 0, 220, 2400), Rect2(2980, 0, 220, 2400)],
-		"checkpoints": [
-			Vector2(160, 160), Vector2(800, 160), Vector2(1600, 160), Vector2(2400, 160), Vector2(3040, 160),
-			Vector2(160, 2240), Vector2(800, 2240), Vector2(1600, 2240), Vector2(2400, 2240), Vector2(3040, 2240),
-			Vector2(160, 700), Vector2(160, 1200), Vector2(160, 1700),
-			Vector2(3040, 700), Vector2(3040, 1200), Vector2(3040, 1700),
-			Vector2(1100, 1200), Vector2(1600, 1200), Vector2(2100, 1200), Vector2(1600, 900), Vector2(1600, 1500),
-		],
-		"barrel_spots": [
-			Vector2(1200, 1050), Vector2(1350, 1050), Vector2(1850, 1350), Vector2(2000, 1350),
-			Vector2(1100, 1450), Vector2(2100, 950),
-		],
-		"spawn_points": [
-			Vector2(80, 700), Vector2(80, 1200), Vector2(80, 1700),
-			Vector2(3120, 700), Vector2(3120, 1200), Vector2(3120, 1700),
-			Vector2(900, 80), Vector2(1600, 80), Vector2(2300, 80),
-			Vector2(900, 2320), Vector2(1600, 2320), Vector2(2300, 2320),
-		],
+		"roads": [],
+		"checkpoints": [],
+		"barrel_spots": [],
+		"spawn_points": [],
 		"blocks": [],
 	},
 	"endless": {
@@ -599,35 +543,12 @@ const LAYOUTS := {
 		"chokes": [],
 		"jobs": [],
 		"start": Vector2(1600, 1200),
-		"buildings": [
-			Rect2(340, 300, 200, 140), Rect2(2660, 300, 200, 140),
-			Rect2(340, 1960, 200, 140), Rect2(2660, 1960, 200, 140),
-		],
+		"buildings": [],
 		"props": [],
-		"roads": [
-			Rect2(0, 0, 3200, 200), Rect2(0, 2200, 3200, 200), Rect2(0, 0, 200, 2400), Rect2(3000, 0, 200, 2400),
-			Rect2(640, 520, 1920, 160), Rect2(640, 1720, 1920, 160), Rect2(640, 520, 160, 1360), Rect2(2400, 520, 160, 1360),
-			Rect2(1520, 200, 160, 320), Rect2(1520, 1880, 160, 320), Rect2(200, 1120, 440, 160), Rect2(2560, 1120, 440, 160),
-			Rect2(800, 1120, 1600, 160), Rect2(1520, 680, 160, 1040),
-		],
-		"checkpoints": [
-			Vector2(160, 160), Vector2(800, 160), Vector2(1600, 160), Vector2(2400, 160), Vector2(3040, 160),
-			Vector2(160, 2240), Vector2(800, 2240), Vector2(1600, 2240), Vector2(2400, 2240), Vector2(3040, 2240),
-			Vector2(160, 700), Vector2(160, 1200), Vector2(160, 1700),
-			Vector2(3040, 700), Vector2(3040, 1200), Vector2(3040, 1700),
-			Vector2(1100, 1200), Vector2(1600, 1200), Vector2(2100, 1200), Vector2(1600, 900), Vector2(1600, 1500),
-			Vector2(1600, 600), Vector2(1600, 1800), Vector2(720, 1200), Vector2(2480, 1200),
-		],
-		"barrel_spots": [
-			Vector2(1200, 1050), Vector2(1350, 1050), Vector2(1850, 1350), Vector2(2000, 1350),
-			Vector2(1100, 1450), Vector2(2100, 950),
-		],
-		"spawn_points": [
-			Vector2(80, 700), Vector2(80, 1200), Vector2(80, 1700),
-			Vector2(3120, 700), Vector2(3120, 1200), Vector2(3120, 1700),
-			Vector2(900, 80), Vector2(1600, 80), Vector2(2300, 80),
-			Vector2(900, 2320), Vector2(1600, 2320), Vector2(2300, 2320),
-		],
+		"roads": [],
+		"checkpoints": [],
+		"barrel_spots": [],
+		"spawn_points": [],
 		"blocks": [],
 	},
 }
