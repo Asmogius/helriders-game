@@ -4048,5 +4048,20 @@
  ],
  "sheet": "courier_frame__core.png",
  "composite": "courier_frame.png",
+ "shadow": {
+  "sheet": "courier_frame__shadow.png",
+  "frame_w": 254,
+  "frame_h": 254,
+  "alpha": 0.82,
+  "sun": [
+   -0.45,
+   -0.55,
+   0.7
+  ],
+  "dir": [
+   0.643,
+   0.786
+  ]
+ },
  "hd": true
 }

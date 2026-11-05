@@ -1877,5 +1877,20 @@
  "defaults": [],
  "sheet": "torcher__core.png",
  "composite": "torcher.png",
+ "shadow": {
+  "sheet": "torcher__shadow.png",
+  "frame_w": 110,
+  "frame_h": 110,
+  "alpha": 0.82,
+  "sun": [
+   -0.45,
+   -0.55,
+   0.7
+  ],
+  "dir": [
+   0.643,
+   0.786
+  ]
+ },
  "burnt": "torcher__chassis_burnt.png"
 }
