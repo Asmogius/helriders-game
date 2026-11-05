@@ -50,12 +50,12 @@ func _initialize() -> void:
 	_check(JSON.stringify(Layouts.build("alleys", 77)) != JSON.stringify(Layouts.build("alleys", 78)), "another seed varies it")
 	var used := {}
 	for day in range(1, 15):
-		for job: Dictionary in Missions.make_board(day, 4, 0):
+		for job: Dictionary in Missions.make_board(day, 4, 0, "core"):   # every district open
 			var lid := str(job.get("layout", ""))
 			used[lid] = true
 			if not Layouts.ids_for(str(job.type)).has(lid):
 				_check(false, "a %s job got a layout it can't use (%s)" % [job.type, lid])
-	_check(used.size() >= 9, "two weeks of boards use most layouts (%d)" % used.size())
+	_check(used.size() >= 9, "two weeks of boards (all districts open) use most layouts (%d)" % used.size())
 	var job: Dictionary = Missions.make_board(3, 4, 0)[0]
 	_check(Missions.threats_text(job).begins_with(str(Layouts.LAYOUTS[str(job.layout)].name)), "the Comms card names the map")
 	_check(str(ProfileScript._clean_mission(JSON.parse_string(JSON.stringify(job))).get("layout", "")) == str(job.layout), "saves keep a job's layout")
