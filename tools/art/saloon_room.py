@@ -11,10 +11,10 @@ OUT = os.path.join(HERE, "..", "..", "art", "saloon")
 from saloon_iso import night_grade, S, TOP, FRONT  # noqa: E402
 from saloon_concept_c import build_C as _build_C  # noqa: E402
 
-SPRITE_SCALE = 1.35
+SPRITE_SCALE = 1.0  # exact concept C figure scale
 SEAT_IDS = ["bar_left", "table_left", "table_mid", "table_right"]
 # Concept C crew() seat voxel centres
-SEAT_VOX = [(32, 21, 9), (44, 46, 9), (58, 42, 9), (86, 42, 9)]
+SEAT_VOX = [(32, 21, 9), (44, 46, 9), (58, 42, 9), (70, 48, 9)]
 
 
 def write_import(path: str) -> None:
@@ -165,7 +165,9 @@ def main():
         hw = max(64, nw + 24); hh = max(64, nh + 24)
         hx = int(np.clip(pos[0] + nw / 2 - hw / 2, 0, 1280 - hw))
         hy = int(np.clip(pos[1] + nh / 2 - hh / 2, 0, 720 - hh))
-        side = "right" if (pos[0] + nw // 2) < 700 else "left"
+        # Card opens away from the figure. Fireplace is center-back (clear of both strips).
+        cx = pos[0] + nw // 2
+        side = "right" if cx < 640 else "left"
         seats_out.append({
             "id": sid, "slot": slot, "pos": pos, "z": int(pos[1] + nh),
             "hit_rect": [hx, hy, hw, hh], "anchor": [ax, ay], "card_side": side,
@@ -178,6 +180,9 @@ def main():
 
     meta = {
         "room_size": [1280, 720],
+        "fireplace_rect": [560, 50, 280, 180],
+        "card_left_rect": [24, 72, 356, 448],
+        "card_right_rect": [900, 72, 356, 448],
         "camera": "near-isometric ~52° (S=8,TOP=5,FRONT=10,SIDE=4) — identical to saloon_v2 concept C",
         "tilt_note": "Not garage TILT 30°. Matches approved concepts/saloon_v2/saloon_c_*.png.",
         "sun": "upper-left → hard shadows down-right",

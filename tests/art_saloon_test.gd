@@ -1,7 +1,5 @@
 extends SceneTree
-## Headless check of the Saloon C room bake (art/saloon/saloon_room.json).
-## Verifies UI seat schema, hit_rect >= 64x64, textures load, card_side opens
-## away from the seat and never covers the fireplace (right upper).
+## Saloon C bake: schema, hit_rect >= 64x64, card clears fireplace + own crew.
 
 var fails := 0
 
@@ -9,6 +7,11 @@ func check(ok: bool, msg: String) -> void:
 	if not ok:
 		fails += 1
 		printerr("FAIL: ", msg)
+
+func _rects_overlap(a: Array, b: Array) -> bool:
+	# a,b = [x,y,w,h]
+	return int(a[0]) < int(b[0]) + int(b[2]) and int(a[0]) + int(a[2]) > int(b[0]) \
+		and int(a[1]) < int(b[1]) + int(b[3]) and int(a[1]) + int(a[3]) > int(b[1])
 
 func _init() -> void:
 	_run.call_deferred()
@@ -20,7 +23,6 @@ func _run() -> void:
 	check(f != null, "saloon_room.json opens")
 	if f == null:
 		print("art_saloon_test: %d FAILURES" % fails); quit(1); return
-	# GDScript has no None — use null check above; continue:
 	var data: Variant = JSON.parse_string(f.get_as_text())
 	check(typeof(data) == TYPE_DICTIONARY, "json is Dictionary")
 	var meta: Dictionary = data
@@ -29,11 +31,12 @@ func _run() -> void:
 	check(meta.has("seats") and meta.seats is Array and meta.seats.size() >= 1, "seats array")
 	check(FileAccess.file_exists(String(meta.get("background", ""))), "background texture")
 	check(FileAccess.file_exists(String(meta.get("lights", ""))), "lights texture")
-	# Fireplace occupies the right-upper strip; cards opening left would cover it.
-	# Seats must sit left/center; card_side must open away from the figure.
-	const FIRE_X0 := 780
-	const CARD_LEFT_X1 := 380
-	const CARD_RIGHT_X0 := 900
+	check(meta.has("fireplace_rect") and meta.fireplace_rect is Array and meta.fireplace_rect.size() == 4, "fireplace_rect")
+	var fire: Array = meta.fireplace_rect
+	var card_left: Array = meta.get("card_left_rect", [24, 72, 356, 448])
+	var card_right: Array = meta.get("card_right_rect", [900, 72, 356, 448])
+	check(not _rects_overlap(card_left, fire), "left card strip clear of fireplace")
+	check(not _rects_overlap(card_right, fire), "right card strip clear of fireplace")
 	var ids := {}
 	for s in meta.seats:
 		check(s is Dictionary, "seat is Dictionary")
@@ -46,18 +49,20 @@ func _run() -> void:
 		check(int(seat.hit_rect[2]) >= 64 and int(seat.hit_rect[3]) >= 64, "%s hit_rect >= 64x64" % seat.id)
 		var side := String(seat.card_side)
 		check(side in ["left", "right"], "%s.card_side" % seat.id)
+		var card: Array = card_left if side == "left" else card_right
+		check(not _rects_overlap(card, fire), "%s card clear of fireplace" % seat.id)
+		check(not _rects_overlap(card, seat.hit_rect), "%s card clear of own crew hit_rect" % seat.id)
+		# Callout: anchor must not lie inside the card
+		var ax := int(seat.anchor[0]); var ay := int(seat.anchor[1])
+		var in_card := ax >= int(card[0]) and ax < int(card[0]) + int(card[2]) \
+			and ay >= int(card[1]) and ay < int(card[1]) + int(card[3])
+		check(not in_card, "%s anchor outside card (callout target)" % seat.id)
+		# Prefer opening away from the figure
 		var cx := int(seat.pos[0]) + int(seat.hit_rect[2]) / 2
-		if cx < 700:
-			check(side == "right", "%s left/center seat → card_side right (away from figure)" % seat.id)
+		if cx < 640:
+			check(side == "right", "%s left-ish seat → card_side right" % seat.id)
 		else:
-			check(side == "left", "%s right seat → card_side left (away from figure)" % seat.id)
-		# No seat under the fireplace / right card strip when card opens right
-		check(int(seat.pos[0]) < FIRE_X0, "%s clear of fireplace strip" % seat.id)
-		if side == "right":
-			check(int(seat.pos[0]) + int(seat.hit_rect[2]) < CARD_RIGHT_X0,
-				"%s figure not under right card strip" % seat.id)
-		else:
-			check(int(seat.pos[0]) > CARD_LEFT_X1, "%s figure not under left card strip" % seat.id)
+			check(side == "left", "%s right-ish seat → card_side left" % seat.id)
 		check(seat.sprites is Dictionary, "%s.sprites" % seat.id)
 		for sk in ["idle", "highlight", "dim"]:
 			check(seat.sprites.has(sk), "%s.sprites.%s" % [seat.id, sk])

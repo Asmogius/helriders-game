@@ -3,6 +3,24 @@
   1280,
   720
  ],
+ "fireplace_rect": [
+  560,
+  50,
+  280,
+  180
+ ],
+ "card_left_rect": [
+  24,
+  72,
+  356,
+  448
+ ],
+ "card_right_rect": [
+  900,
+  72,
+  356,
+  448
+ ],
  "camera": "near-isometric ~52\u00b0 (S=8,TOP=5,FRONT=10,SIDE=4) \u2014 identical to saloon_v2 concept C",
  "tilt_note": "Not garage TILT 30\u00b0. Matches approved concepts/saloon_v2/saloon_c_*.png.",
  "sun": "upper-left \u2192 hard shadows down-right",
@@ -10,21 +28,21 @@
  "background": "res://art/saloon/saloon_room.png",
  "lights": "res://art/saloon/saloon_room_lights.png",
  "lights_note": "Fireplace + lantern glow. Composite above world night grade; do not CanvasModulate.",
- "sprite_scale": 1.35,
+ "sprite_scale": 1.0,
  "seats": [
   {
    "id": "bar_left",
    "slot": 0,
    "pos": [
-    215,
-    92
+    232,
+    135
    ],
-   "z": 424,
+   "z": 381,
    "hit_rect": [
-    203,
-    80,
-    153,
-    356
+    220,
+    123,
+    120,
+    270
    ],
    "anchor": [
     284,
@@ -41,15 +59,15 @@
    "id": "table_left",
    "slot": 1,
    "pos": [
-    310,
-    217
+    328,
+    260
    ],
-   "z": 549,
+   "z": 506,
    "hit_rect": [
-    298,
-    205,
-    159,
-    356
+    316,
+    248,
+    124,
+    270
    ],
    "anchor": [
     380,
@@ -66,15 +84,15 @@
    "id": "table_mid",
    "slot": 2,
    "pos": [
-    422,
-    209
+    440,
+    250
    ],
-   "z": 527,
+   "z": 486,
    "hit_rect": [
-    410,
-    197,
-    159,
-    342
+    428,
+    238,
+    124,
+    260
    ],
    "anchor": [
     492,
@@ -91,21 +109,21 @@
    "id": "table_right",
    "slot": 3,
    "pos": [
-    646,
-    209
+    536,
+    280
    ],
-   "z": 527,
+   "z": 516,
    "hit_rect": [
-    634,
-    197,
-    159,
-    342
+    524,
+    268,
+    124,
+    260
    ],
    "anchor": [
-    716,
-    273
+    588,
+    303
    ],
-   "card_side": "left",
+   "card_side": "right",
    "sprites": {
     "idle": "res://art/saloon/crew_table_right_idle.png",
     "highlight": "res://art/saloon/crew_table_right_highlight.png",
