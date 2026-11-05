@@ -105,8 +105,6 @@ const ABILITIES := {
 		"effect": {"pierce": 3.0}},
 	"patcher": {"name": "Patcher", "ability": "Field Repair", "kind": "field_repair", "time": 0.0, "cooldown": 28.0,
 		"effect": {"heal": 30.0}, "fixed": {"epic_dr": 0.3, "epic_time": 3.0}},
-	"welder_old": {"name": "Welder", "ability": "Weld Plates", "kind": "weld", "time": 4.0, "cooldown": 25.0,
-		"effect": {"dr": 0.5}},
 	"marker": {"name": "Marker", "ability": "Mark", "kind": "mark", "time": 6.0, "cooldown": 20.0,
 		"effect": {"vuln": 0.3}},
 	"scout": {"name": "Scout", "ability": "Flare", "kind": "flare", "time": 5.0, "cooldown": 24.0,
@@ -838,8 +836,6 @@ static func _apply_active(m: Dictionary, active: Dictionary) -> void:
 				m.pierce = maxi(int(m.pierce), int(a.pierce))
 			"repair_guard":
 				m.taken *= 1.0 - float(a.dr)
-			"weld":
-				m.taken *= 1.0 - minf(float(a.dr), MAX_DAMAGE_REDUCTION)
 			"overclock":
 				m.ignore_overload = true
 				m.speed *= 1.0 + float(a.speed)

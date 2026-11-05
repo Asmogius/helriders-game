@@ -2484,7 +2484,6 @@ func is_drifting() -> bool:
 ## A DRIFT just ended: what's keyed to it fires (tests call this directly).
 func end_drift() -> void:
 	drifts += 1
-	drift_ended.emit()
 	keyword_pop("DRIFT")
 	if has_mod("hit_and_run"):
 		hit_run_left = T.HIT_AND_RUN_TIME
@@ -2918,7 +2917,6 @@ var drifts := 0                    # DRIFTs ended (tests, keyword feedback)
 var hit_run_left := 0.0            # Hit and Run: +15% damage while > 0
 var workshop_used := false         # Mobile Workshop: once per mission
 var _drift_time := 0.0
-signal drift_ended
 signal keyword(kw: String, at: Vector2)   # keyword feedback (keyword_fx.gd)
 var _kw_last := {}                 # keyword -> clock of its last popup (throttle)
 var _kw_clock := 0.0
