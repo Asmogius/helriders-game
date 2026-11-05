@@ -90,9 +90,9 @@ const COL_GARAGE_FLOOR_LINE := Color(0.471, 0.408, 0.235)# painted bay lines (12
 const COL_GARAGE_OIL := Color(0.094, 0.09, 0.094)       # oil stains on the slab (24, 23, 24)
 const COL_GARAGE_PEGBOARD := Color(0.29, 0.235, 0.173)  # tool pegboard (74, 60, 44)
 const COL_GARAGE_WALL := Color(0.18, 0.188, 0.204)      # corrugated back wall (46, 48, 52)
-# The world-only night tint (#512b11), shared by every scene incl. the garage; FX stay unmodulated.
-const COL_NIGHT_WORLD := Color(0.318, 0.169, 0.067)
-const COL_GARAGE_STREET_NIGHT := COL_NIGHT_WORLD # street past the roll-up door (#512b11; was cool blue 30,34,44)
+# The world-only night tint (#2a3550), shared by every scene incl. the garage; FX stay unmodulated.
+const COL_NIGHT_WORLD := Color(42.0 / 255.0, 53.0 / 255.0, 80.0 / 255.0) # RGB 42, 53, 80
+const COL_GARAGE_STREET_NIGHT := COL_NIGHT_WORLD # street past the roll-up door (#2a3550; was #512b11, before that cool blue 30,34,44)
 const COL_GARAGE_GAS_RED := Color(0.431, 0.157, 0.133)  # welding gas cylinders (110, 40, 34)
 const COL_GARAGE_DUST := Color(0.9, 0.88, 0.8)          # drifting dust motes, drawn at alpha 0.02-0.18 (230, 224, 204; garage_ambient.gd)
 const COL_GARAGE_SPARK := Color(1.0, 0.85, 0.5)         # weld sparks, alpha fades with life (255, 217, 128; garage_ambient.gd)

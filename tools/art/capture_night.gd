@@ -5,7 +5,7 @@ extends SceneTree
 ## Writes day_play.png, night_play.png (close, with a tracer and a blast),
 ## day_map.png, night_map.png (styled bake) and night_fallback.png (code-drawn).
 ## The night shots force the flag on this one job so the pair differs only by
-## the world multiply. FX, tracers and the rig stay unmodulated.
+## the world multiply (T.COL_NIGHT_WORLD, #2a3550). FX, tracers and the rig stay unmodulated.
 
 const Missions := preload("res://scripts/missions.gd")
 const T := preload("res://scripts/tuning.gd")

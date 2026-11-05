@@ -17,6 +17,7 @@ func _initialize() -> void:
 	var profile: Node = root.get_node("Profile")
 	profile.set("persist", false)
 	profile.call("new_game")
+	_check_colour()
 	_check_chances()
 	_check_rolls()
 	_check_boards()
@@ -24,6 +25,12 @@ func _initialize() -> void:
 	# The mission scene only enters the tree once this script's _initialize
 	# has returned, so the tint checks run on the next idle frame.
 	_check_tint.call_deferred()
+
+
+func _check_colour() -> void:
+	var want := Color(42.0 / 255.0, 53.0 / 255.0, 80.0 / 255.0)
+	_check(T.COL_NIGHT_WORLD == want and T.COL_NIGHT_WORLD.to_html(false) == "2a3550", "world night is #2a3550 (42, 53, 80)")
+	_check(T.COL_GARAGE_STREET_NIGHT == T.COL_NIGHT_WORLD, "garage street night tracks the world night")
 
 
 func _check(ok: bool, what: String) -> void:
