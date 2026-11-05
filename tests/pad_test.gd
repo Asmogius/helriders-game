@@ -72,8 +72,15 @@ func _process(_delta: float) -> bool:
 	match frame:
 		3:
 			_check(not bool(pad.get("active")) and _focus() == null, "touch mode to start: no focus")
+			_check(not bool(pad.call("touch_chrome_hidden")), "headless start keeps touch chrome available")
+			pad.set("joy_connected", true)
+			_check(bool(pad.call("touch_chrome_hidden")), "a connected joypad hides touch chrome")
+			pad.set("joy_connected", false)
+			_check(not bool(pad.call("touch_chrome_hidden")), "unplugging the joypad restores touch chrome on non-PC")
 			_button(JOY_BUTTON_DPAD_DOWN)
 			_check(bool(pad.get("active")), "a pad press switches to controller mode")
+			_check(str(pad.get("last_scheme")) == "pad", "last_scheme follows the pad")
+			_check(bool(pad.call("touch_chrome_hidden")), "controller mode hides touch chrome")
 		6:
 			var f := _focus()
 			_check(f is BaseButton and f.is_visible_in_tree(), "a visible button takes focus")

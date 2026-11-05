@@ -13,6 +13,8 @@ extends Node
 ## scene's pad_button(button) if it has one.
 
 signal mode_changed(active: bool)
+signal scheme_changed(scheme: String)   # "touch" | "pad" | "kbm" — last input used
+signal joy_connection_changed(connected: bool)
 
 const DEAD := 0.18           # stick deadzone
 const TRIGGER := 0.4         # R2 counts as held past this
@@ -25,6 +27,8 @@ var _scan := 0.0
 var _modal: Control          # the modal at the last scan (a new one rescans at once)
 var override := {}           # tests: "left" / "right" Vector2 and "r2" bool stand in for the pad
 var kbm := false             # PC: mouse and keyboard in use (pad.gd tracks all three schemes)
+var last_scheme := "touch"   # prompts / glyphs follow the last input used
+var joy_connected := false   # any joypad currently plugged in
 
 
 func _ready() -> void:
@@ -34,6 +38,10 @@ func _ready() -> void:
 		Input.emulate_touch_from_mouse = false
 		if DisplayServer.get_name() != "headless":
 			kbm = true   # playtest #10: real PC starts KBM so touch chrome stays hidden
+			last_scheme = "kbm"
+	_refresh_joy_connected()
+	if not Input.joy_connection_changed.is_connected(_on_joy_connection_changed):
+		Input.joy_connection_changed.connect(_on_joy_connection_changed)
 	var layer := CanvasLayer.new()
 	layer.layer = 120
 	add_child(layer)
@@ -41,6 +49,41 @@ func _ready() -> void:
 	_ring.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(_ring)
+
+
+func _refresh_joy_connected() -> void:
+	joy_connected = not Input.get_connected_joypads().is_empty()
+
+
+func _on_joy_connection_changed(_device: int, connected: bool) -> void:
+	var was := joy_connected
+	_refresh_joy_connected()
+	if joy_connected != was:
+		joy_connection_changed.emit(joy_connected)
+	# Android: last pad unplugged → drop controller mode so touch chrome returns.
+	if not joy_connected and active and not _desktop():
+		set_active(false)
+	elif joy_connected and not _desktop():
+		# A pad plugged in on a phone: prefer controller chrome immediately.
+		set_scheme("pad")
+	mode_changed.emit(active)
+
+
+## Hide on-screen touch sticks / ability / CREW / LOCK / pause when a pad is
+## connected, the player is on KBM, or this is a desktop build.
+func touch_chrome_hidden() -> bool:
+	if _desktop() and DisplayServer.get_name() != "headless":
+		return true
+	if joy_connected or active or kbm:
+		return true
+	return false
+
+
+func set_scheme(scheme: String) -> void:
+	if scheme == last_scheme:
+		return
+	last_scheme = scheme
+	scheme_changed.emit(scheme)
 
 
 func _input(event: InputEvent) -> void:
@@ -91,6 +134,7 @@ func _input(event: InputEvent) -> void:
 	elif event is InputEventScreenTouch and (event as InputEventScreenTouch).pressed:
 		capturing = ""
 		capturing_kbm = ""
+		set_scheme("touch")
 		set_active(false)
 		set_kbm(false)
 	elif event is InputEventMouseButton and (event as InputEventMouseButton).pressed:
@@ -121,6 +165,12 @@ func set_kbm(on: bool) -> void:
 	if on == kbm:
 		return
 	kbm = on
+	if on:
+		set_scheme("kbm")
+	elif active or joy_connected:
+		set_scheme("pad")
+	else:
+		set_scheme("touch")
 	if on and active:
 		set_active(false)
 		return   # set_active emitted the change
@@ -136,6 +186,7 @@ func set_active(on: bool) -> void:
 		return
 	if on:
 		kbm = false
+		set_scheme("pad")
 	active = on
 	_scan = 0.0
 	if not on:
@@ -143,18 +194,20 @@ func set_active(on: bool) -> void:
 		var owner := get_viewport().gui_get_focus_owner()
 		if owner != null:
 			owner.release_focus()
+		if not kbm and not joy_connected:
+			set_scheme("touch")
 	mode_changed.emit(on)
 
 
-## The touch wording, or the pad's while a controller is in use (hints and
-## tips; screens listen to mode_changed to swap them).
+## The touch wording, or the pad/KBM wording for the last input used (hints and
+## tips; screens listen to mode_changed / scheme_changed to swap them).
 static func hint(touch: String, pad: String, mouse := "") -> String:
 	var tree := Engine.get_main_loop() as SceneTree
 	var p: Node = tree.root.get_node_or_null("Pad") if tree != null else null
-	if p != null and bool(p.get("active")):
+	var scheme := str(p.get("last_scheme")) if p != null else "touch"
+	if scheme == "pad" or (p != null and bool(p.get("active"))):
 		return pad
-	if p != null and bool(p.get("kbm")):
-		# Mouse and keyboard: its own wording, or the touch text with clicks for taps.
+	if scheme == "kbm" or (p != null and bool(p.get("kbm"))):
 		return mouse if mouse != "" else touch.replace("Tap", "Click").replace("tap", "click").replace("TAP", "CLICK")
 	return touch
 

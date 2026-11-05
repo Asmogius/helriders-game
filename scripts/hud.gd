@@ -19,6 +19,9 @@ var left_stick: ThumbStick
 var right_stick: ThumbStick
 var _lock_wanted := false
 var _crew_wanted := false
+## Empty slot reserved for the rig-diagram health widget (ui-rig-health-hud).
+## Layout-only: this PR leaves the Control empty for that follow-up.
+var rig_health_slot: Control
 
 var _root: Control
 var _armor_bar: ArmorBar
@@ -64,6 +67,13 @@ func _ready() -> void:
 	_rig_icon.position = Vector2(20, 10)
 	_rig_icon.size = Vector2(64, 76)
 	_root.add_child(_rig_icon)
+	# Anchor for ui-rig-health-hud: sits beside the existing icon, empty for now.
+	rig_health_slot = Control.new()
+	rig_health_slot.name = "RigHealthSlot"
+	rig_health_slot.position = Vector2(20, 10)
+	rig_health_slot.size = Vector2(120, 120)
+	rig_health_slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(rig_health_slot)
 
 	_status_strip = StatusStrip.new()
 	_status_strip.position = Vector2(20, 90)
@@ -209,6 +219,10 @@ func _ready() -> void:
 	if pad != null:
 		pad.connect("mode_changed", _pad_badges)
 		pad.connect("map_changed", _pad_badges.bind(false))
+		if pad.has_signal("scheme_changed") and not pad.is_connected("scheme_changed", _on_scheme_changed):
+			pad.connect("scheme_changed", _on_scheme_changed)
+		if pad.has_signal("joy_connection_changed") and not pad.is_connected("joy_connection_changed", _on_joy_chrome):
+			pad.connect("joy_connection_changed", _on_joy_chrome)
 	_pad_badges()
 
 
@@ -409,18 +423,23 @@ func set_lock_available(available: bool) -> void:
 	_controls_hint()
 
 
-## The control line at the bottom, in touch or controller wording.
+## The control line at the bottom: glyphs follow the last input scheme.
 func _controls_hint() -> void:
-	var lock := _lock_button.visible
+	var lock := _lock_wanted
 	var pad := get_node_or_null("/root/Pad")
-	if pad != null and bool(pad.get("kbm")):
+	var scheme := str(pad.get("last_scheme")) if pad != null else "touch"
+	if pad != null and (scheme == "kbm" or bool(pad.get("kbm"))):
 		var fire_n := str(pad.call("kbm_button_name", "fire"))
 		var lock_n := str(pad.call("kbm_button_name", "lock"))
-		_hint.text = "WASD  DRIVE      MOUSE  AIM      %s  FIRE" % fire_n + ("      %s  LOCK" % lock_n if lock else "")
-	elif pad != null and bool(pad.get("active")):
+		var pause_n := str(pad.call("kbm_button_name", "pause"))
+		_hint.text = "WASD  DRIVE      MOUSE  AIM      %s  FIRE" % fire_n \
+			+ ("      %s  LOCK" % lock_n if lock else "") \
+			+ "      %s  PAUSE" % pause_n
+	elif pad != null and (scheme == "pad" or bool(pad.get("active")) or bool(pad.get("joy_connected"))):
 		var sw := bool(pad.call("sticks_swapped"))
 		_hint.text = "%s STICK  DRIVE      %s STICK  AIM      %s  FIRE" % ["RIGHT" if sw else "LEFT", "LEFT" if sw else "RIGHT", str(pad.call("button_name", "fire"))] \
-			+ ("      %s  LOCK" % str(pad.call("button_name", "lock")) if lock else "")
+			+ ("      %s  LOCK" % str(pad.call("button_name", "lock")) if lock else "") \
+			+ "      %s  PAUSE" % str(pad.call("button_name", "pause"))
 	else:
 		_hint.text = "LEFT THUMB  DRIVE      RIGHT THUMB  AIM + FIRE" + ("      LOCK  AUTO-AIM" if lock else "")
 
@@ -1248,28 +1267,44 @@ const PadScript := preload("res://scripts/pad.gd")
 
 
 ## Controller mode: each button shows the pad button that works it.
+func _on_scheme_changed(_scheme: String) -> void:
+	_pad_badges()
+
+
+func _on_joy_chrome(_connected: bool) -> void:
+	_pad_badges()
+
+
 func _pad_badges(_on := false) -> void:
 	var pad := get_node_or_null("/root/Pad")
-	var on := pad != null and bool(pad.get("active"))
-	var keys := pad != null and bool(pad.get("kbm"))
+	var scheme := str(pad.get("last_scheme")) if pad != null else "touch"
+	var on := pad != null and (scheme == "pad" or bool(pad.get("active")))
+	var keys := pad != null and (scheme == "kbm" or bool(pad.get("kbm")))
 	for i in _ability_buttons.size():
 		var action := "ability_%d" % (i + 1)
 		_ability_buttons[i].pad_badge = str(pad.call("badge", action)) if on and i < 3 else (str(pad.call("kbm_badge", action)) if keys and i < 3 else "")
 	_lock_button.pad_badge = str(pad.call("badge", "lock")) if on else (str(pad.call("kbm_badge", "lock")) if keys else "")
 	_crew_button.pad_badge = str(pad.call("badge", "crew")) if on else (str(pad.call("kbm_badge", "crew")) if keys else "")
 	_sync_touch_chrome()
-	left_stick.queue_redraw()   # V6.4 / playtest #10: sticks hide in mouse-and-keyboard mode
-	right_stick.queue_redraw()
 	_controls_hint()
 
 
-## Touch stick chrome (CREW / LOCK buttons) hides on desktop KBM; keys still work.
+## Touch sticks, ability / CREW / LOCK / pause buttons hide on PC, when a
+## joypad is connected, or while KBM / controller mode is active. Keys and
+## pad bindings still work; only the on-screen touch chrome goes away.
 func _sync_touch_chrome() -> void:
 	var pad := get_node_or_null("/root/Pad")
-	var hide := pad != null and bool(pad.get("kbm"))
+	var hide := pad != null and bool(pad.call("touch_chrome_hidden"))
+	left_stick.visible = not hide
+	right_stick.visible = not hide
+	pause_button.visible = not hide
 	_lock_button.visible = _lock_wanted and not hide
 	_crew_button.visible = _crew_wanted and not hide
+	for b in _ability_buttons:
+		b.visible = not hide
 	_layout_buttons()
+	left_stick.queue_redraw()
+	right_stick.queue_redraw()
 
 
 ## R1: the LOCK button, if it's showing.

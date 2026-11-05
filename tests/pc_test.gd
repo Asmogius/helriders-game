@@ -109,6 +109,30 @@ func _process(_delta: float) -> bool:
 			_check(int(pad.call("kbm_binding", "fire")) >= 0, "swap left FIRE bound after pause move")
 			pad.call("reset_kbm_map")
 			_check(str(pad.call("kbm_button_name", "fire")) == "LEFT CLICK" and str(pad.call("kbm_button_name", "pause")) == "ESC", "RESET restores fire/lock/pause defaults")
+			# Defaults cover every fight action; map persists with settings.
+			var defaults: Dictionary = pad.get("KBM_DEFAULT")
+			for a: String in ["fire", "lock", "pause", "ability_1", "ability_2", "ability_3", "crew"]:
+				_check(defaults.has(a) and int(pad.call("kbm_binding", a)) == int(defaults[a]), "KBM default binds %s" % a)
+			pad.call("bind_kbm", "ability_2", KEY_G)
+			profile.persist = true
+			var ppath: String = profile.settings_path
+			profile.settings_path = "user://helriders_kbm_map_test.cfg"
+			profile.save_settings()
+			profile.settings.erase("kbm_map")
+			profile.load_settings()
+			_check(int(pad.call("kbm_binding", "ability_2")) == KEY_G, "kbm_map survives save/load")
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(profile.settings_path))
+			profile.settings_path = ppath
+			profile.persist = false
+			pad.call("reset_kbm_map")
+			# Device detection / touch chrome hide (simulated joy + scheme).
+			pad.set("joy_connected", true)
+			pad.call("set_scheme", "pad")
+			_check(bool(pad.call("touch_chrome_hidden")), "joy_connected hides touch chrome")
+			pad.set("joy_connected", false)
+			pad.call("set_scheme", "kbm")
+			pad.set("kbm", true)
+			_check(bool(pad.call("touch_chrome_hidden")), "kbm hides touch chrome")
 			garage.menu.show_page("settings")
 			_check(bool(profile.settings.get("fullscreen", false)), "the DISPLAY toggle turns fullscreen on")
 		5:
@@ -170,6 +194,10 @@ func _process(_delta: float) -> bool:
 			# Playtest #10: touch stick chrome hidden on KBM (keys still work).
 			hud.set_lock_available(true)
 			_check(not hud._lock_button.visible and not hud._crew_button.visible, "LOCK and CREW buttons hide on KBM")
+			_check(not hud.left_stick.visible and not hud.right_stick.visible and not hud.pause_button.visible, "sticks and pause hide on KBM/PC")
+			_check(hud._ability_buttons.is_empty() or not hud._ability_buttons[0].visible, "ability buttons hide on KBM/PC")
+			_check(hud.rig_health_slot != null and hud.rig_health_slot.name == "RigHealthSlot", "HUD leaves a RigHealthSlot anchor for ui-rig-health-hud")
+			_check(str(hud._hint.text).contains("PAUSE"), "KBM control line shows the pause glyph")
 			_check(bool(root.get_node("Pad").get("kbm")), "still in KBM mode")
 			_key(KEY_Q)
 			_check(float(main.vehicle.abilities[0].ready_in) > 0.0, "Q fires the first utility")

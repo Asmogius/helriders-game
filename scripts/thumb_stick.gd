@@ -143,8 +143,10 @@ func _draw() -> void:
 			return
 		var rest := Vector2(170.0, size.y - 160.0) if left_side else Vector2(size.x - 170.0, size.y - 160.0)
 		var pad := get_node_or_null("/root/Pad")
+		if pad != null and pad.has_method("touch_chrome_hidden") and bool(pad.call("touch_chrome_hidden")):
+			return   # PC / pad connected / KBM: no on-screen stick chrome
 		if pad != null and bool(pad.get("kbm")):
-			return   # playtest #10: no rest stick / gauge rings on KBM
+			return
 		_draw_rest(rest, accent)
 		_draw_gauges(rest)
 		return
