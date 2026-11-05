@@ -108,6 +108,7 @@ godot --headless --fixed-fps 60 --path . -s res://tests/night_test.gd      # mus
 godot --headless --fixed-fps 60 --path . -s res://tests/kill_loops_test.gd   # must end "KILL LOOPS TEST PASSED" (one blast hits every zombie in range)
 godot --headless --fixed-fps 60 --path . -s res://tests/save_safety_test.gd # must end "SAVE SAFETY TEST PASSED" (corrupt nested fields, .broken copies, newer saves refused, scrap clamp)
 godot --headless --fixed-fps 60 --path . -s res://tests/wreck_and_swarm_test.gd   # must end "WRECK AND SWARM TEST PASSED" (shove through a pack, wreck freezes the fight, free hires match their card)
+godot --headless --fixed-fps 60 --path . -s res://tests/job_unlock_test.gd # must end "JOB UNLOCK TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/abandon_job_test.gd   # must end "ABANDON JOB TEST PASSED" (pause menu gives a job up: day passes, no pay, rig and crew kept)
 godot --headless --fixed-fps 60 --path . -s res://tests/crew_seating_test.gd   # must end "CREW SEATING TEST PASSED" (hires seated after a rebuild, no Driver = no DEPLOY)
 godot --headless --fixed-fps 60 --path . -s res://tests/escort_truck_test.gd # must end "ESCORT TRUCK TEST PASSED" (truck HP line, low-HP warning, GOOPED pulls the horde)

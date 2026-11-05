@@ -50,7 +50,7 @@ func _initialize() -> void:
 	_check(JSON.stringify(Layouts.build("alleys", 77)) != JSON.stringify(Layouts.build("alleys", 78)), "another seed varies it")
 	var used := {}
 	for day in range(1, 15):
-		for job: Dictionary in Missions.make_board(day, 4, 0, "core"):   # every district open
+		for job: Dictionary in Missions.make_board(day, 4, 0, "core", 99):   # every district and job type open
 			var lid := str(job.get("layout", ""))
 			used[lid] = true
 			if not Layouts.ids_for(str(job.type)).has(lid):

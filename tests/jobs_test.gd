@@ -198,7 +198,7 @@ func _check_tables() -> void:
 	_check(float(T.TRUCK.armor) == 400.0 and float(T.TRUCK.max_speed) == 230.0, "the truck: 400 armor, speed 230")
 	_check(Missions.threats_text(Missions.make("retrieve", 4, 5)).contains("4 caches (1 deep"), "Comms: Retrieve lists its caches")
 	_check(Missions.threats_text(Missions.make("escort", 5, 5)).contains("3 salvage sites"), "Comms: Escort lists its sites")
-	var board := Missions.make_board(1, 6, 0)
+	var board := Missions.make_board(1, 6, 0, "outer_blocks", 99)   # every type unlocked
 	var types := {}
 	for m: Dictionary in board:
 		types[str(m.type)] = true
