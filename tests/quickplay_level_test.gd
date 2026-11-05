@@ -159,7 +159,7 @@ func _check_sanitize_rejects() -> void:
 		"schema_version": 1, "id": "x", "name": "P", "base_map": "crossroads",
 		"player_start": [10, 10], "placeables": {"a": 1},
 	}).is_empty(), "dict placeables rejected by sanitize")
-	# validate on raw (unsanitized) must not return playable or SCRIPT ERROR
+	# validate on raw (unsanitized) must not return playable or raise a script error
 	_check(LevelData.validate_playable({"placeables": {"a": 1}}) != "", "validate rejects dict placeables")
 	_check(LevelData.validate_playable({"foo": 1}) != "", "validate rejects junk")
 
@@ -178,7 +178,7 @@ func _check_type_safety() -> void:
 		"player_start": [100, 100],
 		"placeables": [{"id": "building_box_s", "pos": [null, "x"], "rot": 0.0, "snap": true, "data": {}}],
 	})
-	_check(not with_bad_pos.is_empty() and (with_bad_pos.placeables as Array).is_empty(), "null/str pos dropped, no SCRIPT ERROR")
+	_check(not with_bad_pos.is_empty() and (with_bad_pos.placeables as Array).is_empty(), "null/str pos dropped without a script error")
 	var with_nan_rot := LevelData.sanitize({
 		"schema_version": 1, "id": "t", "name": "T", "base_map": "blank_m",
 		"player_start": [100, 100],
@@ -193,7 +193,7 @@ func _check_type_safety() -> void:
 			"data": {"enemy": "shambler", "count": {"x": 1}, "rate": 2.5, "trigger": "level_start", "radius": 100.0},
 		}],
 	})
-	_check(not with_dict_count.is_empty(), "dict spawner count does not SCRIPT ERROR")
+	_check(not with_dict_count.is_empty(), "dict spawner count is safe (no script error)")
 	var cnt: int = int((with_dict_count.placeables as Array)[0].data.count)
 	_check(cnt >= 0 and cnt <= LevelData.MAX_SPAWNER_COUNT, "dict count coerced safely")
 
