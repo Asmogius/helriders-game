@@ -11,6 +11,7 @@ const Mission := preload("res://scripts/mission.gd")
 const Missions := preload("res://scripts/missions.gd")
 const ProfileScript := preload("res://scripts/profile.gd")
 const Parts := preload("res://scripts/parts.gd")
+const Layouts := preload("res://scripts/layouts.gd")
 const T := preload("res://scripts/tuning.gd")
 const Crew := preload("res://scripts/crew.gd")
 
@@ -34,6 +35,7 @@ func _process(_delta: float) -> bool:
 	match step:
 		0:
 			_check_board()
+			_check_districts()
 			_check_bulwark_tables()
 			_start(Missions.make("clear", 1, 7), true)
 		1:
@@ -217,6 +219,39 @@ func _check_board() -> void:
 	print("  district score after four Outrider drops: %d" % profile.district_score())
 	_check(profile.district_score() == 8 and not profile.is_district_open(1) and profile.is_district_open(0), "four Uncommons score 8 of Midtown's 40")
 	profile.new_game()
+
+
+## Playtest P1-1 / P2-3: the board follows the furthest open district (skull
+## band and layouts), on a throwaway profile so the run's own save is untouched.
+func _check_districts() -> void:
+	var p: Node = ProfileScript.new()
+	p.set("persist", false)
+	p.new_game()
+	_check(p.board_district() == "outer_blocks", "a new game's board is Outer Blocks")
+	for m: Dictionary in Missions.make_board(3, 6, 0, "outer_blocks"):
+		_check(str(Layouts.LAYOUTS[str(m.layout)].district) == "outer_blocks", "Outer Blocks board uses only Outer Blocks maps (%s)" % m.layout)
+	# Extract parts (not starters) until Midtown opens.
+	var need := int(T.DISTRICTS[1].need)
+	for id: String in Parts.CATALOG:
+		if p.district_score() >= need:
+			break
+		if not Parts.STARTER_SCHEMATICS.has(id) and not p.schematics.has(id):
+			p.schematics.append(id)
+	_check(p.is_district_open(1) and p.board_district() != "outer_blocks", "unlocking Midtown moves the board's district (%s, score %d)" % [p.board_district(), p.district_score()])
+	p.board = []
+	p.ensure_board()
+	var band: Vector2i = Missions.skull_band(p.board_district())
+	var open: Array = Missions.districts_through(p.board_district())
+	var ok := true
+	for m: Dictionary in p.board:
+		ok = ok and int(m.skulls) >= band.x and int(m.skulls) <= band.y and open.has(str(Layouts.LAYOUTS[str(m.layout)].district))
+	_check(ok, "the Profile's board rolls the open district's band %s with open-district maps" % str(band))
+	var seen := {}
+	for d in range(1, 41):
+		for m: Dictionary in Missions.make_board(d, 3, 0, "midtown"):
+			seen[int(m.skulls)] = true
+	_check(seen.has(5), "Midtown boards reach 5 skulls")
+	p.free()
 
 
 func _check_saloon_and_old_save() -> void:
