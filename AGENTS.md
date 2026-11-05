@@ -105,6 +105,8 @@ godot --headless --fixed-fps 60 --path . -s res://tests/fx_sample_test.gd # must
 godot --headless --fixed-fps 60 --path . -s res://tests/tracer_styles_test.gd # must end "TRACER STYLES TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/transitions_test.gd # must end "TRANSITIONS TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/night_test.gd      # must end "NIGHT TEST PASSED"
+godot --headless --fixed-fps 60 --path . -s res://tests/night_tint_test.gd # must end "NIGHT TINT TEST PASSED"
+godot --headless --fixed-fps 60 --path . -s res://tests/looktest_test.gd   # must end "LOOKTEST TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/kill_loops_test.gd   # must end "KILL LOOPS TEST PASSED" (one blast hits every zombie in range)
 godot --headless --fixed-fps 60 --path . -s res://tests/power_overload_test.gd # must end "POWER OVERLOAD TEST PASSED" (power overload takes utilities, then the shield, offline)
 godot --headless --fixed-fps 60 --path . -s res://tests/save_safety_test.gd # must end "SAVE SAFETY TEST PASSED" (corrupt nested fields, .broken copies, newer saves refused, scrap clamp)
