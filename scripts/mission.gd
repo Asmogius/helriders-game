@@ -2017,7 +2017,7 @@ func _schematic_finds() -> Array:
 # --- HUD -------------------------------------------------------------------------
 
 func _refresh_hud() -> void:
-	hud.set_armor(vehicle.armor / vehicle.armor_max)
+	hud.set_armor((vehicle.armor + vehicle.hp) / maxf(vehicle.armor_max + vehicle.hp_max, 1.0))   # armor + HP: bar and number
 	var plates := PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
 	for i in 4:
 		plates[i] = vehicle.facing_armor[i] / vehicle.facing_max[i] if vehicle.facing_max[i] > 0.0 else -1.0
