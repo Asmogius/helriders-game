@@ -1115,3 +1115,35 @@ const MUSIC_DUCK_FADE := 0.3
 
 # --- Combat SFX (agreed with the owner 2026-11-04) -----------------------------------------------------
 const SFX_WINDUP_PITCH := [0.9, 1.25]   # Bulwark roar pitch at wind-up start / end
+
+# --- Night (approved by the owner 2026-11-04, PR #69) -----------------------
+# Night is rolled per job from its seed and saved with the job. Only zombies
+# (Shamblers, variants, Hunters) change at night; enemy rigs stay the same.
+const COL_NIGHT := Color8(0x51, 0x2b, 0x11)   # #512b11, the night colour (Maps and UI own it)
+const NIGHT_CHANCE_BY_DISTRICT := [0.10, 0.35, 0.60, 1.0]   # by DISTRICTS index
+const NIGHT_CHANCE_COURIER := 0.5        # Courier jobs are 50/50 night in every district
+const NIGHT_MIN_SKULLS := 2              # never night at 1 skull...
+const NIGHT_MIN_CLEARS := 3              # ...or before the first 3 clears
+const NIGHT_ZOMBIE_SPEED_MULT := 1.15     # shambler 85 -> ~98; still far below rig 560
+const NIGHT_HUNTER_SPEED_MULT := 1.10     # 250 -> 275
+const NIGHT_ZOMBIE_DPS_MULT := 1.10       # zombies and Hunters, on top of ENEMY_DAMAGE_BY_SKULL (approved 1.20, trimmed for the 85% floor)
+const NIGHT_ZOMBIE_HP_MULT := 1.0         # unchanged: faster and meaner, not spongier
+const NIGHT_ZOMBIE_START_BONUS := 4       # 12 -> 16 alive at start (still under the cap)
+const NIGHT_RAMP_SECONDS := 3.0           # vs ZOMBIE_RAMP_SECONDS 4.0 (job ramps scale alike)
+const NIGHT_HORDE_SIZE := Vector2i(4, 7)  # vs HORDE_SIZE (3, 6)
+# ZOMBIE_CAP stays 28 at night (DESIGN §12 perf cap).
+const NIGHT_HUNTER_SPAWN_TIME := 15.0     # vs HUNTER_SPAWN_TIME 25.0 (kill trigger unchanged)
+const NIGHT_TANK_EARLIEST := 20.0         # vs TANK_EARLIEST 30.0
+const NIGHT_TANK_PACK_CHANCE := 0.4       # vs TANK_PACK_CHANCE 0.3
+const NIGHT_BILE_MARK_RANGE := 650.0      # vs BILE_MARK_RANGE 500
+# Night surge: every NIGHT_SURGE_EVERY s the whole horde frenzies (x BILE_FRENZY)
+# for NIGHT_SURGE_TIME s, warned NIGHT_SURGE_WARN s before.
+const NIGHT_SURGE_EVERY := 35.0
+const NIGHT_SURGE_TIME := 4.0
+const NIGHT_SURGE_WARN := 1.5
+const NIGHT_WRECK_TIME_FLOOR := 0.85      # night time-to-wreck >= 85% of day's (balance report)
+# Rewards
+const NIGHT_PAYOUT_MULT := 1.30           # job pay; stacks with Core Collapse's pay
+const NIGHT_KILL_SCRAP_MULT := 1.25       # zombie kill scrap, rounded up (shambler 2 -> 3)
+const NIGHT_SCHEMATIC_BONUS := 0.10       # + MISSION_SCHEMATIC_CHANCE, cap 1.0
+const NIGHT_XP_MULT := 1.25               # crew job XP

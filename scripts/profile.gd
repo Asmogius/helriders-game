@@ -142,7 +142,7 @@ func new_game() -> void:
 	day = 1
 	active_mission = {}
 	run_active = false
-	board = Missions.make_board(day, board_size(), 0)
+	board = Missions.make_board(day, board_size(), 0, "outer_blocks", int(record.clears))
 	_starter_crew()
 	saloon_day = 0
 	ensure_saloon()
@@ -374,7 +374,7 @@ func board_size() -> int:
 
 func ensure_board() -> void:
 	if board.size() != board_size():
-		board = Missions.make_board(day, board_size(), int(upgrades.get("quality", 0)))
+		board = Missions.make_board(day, board_size(), int(upgrades.get("quality", 0)), "outer_blocks", int(record.clears))
 
 
 func choose_mission(index: int) -> void:
@@ -398,7 +398,7 @@ func finish_day() -> void:
 	day += 1
 	research_today = 0
 	active_mission = {}
-	board = Missions.make_board(day, board_size(), int(upgrades.get("quality", 0)))
+	board = Missions.make_board(day, board_size(), int(upgrades.get("quality", 0)), "outer_blocks", int(record.clears))
 	_advance_lost()
 	ensure_saloon()
 	_advance_expeditions()
@@ -929,12 +929,12 @@ func rehire_done_today() -> bool:
 ## injured goes to the Inn to rest (a day less with Tough, or with a Medic's
 ## Triage on the run). Call after finish_day(), so tonight's rest doesn't
 ## count. Returns lines for the results card.
-func bank_crew(skulls: int, injured_ids: Array, triage := false, half_rest := false) -> Array[String]:
+func bank_crew(skulls: int, injured_ids: Array, triage := false, half_rest := false, xp_mult := 1.0) -> Array[String]:
 	var lines: Array[String] = []
 	var riders := seated_crew()
 	if riders.is_empty():
 		return lines
-	var share := float(skulls) / riders.size()
+	var share := float(skulls) * xp_mult / riders.size()   # xp_mult: night jobs (T.NIGHT_XP_MULT)
 	for m in riders:
 		var before := Crew.level(m)
 		m.xp = float(m.xp) + share
@@ -1207,7 +1207,7 @@ func buy_upgrade(key: String) -> bool:
 	upgrades[key] = upgrade_level(key) + 1
 	if key == "choices" or key == "quality":
 		# Same seed, so today's missions stay; more of them, or better paid.
-		board = Missions.make_board(day, board_size(), int(upgrades.quality))
+		board = Missions.make_board(day, board_size(), int(upgrades.quality), "outer_blocks", int(record.clears))
 	if key == "back_room":
 		ensure_saloon()
 	if key == "seasoned_hands":
@@ -1587,6 +1587,8 @@ static func _clean_mission(raw: Variant) -> Dictionary:
 	}
 	if Layouts.LAYOUTS.has(str(d.get("layout", ""))):
 		out["layout"] = str(d.layout)
+	if d.has("night"):
+		out["night"] = bool(d.night)   # the job's saved night roll (PR #69)
 	return out
 
 
