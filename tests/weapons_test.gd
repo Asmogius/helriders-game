@@ -59,9 +59,14 @@ func _process(_delta: float) -> bool:
 				rig.armor_max = 100000.0
 				rig.armor = rig.armor_max
 				_park(SPOT)
-				# Rig faces down (+y); aim right, a third of the way out: 600 px.
-				var push := T.MORTAR_AIM_CONE * 0.0 + 0.2 + 0.8 * (600.0 - 300.0) / 900.0
-				var o := main.spawn_bulwark(SPOT + Vector2(600, 0))
+				# Rig faces down (+y); aim right. A full push reaches the screen's
+				# edge (less half the blast), so aim a third of the way to it.
+				var reach := clampf(rig.view_reach(SPOT, Vector2.RIGHT, 45.0), 300.0, 1200.0)
+				mark.reach = reach
+				var want := lerpf(300.0, reach, 1.0 / 3.0)
+				mark.want = want
+				var push := 0.2 + 0.8 * (1.0 / 3.0)
+				var o := main.spawn_bulwark(SPOT + Vector2(want, 0))
 				o.player = null   # parked under the circle
 				o.velocity = Vector2.ZERO
 				mark.z = o
@@ -69,9 +74,9 @@ func _process(_delta: float) -> bool:
 				main.hud.right_stick.output = Vector2.RIGHT * push
 			if frame == 3 + 90:
 				var aim: Vector2 = main.shells.aim_at
-				_check(aim != Vector2.INF and absf(aim.distance_to(SPOT) - 600.0) < 25.0, "the landing circle sits where the push puts it (%.0f px out)" % aim.distance_to(SPOT))
+				_check(aim != Vector2.INF and absf(aim.distance_to(SPOT) - float(mark.want)) < 25.0, "the landing circle sits where the push puts it (%.0f px out, want %.0f; screen reach %.0f)" % [aim.distance_to(SPOT), float(mark.want), float(mark.reach)])
 			if frame == 3 + 150:
-				_check(main.shells.blasts >= 1 and main.shells.last_blast.distance_to(SPOT + Vector2(600, 0)) < 30.0, "shells land on the circle")
+				_check(main.shells.blasts >= 1 and main.shells.last_blast.distance_to(SPOT + Vector2(float(mark.want), 0)) < 30.0, "shells land on the circle")
 				var z: Node = mark.z
 				_check(float(z.get("armor")) < float(mark.zhp) - 50.0, "the blast hurts what's under it (-%.0f)" % (float(mark.zhp) - float(z.get("armor"))))
 			if frame == 3 + 200:
@@ -88,6 +93,12 @@ func _process(_delta: float) -> bool:
 			if frame == 3 + 200 + 280:
 				var aim: Vector2 = main.shells.aim_at
 				_check(absf(aim.distance_to(SPOT) - 300.0) < 25.0, "a light push lobs at the 300 px minimum (%.0f px)" % aim.distance_to(SPOT))
+				main.hud.right_stick.output = Vector2.RIGHT   # full push
+			if frame == 3 + 200 + 330:
+				var aim: Vector2 = main.shells.aim_at
+				var vp := main.get_viewport()
+				var view: Rect2 = vp.get_canvas_transform().affine_inverse() * vp.get_visible_rect()
+				_check(aim != Vector2.INF and view.has_point(aim) and aim.distance_to(SPOT) < 1200.0 - 1.0, "a full push lands at the screen's edge, not off it (%.0f px; view %s)" % [aim.distance_to(SPOT), view])
 				main.hud.right_stick.output = Vector2.ZERO
 				main.zombies.clear_all()
 				_next()

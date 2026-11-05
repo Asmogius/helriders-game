@@ -1218,7 +1218,10 @@ func _kbm_input() -> void:
 		var mortar := _mortar_stats()
 		if not mortar.is_empty():
 			# The shell lands where you point (within the Mortar's reach).
-			var t := clampf(inverse_lerp(float(mortar.get("min_range", 300.0)), float(mortar.get("max_range", 1200.0)), to.length()), 0.0, 1.0)
+			# Same scale as the stick: min range (or less on a short view) to the screen's edge.
+			var reach := minf(vehicle.view_reach(vehicle.global_position, dir, float(mortar.get("blast", 90.0)) * 0.5), float(mortar.get("max_range", 1200.0)))
+			var near := minf(float(mortar.get("min_range", 300.0)), reach)
+			var t := clampf(inverse_lerp(near, reach, to.length()), 0.0, 1.0) if reach > near else 1.0
 			push = lerpf(Vehicle.AIM_DEADZONE, 1.0, t)
 		vehicle.aim_input = dir * maxf(push, Vehicle.AIM_DEADZONE + 0.01)
 		vehicle.fire_trigger = true

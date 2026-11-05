@@ -1443,13 +1443,24 @@ func _mortar(i: int, w: Dictionary, delta: float, manual: bool, locked: bool, ca
 	var want_angle := 0.0
 	if manual:
 		var push := clampf(inverse_lerp(AIM_DEADZONE, 1.0, aim_input.length()), 0.0, 1.0)
-		dist = lerpf(min_r, max_r, push)
 		want_angle = aim_input.angle() if can_aim else rotation
+		# The player can only lob as far as the screen shows: a full push lands
+		# at the edge of the view, never off it.
+		var reach := max_r
+		var near := min_r
+		if team == BulletPool.TEAM_PLAYER:
+			# The screen wins over the minimum too (a short view up or down).
+			reach = minf(view_reach(turret.global_position, Vector2.RIGHT.rotated(want_angle), float(w.get("blast", 90.0)) * 0.5), max_r)
+			near = minf(min_r, reach)
+		dist = lerpf(near, reach, push)
 	elif locked and can_aim:
 		var vel: Vector2 = lock_target.get("velocity") if lock_target.get("velocity") != null else Vector2.ZERO
 		var aim_point := lock_target.global_position + vel * flight
-		dist = clampf(turret.global_position.distance_to(aim_point), min_r, max_r)
 		want_angle = (aim_point - turret.global_position).angle()
+		var reach_l := max_r
+		if team == BulletPool.TEAM_PLAYER:
+			reach_l = minf(view_reach(turret.global_position, Vector2.RIGHT.rotated(want_angle), float(w.get("blast", 90.0)) * 0.5), max_r)
+		dist = clampf(turret.global_position.distance_to(aim_point), minf(min_r, reach_l), reach_l)
 	if dist < 0.0:
 		turret.rotation = lerp_angle(turret.rotation, 0.0, 1.0 - exp(-4.0 * delta))
 		_show_aim(Vector2.INF, i, w)
@@ -1465,6 +1476,32 @@ func _mortar(i: int, w: Dictionary, delta: float, manual: bool, locked: bool, ca
 		if _lob(w, turret.global_position, landing, flight):
 			_cooldowns[i] = 1.0 / (float(w.fire_rate) * crew_fire)
 			_use_round(i)
+
+
+## How far from `from` along `dir` the camera's view reaches, less `margin`
+## (world units). Arcing weapons use it so the player's shells, and the
+## landing circle, never go past what's on screen. Off-tree or with no view:
+## INF (no limit).
+func view_reach(from: Vector2, dir: Vector2, margin: float = 0.0) -> float:
+	if not is_inside_tree() or dir == Vector2.ZERO:
+		return INF
+	var vp := get_viewport()
+	if vp == null:
+		return INF
+	var view := vp.get_canvas_transform().affine_inverse() * vp.get_visible_rect()
+	view = view.grow(-margin)
+	if view.size.x <= 0.0 or view.size.y <= 0.0 or not view.has_point(from):
+		return INF   # odd view (tests, a tiny window): fall back to the weapon's range
+	var t := INF
+	if dir.x > 0.0:
+		t = minf(t, (view.end.x - from.x) / dir.x)
+	elif dir.x < 0.0:
+		t = minf(t, (view.position.x - from.x) / dir.x)
+	if dir.y > 0.0:
+		t = minf(t, (view.end.y - from.y) / dir.y)
+	elif dir.y < 0.0:
+		t = minf(t, (view.position.y - from.y) / dir.y)
+	return maxf(t, 0.0)
 
 
 ## One shell out of a Mortar or a lobber. The Acid Lobber's globs leave an
