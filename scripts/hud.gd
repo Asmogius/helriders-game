@@ -87,12 +87,13 @@ func _ready() -> void:
 	_root.add_child(_hp_value)
 
 	_power_bar = PowerBar.new()
+	# Tall enough for the PWR label under the fill so it never sits on the HP number.
 	_power_bar.position = Vector2(94, 38)
-	_power_bar.size = Vector2(300, 8)
+	_power_bar.size = Vector2(300, 22)
 	_root.add_child(_power_bar)
 
 	_status = _label(24, Color(0.85, 0.83, 0.78))
-	_status.position = Vector2(94, 52)
+	_status.position = Vector2(94, 64)
 	_root.add_child(_status)
 
 	_fps = _label(20, Color(0.6, 0.6, 0.58))
@@ -111,13 +112,14 @@ func _ready() -> void:
 	_banner_bg.anchor_right = 0.5
 	_banner_bg.offset_left = -420.0
 	_banner_bg.offset_right = 420.0
-	_banner_bg.offset_top = 84.0
-	_banner_bg.offset_bottom = 132.0
+	# Below the status line (TRUCK % / SCRAP) so the title never covers it.
+	_banner_bg.offset_top = 112.0
+	_banner_bg.offset_bottom = 160.0
 	_banner_bg.modulate.a = 0.0
 	_root.add_child(_banner_bg)
-	_banner = _centered_label(30, T.COL_UI_ACCENT, 96.0)
+	_banner = _centered_label(30, T.COL_UI_ACCENT, 124.0)
 	_banner.modulate.a = 0.0
-	_alert = _centered_label(26, T.COL_ENEMY, 140.0)
+	_alert = _centered_label(26, T.COL_ENEMY, 168.0)
 	_alert.visible = false
 
 	_hint = _label(22, Color(0.85, 0.83, 0.78))
@@ -175,7 +177,7 @@ func _ready() -> void:
 	tip.anchor_right = 0.5
 	tip.offset_left = -430.0
 	tip.offset_right = 430.0
-	tip.offset_top = 150.0
+	tip.offset_top = 172.0
 	tip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	tip.autowrap_mode = TextServer.AUTOWRAP_WORD
 	tip.visible = false
@@ -1060,19 +1062,20 @@ class PowerBar extends Control:
 			return
 		var over := used > output
 		var heavy := capacity > 0.0 and weight > capacity
-		draw_rect(Rect2(Vector2.ZERO, size), Color(0, 0, 0, 0.55))
+		var bar_h := 8.0
+		draw_rect(Rect2(Vector2(0, 0), Vector2(size.x, bar_h)), Color(0, 0, 0, 0.55))
 		var inner := size.x - 4.0
 		var fill := minf(used / output, 1.0) * inner
 		var color := T.COL_UI_DANGER_TEXT if over or heavy else T.COL_UI_ACCENT
-		draw_rect(Rect2(Vector2(2, 2), Vector2(fill, size.y - 4.0)), color)
+		draw_rect(Rect2(Vector2(2, 2), Vector2(fill, bar_h - 4.0)), color)
 		var font := UI.font()   # Black Ops: power / overload readout
 		var text := "PWR %d/%d" % [roundi(used), roundi(output)]
 		if heavy:
 			text += "  WT %d/%d" % [roundi(weight), roundi(capacity)]
 		if over or heavy:
 			text += "  OVERLOAD"
-		# Fit on a phone-width HUD (bar is 300 px; leave room beside it).
-		UI.draw_fit(self, font, Vector2(size.x + 10.0, size.y + 1.0), text, HORIZONTAL_ALIGNMENT_LEFT, 360.0, 16, color)
+		# Under the fill, inside this control — never to the right over the HP number.
+		UI.draw_fit(self, font, Vector2(2.0, bar_h + 12.0), text, HORIZONTAL_ALIGNMENT_LEFT, size.x - 4.0, 14, color)
 
 
 class StatusStrip extends Control:
