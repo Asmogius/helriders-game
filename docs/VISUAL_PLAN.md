@@ -46,13 +46,13 @@ This plan goes to a team of agents with specialists. The work is cut into **pack
 8. **Rebase, don't fight.** If `main` moved, rebase onto it. If your PR conflicts with another package's file, stop and leave a note for the file's owner rather than editing their section.
 9. **When a task is done**, tick it in this file (`- [x]`) in the same PR, so the plan shows progress.
 
-### Defaults until the owner answers the open questions
+### Owner decisions (answered 2026-11-05; see the end of this file)
 
-So nobody is blocked, assume these; the owner can overrule any of them:
+These were the defaults and are now confirmed:
 1. **Style:** pixel-voxel everywhere, the garage included.
 2. **Garage navigation:** one panning panorama (V2.3).
 3. **Districts:** as written in V5.5; landmarks as listed in V5.7.
-4. **Breakable cover:** not built until the owner says yes.
+4. **Breakable cover:** wanted, but built last, after everything else in this plan has caught up.
 5. **Fonts:** Black Ops One for titles / big numbers; Inter for body (Ebbtide, Cameron 2026-11-04). Readability on a phone beats grit.
 
 ### Ebbtide UI decisions (Cameron, 2026-11-04)
@@ -183,8 +183,8 @@ Make the home base a place with distinct areas you move between: lit, animated a
 
 ## V3. Better zombies (explicitly asked)
 
-- [ ] **V3.1 Voxel zombie sheets.** Add `tools/art/zombies.py`: one humanoid voxel model (about 14x10x18 voxels) with parts (head, torso, arms, legs). Render it at **16 headings** with a **4-frame shamble cycle** and a **2-frame lunge/attack**, plus a hit-flash palette. Sheets go into one atlas.
-- [ ] **V3.2 The five kinds look like their role:**
+- [x] **V3.1 Voxel zombie sheets.** Add `tools/art/zombies.py`: one humanoid voxel model (about 14x10x18 voxels) with parts (head, torso, arms, legs). Render it at **16 headings** with a **4-frame shamble cycle** and a **2-frame lunge/attack**, plus a hit-flash palette. Sheets go into one atlas.
+- [x] **V3.2 The five kinds look like their role:** (owner approved the v2 sheets, PR #120: 3 Shambler looks instead of 6, plus Slimer, Hunter, Brute, Tank, Boomer art)
   - **Shambler:** ragged clothes in 6 palette variants (random per spawn, so a horde isn't clones); a hunched walk.
   - **Brute:** wide, with scrap plates bolted on (the plates throw grey sparks, as already happens when bullets hit); a heavier walk.
   - **Tank:** huge, about 2x; a roar pose for the wind-up (replaces the red arc), a charge pose and a stumble pose.
@@ -297,10 +297,10 @@ Bring these to voxel art (`art_id()` / sheet lookup like the rigs): the salvage 
 
 Each step is its own PR, with captures and all suites green. Gameplay numbers never change in a visual PR; anything that touches gameplay (V0.2 zoom, V5.8 breakable cover) needs the owner's yes first.
 
-## Open questions for the owner
+## Owner answers (2026-11-05)
 
-1. **Style samples:** pixel-voxel everywhere (garage dioramas and zombies included), as above? Or a hand-drawn 2D look for the garage only?
-2. **Garage navigation:** one panning panorama, or separate rooms that fade between each other?
-3. **Districts:** is the per-district art direction above right? Do you want any specific landmarks?
-4. **Breakable cover (V5.8):** wanted?
-5. **Fonts:** a gritty stencil look, or keep a clean modern look for readability?
+1. **Style:** pixel-voxel everywhere, garage dioramas and zombies included.
+2. **Garage navigation:** one panning yard panorama (V2.3).
+3. **Districts:** the V5.5 art direction as written, with the V5.7 landmarks.
+4. **Breakable cover (V5.8):** wanted, but only after the rest of the plan has caught up. Do it last.
+5. **Fonts:** Black Ops One for titles and big numbers, Inter for body (Cameron, 2026-11-04).
