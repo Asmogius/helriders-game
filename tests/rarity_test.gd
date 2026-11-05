@@ -53,6 +53,12 @@ func _initialize() -> void:
 		seen[T.RARITY_COLORS[r].to_html(false)] = true
 		_check(Crew.color_of({"rarity": r}) == T.RARITY_COLORS[r], "Crew.color_of(%s) reads tuning.gd" % r)
 	_check(seen.size() == 6, "the six colours differ")
+	# Ebbtide: Legendary gold must stay visibly distinct from the UI accent gold.
+	var accent_h := T.COL_UI_ACCENT.to_html(false)
+	var legend_h := T.RARITY_COLORS["Legendary"].to_html(false)
+	_check(accent_h != legend_h, "Legendary #%s != UI accent #%s" % [legend_h, accent_h])
+	_check(accent_h == "e1b441", "UI accent is #e1b441 (got #%s)" % accent_h)
+	_check(legend_h == "ff9a2a", "Legendary is #ff9a2a orange-leaning gold (got #%s)" % legend_h)
 	_check(Parts.RARITY_COLORS == T.RARITY_COLORS, "Parts.RARITY_COLORS is tuning.gd's")
 	for id: String in Parts.CATALOG:
 		var r := str(Parts.get_part(id).rarity)
