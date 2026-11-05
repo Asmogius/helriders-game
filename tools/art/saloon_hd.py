@@ -637,10 +637,9 @@ def place_on_room(img, own_img, room=(1280, 720), target_crew_h=TARGET_CREW_H):
 
 
 def grade_night(rgba, em, pool_boost=1.0):
-    """Grade ambient/shadows toward #512b11; keep lit-surface hue.
-    Fireplace is the hero light: warm floor pool (~350px), rim on fire-facing
-    surfaces, glow on hearth/mantel; far corners stay dark. pool_boost pulses
-    the glow with flicker frames (~0.85–1.15)."""
+    """bb36a04 night grade (hue-preserving) + soft hearth glow only.
+    Glow is a heavily blurred radial — no hard circle/rect edges.
+    pool_boost pulses with flicker (~0.85–1.15)."""
     rgb = rgba[:, :, :3].astype(np.float32)
     tint = np.array([0x51, 0x2b, 0x11], dtype=np.float32)
     lum = (rgb @ np.array([0.299, 0.587, 0.114], dtype=np.float32))
@@ -653,86 +652,70 @@ def grade_night(rgba, em, pool_boost=1.0):
     out = ambient * (1.0 - lit[..., None]) + warm_lit * lit[..., None]
     body = (rgba[:, :, 3] > 0) & ~em
     out[body] = np.clip(out[body] * (0.95 + 0.08 * lit[body][..., None]) + 3.0, 0, 255)
-
-    # --- Fireplace hero pool + rim (screen-space) ---
+    e = np.zeros_like(out)
+    e[em] = np.clip(rgb[em], 0, 230)
+    glow = np.array(Image.fromarray(np.clip(e, 0, 255).astype(np.uint8)).filter(
+        ImageFilter.GaussianBlur(10))).astype(np.float32)
+    out = out + glow * 0.45
+    out = np.clip(out, 0, 235)
+    out[em] = np.clip(rgb[em], 0, 225)
+    near_white = (out[:, :, 0] > 220) & (out[:, :, 1] > 220) & (out[:, :, 2] > 200)
+    if near_white.any():
+        out[near_white] = np.array([225, 160, 55], dtype=np.float32)
     H, W = out.shape[:2]
     Y, X = np.mgrid[0:H, 0:W].astype(np.float32)
-    # Prefer fire em in the back-centre band (exclude table lanterns)
-    # Hearth band only — exclude bar/table lanterns (fire sits ~centre-back)
-    fire_band = em & (Y < H * 0.48) & (X > W * 0.40) & (X < W * 0.72)
+    v = np.clip((np.hypot((X - W / 2) / (W * 0.60), (Y - H * 0.42) / (H * 0.60)) - 0.78) / 0.42, 0, 1)
+    out *= (1.0 - 0.42 * v)[..., None]
+
+    # --- Soft hearth hero glow (no hard edge) ---
+    # Hearth band only — exclude lanterns
+    fire_band = em & (Y < H * 0.48) & (X > W * 0.42) & (X < W * 0.70)
     if fire_band.any():
         ys, xs = np.where(fire_band)
         fcx, fcy = float(xs.mean()), float(ys.mean())
     else:
         fcx, fcy = W * 0.55, H * 0.22
-    # Floor pool centre sits in front of the hearth opening
-    pcx, pcy = fcx, min(H - 1.0, fcy + 90.0)
-    dist = np.hypot(X - pcx, (Y - pcy) * 0.85)
-    # ~350–400 px soft falloff
-    pool = np.clip(1.0 - dist / 380.0, 0, 1) ** 1.25
+    # Floor pool sits in front of the hearth
+    pcx, pcy = fcx, min(H - 1.0, fcy + 85.0)
+    dist = np.hypot(X - pcx, (Y - pcy) * 0.88)
+    # Soft analytic falloff, then heavy blur so no shape edge is visible
+    raw = np.clip(1.0 - dist / 260.0, 0, 1)
+    raw = raw * raw * (3.0 - 2.0 * raw)  # smoothstep
+    pool = np.array(Image.fromarray((raw * 255).astype(np.uint8)).filter(
+        ImageFilter.GaussianBlur(56))).astype(np.float32) / 255.0
+    # Tiny dither breaks any residual banding
+    pool = np.clip(pool + (np.random.default_rng(3).random(pool.shape).astype(np.float32) - 0.5) * 0.03 * pool, 0, 1)
     pool *= float(pool_boost)
-    warm = np.array([1.60, 0.92, 0.38], dtype=np.float32)
-    add = pool[..., None] * warm[None, None, :] * 72.0
+    warm = np.array([1.55, 0.90, 0.35], dtype=np.float32)
+    # Additive warm lift on body only — leaves far regions at bb36 grade
+    add = pool[..., None] * warm[None, None, :] * 20.0
     out[body] = np.clip(out[body] + add[body], 0, 235)
-    # Warm rim on surfaces facing the fire (toward-fire side)
-    toward = np.clip(1.0 - np.hypot(X - fcx, Y - fcy) / 320.0, 0, 1)
-    rim = (toward * np.clip(pool * 1.1, 0, 1) * 0.7 * float(pool_boost))[..., None]
-    rim = rim * np.array([48.0, 26.0, 8.0], dtype=np.float32)
+    # Soft rim toward fire (also blurred weight)
+    toward = np.array(Image.fromarray(
+        (np.clip(1.0 - np.hypot(X - fcx, Y - fcy) / 300.0, 0, 1) * 255).astype(np.uint8)
+    ).filter(ImageFilter.GaussianBlur(24))).astype(np.float32) / 255.0
+    rim = (toward * pool * 0.35 * float(pool_boost))[..., None] * np.array([22.0, 12.0, 4.0], dtype=np.float32)
     out[body] = np.clip(out[body] + rim[body], 0, 235)
-    # Glow on hearth stones / mantel (tight to fire)
-    hearth = body & (np.hypot(X - fcx, Y - fcy) < 110)
-    out[hearth] = np.clip(out[hearth] + np.array([38, 20, 6], dtype=np.float32) * float(pool_boost), 0, 235)
-    # Soft warm cast on nearby beams/ceiling
-    ceil = (Y < fcy + 40) & (np.abs(X - fcx) < 240) & body
-    out[ceil] = np.clip(out[ceil] + np.array([34, 18, 6], dtype=np.float32) * float(pool_boost), 0, 235)
-
-    # Emissive sculpt + hard anti-blowout clamp
-    e = np.zeros_like(out)
-    e[em] = np.clip(rgb[em], 0, 225)
-    glow = np.array(Image.fromarray(np.clip(e, 0, 255).astype(np.uint8)).filter(
-        ImageFilter.GaussianBlur(14))).astype(np.float32)
-    out = out + glow * (0.55 * float(pool_boost))
-    out = np.clip(out, 0, 235)
-    out[em] = np.clip(rgb[em], 0, 220)
-    near_white = (out[:, :, 0] > 220) & (out[:, :, 1] > 220) & (out[:, :, 2] > 200)
-    if near_white.any():
-        out[near_white] = np.array([220, 150, 50], dtype=np.float32)
-    # Far-corner vignette (keep dark away from the fire)
-    v = np.clip((np.hypot((X - W / 2) / (W * 0.60), (Y - H * 0.42) / (H * 0.60)) - 0.78) / 0.42, 0, 1)
-    # Ease vignette inside the fire pool so the hearth stays readable
-    v = v * (1.0 - 0.75 * pool)
-    out *= (1.0 - 0.42 * v)[..., None]
+    # Mantel / hearth stones (tight, soft)
+    hearth_w = np.array(Image.fromarray(
+        (np.clip(1.0 - np.hypot(X - fcx, Y - fcy) / 95.0, 0, 1) * 255).astype(np.uint8)
+    ).filter(ImageFilter.GaussianBlur(10))).astype(np.float32) / 255.0
+    hearth_add = (hearth_w * float(pool_boost))[..., None] * np.array([16.0, 8.0, 2.0], dtype=np.float32)
+    out[body] = np.clip(out[body] + hearth_add[body], 0, 235)
     return np.clip(out, 0, 235).astype(np.uint8)
 
 
 
 def lights_overlay(rgb, em, pool_boost=1.0):
-    """Emissive cores + soft fire bloom that reaches the floor pool."""
+    """Emissive cores + soft gaussian bloom only. No hard-edged pool shape."""
     out = np.zeros((rgb.shape[0], rgb.shape[1], 4), np.uint8)
-    out[em, :3] = np.clip(rgb[em], 0, 220)
+    out[em, :3] = np.clip(rgb[em], 0, 230)
     out[em, 3] = 255
-    bloom = np.array(Image.fromarray(out).filter(ImageFilter.GaussianBlur(18))).astype(np.float32)
-    bloom[..., 3] *= 0.55 * float(pool_boost)
-    # Extra warm pool baked into lights plate (composites over room)
-    H, W = rgb.shape[:2]
-    Y, X = np.mgrid[0:H, 0:W].astype(np.float32)
-    fire_band = em & (Y < H * 0.48) & (X > W * 0.40) & (X < W * 0.72)
-    if fire_band.any():
-        ys, xs = np.where(fire_band)
-        fcx, fcy = float(xs.mean()), float(ys.mean()) + 90.0
-    else:
-        fcx, fcy = W * 0.55, H * 0.32
-    dist = np.hypot(X - fcx, (Y - fcy) * 0.85)
-    pool = np.clip(1.0 - dist / 380.0, 0, 1) ** 1.25 * float(pool_boost)
-    pool_rgba = np.zeros((H, W, 4), np.float32)
-    pool_rgba[..., 0] = 255 * pool
-    pool_rgba[..., 1] = 135 * pool
-    pool_rgba[..., 2] = 36 * pool
-    pool_rgba[..., 3] = 110 * pool
-    base = Image.alpha_composite(
+    bloom = np.array(Image.fromarray(out).filter(ImageFilter.GaussianBlur(12))).astype(np.float32)
+    bloom[..., 3] *= 0.40 * float(pool_boost)
+    return Image.alpha_composite(
         Image.fromarray(np.clip(bloom, 0, 255).astype(np.uint8), "RGBA"),
         Image.fromarray(out, "RGBA"))
-    return Image.alpha_composite(base, Image.fromarray(np.clip(pool_rgba, 0, 255).astype(np.uint8), "RGBA"))
 
 
 
@@ -846,22 +829,26 @@ def bake(tilt=TILT_GAME, write_assets=True):
         print(f"  {sid} opaque~", Image.open(os.path.join(OUT, f"crew_{sid}_idle.png")).getbbox(),
               "size", (nw, nh), "pos", pos)
 
-    # animations — fire flicker includes pulsing floor glow pool
+    # animations — fire flicker + soft pool pulse (feathered crop, no hard rect)
     fire_frames = []
     boosts = (0.88, 1.00, 1.12, 0.96)
-    # Crop covers hearth + floor pool in front (~400px down)
     fx, fy, fw, fh = 480, 40, 400, 380
+    # Feather mask so the sheet never shows a rectangle when pasted
+    yy, xx = np.mgrid[0:fh, 0:fw].astype(np.float32)
+    edge = np.minimum(np.minimum(xx, fw - 1 - xx), np.minimum(yy, fh - 1 - yy))
+    feather = np.clip(edge / 36.0, 0, 1).astype(np.float32)
+    feather = np.array(Image.fromarray((feather * 255).astype(np.uint8)).filter(
+        ImageFilter.GaussianBlur(8))).astype(np.float32) / 255.0
     for fi in range(4):
         gf, of = build_room(False, fire_frame=fi, lantern_pulse=0, breath=0)
         im, oi, _ = render_scene(gf, of, tilt)
         rgba, _, emf, _ = place_on_room(im, oi)
         graded_f = grade_night(rgba, emf, pool_boost=boosts[fi])
-        # Lights-only-ish plate: emissives + pool delta vs a dark base
         lights_f = lights_overlay(graded_f, emf, pool_boost=boosts[fi])
-        # Also keep flame RGB from graded for the sheet
-        arr = np.array(lights_f)
+        arr = np.array(lights_f).astype(np.float32)
         crop = arr[fy:fy + fh, fx:fx + fw].copy()
-        fire_frames.append(Image.fromarray(crop))
+        crop[..., 3] *= feather
+        fire_frames.append(Image.fromarray(np.clip(crop, 0, 255).astype(np.uint8), "RGBA"))
     fww, fhh = fire_frames[0].size
     fire_strip = Image.new("RGBA", (fww * 4, fhh))
     for i, fr in enumerate(fire_frames):

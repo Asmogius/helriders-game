@@ -26,7 +26,7 @@
   "px_per_voxel": 2,
   "hd": true,
   "sun": "dim moonlight upper-left \u2192 hard cast shadows down-right; fire/lanterns hero lights",
-  "night": "#512b11 world grade + vignette; fireplace hero warm pool ~380px falloff",
+  "night": "#512b11 grade (bb36) + soft hearth glow; far corners unchanged",
   "background": "res://art/saloon/saloon_room.png",
   "lights": "res://art/saloon/saloon_room_lights.png",
   "lights_note": "Fireplace + lantern glow. Composite above world night grade; do not CanvasModulate.",
@@ -35,7 +35,6 @@
       "sheet": "res://art/saloon/fireplace_flicker.png",
       "frames": 4,
       "fps": 8,
-      "note": "Flame tongues + warm floor-pool pulse; composite at fireplace_rect (sheet origin 480,40; frame 400x380)",
       "sheet_origin": [
         480,
         40
@@ -43,7 +42,8 @@
       "frame_size": [
         400,
         380
-      ]
+      ],
+      "note": "Fuller flames + soft glow pulse; feathered crop edges"
     },
     "lantern_pulse": {
       "plates": [
