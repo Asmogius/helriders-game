@@ -2,7 +2,7 @@
 """Helriders pixel-voxel renderer.
 
 Voxel models (tools/art/models.py, or MagicaVoxel .vox) are rendered to sprite
-sheets at 32 headings for the rotation-locked camera, tilted 30 degrees off
+sheets at 32 headings for the rotation-locked camera, tilted 45 degrees off
 straight-down. Frame i shows heading i * 360/N degrees, clockwise from +x
 (Godot's convention). The frame centre is the footprint centre at ground level,
 which is the rig's collision centre.
@@ -27,7 +27,7 @@ from palette import OUTLINE, shade, burnt_colors  # noqa: E402
 
 DIRECTIONS = 32      # headings per sheet
 PX_PER_VOXEL = 1     # 1 voxel = 1 game px; a 64x36 hull = 64x36 px (vehicle.gd body)
-TILT_DEG = 30.0      # camera tilt off straight-down; 0 = pure top-down
+TILT_DEG = 45.0      # camera tilt off straight-down; 0 = pure top-down (Ebbtide-matched, Cameron 2026-11-04)
 SAMPLES = 3          # face samples per voxel edge per pixel (no holes)
 COLUMNS = 8
 LIGHT = np.array([-0.45, -0.55, 0.70])  # from upper-left of the screen, above
