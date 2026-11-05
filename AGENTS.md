@@ -120,6 +120,7 @@ godot --headless --fixed-fps 60 --path . -s res://tests/retest2_test.gd       # 
 godot --headless --fixed-fps 60 --path . -s res://tests/saloon_free_test.gd   # must end "SALOON FREE TEST PASSED" (survivors seated on rebuild, stable free Driver, free hires respect the cap)
 godot --headless --fixed-fps 60 --path . -s res://tests/saloon_match_test.gd # must end "SALOON MATCH TEST PASSED" (every Saloon card is exactly who you hire)
 godot --headless --fixed-fps 60 --path . -s res://tests/tutorial_readability_test.gd # must end "TUTORIAL READABILITY TEST PASSED" (Training Run brightens the arena and rings zombies)
+godot --headless --fixed-fps 60 --path . -s res://tests/quickplay_hub_test.gd # must end "QUICKPLAY HUB TEST PASSED" (title -> QUICKPLAY -> hub -> BACK; CAMPAIGN reaches the garage)
 godot --headless --fixed-fps 60 --path . -s res://tests/quickplay_icons_test.gd # must end "QUICKPLAY ICONS TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/endless_tuning_test.gd # must end "ENDLESS TUNING TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/hud_readout_test.gd   # must end "HUD READOUT TEST PASSED" (the big number always matches the armor+HP gauge)
