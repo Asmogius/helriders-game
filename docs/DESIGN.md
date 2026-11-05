@@ -140,7 +140,7 @@ No forced ending. Core Collapse remains open for continued refinement.
 
 ## Night (agreed with the owner 2026-11-05; built, PR #79)
 
-Night is rolled once per job from its seed and saved with the job (`night`). Comms shows a NIGHT badge before you take the job. Only zombies and Hunters change at night: speed x1.1 (Hunters x1.1), damage x1.1, +4 alive at the start, faster ramp, bigger packs, earlier Tanks and Hunter, a horde surge every 35 s (4 s, warned 1.5 s before). Enemy rigs don't change. Rewards: pay x1.3 (stacks with any district's pay), kill scrap x1.25 rounded up, schematic chance +0.10, crew XP x1.25. Numbers are in `tuning.gd` (`NIGHT_*`).
+Night is rolled once per job from its seed and saved with the job (`night`). Comms shows a NIGHT badge before you take the job. The night colour is blue #2a3550 everywhere, the world grade and the NIGHT badge included (`COL_NIGHT_WORLD`; Cameron 2026-11-05). Only zombies and Hunters change at night: speed x1.1 (Hunters x1.1), damage x1.1, +4 alive at the start, faster ramp, bigger packs, earlier Tanks and Hunter, a horde surge every 35 s (4 s, warned 1.5 s before). Enemy rigs don't change. Rewards: pay x1.3 (stacks with any district's pay), kill scrap x1.25 rounded up, schematic chance +0.10, crew XP x1.25. Numbers are in `tuning.gd` (`NIGHT_*`).
 
 Who gets night, first match wins:
 1. Core Collapse: always night, no exceptions (above every rule below).

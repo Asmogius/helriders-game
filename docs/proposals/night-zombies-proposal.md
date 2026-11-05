@@ -9,7 +9,7 @@
 4. The night pay bonus stacks on top of Core Collapse's pay.
 5. All four rewards stay: pay x1.3, kill scrap x1.25 rounded up, schematic chance +0.10, crew XP x1.25. XP goes through a new `xp_mult` argument on `Profile.bank_crew()`.
 6. Only zombies (and Hunters) change at night. Enemy rigs stay the same.
-7. The headlight look waits on an Art mockup and isn't built. The night colour was #512b11; Art has since moved `COL_NIGHT_WORLD` to #2a3550 on main, and `COL_NIGHT` follows it. Maps, UI and Art own the palette.
+7. The headlight look waits on an Art mockup and isn't built. The night colour is blue #2a3550 everywhere, the NIGHT badge included (Cameron, 2026-11-05; it replaced the earlier #512b11). `COL_NIGHT` follows `COL_NIGHT_WORLD`. Maps, UI and Art own the palette.
 8. Job cards show a night icon before the player takes the job.
 - Courier jobs are 50/50 night outside Core Collapse (`NIGHT_CHANCE_COURIER`); Core Couriers are always night (Cameron, 2026-11-05).
 - 2026-11-05: `NIGHT_ZOMBIE_DPS_MULT` 1.10 approved; `NIGHT_ZOMBIE_SPEED_MULT` 1.10 approved (the code had 1.15; Head Dev's note said "from 1.05", which matched neither, so 1.15 -> 1.10 is the change made).
