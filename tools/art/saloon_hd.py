@@ -159,25 +159,28 @@ def ellipsoid(g, cx, cy, cz, rx, ry, rz, n, own=None, oid=0):
 
 
 def flame_tongue(g, cx, cy, z0, w, d, h, frame_off=0):
-    """Tapered flame: deep red base → orange → yellow → small core. No white blowout."""
+    """Wide rounded flame tongue: deep red base → orange → yellow → small capped core."""
     for zi in range(h):
         t = zi / max(h - 1, 1)
-        # taper width
-        rw = max(1.0, w * (1.0 - t * 0.85) * (0.85 + 0.15 * ((zi + frame_off) % 3 == 0)))
-        rd = max(1.0, d * (1.0 - t * 0.75))
-        if t < 0.25:
+        # Stay wide through mid-height, taper only near the tip
+        flare = 1.0 + 0.18 * max(0.0, 1.0 - abs(t - 0.35) / 0.35)
+        wobble = 0.92 + 0.10 * ((zi + frame_off) % 4 == 0)
+        rw = max(1.2, w * (1.0 - t * t * 0.72) * flare * wobble)
+        rd = max(1.0, d * (1.0 - t * 0.55) * flare)
+        if t < 0.22:
             col = "fire_deep"
-        elif t < 0.55:
+        elif t < 0.50:
             col = "fire_mid"
-        elif t < 0.82:
+        elif t < 0.80:
             col = "fire_yellow"
         else:
             col = "fire_core"
-        for x in range(int(cx - rw), int(cx + rw) + 1):
-            for y in range(int(cy - rd), int(cy + rd) + 1):
+        for x in range(int(cx - rw - 1), int(cx + rw + 2)):
+            for y in range(int(cy - rd - 1), int(cy + rd + 2)):
                 if 0 <= x < SX and 0 <= y < SY and 0 <= z0 + zi < SZ:
-                    if ((x - cx) / rw) ** 2 + ((y - cy) / rd) ** 2 <= 1.0:
+                    if ((x - cx) / rw) ** 2 + ((y - cy) / rd) ** 2 <= 1.05:
                         g[x, y, z0 + zi] = IDX[col]
+
 
 
 def wood_grain_top(g, x0, x1, y0, y1, z, seed=0):
@@ -254,8 +257,9 @@ def fireplace(g, frame=0):
             col = "stone_lt" if ((x + z) // 5) % 3 == 0 else ("stone_dk" if ((x + z) // 4) % 2 else "stone")
             box(g, x + off, min(x1, x + off + 5), y0, y1, z, min(48, z + 3), col)
             box(g, x + off, min(x1, x + off + 5), y0, y1, z, z + 1, "mortar")
-    # hearth opening (ash back wall)
-    box(g, x0 + 8, x1 - 8, y1 - 8, y1, 2, 28, "ash")
+    # hearth opening (ash back wall) — opening width used for 70% fill
+    ox0, ox1 = x0 + 8, x1 - 8
+    box(g, ox0, ox1, y1 - 8, y1, 2, 28, "ash")
     # mantel + pillars
     box(g, x0 - 4, x1 + 4, y0 - 1, y1 + 1, 46, 50, "stone_lt")
     box(g, x0 - 3, x1 + 3, y0, y1, 50, 51, "stone")
@@ -267,19 +271,54 @@ def fireplace(g, frame=0):
     box(g, x0 + 16, x1 - 14, y1 - 5, y1 - 2, 5, 9, "log")
     box(g, x0 + 12, x0 + 14, y1 - 6, y1 - 2, 3, 8, "log_end")
     box(g, x1 - 14, x1 - 12, y1 - 6, y1 - 2, 7, 11, "log_end")
-    # ember bed
-    for ex in range(x0 + 14, x1 - 14, 2):
-        box(g, ex, ex + 2, y1 - 5, y1 - 2, 4, 6, "ember" if (ex // 2 + frame) % 2 == 0 else "fire_deep")
-    # 3–4 flame tongues with flicker offsets (frame moves them)
+    # bright ember bed across the logs
+    for ex in range(ox0 + 4, ox1 - 4, 2):
+        ez = 4 + ((ex + frame) % 3)
+        box(g, ex, ex + 2, y1 - 5, y1 - 1, 3, ez + 1, "ember")
+        if (ex + frame) % 3 == 0:
+            box(g, ex, ex + 1, y1 - 4, y1 - 1, ez, ez + 2, "fire_deep")
+    # Wide rounded fire body (~70% of opening width)
     fo = frame % 4
-    mid = (x0 + x1) // 2
-    cy = y1 - 2
-    flame_tongue(g, mid - 12 + (fo % 2), cy, 7, w=3.2, d=2.2, h=22 + fo * 2, frame_off=fo)
-    flame_tongue(g, mid - 2 - (fo // 2), cy + 1, 6, w=4.0, d=2.6, h=28 + (3 - fo) * 2, frame_off=fo + 1)
-    flame_tongue(g, mid + 10 - fo, cy, 7, w=3.0, d=2.0, h=20 + fo * 2, frame_off=fo + 2)
-    flame_tongue(g, mid + 2, cy + 2, 8, w=2.6, d=1.8, h=16 + (fo % 3) * 2, frame_off=fo + 3)
-    # small lick toward camera
-    flame_tongue(g, mid + (2 if fo % 2 else -2), cy + 4, 9, w=2.2, d=1.6, h=12 + fo, frame_off=fo)
+    mid = (ox0 + ox1) // 2
+    open_w = ox1 - ox0
+    body_w = open_w * 0.70 / 2  # half-width
+    cy = y1 - 1
+    # Base mass — fat ellipsoid stack filling the hearth
+    for zi, (rw, rd, col, zh) in enumerate([
+        (body_w * 0.98, 5.0, "fire_deep", 5),
+        (body_w * 1.02, 5.4, "fire_mid", 5),
+        (body_w * 0.95, 4.6, "fire_mid", 5),
+        (body_w * 0.82, 3.8, "fire_yellow", 4),
+        (body_w * 0.58, 2.8, "fire_yellow", 4),
+        (body_w * 0.26, 1.6, "fire_core", 3),  # small capped core
+    ]):
+        zbase = 6 + zi * 3 + (fo % 2)
+        for x in range(int(mid - rw - 1), int(mid + rw + 2)):
+            for y in range(int(cy - rd - 1), int(cy + rd + 3)):
+                if 0 <= x < SX and 0 <= y < SY and 0 <= zbase < SZ:
+                    if ((x - mid) / max(rw, 0.5)) ** 2 + ((y - cy) / max(rd, 0.5)) ** 2 <= 1.08:
+                        g[x, y, zbase:min(SZ, zbase + zh)] = IDX[col]
+    # 5–6 overlapping tongues of varied height on top of the body
+    tongues = [
+        (mid - body_w * 0.58 + (fo % 2), cy, 10, body_w * 0.30, 3.4, 22 + fo * 2),
+        (mid - body_w * 0.28 - fo // 2, cy + 1, 9, body_w * 0.36, 3.8, 32 + (3 - fo) * 2),
+        (mid + 0.5, cy + 1, 8, body_w * 0.40, 4.0, 36 + fo),
+        (mid + body_w * 0.26 - fo, cy, 9, body_w * 0.32, 3.4, 28 + (fo % 3) * 2),
+        (mid + body_w * 0.55, cy + 1, 11, body_w * 0.26, 3.0, 20 + fo * 2),
+        (mid - 2 + (2 if fo % 2 else -3), cy + 3, 12, body_w * 0.22, 2.6, 16 + fo),
+    ]
+    for i, (tcx, tcy, tz, tw, td, th) in enumerate(tongues):
+        flame_tongue(g, tcx, tcy, tz, w=tw, d=td, h=int(th), frame_off=fo + i)
+    # sparks above the fire (tiny emissive dots that shift with frame)
+    rng = __import__("numpy").random.default_rng(7 + fo)
+    for _ in range(10):
+        sx = int(mid + rng.integers(-int(body_w), int(body_w) + 1))
+        sy = int(cy + rng.integers(-1, 4))
+        sz = int(28 + rng.integers(0, 14) + fo)
+        if 0 <= sx < SX and 0 <= sy < SY and 0 <= sz < SZ - 1:
+            g[sx, sy, sz] = IDX["fire_yellow" if rng.random() < 0.6 else "fire_core"]
+            if sz + 1 < SZ and rng.random() < 0.4:
+                g[sx, sy, sz + 1] = IDX["ember"]
 
 
 
@@ -597,54 +636,104 @@ def place_on_room(img, own_img, room=(1280, 720), target_crew_h=TARGET_CREW_H):
     return out, ow, em, (px, py, nw, nh, scale)
 
 
-def grade_night(rgba, em):
-    """Grade ambient/shadows toward #512b11; keep lit-surface hue (bottles, cloth, brass)."""
+def grade_night(rgba, em, pool_boost=1.0):
+    """Grade ambient/shadows toward #512b11; keep lit-surface hue.
+    Fireplace is the hero light: warm floor pool (~350px), rim on fire-facing
+    surfaces, glow on hearth/mantel; far corners stay dark. pool_boost pulses
+    the glow with flicker frames (~0.85–1.15)."""
     rgb = rgba[:, :, :3].astype(np.float32)
     tint = np.array([0x51, 0x2b, 0x11], dtype=np.float32)
     lum = (rgb @ np.array([0.299, 0.587, 0.114], dtype=np.float32))
-    # How "in shadow" — low luminance gets more night tint; bright keeps albedo hue
     shadow = np.clip(1.0 - lum / 140.0, 0.0, 1.0)
     heat = np.array(Image.fromarray((em.astype(np.uint8) * 255)).filter(
         ImageFilter.GaussianBlur(40))).astype(np.float32) / 255.0
-    # Lit by fire/lantern: prefer true albedo
     lit = np.clip(heat * 1.4 + (1.0 - shadow) * 0.55, 0, 1)
-    # Ambient: night tint at readable level (aim ~a0 mean)
     ambient = np.clip((lum[..., None] / 145.0), 0.25, 1.45) * tint[None, None, :] * 1.70
-    # Preserve hue on lit surfaces
     warm_lit = rgb * np.array([1.02, 1.0, 0.95], dtype=np.float32)
     out = ambient * (1.0 - lit[..., None]) + warm_lit * lit[..., None]
     body = (rgba[:, :, 3] > 0) & ~em
     out[body] = np.clip(out[body] * (0.95 + 0.08 * lit[body][..., None]) + 3.0, 0, 255)
-    # Emissive sculpt + hard anti-blowout clamp (no flat white)
-    e = np.zeros_like(out)
-    e[em] = np.clip(rgb[em], 0, 230)
-    glow = np.array(Image.fromarray(np.clip(e, 0, 255).astype(np.uint8)).filter(
-        ImageFilter.GaussianBlur(10))).astype(np.float32)
-    out = out + glow * 0.45
-    # Global anti-blowout: nothing becomes a flat white/near-white block
-    out = np.clip(out, 0, 235)
-    out[em] = np.clip(rgb[em], 0, 225)
-    # Near-white leftovers → flame yellow
-    near_white = (out[:, :, 0] > 220) & (out[:, :, 1] > 220) & (out[:, :, 2] > 200)
-    if near_white.any():
-        out[near_white] = np.array([225, 160, 55], dtype=np.float32)
+
+    # --- Fireplace hero pool + rim (screen-space) ---
     H, W = out.shape[:2]
     Y, X = np.mgrid[0:H, 0:W].astype(np.float32)
+    # Prefer fire em in the back-centre band (exclude table lanterns)
+    # Hearth band only — exclude bar/table lanterns (fire sits ~centre-back)
+    fire_band = em & (Y < H * 0.48) & (X > W * 0.40) & (X < W * 0.72)
+    if fire_band.any():
+        ys, xs = np.where(fire_band)
+        fcx, fcy = float(xs.mean()), float(ys.mean())
+    else:
+        fcx, fcy = W * 0.55, H * 0.22
+    # Floor pool centre sits in front of the hearth opening
+    pcx, pcy = fcx, min(H - 1.0, fcy + 90.0)
+    dist = np.hypot(X - pcx, (Y - pcy) * 0.85)
+    # ~350–400 px soft falloff
+    pool = np.clip(1.0 - dist / 380.0, 0, 1) ** 1.25
+    pool *= float(pool_boost)
+    warm = np.array([1.60, 0.92, 0.38], dtype=np.float32)
+    add = pool[..., None] * warm[None, None, :] * 72.0
+    out[body] = np.clip(out[body] + add[body], 0, 235)
+    # Warm rim on surfaces facing the fire (toward-fire side)
+    toward = np.clip(1.0 - np.hypot(X - fcx, Y - fcy) / 320.0, 0, 1)
+    rim = (toward * np.clip(pool * 1.1, 0, 1) * 0.7 * float(pool_boost))[..., None]
+    rim = rim * np.array([48.0, 26.0, 8.0], dtype=np.float32)
+    out[body] = np.clip(out[body] + rim[body], 0, 235)
+    # Glow on hearth stones / mantel (tight to fire)
+    hearth = body & (np.hypot(X - fcx, Y - fcy) < 110)
+    out[hearth] = np.clip(out[hearth] + np.array([38, 20, 6], dtype=np.float32) * float(pool_boost), 0, 235)
+    # Soft warm cast on nearby beams/ceiling
+    ceil = (Y < fcy + 40) & (np.abs(X - fcx) < 240) & body
+    out[ceil] = np.clip(out[ceil] + np.array([34, 18, 6], dtype=np.float32) * float(pool_boost), 0, 235)
+
+    # Emissive sculpt + hard anti-blowout clamp
+    e = np.zeros_like(out)
+    e[em] = np.clip(rgb[em], 0, 225)
+    glow = np.array(Image.fromarray(np.clip(e, 0, 255).astype(np.uint8)).filter(
+        ImageFilter.GaussianBlur(14))).astype(np.float32)
+    out = out + glow * (0.55 * float(pool_boost))
+    out = np.clip(out, 0, 235)
+    out[em] = np.clip(rgb[em], 0, 220)
+    near_white = (out[:, :, 0] > 220) & (out[:, :, 1] > 220) & (out[:, :, 2] > 200)
+    if near_white.any():
+        out[near_white] = np.array([220, 150, 50], dtype=np.float32)
+    # Far-corner vignette (keep dark away from the fire)
     v = np.clip((np.hypot((X - W / 2) / (W * 0.60), (Y - H * 0.42) / (H * 0.60)) - 0.78) / 0.42, 0, 1)
+    # Ease vignette inside the fire pool so the hearth stays readable
+    v = v * (1.0 - 0.75 * pool)
     out *= (1.0 - 0.42 * v)[..., None]
     return np.clip(out, 0, 235).astype(np.uint8)
 
 
 
-def lights_overlay(rgb, em):
+def lights_overlay(rgb, em, pool_boost=1.0):
+    """Emissive cores + soft fire bloom that reaches the floor pool."""
     out = np.zeros((rgb.shape[0], rgb.shape[1], 4), np.uint8)
-    out[em, :3] = np.clip(rgb[em], 0, 245)
+    out[em, :3] = np.clip(rgb[em], 0, 220)
     out[em, 3] = 255
-    bloom = np.array(Image.fromarray(out).filter(ImageFilter.GaussianBlur(8))).astype(np.float32)
-    bloom[..., 3] *= 0.45
-    return Image.alpha_composite(
+    bloom = np.array(Image.fromarray(out).filter(ImageFilter.GaussianBlur(18))).astype(np.float32)
+    bloom[..., 3] *= 0.55 * float(pool_boost)
+    # Extra warm pool baked into lights plate (composites over room)
+    H, W = rgb.shape[:2]
+    Y, X = np.mgrid[0:H, 0:W].astype(np.float32)
+    fire_band = em & (Y < H * 0.48) & (X > W * 0.40) & (X < W * 0.72)
+    if fire_band.any():
+        ys, xs = np.where(fire_band)
+        fcx, fcy = float(xs.mean()), float(ys.mean()) + 90.0
+    else:
+        fcx, fcy = W * 0.55, H * 0.32
+    dist = np.hypot(X - fcx, (Y - fcy) * 0.85)
+    pool = np.clip(1.0 - dist / 380.0, 0, 1) ** 1.25 * float(pool_boost)
+    pool_rgba = np.zeros((H, W, 4), np.float32)
+    pool_rgba[..., 0] = 255 * pool
+    pool_rgba[..., 1] = 135 * pool
+    pool_rgba[..., 2] = 36 * pool
+    pool_rgba[..., 3] = 110 * pool
+    base = Image.alpha_composite(
         Image.fromarray(np.clip(bloom, 0, 255).astype(np.uint8), "RGBA"),
         Image.fromarray(out, "RGBA"))
+    return Image.alpha_composite(base, Image.fromarray(np.clip(pool_rgba, 0, 255).astype(np.uint8), "RGBA"))
+
 
 
 def variant_sprite(base_rgba, mode):
@@ -757,28 +846,35 @@ def bake(tilt=TILT_GAME, write_assets=True):
         print(f"  {sid} opaque~", Image.open(os.path.join(OUT, f"crew_{sid}_idle.png")).getbbox(),
               "size", (nw, nh), "pos", pos)
 
-    # animations (cheap)
+    # animations — fire flicker includes pulsing floor glow pool
     fire_frames = []
+    boosts = (0.88, 1.00, 1.12, 0.96)
+    # Crop covers hearth + floor pool in front (~400px down)
+    fx, fy, fw, fh = 480, 40, 400, 380
     for fi in range(4):
         gf, of = build_room(False, fire_frame=fi, lantern_pulse=0, breath=0)
-        im, oi, _ = render_scene(gf, of, tilt, light_only=True)
+        im, oi, _ = render_scene(gf, of, tilt)
         rgba, _, emf, _ = place_on_room(im, oi)
-        fr = meta_fire = [500, 40, 360, 260]
-        fx, fy, fw, fh = 500, 40, 360, 260
-        arr = np.concatenate([rgba[:, :, :3], np.where(emf, 255, 0).astype(np.uint8)[..., None]], -1)
-        fire_frames.append(Image.fromarray(arr[fy:fy + fh, fx:fx + fw]))
-    fw, fh = fire_frames[0].size
-    fire_strip = Image.new("RGBA", (fw * 4, fh))
+        graded_f = grade_night(rgba, emf, pool_boost=boosts[fi])
+        # Lights-only-ish plate: emissives + pool delta vs a dark base
+        lights_f = lights_overlay(graded_f, emf, pool_boost=boosts[fi])
+        # Also keep flame RGB from graded for the sheet
+        arr = np.array(lights_f)
+        crop = arr[fy:fy + fh, fx:fx + fw].copy()
+        fire_frames.append(Image.fromarray(crop))
+    fww, fhh = fire_frames[0].size
+    fire_strip = Image.new("RGBA", (fww * 4, fhh))
     for i, fr in enumerate(fire_frames):
-        fire_strip.paste(fr, (i * fw, 0))
+        fire_strip.paste(fr, (i * fww, 0))
     fp = os.path.join(OUT, "fireplace_flicker.png"); fire_strip.save(fp); write_import(fp)
 
     for li in range(2):
-        gf, of = build_room(False, fire_frame=1, lantern_pulse=li, breath=0)
+        gf, of = build_room(False, fire_frame=1 + li, lantern_pulse=li, breath=0)
         im, oi, _ = render_scene(gf, of, tilt)
         rgba, _, eml, _ = place_on_room(im, oi)
-        graded_l = grade_night(rgba, eml)
-        lights_overlay(graded_l, eml).save(os.path.join(OUT, f"saloon_room_lights_pulse{li}.png"))
+        boost = 0.92 if li == 0 else 1.10
+        graded_l = grade_night(rgba, eml, pool_boost=boost)
+        lights_overlay(graded_l, eml, pool_boost=boost).save(os.path.join(OUT, f"saloon_room_lights_pulse{li}.png"))
         write_import(os.path.join(OUT, f"saloon_room_lights_pulse{li}.png"))
 
     for slot, sid in enumerate(SEAT_IDS):

@@ -1,191 +1,200 @@
 {
- "room_size": [
-  1280,
-  720
- ],
- "fireplace_rect": [
-  560,
-  90,
-  300,
-  220
- ],
- "card_left_rect": [
-  24,
-  72,
-  356,
-  448
- ],
- "card_right_rect": [
-  900,
-  72,
-  356,
-  448
- ],
- "camera": "voxel_render HD ppv=2 tilt=45.0\u00b0 heading=0.0\u00b0 (PR #70)",
- "tilt_deg": 45.0,
- "px_per_voxel": 2,
- "hd": true,
- "sun": "dim moonlight upper-left \u2192 hard cast shadows down-right; fire/lanterns hero lights",
- "night": "#512b11 world grade + vignette; emissive pools untinted on lights plate",
- "background": "res://art/saloon/saloon_room.png",
- "lights": "res://art/saloon/saloon_room_lights.png",
- "lights_note": "Fireplace + lantern glow. Composite above world night grade; do not CanvasModulate.",
- "animations": {
-  "fireplace_flicker": {
-   "sheet": "res://art/saloon/fireplace_flicker.png",
-   "frames": 4,
-   "fps": 8
+  "room_size": [
+    1280,
+    720
+  ],
+  "fireplace_rect": [
+    560,
+    90,
+    300,
+    220
+  ],
+  "card_left_rect": [
+    24,
+    72,
+    356,
+    448
+  ],
+  "card_right_rect": [
+    900,
+    72,
+    356,
+    448
+  ],
+  "camera": "voxel_render HD ppv=2 tilt=45.0\u00b0 heading=0.0\u00b0 (PR #70)",
+  "tilt_deg": 45.0,
+  "px_per_voxel": 2,
+  "hd": true,
+  "sun": "dim moonlight upper-left \u2192 hard cast shadows down-right; fire/lanterns hero lights",
+  "night": "#512b11 world grade + vignette; fireplace hero warm pool ~380px falloff",
+  "background": "res://art/saloon/saloon_room.png",
+  "lights": "res://art/saloon/saloon_room_lights.png",
+  "lights_note": "Fireplace + lantern glow. Composite above world night grade; do not CanvasModulate.",
+  "animations": {
+    "fireplace_flicker": {
+      "sheet": "res://art/saloon/fireplace_flicker.png",
+      "frames": 4,
+      "fps": 8,
+      "note": "Flame tongues + warm floor-pool pulse; composite at fireplace_rect (sheet origin 480,40; frame 400x380)",
+      "sheet_origin": [
+        480,
+        40
+      ],
+      "frame_size": [
+        400,
+        380
+      ]
+    },
+    "lantern_pulse": {
+      "plates": [
+        "res://art/saloon/saloon_room_lights_pulse0.png",
+        "res://art/saloon/saloon_room_lights_pulse1.png"
+      ],
+      "fps": 2
+    }
   },
-  "lantern_pulse": {
-   "plates": [
-    "res://art/saloon/saloon_room_lights_pulse0.png",
-    "res://art/saloon/saloon_room_lights_pulse1.png"
-   ],
-   "fps": 2
-  }
- },
- "seats": [
-  {
-   "id": "bar_left",
-   "slot": 0,
-   "pos": [
-    171,
-    164
-   ],
-   "z": 420,
-   "hit_rect": [
-    157,
-    150,
-    243,
-    284
-   ],
-   "anchor": [
-    278,
-    215
-   ],
-   "card_side": "right",
-   "sprites": {
-    "idle": "res://art/saloon/crew_bar_left_idle.png",
-    "highlight": "res://art/saloon/crew_bar_left_highlight.png",
-    "dim": "res://art/saloon/crew_bar_left_dim.png",
-    "idle_anim": "res://art/saloon/crew_bar_left_idle_anim.png"
-   },
-   "anim": {
-    "idle_frames": 4,
-    "idle_frame_w": 215,
-    "fps": 4
-   }
+  "seats": [
+    {
+      "id": "bar_left",
+      "slot": 0,
+      "pos": [
+        171,
+        164
+      ],
+      "z": 420,
+      "hit_rect": [
+        157,
+        150,
+        243,
+        284
+      ],
+      "anchor": [
+        278,
+        215
+      ],
+      "card_side": "right",
+      "sprites": {
+        "idle": "res://art/saloon/crew_bar_left_idle.png",
+        "highlight": "res://art/saloon/crew_bar_left_highlight.png",
+        "dim": "res://art/saloon/crew_bar_left_dim.png",
+        "idle_anim": "res://art/saloon/crew_bar_left_idle_anim.png"
+      },
+      "anim": {
+        "idle_frames": 4,
+        "idle_frame_w": 215,
+        "fps": 4
+      }
+    },
+    {
+      "id": "table_left",
+      "slot": 1,
+      "pos": [
+        282,
+        350
+      ],
+      "z": 606,
+      "hit_rect": [
+        268,
+        336,
+        244,
+        284
+      ],
+      "anchor": [
+        390,
+        401
+      ],
+      "card_side": "right",
+      "sprites": {
+        "idle": "res://art/saloon/crew_table_left_idle.png",
+        "highlight": "res://art/saloon/crew_table_left_highlight.png",
+        "dim": "res://art/saloon/crew_table_left_dim.png",
+        "idle_anim": "res://art/saloon/crew_table_left_idle_anim.png"
+      },
+      "anim": {
+        "idle_frames": 4,
+        "idle_frame_w": 216,
+        "fps": 4
+      }
+    },
+    {
+      "id": "table_mid",
+      "slot": 2,
+      "pos": [
+        457,
+        316
+      ],
+      "z": 570,
+      "hit_rect": [
+        443,
+        302,
+        221,
+        282
+      ],
+      "anchor": [
+        553,
+        366
+      ],
+      "card_side": "right",
+      "sprites": {
+        "idle": "res://art/saloon/crew_table_mid_idle.png",
+        "highlight": "res://art/saloon/crew_table_mid_highlight.png",
+        "dim": "res://art/saloon/crew_table_mid_dim.png",
+        "idle_anim": "res://art/saloon/crew_table_mid_idle_anim.png"
+      },
+      "anim": {
+        "idle_frames": 4,
+        "idle_frame_w": 193,
+        "fps": 4
+      }
+    },
+    {
+      "id": "table_right",
+      "slot": 3,
+      "pos": [
+        600,
+        362
+      ],
+      "z": 617,
+      "hit_rect": [
+        586,
+        348,
+        239,
+        283
+      ],
+      "anchor": [
+        705,
+        413
+      ],
+      "card_side": "right",
+      "sprites": {
+        "idle": "res://art/saloon/crew_table_right_idle.png",
+        "highlight": "res://art/saloon/crew_table_right_highlight.png",
+        "dim": "res://art/saloon/crew_table_right_dim.png",
+        "idle_anim": "res://art/saloon/crew_table_right_idle_anim.png"
+      },
+      "anim": {
+        "idle_frames": 4,
+        "idle_frame_w": 211,
+        "fps": 4
+      }
+    }
+  ],
+  "card_side_rule": "Per seat: opens away from the figure. Left/center \u2192 right. Fireplace stays clear.",
+  "ui_colours_needed": {
+    "PANEL": "#181d20",
+    "PANEL_BODY": "#24292f",
+    "HEADER": "#1e1b14",
+    "ACCENT_GOLD": "#e1b441",
+    "HAIRLINE": "#3a3d3c",
+    "TEXT": "#ccc8bc",
+    "TEXT_DIM": "#8a8a84",
+    "RARITY_COMMON": "#8a8a84",
+    "RARITY_UNCOMMON": "#5aa05a",
+    "RARITY_RARE": "#4a7ac8",
+    "RARITY_EPIC": "#9a5ac8",
+    "RARITY_LEGENDARY": "#e1b441",
+    "RARITY_MYTHIC": "#c4473f",
+    "NIGHT_WORLD": "#512b11"
   },
-  {
-   "id": "table_left",
-   "slot": 1,
-   "pos": [
-    282,
-    350
-   ],
-   "z": 606,
-   "hit_rect": [
-    268,
-    336,
-    244,
-    284
-   ],
-   "anchor": [
-    390,
-    401
-   ],
-   "card_side": "right",
-   "sprites": {
-    "idle": "res://art/saloon/crew_table_left_idle.png",
-    "highlight": "res://art/saloon/crew_table_left_highlight.png",
-    "dim": "res://art/saloon/crew_table_left_dim.png",
-    "idle_anim": "res://art/saloon/crew_table_left_idle_anim.png"
-   },
-   "anim": {
-    "idle_frames": 4,
-    "idle_frame_w": 216,
-    "fps": 4
-   }
-  },
-  {
-   "id": "table_mid",
-   "slot": 2,
-   "pos": [
-    457,
-    316
-   ],
-   "z": 570,
-   "hit_rect": [
-    443,
-    302,
-    221,
-    282
-   ],
-   "anchor": [
-    553,
-    366
-   ],
-   "card_side": "right",
-   "sprites": {
-    "idle": "res://art/saloon/crew_table_mid_idle.png",
-    "highlight": "res://art/saloon/crew_table_mid_highlight.png",
-    "dim": "res://art/saloon/crew_table_mid_dim.png",
-    "idle_anim": "res://art/saloon/crew_table_mid_idle_anim.png"
-   },
-   "anim": {
-    "idle_frames": 4,
-    "idle_frame_w": 193,
-    "fps": 4
-   }
-  },
-  {
-   "id": "table_right",
-   "slot": 3,
-   "pos": [
-    600,
-    362
-   ],
-   "z": 617,
-   "hit_rect": [
-    586,
-    348,
-    239,
-    283
-   ],
-   "anchor": [
-    705,
-    413
-   ],
-   "card_side": "right",
-   "sprites": {
-    "idle": "res://art/saloon/crew_table_right_idle.png",
-    "highlight": "res://art/saloon/crew_table_right_highlight.png",
-    "dim": "res://art/saloon/crew_table_right_dim.png",
-    "idle_anim": "res://art/saloon/crew_table_right_idle_anim.png"
-   },
-   "anim": {
-    "idle_frames": 4,
-    "idle_frame_w": 211,
-    "fps": 4
-   }
-  }
- ],
- "card_side_rule": "Per seat: opens away from the figure. Left/center \u2192 right. Fireplace stays clear.",
- "ui_colours_needed": {
-  "PANEL": "#181d20",
-  "PANEL_BODY": "#24292f",
-  "HEADER": "#1e1b14",
-  "ACCENT_GOLD": "#e1b441",
-  "HAIRLINE": "#3a3d3c",
-  "TEXT": "#ccc8bc",
-  "TEXT_DIM": "#8a8a84",
-  "RARITY_COMMON": "#8a8a84",
-  "RARITY_UNCOMMON": "#5aa05a",
-  "RARITY_RARE": "#4a7ac8",
-  "RARITY_EPIC": "#9a5ac8",
-  "RARITY_LEGENDARY": "#e1b441",
-  "RARITY_MYTHIC": "#c4473f",
-  "NIGHT_WORLD": "#512b11"
- },
- "ui_colours_note": "Do not add these to tuning.gd from this PR."
+  "ui_colours_note": "Do not add these to tuning.gd from this PR."
 }
