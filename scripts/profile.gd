@@ -1698,6 +1698,15 @@ func load_settings() -> void:
 					settings.pad_map = m
 			var swap: Variant = cfg.get_value("pad", "swap", false)
 			settings.pad_swap = swap is bool and bool(swap)
+			var saved_kbm: Variant = cfg.get_value("pad", "kbm_map", {})
+			if saved_kbm is Dictionary:
+				var km := {}
+				for a: Variant in saved_kbm:
+					var code: Variant = saved_kbm[a]
+					if (code is int or code is float) and int(code) > 0:
+						km[str(a)] = int(code)
+				if not km.is_empty():
+					settings.kbm_map = km
 	apply_settings()
 
 
@@ -1714,6 +1723,8 @@ func save_settings() -> void:
 	if settings.has("pad_map"):
 		cfg.set_value("pad", "map", settings.pad_map)
 	cfg.set_value("pad", "swap", bool(settings.get("pad_swap", false)))
+	if settings.has("kbm_map"):
+		cfg.set_value("pad", "kbm_map", settings.kbm_map)
 	cfg.save(settings_path)
 
 

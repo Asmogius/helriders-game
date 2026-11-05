@@ -66,15 +66,26 @@ func _ready() -> void:
 
 
 ## Esc on a PC works like the phone's back button (the menu runs while paused).
+## During a rebind, Esc cancels the capture instead of leaving the page.
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and (event as InputEventKey).pressed and not (event as InputEventKey).echo and (event as InputEventKey).keycode == KEY_ESCAPE:
 		get_viewport().set_input_as_handled()
+		var pad := _pad()
+		if pad != null and (str(pad.get("capturing")) != "" or str(pad.get("capturing_kbm")) != ""):
+			pad.call("cancel_capture")
+			pad.call("cancel_kbm_capture")
+			show_page(page)
+			return
 		back()
 
 
 ## The phone's back button: up a page, or close.
 func back() -> void:
-	if page == "controller":
+	var pad := _pad()
+	if pad != null:
+		pad.call("cancel_capture")
+		pad.call("cancel_kbm_capture")
+	if page == "controller" or page == "kbm":
 		show_page("settings")
 	elif page != "main":
 		show_page("main")
@@ -112,8 +123,11 @@ func quit_game() -> void:
 func show_page(which: String) -> void:
 	page = which
 	var pad := _pad()
-	if which != "controller" and pad != null and str(pad.get("capturing")) != "":
-		pad.call("cancel_capture")
+	if pad != null:
+		if which != "controller" and str(pad.get("capturing")) != "":
+			pad.call("cancel_capture")
+		if which != "kbm" and str(pad.get("capturing_kbm")) != "":
+			pad.call("cancel_kbm_capture")
 	if _body == null:
 		return   # not on screen yet; _ready shows the main page
 	for c in _body.get_children():
@@ -128,6 +142,8 @@ func show_page(which: String) -> void:
 			_database_page()
 		"controller":
 			_controller_page()
+		"kbm":
+			_kbm_page()
 
 
 func _title(text: String) -> void:
@@ -221,6 +237,7 @@ func _settings_page() -> void:
 		slider.value_changed.connect(func(v: float) -> void: profile.set_setting(key, v))
 		line.add_child(slider)
 	_button("CONTROLLER BUTTONS", show_page.bind("controller"))
+	_button("KEYBOARD & MOUSE", show_page.bind("kbm"))
 	var note := UI.label("Lower quality caps the frame rate and draws fewer effects. New settings apply to the next fight; the frame cap applies now.", 18, UI.TEXT_DIM)
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_body.add_child(note)
@@ -268,7 +285,7 @@ func _controller_page() -> void:
 		var b := Button.new()
 		b.focus_mode = Control.FOCUS_NONE
 		b.custom_minimum_size = Vector2(300, 54)
-		b.text = "PRESS A BUTTON..." if waiting == action else str(pad.call("button_name", action))
+		b.text = ("PRESS A BUTTON... (Esc cancels)" if waiting == action else str(pad.call("button_name", action)))
 		if waiting == action:
 			UI.accent(b, T.COL_UI_ACCENT)
 		b.pressed.connect(rebind.bind(action))
@@ -280,7 +297,7 @@ func _controller_page() -> void:
 	_button("STICKS: %s" % ("LEFT AIMS, RIGHT DRIVES" if swapped else "LEFT DRIVES, RIGHT AIMS"), func() -> void:
 		pad.call("set_sticks_swapped", not swapped))
 	_button("RESET TO DEFAULT", func() -> void: pad.call("reset_map"))
-	var note := UI.label("Pick an action, then press the pad button you want for it (L2 and R2 work too). A button already in use swaps over. Menus always use the D-pad, Cross, Circle and L1 / R1; Cross always picks in the crew wheel.", 18, UI.TEXT_DIM)
+	var note := UI.label("Pick an action, then press the pad button you want for it (L2 and R2 work too). Esc cancels a rebind without leaving this page. A button already in use swaps over. Menus always use the D-pad, Cross, Circle and L1 / R1; Cross always picks in the crew wheel.", 18, UI.TEXT_DIM)
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_body.add_child(note)
 	_button("BACK", show_page.bind("settings"), T.COL_UI_ACCENT)
@@ -297,8 +314,54 @@ func rebind(action: String) -> void:
 
 
 func _on_map_changed() -> void:
-	if page == "controller" and is_inside_tree():
-		show_page("controller")
+	if page in ["controller", "kbm"] and is_inside_tree():
+		show_page(page)
+
+
+
+# --- Keyboard & mouse (pad.gd) ---
+
+func _kbm_page() -> void:
+	_title("KEYBOARD & MOUSE")
+	var pad := _pad()
+	if pad == null:
+		return
+	if not pad.is_connected("map_changed", _on_map_changed):
+		pad.connect("map_changed", _on_map_changed)
+	var layout := UI.label("DRIVE  WASD / arrows      AIM  mouse      FIRE  left click      LOCK  right click      PAUSE  Esc", 18, UI.TEXT)
+	layout.autowrap_mode = TextServer.AUTOWRAP_WORD
+	_body.add_child(layout)
+	var grid := GridContainer.new()
+	grid.columns = 4
+	grid.add_theme_constant_override("h_separation", 12)
+	grid.add_theme_constant_override("v_separation", 8)
+	_body.add_child(grid)
+	var waiting := str(pad.get("capturing_kbm"))
+	for action: String in PadScript.KBM_REBIND:
+		var l := UI.label(str(PadScript.ACTION_NAMES[action]), 20)
+		l.custom_minimum_size = Vector2(170, 0)
+		grid.add_child(l)
+		var b := Button.new()
+		b.focus_mode = Control.FOCUS_NONE
+		b.custom_minimum_size = Vector2(300, 54)
+		b.text = "PRESS A KEY... (Esc cancels)" if waiting == action else str(pad.call("kbm_button_name", action))
+		if waiting == action:
+			UI.accent(b, T.COL_UI_ACCENT)
+		b.pressed.connect(rebind_kbm.bind(action))
+		grid.add_child(b)
+	_button("RESET TO DEFAULT", func() -> void: pad.call("reset_kbm_map"))
+	var note := UI.label("Click a row, then press the key you want. Esc cancels a rebind without leaving this page. Fire, lock and pause stay on the mouse buttons and Esc. A key already in use swaps over.", 18, UI.TEXT_DIM)
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD
+	_body.add_child(note)
+	_button("BACK", show_page.bind("settings"), T.COL_UI_ACCENT)
+
+
+func rebind_kbm(action: String) -> void:
+	var pad := _pad()
+	if pad == null:
+		return
+	pad.call("start_kbm_capture", action)
+	show_page("kbm")
 
 
 # --- Database ---
