@@ -81,6 +81,19 @@ func _process(_delta: float) -> bool:
 					found = true
 					(b as Button).pressed.emit()
 			_check(found, "Settings shows DISPLAY: WINDOWED on a PC")
+			var kbm_btn := false
+			for b: Node in garage.menu.find_children("*", "Button", true, false):
+				if (b as Button).text == "KEYBOARD & MOUSE":
+					kbm_btn = true
+					(b as Button).pressed.emit()
+			_check(kbm_btn and garage.menu.page == "kbm", "Settings has KEYBOARD & MOUSE")
+			var pad: Node = root.get_node("Pad")
+			pad.call("start_kbm_capture", "ability_1")
+			garage.menu.show_page("kbm")
+			_check(str(pad.get("capturing_kbm")) == "ability_1", "KBM rebind is waiting for a key")
+			_key(KEY_ESCAPE)
+			_check(str(pad.get("capturing_kbm")) == "" and garage.menu.page == "kbm", "Esc cancels KBM rebind without leaving the page")
+			garage.menu.show_page("settings")
 			_check(bool(profile.settings.get("fullscreen", false)), "the DISPLAY toggle turns fullscreen on")
 		5:
 			_key(KEY_F11)

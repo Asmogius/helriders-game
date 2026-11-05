@@ -73,6 +73,13 @@ func _input(event: InputEvent) -> void:
 				_trig_down[k] = down
 	elif event is InputEventKey and (event as InputEventKey).pressed and not (event as InputEventKey).echo:
 		var k := event as InputEventKey
+		if capturing_kbm != "":
+			if k.keycode == KEY_ESCAPE:
+				cancel_kbm_capture()
+			else:
+				_capture_kbm(int(k.physical_keycode))
+			get_viewport().set_input_as_handled()
+			return
 		if _desktop():
 			set_kbm(true)
 		if k.keycode == KEY_F11 or ((k.keycode == KEY_ENTER or k.keycode == KEY_KP_ENTER) and k.alt_pressed):
@@ -80,10 +87,12 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 	elif event is InputEventScreenTouch and (event as InputEventScreenTouch).pressed:
 		capturing = ""
+		capturing_kbm = ""
 		set_active(false)
 		set_kbm(false)
 	elif event is InputEventMouseButton and (event as InputEventMouseButton).pressed:
 		capturing = ""
+		capturing_kbm = ""
 		set_active(false)
 		if _desktop():
 			set_kbm(true)
@@ -194,18 +203,62 @@ const BUTTON_NAMES := {JOY_BUTTON_A: "CROSS", JOY_BUTTON_B: "CIRCLE", JOY_BUTTON
 	JOY_BUTTON_DPAD_RIGHT: "D-PAD RIGHT", JOY_BUTTON_MISC1: "MUTE", JOY_BUTTON_TOUCHPAD: "TOUCHPAD",
 	TRIGGER_BASE + JOY_AXIS_TRIGGER_LEFT: "L2", TRIGGER_BASE + JOY_AXIS_TRIGGER_RIGHT: "R2"}
 
-## Mouse and keyboard (fixed layout): WASD / arrows drive, the mouse aims,
-## left click fires, right click toggles LOCK, Q / E / F fire utilities 1-3,
-## Tab opens the crew wheel (point and click, or 1-4), Esc pauses.
-const KBM_KEYS := {"ability_1": KEY_Q, "ability_2": KEY_E, "ability_3": KEY_F, "crew": KEY_TAB}
+## Mouse and keyboard: WASD / arrows drive, the mouse aims, left click fires,
+## right click toggles LOCK, Esc pauses. Utilities and CREW are rebindable
+## (Settings > KEYBOARD & MOUSE); defaults Q / E / F / Tab.
+const KBM_DEFAULT := {"ability_1": KEY_Q, "ability_2": KEY_E, "ability_3": KEY_F, "crew": KEY_TAB}
+const KBM_FIXED_NAMES := {"fire": "LEFT CLICK", "lock": "RIGHT CLICK", "pause": "ESC"}
+const KBM_KEYS := KBM_DEFAULT   # compat alias for older callers / tests
+const KBM_REBIND := ["ability_1", "ability_2", "ability_3", "crew"]
 const KBM_NAMES := {"fire": "LEFT CLICK", "lock": "RIGHT CLICK", "ability_1": "Q", "ability_2": "E", "ability_3": "F", "crew": "TAB", "pause": "ESC"}
 const KBM_BADGES := {"fire": "LMB", "lock": "RMB", "ability_1": "Q", "ability_2": "E", "ability_3": "F", "crew": "TAB", "pause": "ESC"}
+var capturing_kbm := ""   # action waiting for a key (Settings), or ""
 
 
-## The fight action a key is bound to (physical key, so it works on any layout), or "".
+## Physical key currently bound to a rebindable KBM action.
+func kbm_binding(action: String) -> int:
+	var m: Variant = _settings().get("kbm_map", {})
+	if m is Dictionary and (m as Dictionary).has(action):
+		return int(m[action])
+	return int(KBM_DEFAULT.get(action, -1))
+
+
+## Display name for a KBM action (fixed mouse/Esc, or the rebound key).
+func kbm_button_name(action: String) -> String:
+	if KBM_FIXED_NAMES.has(action):
+		return str(KBM_FIXED_NAMES[action])
+	var code := kbm_binding(action)
+	return OS.get_keycode_string(code as Key).to_upper() if code >= 0 else "?"
+
+
+## HUD badge for a KBM action.
+func kbm_badge(action: String) -> String:
+	if action == "fire":
+		return "LMB"
+	if action == "lock":
+		return "RMB"
+	if action == "pause":
+		return "ESC"
+	var name := kbm_button_name(action)
+	return name.left(3) if name.length() > 3 else name
+
+
+## The fight action a key is bound to (physical key), or "".
+func kbm_action_of(physical: int) -> String:
+	for a: String in KBM_REBIND:
+		if kbm_binding(a) == physical:
+			return a
+	return ""
+
+
+## Static entry (preload callers): prefers the live Pad map.
 static func kbm_action(physical: int) -> String:
-	for a: String in KBM_KEYS:
-		if int(KBM_KEYS[a]) == physical:
+	var tree := Engine.get_main_loop() as SceneTree
+	var node: Node = tree.root.get_node_or_null("Pad") if tree != null else null
+	if node != null and node.has_method("kbm_action_of"):
+		return str(node.call("kbm_action_of", physical))
+	for a: String in KBM_DEFAULT:
+		if int(KBM_DEFAULT[a]) == physical:
 			return a
 	return ""
 
@@ -301,10 +354,46 @@ func set_sticks_swapped(on: bool) -> void:
 ## Wait for the next pad press and bind it to `action`.
 func start_capture(action: String) -> void:
 	capturing = action
+	capturing_kbm = ""
 
 
 func cancel_capture() -> void:
 	capturing = ""
+
+
+func start_kbm_capture(action: String) -> void:
+	capturing_kbm = action
+	capturing = ""
+
+
+func cancel_kbm_capture() -> void:
+	capturing_kbm = ""
+	map_changed.emit()
+
+
+func bind_kbm(action: String, code: int) -> void:
+	if action not in KBM_REBIND:
+		return
+	var m := {}
+	for a: String in KBM_REBIND:
+		m[a] = kbm_binding(a)
+	var old_code: int = m[action]
+	for a: String in KBM_REBIND:
+		if a != action and int(m[a]) == code:
+			m[a] = old_code
+	m[action] = code
+	_store("kbm_map", m)
+
+
+func reset_kbm_map() -> void:
+	_store("kbm_map", KBM_DEFAULT.duplicate())
+
+
+func _capture_kbm(code: int) -> void:
+	var a := capturing_kbm
+	capturing_kbm = ""
+	if a != "":
+		bind_kbm(a, code)
 
 
 func _capture(code: int) -> void:

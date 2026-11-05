@@ -1252,9 +1252,9 @@ func _pad_badges(_on := false) -> void:
 	var keys := pad != null and bool(pad.get("kbm"))
 	for i in _ability_buttons.size():
 		var action := "ability_%d" % (i + 1)
-		_ability_buttons[i].pad_badge = str(pad.call("badge", action)) if on and i < 3 else (str(PadScript.KBM_BADGES[action]) if keys and i < 3 else "")
-	_lock_button.pad_badge = str(pad.call("badge", "lock")) if on else ("RMB" if keys else "")
-	_crew_button.pad_badge = str(pad.call("badge", "crew")) if on else ("TAB" if keys else "")
+		_ability_buttons[i].pad_badge = str(pad.call("badge", action)) if on and i < 3 else (str(pad.call("kbm_badge", action)) if keys and i < 3 else "")
+	_lock_button.pad_badge = str(pad.call("badge", "lock")) if on else (str(pad.call("kbm_badge", "lock")) if keys else "")
+	_crew_button.pad_badge = str(pad.call("badge", "crew")) if on else (str(pad.call("kbm_badge", "crew")) if keys else "")
 	_sync_touch_chrome()
 	left_stick.queue_redraw()   # V6.4 / playtest #10: sticks hide in mouse-and-keyboard mode
 	right_stick.queue_redraw()
