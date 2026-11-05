@@ -13,6 +13,7 @@ const Parts := preload("res://scripts/parts.gd")
 const Loadout := preload("res://scripts/loadout.gd")
 const Crew := preload("res://scripts/crew.gd")
 const T := preload("res://scripts/tuning.gd")
+const UI := preload("res://scripts/ui_theme.gd")
 
 const CHASSIS := 0      # indexes into Garage.SLOTS
 const DRIVE := 2
@@ -107,7 +108,17 @@ func _run_checks() -> void:
 	var speed_after: float = sheet.after.speed
 	print("  stat sheet top speed %d > %d (overload included), power load %d > %d" % [roundi(speed_now), roundi(speed_after), int(sheet.now.load), int(sheet.after.load)])
 	_check(sheet.visible and int(sheet.after.load) == 110 and float(sheet.after.mobility) < 1.0, "stat sheet shows the previewed part's power and overload")
-	_check(garage.press_card("outrider_sport_wheels") and profile.rig.drive == "outrider_sport_wheels", "second tap fits the part")
+	# Overload fit: preview already done; next tap arms confirm, then fit.
+	_check(not garage.press_card("outrider_sport_wheels") and profile.rig.drive == "street_wheels", "overload fit asks for a confirm tap")
+	_check(garage._overload_armed == "outrider_sport_wheels", "confirm is armed for the overloaded part")
+	var over_status := ""
+	var over_color := Color.WHITE
+	for c in garage._cards.get_children():
+		if str(c.get("part_id")) == "outrider_sport_wheels":
+			over_status = str(c.get("status"))
+			over_color = c.get("status_color") as Color
+	_check(over_status.contains("FIT ANYWAY") and over_status.contains("OVERLOAD") and over_color.is_equal_approx(UI.BAD), "overload card uses the warn colour, not go-ahead green (%s)" % over_status)
+	_check(garage.press_card("outrider_sport_wheels") and profile.rig.drive == "outrider_sport_wheels", "third tap fits the overloaded part")
 	_check(garage.press_card("street_wheels") == false and garage.press_card("street_wheels") and profile.scrap == 30, "two taps to swap back, still free")
 	garage.close_sheet()
 	# V2.3 sample: the stats panel stays on the right (whole-rig stats) when the sheet closes.

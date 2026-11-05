@@ -73,6 +73,7 @@ var _workshop: Control
 var _rig_touch: Control
 var _stat_sheet: StatSheet
 var _preview := ""                 # part id previewed in the open sheet ("" = empty slot)
+var _overload_armed := ""          # part id armed for a second confirm when fitting would overload
 var _tags: Array[SlotTag] = []
 var _callouts: Callouts
 var _rings: Callouts
@@ -200,6 +201,7 @@ func open_slot(i: int) -> void:
 
 
 func close_sheet() -> void:
+	_overload_armed = ""
 	selected = -1
 	_sheet.visible = false
 	_show_stat_sheet(false)
@@ -221,17 +223,33 @@ func _show_stat_sheet(on: bool) -> void:
 
 
 ## First tap on a card previews it; a second tap on the same card fits it.
+## An overload fit needs a third tap on the card: preview → arm confirm → fit
+## (playtest #3). `choose()` still fits in one call for the tour and tests.
 func press_card(id: String) -> bool:
 	if selected < 0:
 		return false
 	if id != _preview:
 		preview_part(id)
 		return false
+	var slot: Dictionary = SLOTS[selected]
+	if _slot_part(slot) == id:
+		return true
+	var candidate := profile.with_part(profile.rig, slot.key, slot.index, id)
+	var after := _built(candidate)
+	var over := StatSheet.overload_cause(after)
+	if over != "" and id != "" and _overload_armed != id:
+		_overload_armed = id
+		toast("%s — %s. Click again to fit anyway." % [over, _overload_explain(after)], 3.5, UI.BAD)
+		for c in _cards.get_children():
+			if c is PartCard:
+				_style_card(c as PartCard)
+		return false
 	return choose(id)
 
 
 func preview_part(id: String) -> void:
 	_preview = id
+	_overload_armed = ""
 	for c in _cards.get_children():
 		if c is PartCard:
 			var card := c as PartCard
@@ -248,13 +266,30 @@ func choose(id: String) -> bool:
 	if _slot_part(slot) == id:
 		return true
 	var candidate := profile.with_part(profile.rig, slot.key, slot.index, id)
+	var after := _built(candidate)
+	var over := StatSheet.overload_cause(after)
 	if not profile.apply_loadout(candidate):
 		toast("Not enough scrap")
 		return false
 	_preview = id
-	toast("Fitted: " + (str(Parts.get_part(id).name) if id != "" else "slot emptied"), 2.2,
-		UI.rarity_color(str(Parts.get_part(id).rarity)) if id != "" else T.COL_UI_ACCENT)
+	_overload_armed = ""
+	var msg := "Fitted: " + (str(Parts.get_part(id).name) if id != "" else "slot emptied")
+	if over != "" and id != "":
+		msg = "Fitted over budget: " + str(Parts.get_part(id).name) + " (" + over + ")"
+	toast(msg, 2.2,
+		UI.BAD if over != "" and id != "" else (UI.rarity_color(str(Parts.get_part(id).rarity)) if id != "" else T.COL_UI_ACCENT))
 	return true
+
+
+## Plain reason for an overload toast: which budget blew and what free room you need.
+func _overload_explain(after: Dictionary) -> String:
+	var bits: Array[String] = []
+	if float(after.power_output) > 0.0 and float(after.power_draw) > float(after.power_output):
+		bits.append("needs %d more power" % roundi(float(after.power_draw) - float(after.power_output)))
+	var cap := float(after.get("weight_capacity", 0.0))
+	if cap > 0.0 and float(after.get("weight", 0.0)) > cap:
+		bits.append("needs %d more capacity" % roundi(float(after.weight) - cap))
+	return " and ".join(bits) if not bits.is_empty() else "over budget"
 
 
 ## Your last build if you can afford it, otherwise a free all-Common starter.
@@ -846,6 +881,7 @@ func _make_card(slot: Dictionary, id: String, current: String, now: Dictionary) 
 
 
 ## Status line on a card: what a tap (or a second tap) would do.
+## Overload fits never use the go-ahead green — they warn, then ask to confirm.
 func _style_card(card: PartCard) -> void:
 	var again := PadScript.hint("TAP AGAIN:  ", "PRESS AGAIN:  ") if card.selected else ""
 	if card.installed:
@@ -854,6 +890,17 @@ func _style_card(card: PartCard) -> void:
 	elif card.cost > profile.scrap:
 		card.status = "NEED %d SCRAP" % card.cost
 		card.status_color = UI.BAD
+	elif card.warning != "" and card.part_id != "":
+		# Short lines so they fit the card (no "TAP AGAIN:" prefix).
+		if card.selected and _overload_armed == card.part_id:
+			card.status = "FIT ANYWAY (OVERLOAD)"
+			card.status_color = UI.BAD
+		elif card.selected:
+			card.status = "CONFIRM OVERLOAD FIT"
+			card.status_color = UI.BAD
+		else:
+			card.status = card.warning
+			card.status_color = UI.BAD
 	elif card.cost == 0:
 		card.status = again + ("TAKE OFF" if card.part_id == "" else "FIT  -  FREE")
 		card.status_color = UI.GOOD
