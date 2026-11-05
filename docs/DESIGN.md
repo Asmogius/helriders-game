@@ -26,7 +26,7 @@ Tone is harsh, industrial, and opportunistic. Vehicles are scavenged and weaponi
 
 4. Launch. Top-down combat against zombies + enemy vehicles.
 
-5. Success: return with scrap, parts, crew XP (possible injuries). Failure (vehicle destroyed): dramatic wreck, scrap penalty scaled to build cost, assigned crew permanently lost.
+5. Success: return with scrap, parts, crew XP (possible injuries). Failure (vehicle destroyed): dramatic wreck, rig and its parts lost (rebuild it), assigned crew permanently lost. No scrap penalty (removed 2026-11-05).
 
 6. Land in garage. Upgrade parts via Research, manage roster/injuries/expeditions, upgrade stations, prepare next day.
 
@@ -62,7 +62,7 @@ Max level by rarity: Common 5, Uncommon 8, Rare 12, Epic 16, Legendary 20. Uniqu
 
 Agreed details: a level belongs to the schematic, so every copy you build has it and a wreck never removes it. Each level past 1 adds +4% to the part's main stats (internals grow their modifier, utilities cool down faster); power draw and weight never change. A level costs a rarity base (Common 15, Uncommon 30, Rare 60, Epic 110, Legendary 180) x the level being bought. Levelling is instant, capped at 3 levels per day. Station upgrades: Bench Discount (-10% per step, 3 steps) and Second Shift (+1 level per day, 2 steps). Levels don't change build cost or the wreck penalty.
 
-Vehicle loss applies a scrap penalty scaled to the cost of the lost build. Chassis/ability to reassemble remains. Parts on the destroyed vehicle are lost (or heavily reduced).
+Vehicle loss costs no scrap (the penalty was removed 2026-11-05; T.WRECK_PENALTY = 0). Chassis/ability to reassemble remains. Parts on the destroyed vehicle are lost (or heavily reduced).
 
 # 5. Garage Systems and UI
 
@@ -137,6 +137,21 @@ Districts: Outer Blocks (start) → Midtown Ruins → Industrial Spine → Core 
 Weighting example: Common 1 pt/level, Uncommon 2, Rare 4, Epic 7, Legendary 12. Thresholds tunable (e.g. 40 / 120 / 300). Progress bar visible on locked districts in Comms. Higher districts raise rarity floor/ceiling of loot and crew.
 
 No forced ending. Core Collapse remains open for continued refinement.
+
+## Night (agreed with the owner 2026-11-05; built, PR #79)
+
+Night is rolled once per job from its seed and saved with the job (`night`). Comms shows a NIGHT badge before you take the job. Only zombies and Hunters change at night: speed x1.1 (Hunters x1.1), damage x1.1, +4 alive at the start, faster ramp, bigger packs, earlier Tanks and Hunter, a horde surge every 35 s (4 s, warned 1.5 s before). Enemy rigs don't change. Rewards: pay x1.3 (stacks with any district's pay), kill scrap x1.25 rounded up, schematic chance +0.10, crew XP x1.25. Numbers are in `tuning.gd` (`NIGHT_*`).
+
+Who gets night, first match wins:
+1. Core Collapse: always night, no exceptions (above every rule below).
+2. The tutorial: always day.
+3. 1 skull, or before the first 3 clears: day.
+4. Escort: day below 5 skulls, night at 5-6.
+5. Courier: 50/50.
+6. Outer Blocks Survive and Hunt at 4 skulls: night.
+7. District chance (Outer Blocks 10%, Midtown 35%, Industrial 60%), +25% for Survive and Hunt (capped at 100%).
+
+Board night share after 3 clears: Outer Blocks ~21%, Midtown ~43%, Industrial ~64%, Core 100%. A job saved before night existed rolls once on load from the same seed.
 
 # 8. Combat Design
 
