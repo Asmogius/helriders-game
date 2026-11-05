@@ -134,7 +134,8 @@ static func skin(name: String, fallback: StyleBox) -> StyleBox:
 
 static func box(fill: Color, border: Color, width: int) -> StyleBoxFlat:
 	var b := StyleBoxFlat.new()
-	b.bg_color = fill
+	# Menu / Database panels must read as solid charcoal (playtest see-through).
+	b.bg_color = Color(fill.r, fill.g, fill.b, 1.0) if fill.a >= 0.85 else fill
 	b.border_color = border
 	b.set_border_width_all(width)
 	b.content_margin_left = 12

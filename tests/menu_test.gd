@@ -15,6 +15,7 @@ const GameMenu := preload("res://scripts/game_menu.gd")
 const Codex := preload("res://scripts/codex.gd")
 const ProfileScript := preload("res://scripts/profile.gd")
 const T := preload("res://scripts/tuning.gd")
+const UI := preload("res://scripts/ui_theme.gd")
 
 var profile: ProfileScript
 var main: Mission
@@ -134,6 +135,11 @@ func _check_database() -> void:
 	_check(text.contains("Brute"), "and shows what you've met")
 	for cat: String in Codex.CATEGORIES:
 		_check(not Codex.entries(cat).is_empty(), "the %s tab has entries" % cat)
+	# Playtest #13: Database / menu panel fill is opaque charcoal.
+	var flat: StyleBoxFlat = UI.box(UI.PANEL, UI.PANEL_EDGE, 2)
+	_check(is_equal_approx(flat.bg_color.a, 1.0), "UI.box forces opaque panel fills")
+	menu._panel.add_theme_stylebox_override("panel", flat)
+	_check(is_equal_approx((menu._panel.get_theme_stylebox("panel") as StyleBoxFlat).bg_color.a, 1.0), "menu panel fill is opaque")
 	menu.queue_free()
 
 
