@@ -32,6 +32,8 @@ func _ready() -> void:
 	if _desktop():
 		# On a PC the mouse aims and clicks; it mustn't grab the touch sticks.
 		Input.emulate_touch_from_mouse = false
+		if DisplayServer.get_name() != "headless":
+			kbm = true   # playtest #10: real PC starts KBM so touch chrome stays hidden
 	var layer := CanvasLayer.new()
 	layer.layer = 120
 	add_child(layer)

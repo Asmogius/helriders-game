@@ -17,6 +17,8 @@ const ThumbStick := preload("res://scripts/thumb_stick.gd")
 
 var left_stick: ThumbStick
 var right_stick: ThumbStick
+var _lock_wanted := false
+var _crew_wanted := false
 
 var _root: Control
 var _armor_bar: ArmorBar
@@ -259,7 +261,8 @@ func set_crew_wheel(entries: Array[Dictionary]) -> void:
 	_wheel.off.fill(false)
 	_wheel.notes.resize(entries.size())
 	_wheel.notes.fill("")
-	_crew_button.visible = not entries.is_empty()
+	_crew_wanted = not entries.is_empty()
+	_sync_touch_chrome()
 	_layout_buttons()
 	_wheel.queue_redraw()
 
@@ -283,7 +286,8 @@ func set_crew_state(index: int, charge: float, disabled: bool, note := "") -> vo
 ## Opens the crew wheel (slow motion, via crew_wheel_toggled) unless it's
 ## cooling down.
 func open_crew_wheel() -> bool:
-	if _wheel.visible or not _crew_button.visible or crew_wheel_cooldown > 0.0 or _overlay.visible:
+	# _crew_wanted (not the button) so Tab still works when KBM hides the button.
+	if _wheel.visible or not _crew_wanted or crew_wheel_cooldown > 0.0 or _overlay.visible:
 		return false
 	_wheel.visible = true
 	_wheel.queue_redraw()
@@ -320,7 +324,7 @@ func is_crew_wheel_open() -> bool:
 
 
 func has_crew_button() -> bool:
-	return _crew_button.visible
+	return _crew_wanted   # true even when KBM hides the button
 
 
 ## Test hook: crew slice `index` is greyed out (injured, or nothing to do).
@@ -399,7 +403,8 @@ func set_power(used: float, output: float, weight := 0.0, capacity := 0.0) -> vo
 
 ## Only rigs with a targeting system (and a lock-capable weapon) get the button.
 func set_lock_available(available: bool) -> void:
-	_lock_button.visible = available
+	_lock_wanted = available
+	_sync_touch_chrome()
 	_layout_buttons()
 	_controls_hint()
 
@@ -439,7 +444,7 @@ func set_lock_state(on: bool, has_target: bool) -> void:
 
 ## Test/keyboard hook: same as tapping the lock button.
 func press_lock() -> void:
-	if _lock_button.visible:
+	if _lock_wanted or _lock_button.visible:
 		_lock_button.press()
 
 
@@ -1250,14 +1255,25 @@ func _pad_badges(_on := false) -> void:
 		_ability_buttons[i].pad_badge = str(pad.call("badge", action)) if on and i < 3 else (str(PadScript.KBM_BADGES[action]) if keys and i < 3 else "")
 	_lock_button.pad_badge = str(pad.call("badge", "lock")) if on else ("RMB" if keys else "")
 	_crew_button.pad_badge = str(pad.call("badge", "crew")) if on else ("TAB" if keys else "")
-	left_stick.queue_redraw()   # V6.4: sticks hide in mouse-and-keyboard mode
+	_sync_touch_chrome()
+	left_stick.queue_redraw()   # V6.4 / playtest #10: sticks hide in mouse-and-keyboard mode
 	right_stick.queue_redraw()
 	_controls_hint()
 
 
+## Touch stick chrome (CREW / LOCK buttons) hides on desktop KBM; keys still work.
+func _sync_touch_chrome() -> void:
+	var pad := get_node_or_null("/root/Pad")
+	var hide := pad != null and bool(pad.get("kbm"))
+	_lock_button.visible = _lock_wanted and not hide
+	_crew_button.visible = _crew_wanted and not hide
+	_layout_buttons()
+
+
 ## R1: the LOCK button, if it's showing.
 func pad_lock() -> void:
-	if _lock_button.visible:
+	# _lock_wanted for KBM (button hidden); visible for tests that force the button on.
+	if _lock_wanted or _lock_button.visible:
 		_lock_button.press()
 
 
