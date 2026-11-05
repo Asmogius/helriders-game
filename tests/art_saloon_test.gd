@@ -9,7 +9,6 @@ func check(ok: bool, msg: String) -> void:
 		printerr("FAIL: ", msg)
 
 func _rects_overlap(a: Array, b: Array) -> bool:
-	# a,b = [x,y,w,h]
 	return int(a[0]) < int(b[0]) + int(b[2]) and int(a[0]) + int(a[2]) > int(b[0]) \
 		and int(a[1]) < int(b[1]) + int(b[3]) and int(a[1]) + int(a[3]) > int(b[1])
 
@@ -48,21 +47,14 @@ func _run() -> void:
 		check(seat.hit_rect is Array and seat.hit_rect.size() == 4, "%s.hit_rect" % seat.id)
 		check(int(seat.hit_rect[2]) >= 64 and int(seat.hit_rect[3]) >= 64, "%s hit_rect >= 64x64" % seat.id)
 		var side := String(seat.card_side)
-		check(side in ["left", "right"], "%s.card_side" % seat.id)
-		var card: Array = card_left if side == "left" else card_right
+		check(side == "right", "%s.card_side right (all cards open right of fireplace)" % seat.id)
+		var card: Array = card_right
 		check(not _rects_overlap(card, fire), "%s card clear of fireplace" % seat.id)
 		check(not _rects_overlap(card, seat.hit_rect), "%s card clear of own crew hit_rect" % seat.id)
-		# Callout: anchor must not lie inside the card
 		var ax := int(seat.anchor[0]); var ay := int(seat.anchor[1])
 		var in_card := ax >= int(card[0]) and ax < int(card[0]) + int(card[2]) \
 			and ay >= int(card[1]) and ay < int(card[1]) + int(card[3])
 		check(not in_card, "%s anchor outside card (callout target)" % seat.id)
-		# Prefer opening away from the figure
-		var cx := int(seat.pos[0]) + int(seat.hit_rect[2]) / 2
-		if cx < 640:
-			check(side == "right", "%s left-ish seat → card_side right" % seat.id)
-		else:
-			check(side == "left", "%s right-ish seat → card_side left" % seat.id)
 		check(seat.sprites is Dictionary, "%s.sprites" % seat.id)
 		for sk in ["idle", "highlight", "dim"]:
 			check(seat.sprites.has(sk), "%s.sprites.%s" % [seat.id, sk])
