@@ -181,7 +181,7 @@ static func _action_bar(g: Control, size: Vector2, footer_h: float, open: bool, 
 		equip.name = "Equip"
 		equip.focus_mode = Control.FOCUS_NONE
 		equip.custom_minimum_size = Vector2(180, 0)
-		UI.accent(equip, T.COL_ORANGE)
+		UI.primary(equip)
 		equip.pressed.connect(func() -> void: g.choose(g.get("_preview")))
 		bar.add_child(equip)
 		(g.get("_sheet") as Control).get_child(1).visible = false   # sheet's CLOSE: BACK does it

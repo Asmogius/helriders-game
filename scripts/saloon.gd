@@ -36,10 +36,10 @@ func _ready() -> void:
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 
-	_title = UI.label("", 30, T.COL_CYAN)
+	_title = UI.label("", 30, T.COL_UI_ACCENT)
 	_title.position = Vector2(24, 14)
 	add_child(_title)
-	_info = UI.label("", 22, T.COL_ORANGE)
+	_info = UI.label("", 22, T.COL_UI_ACCENT)
 	_info.position = Vector2(24, 54)
 	add_child(_info)
 
@@ -69,7 +69,7 @@ func _ready() -> void:
 	_hire.text = "HIRE"
 	_hire.focus_mode = Control.FOCUS_NONE
 	_hire.custom_minimum_size = Vector2(220, 0)
-	UI.accent(_hire, T.COL_ORANGE)
+	UI.primary(_hire)
 	_hire.pressed.connect(hire_selected)
 	bar.add_child(_hire)
 
@@ -118,17 +118,17 @@ func refresh() -> void:
 		var price := profile.hire_price(m)
 		if bool(m.get("rehire", false)):
 			card.status = "BACK  %d SCRAP" % price
-			card.status_color = T.COL_ORANGE if price <= profile.scrap else UI.BAD
+			card.status_color = T.COL_UI_ACCENT if price <= profile.scrap else UI.BAD
 		elif bool(m.get("hired", false)):
 			card.status = "HIRED"
-			card.status_color = T.COL_CYAN
+			card.status_color = T.COL_UI_ACCENT
 			card.dim = true
 		elif price == 0:
 			card.status = "FREE"
 			card.status_color = UI.GOOD
 		else:
 			card.status = "%d SCRAP" % price
-			card.status_color = T.COL_ORANGE if price <= profile.scrap else UI.BAD
+			card.status_color = T.COL_UI_ACCENT if price <= profile.scrap else UI.BAD
 		card.pressed.connect(select.bind(i))
 		_cards.add_child(card)
 	var reason := _block(selected)
@@ -154,10 +154,7 @@ func offer(i: int) -> Dictionary:
 	if is_rehire(i):
 		return profile.rehire_offer()
 	var role: String = FREE_ROLES[i - profile.saloon.size()]
-	var m := {"id": 0, "name": "Free %s" % Crew.ROLE_NAMES[role], "role": role, "rarity": "Common",
-		"specialty": "", "xp": 0.0, "perks": [], "rest": 0, "seated": false, "price": 0}
-	m.xp = profile.hire_start_xp(m)
-	return m
+	return profile.basic_offer(role)   # the person you'll get (name, specialty), free
 
 
 func odds_text() -> String:

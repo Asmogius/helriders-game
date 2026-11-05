@@ -7,4 +7,4 @@ func run(cap: SceneTree) -> void:
 	hud.set_lock_available(true)
 	var kinds: Array[String] = ["overcharge", "hard_line", "spikes"]
 	hud.set_abilities(kinds)
-	hud.banner("SCHEMATIC: OUTRIDER SPORT WHEELS", T.COL_ORANGE, 3.0)
+	hud.banner("SCHEMATIC: OUTRIDER SPORT WHEELS", T.COL_UI_ACCENT, 3.0)
