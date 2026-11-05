@@ -74,8 +74,11 @@ func _input(event: InputEvent) -> void:
 	elif event is InputEventKey and (event as InputEventKey).pressed and not (event as InputEventKey).echo:
 		var k := event as InputEventKey
 		if capturing_kbm != "":
-			if k.keycode == KEY_ESCAPE:
+			# Esc cancels any rebind except PAUSE, where Esc assigns Esc-pause.
+			if k.keycode == KEY_ESCAPE and capturing_kbm != "pause":
 				cancel_kbm_capture()
+			elif k.keycode == KEY_ESCAPE and capturing_kbm == "pause":
+				_capture_kbm(KEY_ESCAPE)
 			else:
 				_capture_kbm(int(k.physical_keycode))
 			get_viewport().set_input_as_handled()
@@ -91,8 +94,13 @@ func _input(event: InputEvent) -> void:
 		set_active(false)
 		set_kbm(false)
 	elif event is InputEventMouseButton and (event as InputEventMouseButton).pressed:
+		var mb := event as InputEventMouseButton
+		if capturing_kbm != "":
+			# Bind the click; mark handled so Settings buttons underneath do not press.
+			_capture_kbm(kbm_encode_mouse(int(mb.button_index)))
+			get_viewport().set_input_as_handled()
+			return
 		capturing = ""
-		capturing_kbm = ""
 		set_active(false)
 		if _desktop():
 			set_kbm(true)
@@ -203,19 +211,37 @@ const BUTTON_NAMES := {JOY_BUTTON_A: "CROSS", JOY_BUTTON_B: "CIRCLE", JOY_BUTTON
 	JOY_BUTTON_DPAD_RIGHT: "D-PAD RIGHT", JOY_BUTTON_MISC1: "MUTE", JOY_BUTTON_TOUCHPAD: "TOUCHPAD",
 	TRIGGER_BASE + JOY_AXIS_TRIGGER_LEFT: "L2", TRIGGER_BASE + JOY_AXIS_TRIGGER_RIGHT: "R2"}
 
-## Mouse and keyboard: WASD / arrows drive, the mouse aims, left click fires,
-## right click toggles LOCK, Esc pauses. Utilities and CREW are rebindable
-## (Settings > KEYBOARD & MOUSE); defaults Q / E / F / Tab.
-const KBM_DEFAULT := {"ability_1": KEY_Q, "ability_2": KEY_E, "ability_3": KEY_F, "crew": KEY_TAB}
-const KBM_FIXED_NAMES := {"fire": "LEFT CLICK", "lock": "RIGHT CLICK", "pause": "ESC"}
+## Mouse and keyboard: WASD / arrows drive, the mouse aims. Fire / lock / pause /
+## utilities / CREW are all rebindable (Settings > KEYBOARD & MOUSE). Defaults:
+## LMB fire, RMB lock, Esc pause, Q / E / F utilities, Tab crew.
+## Mouse buttons are stored as KBM_MOUSE_BASE + MouseButton index.
+const KBM_MOUSE_BASE := 1000000
+const KBM_DEFAULT := {
+	"fire": KBM_MOUSE_BASE + MOUSE_BUTTON_LEFT,
+	"lock": KBM_MOUSE_BASE + MOUSE_BUTTON_RIGHT,
+	"pause": KEY_ESCAPE,
+	"ability_1": KEY_Q, "ability_2": KEY_E, "ability_3": KEY_F, "crew": KEY_TAB,
+}
 const KBM_KEYS := KBM_DEFAULT   # compat alias for older callers / tests
-const KBM_REBIND := ["ability_1", "ability_2", "ability_3", "crew"]
+const KBM_REBIND := ["fire", "lock", "pause", "ability_1", "ability_2", "ability_3", "crew"]
 const KBM_NAMES := {"fire": "LEFT CLICK", "lock": "RIGHT CLICK", "ability_1": "Q", "ability_2": "E", "ability_3": "F", "crew": "TAB", "pause": "ESC"}
 const KBM_BADGES := {"fire": "LMB", "lock": "RMB", "ability_1": "Q", "ability_2": "E", "ability_3": "F", "crew": "TAB", "pause": "ESC"}
-var capturing_kbm := ""   # action waiting for a key (Settings), or ""
+var capturing_kbm := ""   # action waiting for a key/click (Settings), or ""
 
 
-## Physical key currently bound to a rebindable KBM action.
+static func kbm_encode_mouse(button_index: int) -> int:
+	return KBM_MOUSE_BASE + button_index
+
+
+static func kbm_is_mouse(code: int) -> bool:
+	return code >= KBM_MOUSE_BASE and code < KBM_MOUSE_BASE + 32
+
+
+static func kbm_mouse_index(code: int) -> int:
+	return code - KBM_MOUSE_BASE if kbm_is_mouse(code) else -1
+
+
+## Physical key or encoded mouse button currently bound to a KBM action.
 func kbm_binding(action: String) -> int:
 	var m: Variant = _settings().get("kbm_map", {})
 	if m is Dictionary and (m as Dictionary).has(action):
@@ -223,42 +249,89 @@ func kbm_binding(action: String) -> int:
 	return int(KBM_DEFAULT.get(action, -1))
 
 
-## Display name for a KBM action (fixed mouse/Esc, or the rebound key).
-func kbm_button_name(action: String) -> String:
-	if KBM_FIXED_NAMES.has(action):
-		return str(KBM_FIXED_NAMES[action])
-	var code := kbm_binding(action)
-	return OS.get_keycode_string(code as Key).to_upper() if code >= 0 else "?"
-
-
-## HUD badge for a KBM action.
-func kbm_badge(action: String) -> String:
-	if action == "fire":
-		return "LMB"
-	if action == "lock":
-		return "RMB"
-	if action == "pause":
+## Display name for a KBM binding (mouse button or key).
+func kbm_code_name(code: int) -> String:
+	if kbm_is_mouse(code):
+		match kbm_mouse_index(code):
+			MOUSE_BUTTON_LEFT:
+				return "LEFT CLICK"
+			MOUSE_BUTTON_RIGHT:
+				return "RIGHT CLICK"
+			MOUSE_BUTTON_MIDDLE:
+				return "MIDDLE CLICK"
+			MOUSE_BUTTON_XBUTTON1:
+				return "MOUSE 4"
+			MOUSE_BUTTON_XBUTTON2:
+				return "MOUSE 5"
+			_:
+				return "MOUSE %d" % kbm_mouse_index(code)
+	if code == KEY_ESCAPE:
 		return "ESC"
-	var name := kbm_button_name(action)
+	if code >= 0:
+		return OS.get_keycode_string(code as Key).to_upper()
+	return "?"
+
+
+## Display name for a KBM action's current binding.
+func kbm_button_name(action: String) -> String:
+	return kbm_code_name(kbm_binding(action))
+
+
+## HUD badge for a KBM action (short form of the current binding).
+func kbm_badge(action: String) -> String:
+	var code := kbm_binding(action)
+	if kbm_is_mouse(code):
+		match kbm_mouse_index(code):
+			MOUSE_BUTTON_LEFT:
+				return "LMB"
+			MOUSE_BUTTON_RIGHT:
+				return "RMB"
+			MOUSE_BUTTON_MIDDLE:
+				return "MMB"
+			_:
+				return "M%d" % kbm_mouse_index(code)
+	var name := kbm_code_name(code)
 	return name.left(3) if name.length() > 3 else name
 
 
-## The fight action a key is bound to (physical key), or "".
-func kbm_action_of(physical: int) -> String:
+## True while the bound fire input is held (mouse button or key).
+func kbm_fire_held() -> bool:
+	var code := kbm_binding("fire")
+	if kbm_is_mouse(code):
+		return Input.is_mouse_button_pressed(kbm_mouse_index(code) as MouseButton)
+	return code >= 0 and Input.is_physical_key_pressed(code as Key)
+
+
+## True if this event triggers pause: the pause binding, or Esc as hard fallback
+## so pause is never lost when rebound away from Esc.
+func kbm_is_pause_event(event: InputEvent) -> bool:
+	if event is InputEventKey and (event as InputEventKey).pressed and not (event as InputEventKey).echo:
+		var key := event as InputEventKey
+		if key.keycode == KEY_ESCAPE or int(key.physical_keycode) == KEY_ESCAPE:
+			return true   # Esc always pauses (fallback if pause was rebound)
+		return int(key.physical_keycode) == kbm_binding("pause")
+	if event is InputEventMouseButton and (event as InputEventMouseButton).pressed:
+		var code := kbm_binding("pause")
+		return kbm_is_mouse(code) and kbm_mouse_index(code) == int((event as InputEventMouseButton).button_index)
+	return false
+
+
+## The fight action a key/mouse code is bound to, or "".
+func kbm_action_of(code: int) -> String:
 	for a: String in KBM_REBIND:
-		if kbm_binding(a) == physical:
+		if kbm_binding(a) == code:
 			return a
 	return ""
 
 
 ## Static entry (preload callers): prefers the live Pad map.
-static func kbm_action(physical: int) -> String:
+static func kbm_action(code: int) -> String:
 	var tree := Engine.get_main_loop() as SceneTree
 	var node: Node = tree.root.get_node_or_null("Pad") if tree != null else null
 	if node != null and node.has_method("kbm_action_of"):
-		return str(node.call("kbm_action_of", physical))
+		return str(node.call("kbm_action_of", code))
 	for a: String in KBM_DEFAULT:
-		if int(KBM_DEFAULT[a]) == physical:
+		if int(KBM_DEFAULT[a]) == code:
 			return a
 	return ""
 
@@ -371,18 +444,24 @@ func cancel_kbm_capture() -> void:
 	map_changed.emit()
 
 
-func bind_kbm(action: String, code: int) -> void:
-	if action not in KBM_REBIND:
-		return
+## Bind `action` to `code` (key or encoded mouse). An action already on that
+## input swaps over so nothing is left unbound. Refuses a bind that would leave
+## pause with no code (should not happen with swap, but guarded anyway).
+func bind_kbm(action: String, code: int) -> bool:
+	if action not in KBM_REBIND or code < 0:
+		return false
 	var m := {}
 	for a: String in KBM_REBIND:
 		m[a] = kbm_binding(a)
-	var old_code: int = m[action]
+	var old_code: int = int(m[action])
 	for a: String in KBM_REBIND:
 		if a != action and int(m[a]) == code:
 			m[a] = old_code
 	m[action] = code
+	if int(m.get("pause", -1)) < 0:
+		return false   # pause must never end up unbound
 	_store("kbm_map", m)
+	return true
 
 
 func reset_kbm_map() -> void:

@@ -414,7 +414,9 @@ func _controls_hint() -> void:
 	var lock := _lock_button.visible
 	var pad := get_node_or_null("/root/Pad")
 	if pad != null and bool(pad.get("kbm")):
-		_hint.text = "WASD  DRIVE      MOUSE  AIM      LEFT CLICK  FIRE" + ("      RIGHT CLICK  LOCK" if lock else "")
+		var fire_n := str(pad.call("kbm_button_name", "fire"))
+		var lock_n := str(pad.call("kbm_button_name", "lock"))
+		_hint.text = "WASD  DRIVE      MOUSE  AIM      %s  FIRE" % fire_n + ("      %s  LOCK" % lock_n if lock else "")
 	elif pad != null and bool(pad.get("active")):
 		var sw := bool(pad.call("sticks_swapped"))
 		_hint.text = "%s STICK  DRIVE      %s STICK  AIM      %s  FIRE" % ["RIGHT" if sw else "LEFT", "LEFT" if sw else "RIGHT", str(pad.call("button_name", "fire"))] \

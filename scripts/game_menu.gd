@@ -66,11 +66,14 @@ func _ready() -> void:
 
 
 ## Esc on a PC works like the phone's back button (the menu runs while paused).
-## During a rebind, Esc cancels the capture instead of leaving the page.
+## During a rebind, Esc cancels — except when rebinding PAUSE, where Esc assigns Esc-pause (Pad handles it).
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and (event as InputEventKey).pressed and not (event as InputEventKey).echo and (event as InputEventKey).keycode == KEY_ESCAPE:
-		get_viewport().set_input_as_handled()
 		var pad := _pad()
+		# Pause rebind: Esc is the binding, not cancel. Pad._input already handled it.
+		if pad != null and str(pad.get("capturing_kbm")) == "pause":
+			return
+		get_viewport().set_input_as_handled()
 		if pad != null and (str(pad.get("capturing")) != "" or str(pad.get("capturing_kbm")) != ""):
 			pad.call("cancel_capture")
 			pad.call("cancel_kbm_capture")
@@ -328,7 +331,7 @@ func _kbm_page() -> void:
 		return
 	if not pad.is_connected("map_changed", _on_map_changed):
 		pad.connect("map_changed", _on_map_changed)
-	var layout := UI.label("DRIVE  WASD / arrows      AIM  mouse      FIRE  left click      LOCK  right click      PAUSE  Esc", 18, UI.TEXT)
+	var layout := UI.label("DRIVE  WASD / arrows      AIM  mouse      Everything else is rebindable below (click a row, then press a key or mouse button).", 18, UI.TEXT)
 	layout.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_body.add_child(layout)
 	var grid := GridContainer.new()
@@ -344,13 +347,15 @@ func _kbm_page() -> void:
 		var b := Button.new()
 		b.focus_mode = Control.FOCUS_NONE
 		b.custom_minimum_size = Vector2(300, 54)
-		b.text = "PRESS A KEY... (Esc cancels)" if waiting == action else str(pad.call("kbm_button_name", action))
 		if waiting == action:
+			b.text = "PRESS A KEY / CLICK... (Esc sets Esc)" if action == "pause" else "PRESS A KEY / CLICK... (Esc cancels)"
 			UI.accent(b, T.COL_UI_ACCENT)
+		else:
+			b.text = str(pad.call("kbm_button_name", action))
 		b.pressed.connect(rebind_kbm.bind(action))
 		grid.add_child(b)
 	_button("RESET TO DEFAULT", func() -> void: pad.call("reset_kbm_map"))
-	var note := UI.label("Click a row, then press the key you want. Esc cancels a rebind without leaving this page. Fire, lock and pause stay on the mouse buttons and Esc. A key already in use swaps over.", 18, UI.TEXT_DIM)
+	var note := UI.label("Click a row, then press a key or mouse button. Esc cancels a rebind (or assigns Esc when rebinding Pause). BACK also cancels. A binding already in use swaps over. Esc always pauses in a fight even if Pause is rebound.", 18, UI.TEXT_DIM)
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_body.add_child(note)
 	_button("BACK", show_page.bind("settings"), T.COL_UI_ACCENT)

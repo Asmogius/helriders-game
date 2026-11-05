@@ -4,6 +4,7 @@ extends SceneTree
 ## has a DISPLAY (windowed / fullscreen) toggle that is saved, and F11 or
 ## Alt+Enter flips it. Mouse and keyboard: WASD drive, the mouse aims, left
 ## click fires, right click LOCK, Q/E/F utilities, Tab and 1-4 the crew wheel.
+## Fire / lock / pause are rebindable; Esc always pauses as a fallback.
 ##
 ## Run:  godot --headless --fixed-fps 60 --path . -s res://tests/pc_test.gd
 
@@ -93,6 +94,21 @@ func _process(_delta: float) -> bool:
 			_check(str(pad.get("capturing_kbm")) == "ability_1", "KBM rebind is waiting for a key")
 			_key(KEY_ESCAPE)
 			_check(str(pad.get("capturing_kbm")) == "" and garage.menu.page == "kbm", "Esc cancels KBM rebind without leaving the page")
+			# Fire / lock / pause are rebindable (mouse + keys). Esc on PAUSE assigns Esc.
+			_check(pad.call("bind_kbm", "fire", KEY_R) and str(pad.call("kbm_button_name", "fire")) == "R", "FIRE rebinds to a key")
+			pad.call("start_kbm_capture", "lock")
+			garage.menu.show_page("kbm")
+			_click(MOUSE_BUTTON_MIDDLE)
+			_check(str(pad.get("capturing_kbm")) == "" and str(pad.call("kbm_button_name", "lock")) == "MIDDLE CLICK", "LOCK rebinds to a mouse button without leaving capture stuck")
+			_check(garage.menu.page == "kbm", "mouse rebind did not press a Settings button underneath")
+			pad.call("start_kbm_capture", "pause")
+			garage.menu.show_page("kbm")
+			_key(KEY_ESCAPE)
+			_check(str(pad.get("capturing_kbm")) == "" and int(pad.call("kbm_binding", "pause")) == KEY_ESCAPE, "Esc while rebinding PAUSE assigns Esc-pause")
+			_check(pad.call("bind_kbm", "pause", KEY_P) and int(pad.call("kbm_binding", "pause")) == KEY_P, "PAUSE rebinds to P")
+			_check(int(pad.call("kbm_binding", "fire")) >= 0, "swap left FIRE bound after pause move")
+			pad.call("reset_kbm_map")
+			_check(str(pad.call("kbm_button_name", "fire")) == "LEFT CLICK" and str(pad.call("kbm_button_name", "pause")) == "ESC", "RESET restores fire/lock/pause defaults")
 			garage.menu.show_page("settings")
 			_check(bool(profile.settings.get("fullscreen", false)), "the DISPLAY toggle turns fullscreen on")
 		5:
@@ -167,11 +183,19 @@ func _process(_delta: float) -> bool:
 			_key(KEY_1)
 			_check(mark_picked and not hud.is_crew_wheel_open(), "1 picks the first crew member")
 		18:
+			# Pause rebound away from Esc: Esc still pauses (hard fallback).
+			root.get_node("Pad").call("bind_kbm", "pause", KEY_P)
 			_key(KEY_ESCAPE)
-			_check(paused and main.menu != null, "Esc pauses the fight")
+			_check(paused and main.menu != null, "Esc pauses the fight even when PAUSE is rebound to P")
 		20:
 			_key(KEY_ESCAPE)
 			_check(not paused and main.menu == null, "Esc again resumes")
+			# Bound pause key also pauses.
+			_key(KEY_P)
+			_check(paused and main.menu != null, "rebound PAUSE key pauses the fight")
+			_key(KEY_ESCAPE)
+			_check(not paused and main.menu == null, "Esc resumes after rebound pause")
+			root.get_node("Pad").call("reset_kbm_map")
 			_finish()
 	return false
 
