@@ -70,6 +70,11 @@ const COL_OB_PAVE := Color(0.36, 0.35, 0.33)            # sidewalk slabs (tiles.
 const COL_OB_SIDING := Color(0.45, 0.43, 0.38)          # house siding (buildings.py)
 const COL_OB_ROOF := Color(0.3, 0.25, 0.23)             # shingles (buildings.py)
 const COL_OB_GRADE := Color(1.0, 0.96, 0.88)            # warm colour grade, a modulate (arena.gd)
+# Training Run readability (playtest 06/07): the arena is lifted (a modulate
+# over 1 brightens; fine under gl_compatibility) and zombies get a pale disc.
+const COL_TUTORIAL_GRADE := Color(1.75, 1.7, 1.6)
+const COL_TUTORIAL_ZOMBIE_GLOW := Color(0.95, 0.88, 0.7, 0.28)
+const COL_TUTORIAL_ZOMBIE_RING := Color(1.0, 0.82, 0.45, 0.9)
 const COL_OB_MOTE := Color(0.86, 0.82, 0.62, 0.55)      # seed fluff motes (map_ambient.gd)
 
 # P2 Effects: explosions and tracers (V4.3/V4.4; PR #33). Additive lights.
@@ -90,9 +95,10 @@ const COL_GARAGE_FLOOR_LINE := Color(0.471, 0.408, 0.235)# painted bay lines (12
 const COL_GARAGE_OIL := Color(0.094, 0.09, 0.094)       # oil stains on the slab (24, 23, 24)
 const COL_GARAGE_PEGBOARD := Color(0.29, 0.235, 0.173)  # tool pegboard (74, 60, 44)
 const COL_GARAGE_WALL := Color(0.18, 0.188, 0.204)      # corrugated back wall (46, 48, 52)
-# The world-only night tint (#512b11), shared by every scene incl. the garage; FX stay unmodulated.
-const COL_NIGHT_WORLD := Color(0.318, 0.169, 0.067)
-const COL_GARAGE_STREET_NIGHT := COL_NIGHT_WORLD # street past the roll-up door (#512b11; was cool blue 30,34,44)
+# World-only night tint (#2a3550). Cooler and bluer than the old warm brown.
+# Lights, fire and the HUD stay untinted. Maps reads the same hex.
+const COL_NIGHT_WORLD := Color8(0x2a, 0x35, 0x50)
+const COL_GARAGE_STREET_NIGHT := COL_NIGHT_WORLD # street past the roll-up door (#2a3550)
 const COL_GARAGE_GAS_RED := Color(0.431, 0.157, 0.133)  # welding gas cylinders (110, 40, 34)
 const COL_GARAGE_DUST := Color(0.9, 0.88, 0.8)          # drifting dust motes, drawn at alpha 0.02-0.18 (230, 224, 204; garage_ambient.gd)
 const COL_GARAGE_SPARK := Color(1.0, 0.85, 0.5)         # weld sparks, alpha fades with life (255, 217, 128; garage_ambient.gd)
@@ -517,6 +523,10 @@ const TRUCK := {
 	"lock_range": 0.0,
 }
 const COL_TRUCK := Color(0.45, 0.85, 0.5)
+const COL_TRUCK_BODY := Color(0.56, 0.62, 0.44)   # lighter than the street so it reads (playtest 15)
+const TRUCK_LOW_WARN := 0.35   # HUD warns (pulsing) when the truck's HP drops to this share
+const TRUCK_HIT_WINDOW := 1.0  # "under attack" this long after a hit (edge arrow pulses)
+const TRUCK_HIT_BANNER_EVERY := 4.0   # off-screen TRUCK UNDER ATTACK banner at most this often
 
 # Oil (the Scrapper's slicks and your Oil Slick utility): rigs on it keep
 # SLIME_GRIP, zombies in it move at OIL_ZOMBIE_SPEED.
@@ -529,7 +539,7 @@ const COL_OIL := Color(0.05, 0.05, 0.06, 0.6)
 const START_SCRAP := 60
 const SCHEMATIC_DROP_CHANCE := 0.5     # a wrecked Outrider drops a schematic, else a scrap cache
 const SCRAP_CACHE := 20                # scrap in a cache crate
-const WRECK_PENALTY := 0.25            # a wreck costs this x the lost build's value in scrap
+const WRECK_PENALTY := 0.0             # no scrap penalty: losing the rig and crew is the cost (Cameron 2026-11-05; was 0.25)
 const PRESET_COUNT := 3
 const PRESET_NAME_MAX := 18     # characters in a preset's name
 const BOARD_SIZE := 3                  # missions on the Comms board each day
@@ -1135,6 +1145,42 @@ const MUSIC_DUCK_FADE := 0.3
 
 # --- Combat SFX (agreed with the owner 2026-11-04) -----------------------------------------------------
 const SFX_WINDUP_PITCH := [0.9, 1.25]   # Bulwark roar pitch at wind-up start / end
+
+# --- Night (approved by the owner 2026-11-04, PR #69) -----------------------
+# Night is rolled per job from its seed and saved with the job. Only zombies
+# (Shamblers, variants, Hunters) change at night; enemy rigs stay the same.
+const COL_NIGHT := COL_NIGHT_WORLD   # one night colour; Maps/UI/Art own COL_NIGHT_WORLD (main: #2a3550)
+const NIGHT_CHANCE_BY_DISTRICT := [0.10, 0.35, 0.60, 1.0]   # by DISTRICTS index
+const NIGHT_CHANCE_COURIER := 0.5        # Courier jobs are 50/50 night outside Core Collapse (Core is always night)
+const NIGHT_MIN_SKULLS := 2              # never night at 1 skull...
+const NIGHT_MIN_CLEARS := 3              # ...or before the first 3 clears
+# #76's job rules (approved by Cameron 2026-11-05). Precedence: Missions.night_chance().
+const NIGHT_LEAN_SURVIVE_HUNT := 0.25    # Survive and Hunt: + this to the district chance (cap 1.0)
+const NIGHT_ESCORT_MIN_SKULLS := 5       # Escort: day below this, always night at it and above
+const NIGHT_OB_SURE_SKULLS := 4          # Outer Blocks Survive and Hunt at this many skulls: always night
+const NIGHT_ZOMBIE_SPEED_MULT := 1.10     # approved by Cameron 2026-11-05 (was 1.15); shambler 75 -> ~83, far below the starter rig (495)
+const NIGHT_HUNTER_SPEED_MULT := 1.10     # 250 -> 275
+const NIGHT_ZOMBIE_DPS_MULT := 1.10       # approved by Cameron 2026-11-05; zombies and Hunters, on top of ENEMY_DAMAGE_BY_SKULL
+const NIGHT_ZOMBIE_HP_MULT := 1.0         # unchanged: faster and meaner, not spongier
+const NIGHT_ZOMBIE_START_BONUS := 4       # 12 -> 16 alive at start (still under the cap)
+const NIGHT_RAMP_SECONDS := 3.0           # vs ZOMBIE_RAMP_SECONDS 4.0 (job ramps scale alike)
+const NIGHT_HORDE_SIZE := Vector2i(4, 7)  # vs HORDE_SIZE (3, 6)
+# ZOMBIE_CAP stays 28 at night (DESIGN §12 perf cap).
+const NIGHT_HUNTER_SPAWN_TIME := 15.0     # vs HUNTER_SPAWN_TIME 25.0 (kill trigger unchanged)
+const NIGHT_TANK_EARLIEST := 20.0         # vs TANK_EARLIEST 30.0
+const NIGHT_TANK_PACK_CHANCE := 0.4       # vs TANK_PACK_CHANCE 0.3
+const NIGHT_BILE_MARK_RANGE := 650.0      # vs BILE_MARK_RANGE 500
+# Night surge: every NIGHT_SURGE_EVERY s the whole horde frenzies (x BILE_FRENZY)
+# for NIGHT_SURGE_TIME s, warned NIGHT_SURGE_WARN s before.
+const NIGHT_SURGE_EVERY := 35.0
+const NIGHT_SURGE_TIME := 4.0
+const NIGHT_SURGE_WARN := 1.5
+const NIGHT_WRECK_TIME_FLOOR := 0.85      # night time-to-wreck >= 85% of day's (balance report)
+# Rewards
+const NIGHT_PAYOUT_MULT := 1.30           # job pay; stacks with Core Collapse's pay
+const NIGHT_KILL_SCRAP_MULT := 1.25       # zombie kill scrap, rounded up (shambler 2 -> 3)
+const NIGHT_SCHEMATIC_BONUS := 0.10       # + MISSION_SCHEMATIC_CHANCE, cap 1.0
+const NIGHT_XP_MULT := 1.25               # crew job XP
 
 # --- Shoving through a horde (hand playtest 0.1.75, Cameron 2026-11-05) -----------------------------
 # Below RAM speed the rig pushes zombies in front aside (no damage). How hard

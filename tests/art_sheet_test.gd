@@ -52,6 +52,8 @@ func _run() -> void:
 	_check_layers()
 	_check_burnt()
 	_check_roll_cage()
+	_check_shadows()
+	_check_night()
 	print("art_sheet_test: ", "PASS" if fails == 0 else "%d FAILURES" % fails)
 	quit(1 if fails else 0)
 
@@ -230,6 +232,7 @@ func _check_layers() -> void:
 
 ## The roll cage is built per chassis around that chassis's cab: at every
 ## sampled heading it covers the cab and is at most a few px bigger.
+## (2 px slack: at the 45 deg tilt the cab's south wall drops 1 px below the cage's rail.)
 func _check_roll_cage() -> void:
 	for name in ["scrap_frame", "bulwark_frame"]:
 		var s: Sprite2D = DS.new()
@@ -241,6 +244,86 @@ func _check_roll_cage() -> void:
 			var r := Rect2i((i % 8) * fw, (i / 8) * fw, fw, fw)
 			var a := cage.get_region(r).get_used_rect()
 			var b := cab.get_region(r).get_used_rect()
-			check(a.grow(1).encloses(b), "%s: cage covers the cab at %d (%s vs %s)" % [name, i, a, b])
+			check(a.grow(2).encloses(b), "%s: cage covers the cab at %d (%s vs %s)" % [name, i, a, b])
 			check(a.size.x - b.size.x <= 8 and a.size.y - b.size.y <= 10, "%s: cage fits the cab at %d (%s vs %s)" % [name, i, a, b])
 		s.free()
+
+
+## Baked cast shadows (Ebbtide plan phase 1): hulls carry a shadow child at the
+## same frame, drawn behind; turrets don't. The shadow falls down-right.
+## The contact is solid (meta alpha 0.82 times a full sheet pixel) and sits
+## closer to the footprint than the softer far lip.
+func _check_shadows() -> void:
+	for name in ["scrap_frame", "outrider", "bulwark"]:
+		var s: Sprite2D = DS.new()
+		s.load_meta("res://art/sprites/%s.json" % name)
+		var sh: Sprite2D = s.get("shadow")
+		check(sh != null and sh.show_behind_parent, name + ": has a shadow behind it")
+		if sh != null:
+			for h in [0.0, 1.3, 4.0]:
+				s.set("heading", h)
+				check(sh.frame == s.frame, "%s: shadow frame follows heading %.1f" % [name, h])
+			var al: float = float(s.meta.shadow.alpha)
+			check(al >= 0.75, "%s: shadow alpha stronger than 0.5 (%.2f)" % [name, al])
+			check(is_equal_approx(sh.modulate.a, al), name + ": shadow draws at its meta alpha")
+			var sun: Array = s.meta.shadow.sun
+			check(is_equal_approx(float(sun[0]), -0.45) and is_equal_approx(float(sun[1]), -0.55) and is_equal_approx(float(sun[2]), 0.7), name + ": sun unchanged")
+			var img: Image = sh.texture.get_image()
+			var fw := int(s.meta.shadow.frame_w)
+			var frame := img.get_region(Rect2i(0, 0, fw, fw))
+			var used := frame.get_used_rect()
+			check(used.get_center().x > fw / 2.0 and used.get_center().y > fw / 2.0, name + ": shadow falls down-right")
+			var mid := Vector2(fw, fw) * 0.5
+			var hi_n := 0
+			var hi_d := 0.0
+			var lo_n := 0
+			var lo_d := 0.0
+			for y in fw:
+				for x in fw:
+					var a: float = frame.get_pixel(x, y).a
+					if a <= 0.02:
+						continue
+					var d: float = Vector2(x, y).distance_to(mid)
+					if a >= 0.95:
+						hi_n += 1
+						hi_d += d
+					elif a < 0.75:
+						lo_n += 1
+						lo_d += d
+			check(hi_n > 0 and lo_n > 0, "%s: solid contact and a softer far lip (%d / %d)" % [name, hi_n, lo_n])
+			if hi_n > 0 and lo_n > 0:
+				check(hi_d / hi_n < lo_d / lo_n, name + ": contact sits closer than the soft edge")
+		s.free()
+	var t: Sprite2D = DS.new()
+	t.load_meta("res://art/sprites/pintle_turret.json")
+	check(t.get("shadow") == null, "turret: no own shadow")
+	t.free()
+
+
+## Night grade (Ebbtide plan phase 2): hull sprites take the grade, the Lights
+## child (emissive pixels) doesn't; Color.WHITE switches it back off.
+func _check_night() -> void:
+	var NG := preload("res://scripts/night_grade.gd")
+	var Tuning := preload("res://scripts/tuning.gd")
+	var want := Color8(0x2a, 0x35, 0x50)
+	check(NG.night_colour().is_equal_approx(want), "night colour is #2a3550")
+	check(Tuning.COL_NIGHT_WORLD.is_equal_approx(want), "COL_NIGHT_WORLD is #2a3550")
+	check(Tuning.COL_GARAGE_STREET_NIGHT == Tuning.COL_NIGHT_WORLD, "garage street night aliases the world night")
+	var g: Color = NG.world_grade()
+	check(is_equal_approx(g.r, 42.0 / 96.0) and is_equal_approx(g.g, 53.0 / 89.0) and is_equal_approx(g.b, 1.0), "night grade is cool blue over #60594f")
+	check(g.b > g.g and g.g > g.r, "night grade is bluer than it is red")
+	var holder := Node2D.new()
+	var s: Sprite2D = DS.new()
+	s.load_meta("res://art/sprites/bulwark.json")
+	holder.add_child(s)
+	var li: Sprite2D = s.get("lights")
+	check(li != null, "bulwark: has a lights sheet")
+	NG.apply_rig(holder, g)
+	check(s.self_modulate == g, "hull takes the grade")
+	if li != null:
+		check(li.self_modulate == Color.WHITE, "lights stay untinted")
+		s.set("heading", 2.0)
+		check(li.frame == s.frame, "lights follow the frame")
+	NG.apply_rig(holder, Color.WHITE)
+	check(s.self_modulate == Color.WHITE, "day restores")
+	holder.free()

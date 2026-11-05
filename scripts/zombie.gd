@@ -42,6 +42,7 @@ var charge_dir := Vector2.ZERO
 var charge_hits := 0         # tests and feedback
 
 var _stats: Dictionary = T.ZOMBIE_KINDS.shambler
+var highlight := false     # Training Run: a light ring under it (the director sets it)
 var damage_mult := 1.0     # the skull's enemy damage (the director sets it)
 var _circle: CircleShape2D
 var _shape: CollisionShape2D
@@ -417,11 +418,22 @@ func _draw_art() -> void:
 	var fw: float = info.frame_w
 	var fh: float = info.frame_h
 	draw_set_transform(Vector2.ZERO, -rotation, Vector2.ONE)   # sheets carry the heading; never rotate them
+	var sd: Dictionary = info.get("shadow", {})
+	if not sd.is_empty():   # baked cast shadow (same sun as the rigs), same atlas: still one batch
+		var sw: float = sd.frame_w
+		var sh: float = sd.frame_h
+		var sa: float = sd.get("alpha", 0.5)
+		(_art().atlas as RefCounted).draw(self, "%s/shadow/%d" % [kind, art_heading()], Rect2(Vector2(-sw, -sh) * 0.5, Vector2(sw, sh)), Color(1.0, 1.0, 1.0, sa))
 	(_art().atlas as RefCounted).draw(self, "%s/%s/%d" % [kind, art_row(), art_heading()], Rect2(Vector2(-fw, -fh) * 0.5, Vector2(fw, fh)))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 func _draw() -> void:
+	if highlight:
+		# Training Run readability (playtest 06/07): a pale ground disc and ring
+		# so a dark zombie on a dark street reads at a glance.
+		draw_circle(Vector2.ZERO, radius + 9.0, T.COL_TUTORIAL_ZOMBIE_GLOW)
+		draw_arc(Vector2.ZERO, radius + 9.0, 0.0, TAU, 20, T.COL_TUTORIAL_ZOMBIE_RING, 2.0)
 	if has_art():
 		_draw_art()
 		draw_status(radius + 4.0)

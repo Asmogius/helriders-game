@@ -18,7 +18,7 @@ Draft for review; nothing in the game uses these sprites yet.
    3 shades each (lit top, mid, dark side). Light colours (cyan, orange, enemy red,
    elite gold) give off their own light and never shade.
 4. **Renderer** (`tools/art/voxel_render.py`, Python + numpy + Pillow): straight-on
-   (orthographic) view, camera tilted 30 degrees off straight-down, z-buffered, no
+   (orthographic) view, camera tilted 45 degrees off straight-down, z-buffered, no
    anti-aliasing, 1 px near-black outline all round.
 5. **Sheets**: **32 headings** (11.25 degrees each), 8 columns x 4 rows; frame i =
    heading i x 11.25 degrees clockwise from +x. Frames are square (Scrap Frame 90 px,
@@ -74,8 +74,8 @@ godot --headless --path . -s res://tests/art_sheet_test.gd
 - **Overcharge on turrets:** turret art shows a white-hot glow at its `muzzle` point.
 - **Captures:** `tools/art/capture_mission.gd` and `tools/art/capture_showcase.gd` take screenshots under Xvfb.
 
-## Decided (Cameron, 2026-11-03)
-30 degree tilt; 32 headings; tuning.gd colours with 3 shades; 1 px per voxel with
+## Decided (Cameron, 2026-11-04: Ebbtide standard)
+45 degree tilt (was 30, changed to match Ebbtide's high oblique camera; every Art sheet re-rendered); 32 headings; tuning.gd colours with 3 shades; 1 px per voxel with
 finer models at ~64x36 on screen; near-black outline all round; separate chunk sheets
 for the wreck.
 
@@ -165,3 +165,11 @@ subclasses that call `super()` connect it exactly once. Content will not add a
 the leading edge only; spikes heat to enemy red. Stub:
 `tests/stubs/convoy_windup_stub.gd`. Shot: `capture_windup.gd -- out.png convoy`
 -> `art/previews/capture_convoy_windup.png`.
+
+## Baked cast shadows (Ebbtide plan phase 1, Cameron 2026-11-04)
+- One team sun: `voxel_render.LIGHT = (-0.45, -0.55, 0.70)` (screen x right, y down, z up): light from the upper-left, shadows fall down-right.
+- Ground offset per voxel of height: `SHADOW_DIR = (0.643, 0.786)`; on screen at 45 deg tilt that is (+0.643, +0.556) px per voxel.
+- Every model with a `chassis` chunk gets `<name>__shadow.png`: same 32-heading, 8-column layout, its own square frame (`meta.shadow.frame_w`), centre = ground centre, `SHADOW_RGB (20,11,6)`.
+- Strength (Cameron, 2026-11-05): the contact — voxels within `CONTACT_Z` (2) of the ground, plus one screen voxel around that footprint — is solid in the sheet and drawn at `meta.shadow.alpha` 0.82. Across `CAST_FALLOFF` (14) screen voxels the sheet eases to alpha 215, and the outer pixel of that tail is a softer lip (`FAR_LIP` 0.58). The runtime alpha multiplies the sheet, so the contact reads at 0.82 and the far lip nearer 0.4. Same sun; turrets and weapons still have no sheet of their own.
+- Rebake shadows without touching the other sheets: `python3 tools/art/voxel_render.py --shadows-only` and `--shadows-only --garage-hd`.
+- `directional_sprite.gd` adds it as a `Shadow` child (`show_behind_parent`), synced to the frame. Turrets and weapons have none (they sit on the hull, inside its shadow).
