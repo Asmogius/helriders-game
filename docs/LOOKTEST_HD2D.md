@@ -36,10 +36,10 @@ Measured on the capture that shipped with this branch (xvfb, llvmpipe — a ceil
 
 | Shot | Draw calls | Point lights |
 |---|---|---|
-| day_before / night_before | 22 | 0 |
-| day_after / night_after | 26 | 4 |
+| day_before / night_before | 27 | 0 |
+| day_after / night_after | 31 | 4 |
 
-The stack adds 4 draw calls (22 → 26) for the lights, halo sprites and the grade rect together. The grade is the one backbuffer copy.
+The stack adds 4 draw calls (27 → 31) for the lights, halo sprites and the grade rect together. The grade is the one backbuffer copy. The extra draws versus the earlier capture are the shadow and lights sheets that landed on main.
 
 | Piece | Full-screen passes | Notes |
 |---|---|---|

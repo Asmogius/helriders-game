@@ -14,9 +14,8 @@ const CAP_HIGH := 4
 const CAP_LOW := 3
 const CULL_DIST := 980.0
 
-# Hardcoded prototype colours. Not tuning.gd (those constants belong to the UI / night-grade work).
-# Night ambient is a cool desaturated blue-grey. It is deliberately not brown #512b11
-# (that brown is Color(0.318, 0.169, 0.067) / COL_NIGHT_WORLD on the other branch).
+# Hardcoded prototype colours. Not tuning.gd.
+# Night ambient is a cool desaturated blue-grey. It does not read COL_NIGHT_WORLD.
 const DAY_AMBIENT := Color(0.84, 0.80, 0.72, 1.0)
 const NIGHT_AMBIENT := Color(0.40, 0.46, 0.60, 1.0)
 const SUN_COLOR := Color(1.0, 0.92, 0.74, 1.0)
