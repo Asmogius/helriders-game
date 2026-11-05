@@ -35,6 +35,7 @@ func _initialize() -> void:
 	_check_start_stays_clear()
 	_check_base_overlay()
 	_check_caps()
+	_check_spawn_budget_counts_base()
 	_arm_collision_and_draw()
 
 
@@ -202,8 +203,38 @@ func _check_caps() -> void:
 		spawners.append(_piece("spawner_zombie", Vector2(300.0 + float(i) * 50.0, 300.0), 0.0))
 	level.placeables = spawners
 	layout = LevelBake.bake(level)
-	_check((layout.spawn_points as Array).size() == LevelData.MAX_SPAWNERS, "bake keeps 24 spawn points and drops the rest, got %d" % (layout.spawn_points as Array).size())
+	_check((layout.spawn_points as Array).size() == LevelData.MAX_SPAWNERS, "blank canvas keeps 24 placed spawn points, got %d" % (layout.spawn_points as Array).size())
 	_check((layout.props as Array).is_empty() and (layout.buildings as Array).is_empty(), "spawners over the cap still are not solids")
+
+
+func _check_spawn_budget_counts_base() -> void:
+	_check(LevelBake.base_spawn_count("crossroads") > 0, "known district base contributes spawn points, got %d" % LevelBake.base_spawn_count("crossroads"))
+	_check(LevelBake.base_spawn_count("blank_s") == 0 and LevelBake.base_spawn_count("blank_m") == 0, "synthetic blanks contribute no spawn points")
+	_check(LevelBake.base_spawn_count("blank_l") == 0 and LevelBake.base_spawn_count("endless") == 0, "blank_l and endless contribute no spawn points")
+	_check(LevelBake.base_spawn_count("not_a_map") == 0, "unknown base contributes no spawn points")
+	var bare := LevelBake.bake(_level("crossroads", start_at))
+	var inherited := mini(LevelBake.base_spawn_count("crossroads"), LevelData.MAX_SPAWNERS)
+	_check((bare.spawn_points as Array).size() == inherited, "as-drawn bake keeps the base spawn points up to the cap, got %d" % (bare.spawn_points as Array).size())
+	# 24 placed on top of the district's own points (crossroads has 12 → 36 without the shared cap).
+	var level := _level("crossroads", start_at)
+	var placed: Array = []
+	for i in LevelData.MAX_SPAWNERS:
+		placed.append(_piece("spawner_zombie", Vector2(80.0 + float(i) * 40.0, 220.0), 0.0))
+	level.placeables = placed
+	var layout := LevelBake.bake(level)
+	var spawns: Array = layout.spawn_points
+	_check(spawns.size() == LevelData.MAX_SPAWNERS, "inherited plus placed spawn points stay at 24, got %d" % spawns.size())
+	var drawn: Array = Layouts.build("crossroads").spawn_points
+	var prefix := true
+	for i in inherited:
+		if spawns[i] != drawn[i]:
+			prefix = false
+	_check(prefix, "the kept base spawn points stay in front")
+	var room := LevelData.MAX_SPAWNERS - inherited
+	if room > 0 and room < placed.size():
+		var kept_placed: Vector2 = LevelData.arr_to_vec2((placed[room - 1] as Dictionary).pos)
+		var dropped: Vector2 = LevelData.arr_to_vec2((placed[room] as Dictionary).pos)
+		_check(spawns.has(kept_placed) and not spawns.has(dropped), "placed spawners fill only the room left under 24")
 
 
 func _arm_collision_and_draw() -> void:

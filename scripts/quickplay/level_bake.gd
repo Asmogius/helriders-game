@@ -11,7 +11,10 @@ extends RefCounted
 ##   (the collision shape turns with it). Size stays the catalog footprint.
 ## Not solids (no collision box; runtime spawn/pickup is a later PR):
 ##   marker -> layout.start comes from the level's player_start field only.
-##   spawner -> position appended to spawn_points.
+##   spawner -> position appended to spawn_points while the total, including
+##   spawn points inherited from the base map, stays within MAX_SPAWNERS.
+##   A base that already has more than that keeps its first MAX_SPAWNERS
+##   points and gains no placed spawners.
 ##   pickup -> no box. barrel_fuel / barrel_acid positions append to
 ##   barrel_spots. pickup_scrap is skipped (no layout field for it yet).
 ## A solid that intersects the player-start pad (the player_start footprint
@@ -20,7 +23,8 @@ extends RefCounted
 ## A known base_map goes through Layouts.build (seed 0 = as drawn). Planned
 ## blanks and any other accepted base use a minimal synthetic layout on the
 ## same world size. Caps match the schema: at most MAX_PLACEABLES pieces are
-## applied, and at most MAX_SPAWNERS of those become spawn points.
+## applied, and spawn_points after bake (inherited base points plus placed
+## spawners) stays within MAX_SPAWNERS.
 
 const T := preload("res://scripts/tuning.gd")
 const Layouts := preload("res://scripts/layouts.gd")
@@ -29,6 +33,13 @@ const Registry := preload("res://scripts/quickplay/placeable_registry.gd")
 
 ## Categories that become Arena collision boxes. marker / spawner / pickup do not.
 const SOLID_CATEGORIES: Array[String] = ["building", "wreck", "prop"]
+
+
+## How many spawn_points the base_map contributes before placeables.
+## As drawn (seed 0): Layouts.build when the id is a campaign layout, otherwise
+## the synthetic blank. Unknown ids and planned blanks return 0.
+static func base_spawn_count(base_map: String) -> int:
+	return (_base_layout(base_map, 0, "").spawn_points as Array).size()
 
 
 static func bake(level: Dictionary) -> Dictionary:
@@ -41,7 +52,13 @@ static func bake(level: Dictionary) -> Dictionary:
 	out.start = start
 	var pad := start_pad(start)
 	var applied := 0
-	var spawners := 0
+	# Budget counts inherited base-map points. A base already over the cap
+	# keeps its first MAX_SPAWNERS and accepts no placed spawners.
+	var points: Array = out.spawn_points
+	if points.size() > LevelData.MAX_SPAWNERS:
+		points = points.slice(0, LevelData.MAX_SPAWNERS)
+		out.spawn_points = points
+	var spawners := points.size()
 	for raw_p: Variant in clean.placeables:
 		if applied >= LevelData.MAX_PLACEABLES:
 			break
