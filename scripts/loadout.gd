@@ -206,7 +206,9 @@ static func build(loadout: Dictionary, levels: Dictionary = {}) -> Dictionary:
 		"power_output": float(engine.get("power_output", 0.0)),
 		"power_draw": draw,
 		"weight": weight,
-		"weight_capacity": float(chassis.get("weight_capacity", 0.0)),
+		# The chassis sets max weight; the drive adds to it or takes away ("carry",
+		# owner-approved 2026-11-05: Street 0, Sport -10, Off-Road +20, Half-Track +45).
+		"weight_capacity": maxf(float(chassis.get("weight_capacity", 0.0)) + float(drive.get("carry", 0.0)), 0.0) if chassis.has("weight_capacity") else 0.0,
 		"body": [float(body[0]), float(body[1])],
 		"dropped": dropped,
 		# Which parts are on, so the rig can draw them.

@@ -42,7 +42,7 @@ Exactly one physical vehicle. Freely editable between missions using owned parts
 
 - Power Plant/Engine: Power budget. Overload reduces mobility and disables systems: over 100% power the utilities go offline, at 125% the shield stops recharging too (weapons stay online; Overclock ignores it; approved 2026-11-05). Affects acceleration.
 
-- Drive System: Wheels/tracks/hybrids. Directly drives turn radius, drift amount, and recovery. Primary mobility feel.
+- Drive System: Wheels/tracks/hybrids. Directly drives turn radius, drift amount, and recovery. Primary mobility feel. Also changes max weight ("carry", approved 2026-11-05): Street Wheels +0, Sport Wheels -10, Off-Road Tires +20, Half-Track +45.
 
 - Armor Sections: Front/side/rear (roof optional). Weight lowers mobility. Front-heavy favors ramming; flanks become vulnerable.
 

@@ -98,6 +98,14 @@ func _run_checks() -> void:
 	var with_crew := garage._built(profile.rig)
 	_check(float(with_crew.turn_rate) > float(Loadout.build(profile.rig).turn_rate), "the stat sheet includes the Driver's turn bonus")
 
+	# Wheels change max weight (owner-approved 2026-11-05).
+	var caps := {}
+	for drive_id: String in ["street_wheels", "outrider_sport_wheels", "off_road_tires", "half_track"]:
+		var lo: Dictionary = (profile.rig as Dictionary).duplicate(true)
+		lo.drive = drive_id
+		caps[drive_id] = int(Loadout.build(lo).weight_capacity)
+	_check(caps == {"street_wheels": 100, "outrider_sport_wheels": 90, "off_road_tires": 120, "half_track": 145}, "wheels set max weight on a Scrap Frame: Street 100, Sport 90, Off-Road 120, Half-Track 145 (%s)" % caps)
+
 	# The starter has no targeting computer; fit the free one in place of its
 	# Junk Emitter (same power) for the power checks.
 	garage.open_slot(INTERNAL_1)

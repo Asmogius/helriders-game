@@ -92,19 +92,19 @@ const CATALOG := {
 	# --- Drive: grip, braking, handling ------------------------------------------
 	"street_wheels": {
 		"name": "Street Wheels", "category": "Drive", "rarity": "Common", "cost": 20, "power": 10.0, "weight": 10.0,
-		"grip": 5.5, "brake": 1500.0, "speed_mult": 1.0, "turn_mult": 1.0,
+		"grip": 5.5, "brake": 1500.0, "speed_mult": 1.0, "turn_mult": 1.0, "carry": 0.0,
 	},
 	"outrider_sport_wheels": {
 		"name": "Outrider Sport Wheels", "category": "Drive", "rarity": "Uncommon", "cost": 70, "power": 20.0, "weight": 10.0,
-		"grip": 6.5, "brake": 1500.0, "speed_mult": 1.07, "turn_mult": 1.06,
+		"grip": 6.5, "brake": 1500.0, "speed_mult": 1.07, "turn_mult": 1.06, "carry": -10.0,
 	},
 	"off_road_tires": {
 		"name": "Off-Road Tires", "category": "Drive", "rarity": "Uncommon", "cost": 60, "power": 10.0, "weight": 15.0,
-		"grip": 7.5, "brake": 1700.0, "speed_mult": 0.95, "turn_mult": 0.95,
+		"grip": 7.5, "brake": 1700.0, "speed_mult": 0.95, "turn_mult": 0.95, "carry": 20.0,
 	},
 	"half_track": {
 		"name": "Half-Track", "category": "Drive", "rarity": "Rare", "cost": 150, "power": 25.0, "weight": 30.0,
-		"grip": 9.0, "brake": 2000.0, "speed_mult": 0.88, "turn_mult": 0.9,
+		"grip": 9.0, "brake": 2000.0, "speed_mult": 0.88, "turn_mult": 0.9, "carry": 45.0,
 	},
 	# --- Armor -----------------------------------------------------------------------
 	# Armor (§14 defense layers): `armor` is per facing. A rig has three armor

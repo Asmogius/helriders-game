@@ -784,6 +784,8 @@ func _refresh_tags() -> void:
 				tag.detail = "%s    OUTPUT %d    WT %d" % [part.rarity, int(part.power_output), int(part.weight)]
 			elif part.has("weight_capacity"):
 				tag.detail = "%s    PWR %d    CAP %d" % [part.rarity, int(part.power), int(part.weight_capacity)]
+			elif part.category == "Drive" and int(part.get("carry", 0.0)) != 0:
+				tag.detail = "%s   PWR %d   WT %d   CAP %+d" % [part.rarity, int(part.power), int(part.weight), int(part.carry)]
 			elif part.category == "Armor":
 				var sides := str(slot.key) == "armor_sides"
 				tag.detail = "%s   ARMOR %d   WT %d" % [part.rarity, int(part.armor), int(part.get("weight_sides" if sides else "weight", part.weight))]
@@ -928,7 +930,9 @@ func _headline(part: Dictionary) -> String:
 		"Engine":
 			return "OUTPUT %d  ACCEL %d  WT %d" % [int(part.power_output), int(part.acceleration), int(part.weight)]
 		"Drive":
-			return "PWR %d  WT %d  GRIP %.1f  SPD x%.2f" % [int(part.power), int(part.weight), float(part.grip), float(part.speed_mult)]
+			var carry := int(part.get("carry", 0.0))
+			var cap := ("  CAP %+d" % carry) if carry != 0 else ""   # wheels change max weight
+			return "PWR %d  WT %d  GRIP %.1f  SPD x%.2f%s" % [int(part.power), int(part.weight), float(part.grip), float(part.speed_mult), cap]
 		"Armor":
 			var where := "FRONT ONLY" if bool(part.get("front_only", false)) else "WT %d/%d" % [int(part.weight), int(part.get("weight_sides", part.weight))]
 			return "%d / FACING  RAM %d  %s" % [int(part.armor), int(part.ram_damage), where]
