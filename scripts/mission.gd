@@ -1277,14 +1277,15 @@ func pad_wants_focus() -> bool:
 
 
 ## A pad button in the fight (bound in Settings > CONTROLLER; pad.gd).
-## Returns true when it was used.
+## Returns true when it was used. Start / OPTIONS always pauses as a fallback.
 func pad_button(button: int) -> bool:
 	if loading_map:
 		return true   # swallowed behind the loading screen
 	var pad := _pad()
 	var action := str(pad.call("action_for", button)) if pad != null else ""
+	var pause_press := action == "pause" or button == JOY_BUTTON_START
 	if menu != null:
-		if action == "pause":
+		if pause_press:
 			menu.resume()
 			return true
 		return false
@@ -1293,9 +1294,10 @@ func pad_button(button: int) -> bool:
 	if hud.is_crew_wheel_open() and button == JOY_BUTTON_A:
 		hud.pad_wheel_confirm()   # Cross picks in the wheel, whatever it's bound to
 		return true
+	if pause_press:
+		open_menu()
+		return true
 	match action:
-		"pause":
-			open_menu()
 		"ability_1":
 			use_ability(0)
 		"ability_2":

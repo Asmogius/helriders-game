@@ -300,7 +300,7 @@ func _controller_page() -> void:
 	_button("STICKS: %s" % ("LEFT AIMS, RIGHT DRIVES" if swapped else "LEFT DRIVES, RIGHT AIMS"), func() -> void:
 		pad.call("set_sticks_swapped", not swapped))
 	_button("RESET TO DEFAULT", func() -> void: pad.call("reset_map"))
-	var note := UI.label("Pick an action, then press the pad button you want for it (L2 and R2 work too). Esc cancels a rebind without leaving this page. A button already in use swaps over. Menus always use the D-pad, Cross, Circle and L1 / R1; Cross always picks in the crew wheel.", 18, UI.TEXT_DIM)
+	var note := UI.label("Pick an action (fire, lock, pause, utilities, crew), then press the pad button you want (L2 and R2 work too). Esc cancels a rebind without leaving this page. A button already in use swaps over. Options / Start always pauses even if Pause is rebound. Menus always use the D-pad, Cross, Circle and L1 / R1; Cross always picks in the crew wheel.", 18, UI.TEXT_DIM)
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_body.add_child(note)
 	_button("BACK", show_page.bind("settings"), T.COL_UI_ACCENT)

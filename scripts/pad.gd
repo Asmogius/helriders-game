@@ -244,11 +244,12 @@ func held(action: String) -> bool:
 
 
 # --- Button mapping (Settings > CONTROLLER) ---------------------------------------
-# Fight actions can be rebound to any pad button, L2 or R2; menus keep the
-# D-pad, Cross, Circle and L1 / R1. The map lives in Profile.settings
-# ("pad_map": action -> code, "pad_swap": sticks swapped), saved with the
-# other settings. Codes are Godot joypad buttons, or TRIGGER_BASE + axis for
-# L2 / R2.
+# All fight actions (fire, lock, pause, utilities, crew) can be rebound to any
+# pad button, L2 or R2; menus keep the D-pad, Cross, Circle and L1 / R1.
+# Start / OPTIONS always pauses as a hard fallback. The map lives in
+# Profile.settings ("pad_map": action -> code, "pad_swap": sticks swapped),
+# saved with the other settings. Codes are Godot joypad buttons, or
+# TRIGGER_BASE + axis for L2 / R2.
 
 const TRIGGER_BASE := 100
 const ACTIONS := ["fire", "ability_1", "ability_2", "ability_3", "lock", "crew", "pause"]
@@ -450,17 +451,29 @@ func badge(action: String) -> String:
 
 
 ## Bind `action` to `code`. An action already on that button swaps over to
-## this one's old button, so nothing is ever left unbound.
-func bind(action: String, code: int) -> void:
+## this one's old button, so nothing is ever left unbound. Refuses a bind that
+## would leave pause with no code. Start (OPTIONS) remains a hard pause fallback
+## in the fight even when Pause is rebound away from it.
+func bind(action: String, code: int) -> bool:
+	if action not in ACTIONS or code < 0:
+		return false
 	var m := {}
 	for a: String in ACTIONS:
 		m[a] = binding(a)
-	var old: int = m[action]
+	var old: int = int(m[action])
 	for a: String in ACTIONS:
 		if a != action and int(m[a]) == code:
 			m[a] = old
 	m[action] = code
+	if int(m.get("pause", -1)) < 0:
+		return false   # pause must never end up unbound
 	_store("pad_map", m)
+	return true
+
+
+## True when this pad code should pause: the pause binding, or Start as fallback.
+func is_pause_code(code: int) -> bool:
+	return code == binding("pause") or code == JOY_BUTTON_START
 
 
 func reset_map() -> void:
