@@ -1,10 +1,14 @@
 extends SceneTree
 ## V2 style sample capture: the Workshop bay room in the garage (needs a display):
-##   xvfb-run -s "-screen 0 1280x720x24" godot --path . -s res://tools/art/capture_garage_sample.gd -- out.png [before|fade]
+##   xvfb-run -s "-screen 0 1280x720x24" godot --rendering-driver opengl3 --path . -s res://tools/art/capture_garage_sample.gd -- out.png [before|fade|night|night:512b11]
+## "night" grades the bay backdrop and the rig toward COL_NIGHT_WORLD. Lights stay white.
+## "night:512b11" (any hex) grades toward that night average instead.
 ## "before": the room off (old floor grid). "fade": mid-fade to the RESEARCH tab.
 ## "slot": the ARMOR FRONT card open (part sheet, BACK / EQUIP, its part lit).
 ## "halftracks": Half Track fitted and the DRIVE card open. "weapon": WEAPON 1 open.
 ## Uses HOME as given; run with a throwaway HOME so no real save is touched.
+
+const NightGrade := preload("res://scripts/night_grade.gd")
 
 var _frames := 0
 var _out := "user://garage_sample.png"
@@ -37,8 +41,26 @@ func _process(_delta: float) -> bool:
 		_g.call("open_slot", {"slot": 3, "halftracks": 2, "weapon": 6, "engine": 1}[_mode])
 	if _frames == 50 and _mode == "fade":
 		_g.call("show_tab", "RESEARCH")
+	if _frames == 80 and _mode.begins_with("night"):
+		_apply_night()
 	if _frames == (57 if _mode == "fade" else 90):
 		root.get_texture().get_image().save_png(_out)
 		print("saved ", _out)
 		quit()
 	return false
+
+
+## World only: the bay backdrop and the rig. The light overlay and HUD stay white.
+func _apply_night() -> void:
+	var hex := ""
+	if _mode.contains(":"):
+		hex = _mode.get_slice(":", 1)
+	var g := NightGrade.world_grade() if hex == "" else NightGrade.grade_for(Color.html(hex))
+	var room: Node = _g.get("_workshop")
+	if room != null:
+		var back: CanvasItem = room.get("_back")
+		if back != null:
+			back.modulate = g
+	var rig: Node = _g.get("preview")
+	if rig != null:
+		NightGrade.apply_rig(rig, g)

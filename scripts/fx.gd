@@ -24,6 +24,10 @@ const ArtAtlas := preload("res://scripts/art_atlas.gd")   # P0 atlas loader
 const ATLAS_BASE := "res://art/fx/fx_atlas"
 var atlas: RefCounted
 var glow: Node2D       # additive: flash, fireball, shockwave
+## Night grade (Ebbtide plan phase 2): smoke and scorch take the world grade;
+## the additive glow never does, and each explosion lights the ground with a
+## warm pool, so at night only fire and flashes pop. Color.WHITE = day.
+var night_grade := Color.WHITE
 var smoke: Node2D      # normal blend: smoke column, debris chips
 var decals: Node2D     # under the rigs: scorch
 
@@ -168,10 +172,19 @@ func _draw() -> void:
 
 ## V4.4 sample sequence: flash -> fireball (additive) -> shockwave ring ->
 ## flung debris -> a rising smoke column that drifts; a scorch decal stays.
+func set_night(grade: Color) -> void:
+	night_grade = grade
+	for l: Node2D in [smoke, decals]:
+		if l != null:
+			l.self_modulate = grade
+
+
 func _atlas_explosion(at: Vector2, carry: Vector2) -> void:
 	for l: Node2D in [glow, smoke, decals]:
 		l.set("density", density)
 	glow.spawn("flash", 3, at, Vector2.ZERO, 0.12, 2.2, 2.8, Color.WHITE, 0.0, randf() * TAU, 0.0, 0.0, 0.0, true)
+	if night_grade != Color.WHITE:   # ground light pool, night only
+		glow.spawn("flash", 1, at, Vector2.ZERO, 0.9, 6.5, 7.5, Color(1.0, 0.62, 0.3, 0.45), 0.0, 0.0, 0.0, 0.0, 1.0, true)
 	glow.spawn("fireball", 6, at, carry * 0.2, 0.7, 1.7, 2.3, Color.WHITE, 3.0, randf() * TAU, 0.0, 0.0, 1.0, true)
 	for i in 3:
 		var off := Vector2.RIGHT.rotated(randf() * TAU) * randf_range(10.0, 22.0)

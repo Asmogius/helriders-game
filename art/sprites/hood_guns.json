@@ -672,5 +672,8 @@
  "layers": {},
  "defaults": [],
  "sheet": "hood_guns.png",
- "composite": "hood_guns.png"
+ "composite": "hood_guns.png",
+ "lights": {
+  "sheet": "hood_guns__lights.png"
+ }
 }

@@ -420,7 +420,7 @@ func _process(_delta: float) -> bool:
 		_check(main.hud.result_text().contains("Salvage lost"), "results card reports lost salvage")
 		var profile: Node = root.get_node("Profile")
 		_check(not profile.call("has_rig"), "the wreck destroyed the rig")
-		_check(main.hud.result_text().contains("Wreck penalty"), "results card shows the wreck penalty")
+		_check(not main.hud.result_text().contains("Wreck penalty"), "results card no longer mentions a wreck penalty")
 		var cost_ms := (Time.get_ticks_usec() - started_usec) / 1000.0 / (frame - 30)
 		print("  avg CPU cost %.2f ms/frame (headless, no rendering, this machine)" % cost_ms)
 		_finish()

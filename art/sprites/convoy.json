@@ -2154,6 +2154,9 @@
  "defaults": [],
  "sheet": "convoy__core.png",
  "composite": "convoy.png",
+ "lights": {
+  "sheet": "convoy__lights.png"
+ },
  "shadow": {
   "sheet": "convoy__shadow.png",
   "frame_w": 158,
