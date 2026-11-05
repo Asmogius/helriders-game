@@ -158,8 +158,13 @@ func _ready() -> void:
 
 	_toast = UI.label("", 22, T.COL_UI_ACCENT)
 	_toast.z_index = 12   # above overlays and the menu
+	# Above the footer job line, clear of the ENGINE / slot tags (playtest #12).
+	_toast.anchor_left = 0.0
 	_toast.anchor_right = 1.0
-	_toast.offset_top = 100.0
+	_toast.anchor_top = 1.0
+	_toast.anchor_bottom = 1.0
+	_toast.offset_top = -(FOOTER_H + 118.0)
+	_toast.offset_bottom = -(FOOTER_H + 86.0)
 	_toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_toast.modulate.a = 0.0
 	add_child(_toast)

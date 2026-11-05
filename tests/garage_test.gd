@@ -66,6 +66,10 @@ func _process(_delta: float) -> bool:
 		garage._comms.select(0)
 		_check(garage._comms.take_selected() and profile.has_mission(), "TAKE JOB sets the mission")
 		_check(not garage._comms.visible and garage._job.text.begins_with("JOB:"), "taking a job returns to the Garage with the job shown")
+		# Playtest #12: job-taken toast sits above the footer, not over ENGINE.
+		_check(garage._toast.text.begins_with("Job taken"), "job-taken toast shows")
+		var toast_y: float = garage._toast.global_position.y
+		_check(toast_y > 500.0, "job-taken toast is on the lower band, clear of slot tags (y=%.0f)" % toast_y)
 		_check(not garage._deploy.disabled, "DEPLOY is enabled once a job is taken")
 		garage.deploy()
 	if frame == 30:
