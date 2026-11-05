@@ -918,8 +918,8 @@ func is_power_overloaded() -> bool:
 
 
 # Power overload disables systems (DESIGN §4 "Overload reduces mobility or
-# disables systems"; the doc gives no systems or thresholds, so these are
-# DRAFT gap-fillers pending Cameron). On top of the mobility scaling:
+# disables systems"; rule approved by the owner 2026-11-05, with the starter
+# Junk V6 raised to 115 power so one utility fits). On top of the mobility scaling:
 #   draw over output (> 100%)          -> utilities offline (can't be fired)
 #   draw at POWER_SHIELD_OFFLINE x output -> the shield stops recharging too
 # Systems come back the moment draw is within those limits again (crew power

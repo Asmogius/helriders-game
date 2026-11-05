@@ -40,7 +40,7 @@ Exactly one physical vehicle. Freely editable between missions using owned parts
 
 - Chassis/Frame: Light/Medium/Heavy. Sets hardpoint count, mass capacity, crew slots, base mobility ceiling.
 
-- Power Plant/Engine: Power budget. Overload reduces mobility or disables systems. Affects acceleration.
+- Power Plant/Engine: Power budget. Overload reduces mobility and disables systems: over 100% power the utilities go offline, at 125% the shield stops recharging too (weapons stay online; Overclock ignores it; approved 2026-11-05). Affects acceleration.
 
 - Drive System: Wheels/tracks/hybrids. Directly drives turn radius, drift amount, and recovery. Primary mobility feel.
 
@@ -345,7 +345,7 @@ Spiked Ram Plate is renamed Zed Sled (code rename pending). Unlock levels: Minor
 
 Replaces the single armor pool (§4 Armor Sections, §8 Bulwark front rule).
 
-**Built (2026-11-04).** Agreed gap-fillers: the starter carries Scrap Plating on all three slots and the Junk Emitter (100/100 power, 95/100 weight); old saves copy their one plate to all three slots (a front-only ram plate to the front only). Structural Bracing gives +25 max HP (and keeps +15 ram). Cowcatcher Ram: front only, 124 armor, front-slot weight 22. Convoy Lead cab: HP 200, front 250, sides 70, rear 60, shield 30 from 4 skulls; trailer: HP 120, front 50, sides 65, rear 50 (350 in total, not the 300 it had). The salvage truck: HP 120, 70 on every facing. Enemy shields recharge like the Junk Emitter (3 s delay, ~5 s refill). Capacitor Bank and Flux Coil arrived with the Patcher; the Reflex Emitter with the new weapons.
+**Built (2026-11-04).** Agreed gap-fillers: the starter carries Scrap Plating on all three slots and the Junk Emitter (100/115 power, 95/100 weight; the Junk V6 went from 100 to 115 power with the overload rule); old saves copy their one plate to all three slots (a front-only ram plate to the front only). Structural Bracing gives +25 max HP (and keeps +15 ram). Cowcatcher Ram: front only, 124 armor, front-slot weight 22. Convoy Lead cab: HP 200, front 250, sides 70, rear 60, shield 30 from 4 skulls; trailer: HP 120, front 50, sides 65, rear 50 (350 in total, not the 300 it had). The salvage truck: HP 120, 70 on every facing. Enemy shields recharge like the Junk Emitter (3 s delay, ~5 s refill). Capacitor Bank and Flux Coil arrived with the Patcher; the Reflex Emitter with the new weapons.
 
 - Three layers for player and enemy rigs: shield (recharges) -> armor (directional, never regenerates) -> HP (structure; zero = wreck).
 - HP comes from the chassis, plus some parts that raise max HP (e.g., Structural Bracing).

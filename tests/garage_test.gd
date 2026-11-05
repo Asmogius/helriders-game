@@ -96,7 +96,11 @@ func _run_checks() -> void:
 	_check(int(profile.storage.get("street_wheels", 0)) == 1, "the old wheels went to storage")
 	var stats := Loadout.build(profile.rig)
 	print("  power with Sport Wheels %d / %d" % [int(stats.power_draw), int(stats.power_output)])
-	_check(float(stats.power_draw) > float(stats.power_output), "Sport Wheels + Targeting Computer overloads the starter")
+	_check(float(stats.power_draw) == 110.0 and float(stats.power_output) == 115.0, "Sport Wheels + Targeting Computer fit the starter's 115 power")
+	# Put the Junk Emitter back in the spare internal slot for the overload checks.
+	(profile.rig.internal as Array).append("junk_emitter")
+	stats = Loadout.build(profile.rig)
+	_check(float(stats.power_draw) > float(stats.power_output), "Sport Wheels + Targeting Computer + Junk Emitter overload the starter")
 	_check(garage.choose("street_wheels") and profile.scrap == 30, "putting stored wheels back on is free")
 
 	# --- Two-tap cards and the full stat sheet ------------------------------------
@@ -106,12 +110,13 @@ func _run_checks() -> void:
 	var speed_now: float = sheet.now.speed
 	var speed_after: float = sheet.after.speed
 	print("  stat sheet top speed %d > %d (overload included), power load %d > %d" % [roundi(speed_now), roundi(speed_after), int(sheet.now.load), int(sheet.after.load)])
-	_check(sheet.visible and int(sheet.after.load) == 110 and float(sheet.after.mobility) < 1.0, "stat sheet shows the previewed part's power and overload")
+	_check(sheet.visible and int(sheet.after.load) == 135 and float(sheet.after.mobility) < 1.0, "stat sheet shows the previewed part's power and overload")
 	_check(garage.press_card("outrider_sport_wheels") and profile.rig.drive == "outrider_sport_wheels", "second tap fits the part")
 	_check(garage.press_card("street_wheels") == false and garage.press_card("street_wheels") and profile.scrap == 30, "two taps to swap back, still free")
 	garage.close_sheet()
 	# V2.3 sample: the stats panel stays on the right (whole-rig stats) when the sheet closes.
 	_check(not garage._sheet.visible and sheet.title == "RIG STATS" and garage._rig_holder.visible, "closing the sheet brings the rig back")
+	(profile.rig.internal as Array).erase("junk_emitter")
 	garage.open_slot(DRIVE)
 
 	# --- Taking a part off frees its slot and power -----------------------------------
