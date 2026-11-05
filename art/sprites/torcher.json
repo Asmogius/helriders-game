@@ -1877,6 +1877,9 @@
  "defaults": [],
  "sheet": "torcher__core.png",
  "composite": "torcher.png",
+ "lights": {
+  "sheet": "torcher__lights.png"
+ },
  "shadow": {
   "sheet": "torcher__shadow.png",
   "frame_w": 110,

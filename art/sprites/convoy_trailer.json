@@ -1209,6 +1209,9 @@
  "defaults": [],
  "sheet": "convoy_trailer.png",
  "composite": "convoy_trailer.png",
+ "lights": {
+  "sheet": "convoy_trailer__lights.png"
+ },
  "shadow": {
   "sheet": "convoy_trailer__shadow.png",
   "frame_w": 128,

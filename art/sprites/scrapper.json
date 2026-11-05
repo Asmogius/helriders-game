@@ -1353,6 +1353,9 @@
  "defaults": [],
  "sheet": "scrapper__core.png",
  "composite": "scrapper.png",
+ "lights": {
+  "sheet": "scrapper__lights.png"
+ },
  "shadow": {
   "sheet": "scrapper__shadow.png",
   "frame_w": 110,

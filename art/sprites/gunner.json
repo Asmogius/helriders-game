@@ -1483,6 +1483,9 @@
  "defaults": [],
  "sheet": "gunner__core.png",
  "composite": "gunner.png",
+ "lights": {
+  "sheet": "gunner__lights.png"
+ },
  "shadow": {
   "sheet": "gunner__shadow.png",
   "frame_w": 128,

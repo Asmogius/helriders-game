@@ -53,6 +53,7 @@ func _run() -> void:
 	_check_burnt()
 	_check_roll_cage()
 	_check_shadows()
+	_check_night()
 	print("art_sheet_test: ", "PASS" if fails == 0 else "%d FAILURES" % fails)
 	quit(1 if fails else 0)
 
@@ -269,3 +270,26 @@ func _check_shadows() -> void:
 	t.load_meta("res://art/sprites/pintle_turret.json")
 	check(t.get("shadow") == null, "turret: no own shadow")
 	t.free()
+
+
+## Night grade (Ebbtide plan phase 2): hull sprites take the grade, the Lights
+## child (emissive pixels) doesn't; Color.WHITE switches it back off.
+func _check_night() -> void:
+	var NG := preload("res://scripts/night_grade.gd")
+	var g: Color = NG.world_grade()
+	check(g.r > g.g and g.g > g.b and g.r <= 1.0, "night grade is orange-brown")
+	var holder := Node2D.new()
+	var s: Sprite2D = DS.new()
+	s.load_meta("res://art/sprites/bulwark.json")
+	holder.add_child(s)
+	var li: Sprite2D = s.get("lights")
+	check(li != null, "bulwark: has a lights sheet")
+	NG.apply_rig(holder, g)
+	check(s.self_modulate == g, "hull takes the grade")
+	if li != null:
+		check(li.self_modulate == Color.WHITE, "lights stay untinted")
+		s.set("heading", 2.0)
+		check(li.frame == s.frame, "lights follow the frame")
+	NG.apply_rig(holder, Color.WHITE)
+	check(s.self_modulate == Color.WHITE, "day restores")
+	holder.free()

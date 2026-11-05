@@ -9531,6 +9531,9 @@
  ],
  "sheet": "courier_frame__core.png",
  "composite": "courier_frame.png",
+ "lights": {
+  "sheet": "courier_frame__lights.png"
+ },
  "shadow": {
   "sheet": "courier_frame__shadow.png",
   "frame_w": 130,

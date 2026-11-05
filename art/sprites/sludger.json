@@ -1751,6 +1751,9 @@
  "defaults": [],
  "sheet": "sludger__core.png",
  "composite": "sludger.png",
+ "lights": {
+  "sheet": "sludger__lights.png"
+ },
  "shadow": {
   "sheet": "sludger__shadow.png",
   "frame_w": 132,

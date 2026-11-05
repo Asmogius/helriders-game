@@ -584,6 +584,8 @@ func _spawn_wreck_pieces() -> void:
 		p.z_index = 3
 		world.add_child(p)
 		wreck_pieces.append(p)
+	if _hull_art.get("lights") != null:
+		(_hull_art.get("lights") as CanvasItem).visible = false   # burnt-out: lights out
 	if meta.has("burnt"):
 		_hull_art.texture = load(dir.path_join(String(meta.burnt)))
 	elif meta.chunks.has("chassis"):
@@ -2058,6 +2060,8 @@ func revive(fraction: float) -> void:
 				t.art.visible = true
 	if _hull_art != null and _hull_texture != null:
 		_hull_art.texture = _hull_texture
+		if _hull_art.get("lights") != null:
+			(_hull_art.get("lights") as CanvasItem).visible = true
 	queue_redraw()
 	revived.emit()
 

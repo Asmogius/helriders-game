@@ -672,5 +672,8 @@
  "layers": {},
  "defaults": [],
  "sheet": "burst_turret.png",
- "composite": "burst_turret.png"
+ "composite": "burst_turret.png",
+ "lights": {
+  "sheet": "burst_turret__lights.png"
+ }
 }

@@ -672,5 +672,8 @@
  "layers": {},
  "defaults": [],
  "sheet": "convoy_turret.png",
- "composite": "convoy_turret.png"
+ "composite": "convoy_turret.png",
+ "lights": {
+  "sheet": "convoy_turret__lights.png"
+ }
 }
