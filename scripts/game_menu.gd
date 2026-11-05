@@ -265,6 +265,7 @@ func _settings_page() -> void:
 		slider.value = float(profile.settings.get(key, 0.8))
 		slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		slider.custom_minimum_size = Vector2(0, 48)
+		UI.touch_slider(slider)   # thick track, fingertip handle (playtest)
 		slider.value_changed.connect(func(v: float) -> void: profile.set_setting(key, v))
 		line.add_child(slider)
 	_button("CONTROLLER BUTTONS", show_page.bind("controller"))

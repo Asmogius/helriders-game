@@ -101,9 +101,68 @@ static func make() -> Theme:
 	th.set_color("font_pressed_color", "Button", Color.WHITE)
 	th.set_color("font_disabled_color", "Button", Color(0.42, 0.42, 0.42))
 
+	_slider_theme(th)
 	th.set_stylebox("panel", "Panel", skin("panel", box(PANEL, PANEL_EDGE, 2)))
 	th.set_stylebox("panel", "PanelContainer", skin("panel", box(PANEL, PANEL_EDGE, 2)))
 	return th
+
+
+# --- Touch-size sliders (playtest: the default ones are too small for a thumb) ---
+const SLIDER_TRACK := 14        # px tall track
+const SLIDER_GRABBER := 44      # px handle (about a fingertip)
+static var _grabbers := {}
+
+
+## A round handle: gold ring on a dark centre (`hot`: brighter, while held).
+static func _grabber(hot: bool) -> Texture2D:
+	if _grabbers.has(hot):
+		return _grabbers[hot]
+	var n := SLIDER_GRABBER
+	var img := Image.create(n, n, false, Image.FORMAT_RGBA8)
+	var c := (n - 1) / 2.0
+	var ring := ACCENT_HOVER if hot else ACCENT
+	for y in n:
+		for x in n:
+			var d := Vector2(x - c, y - c).length()
+			var a := clampf(c - d + 0.5, 0.0, 1.0)   # soft edge
+			if a <= 0.0:
+				continue
+			var col := ring if d > c - 7.0 else PANEL_DEEP
+			if d <= c - 7.0 and d > c - 9.0:
+				col = ring.darkened(0.4)
+			img.set_pixel(x, y, Color(col, a))
+	var tex := ImageTexture.create_from_image(img)
+	_grabbers[hot] = tex
+	return tex
+
+
+static func _slider_theme(th: Theme) -> void:
+	for kind: String in ["HSlider", "VSlider"]:
+		var track := box(PANEL_DEEP, PANEL_EDGE, 2)
+		track.set_corner_radius_all(SLIDER_TRACK / 2)
+		track.content_margin_top = SLIDER_TRACK / 2.0
+		track.content_margin_bottom = SLIDER_TRACK / 2.0
+		track.content_margin_left = SLIDER_TRACK / 2.0
+		track.content_margin_right = SLIDER_TRACK / 2.0
+		var fill := box(ACCENT.darkened(0.15), ACCENT.darkened(0.15), 0)
+		fill.set_corner_radius_all(SLIDER_TRACK / 2)
+		fill.content_margin_top = SLIDER_TRACK / 2.0
+		fill.content_margin_bottom = SLIDER_TRACK / 2.0
+		th.set_stylebox("slider", kind, track)
+		th.set_stylebox("grabber_area", kind, fill)
+		th.set_stylebox("grabber_area_highlight", kind, fill)
+		th.set_icon("grabber", kind, _grabber(false))
+		th.set_icon("grabber_highlight", kind, _grabber(true))
+		th.set_icon("grabber_disabled", kind, _grabber(false))
+
+
+## Give one slider the touch-size look (for sliders outside the themed tree)
+## and a row tall enough to grab.
+static func touch_slider(slider: Slider) -> void:
+	var th := Theme.new()
+	_slider_theme(th)
+	slider.theme = th
+	slider.custom_minimum_size.y = maxf(slider.custom_minimum_size.y, SLIDER_GRABBER + 12)
 
 
 # --- Panels and buttons (P7 / V6.2) --------------------------------------------
