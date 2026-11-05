@@ -92,6 +92,10 @@ func _next() -> void:
 	var mission := (load("res://scenes/mission.tscn") as PackedScene).instantiate()
 	if _layout != "":
 		var jobs: Array = Layouts.LAYOUTS[_layout].jobs
+		if jobs.is_empty() and _type == "":
+			print("note: %s has no campaign jobs; skipping" % _layout)
+			_next.call_deferred()
+			return
 		var type := _type if _type != "" else str(jobs[0])
 		if not jobs.has(type):
 			print("note: %s jobs don't normally use %s" % [type, _layout])

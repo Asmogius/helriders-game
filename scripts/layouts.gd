@@ -1,7 +1,7 @@
 extends RefCounted
 ## Map layouts (§14 Maps; six for the beta, twelve since V5.7: three per
-## district). Every
-## layout is the same size (T.WORLD_SIZE) and lists which job types use it.
+## district). Quickplay adds four canvases that are not district maps.
+## Every layout is the same size (T.WORLD_SIZE) and lists which job types use it.
 ## Jobs on the daily board are given a layout and a variation seed; the same
 ## job always builds the same map. Variation (seeded): mirrored left-right
 ## and/or top-bottom, props nudged, one or two roads barricaded (from each
@@ -18,6 +18,15 @@ extends RefCounted
 ## Optional `surfaces` [[Rect2, kind]] are visual only (the map style bakes
 ## them; collision, nav and spawns never read them): "parking" is an asphalt
 ## lot with kerbs, "bays" a double row of painted stalls with wheel stops.
+##
+## Quickplay canvases (QP2): `blank_s`, `blank_m`, `blank_l` and `endless`.
+## They list no jobs, so the campaign board never draws them. Until world-size
+## Q1, all four stay on T.WORLD_SIZE. They are empty shells: no buildings,
+## props, roads, checkpoints, barrel spots, spawn points, chokes or blocks.
+## A blank bake must not inherit map geometry. Density tiers are the arena
+## rect only (S smallest, then M, L, then the Endless floor). Real multi-size
+## worlds are a follow-up. Placeable caps (QP7: 40 px snap, 80 px option,
+## ≤300 pieces, ≤24 spawners) are not applied here.
 
 const T := preload("res://scripts/tuning.gd")
 
@@ -473,6 +482,74 @@ const LAYOUTS := {
 		],
 		"blocks": [[Vector2(1100, 450), Vector2(36, 300), 0.0], [Vector2(2100, 1950), Vector2(36, 300), 0.0],
 			[Vector2(600, 800), Vector2(36, 260), 0.0], [Vector2(2600, 1600), Vector2(36, 260), 0.0]],
+	},
+	# --- QP2: Quickplay canvases. Same WORLD_SIZE, empty geometry. Density
+	# tiers are the arena rect (S < M < L < endless), not buildings. No jobs,
+	# so pick() / the daily board never see them. A variation must not add
+	# roads, spawns or barricades: LevelBake uses Layouts.build for these ids. ---
+	"blank_s": {
+		"name": "Small Yard",
+		"district": "quickplay",
+		"landmark": "the fenced small yard",
+		"arena": Rect2(760, 760, 1680, 880),
+		"chokes": [],
+		"jobs": [],
+		"start": Vector2(1600, 1200),
+		"buildings": [],
+		"props": [],
+		"roads": [],
+		"checkpoints": [],
+		"barrel_spots": [],
+		"spawn_points": [],
+		"blocks": [],
+	},
+	"blank_m": {
+		"name": "Mid Yard",
+		"district": "quickplay",
+		"landmark": "the open mid yard",
+		"arena": Rect2(200, 760, 2800, 900),
+		"chokes": [],
+		"jobs": [],
+		"start": Vector2(1600, 1200),
+		"buildings": [],
+		"props": [],
+		"roads": [],
+		"checkpoints": [],
+		"barrel_spots": [],
+		"spawn_points": [],
+		"blocks": [],
+	},
+	"blank_l": {
+		"name": "Large Yard",
+		"district": "quickplay",
+		"landmark": "the wide open yard",
+		"arena": Rect2(960, 200, 1280, 2000),
+		"chokes": [],
+		"jobs": [],
+		"start": Vector2(1600, 1200),
+		"buildings": [],
+		"props": [],
+		"roads": [],
+		"checkpoints": [],
+		"barrel_spots": [],
+		"spawn_points": [],
+		"blocks": [],
+	},
+	"endless": {
+		"name": "Endless",
+		"district": "quickplay",
+		"landmark": "the long outer lap",
+		"arena": Rect2(600, 480, 2000, 1440),
+		"chokes": [],
+		"jobs": [],
+		"start": Vector2(1600, 1200),
+		"buildings": [],
+		"props": [],
+		"roads": [],
+		"checkpoints": [],
+		"barrel_spots": [],
+		"spawn_points": [],
+		"blocks": [],
 	},
 }
 
