@@ -85,7 +85,7 @@ func _load_shadow(dir: String) -> void:
 	shadow.texture = load(p)
 	shadow.hframes = columns
 	shadow.vframes = int(ceil(directions / float(columns)))
-	var al: float = sd.get("alpha", 0.5)
+	var al: float = sd.get("alpha", 0.82)  # voxel_render.SHADOW_ALPHA; contact peak
 	shadow.modulate = Color(1.0, 1.0, 1.0, al)
 
 
