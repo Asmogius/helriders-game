@@ -66,6 +66,10 @@ var mission_override := {}
 ## Tests: ride with these crew (crew.gd dictionaries) instead of the seated ones.
 var crew_override: Array = []
 
+const HUD_REFRESH := 1.0 / 15.0   # seconds between HUD bar/number refreshes
+var _hud_timer := 0.0
+var _threat_points := PackedVector2Array()   # reused each frame (edge arrows)
+var _threat_colors := PackedColorArray()
 var loading_map := false        # start held (tree paused) while the styled map bakes
 var _load_layer: CanvasLayer
 var _restarting := false         # RESTART keeps the baked map cached; leaving drops it
@@ -679,9 +683,16 @@ func _process(_delta: float) -> void:
 	if vehicle.strip_pending > 0.0:
 		scrap += vehicle.strip_pending   # Strip Mine
 		vehicle.strip_pending = 0.0
-	_refresh_hud()
+	# Bars, numbers and the status line at ~15 Hz (they allocate strings and
+	# arrays); the edge arrows track the camera, so they update every frame.
+	_hud_timer -= _delta
+	if _hud_timer <= 0.0:
+		_hud_timer = HUD_REFRESH
+		_refresh_hud()
+		hud.right_stick.set_gauges(vehicle.weapon_gauges())
+	else:
+		_refresh_threats()
 	_music_tick(_delta)
-	hud.right_stick.set_gauges(vehicle.weapon_gauges())
 	bullets.big_game = float(vehicle.crew_mod("big_game"))
 
 
@@ -1941,10 +1952,16 @@ func _refresh_hud() -> void:
 		hud.set_ability_charge(i, vehicle.ability_charge(i))
 	hud.set_status_text(_status_line())
 	hud.set_lock_state(vehicle.lock_enabled, vehicle.lock_target != null)
+	_refresh_threats()
+
+
+func _refresh_threats() -> void:
 	# Edge arrows: specials always, the Courier's next stop, salvage, and the
 	# last few shamblers in a Clear.
-	var points := PackedVector2Array()
-	var colors := PackedColorArray()
+	var points := _threat_points
+	var colors := _threat_colors
+	points.clear()
+	colors.clear()
 	if state == State.RUNNING:
 		var to_screen := get_viewport().get_canvas_transform()
 		for h in hunters:
