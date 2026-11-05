@@ -1144,6 +1144,10 @@ const NIGHT_CHANCE_BY_DISTRICT := [0.10, 0.35, 0.60, 1.0]   # by DISTRICTS index
 const NIGHT_CHANCE_COURIER := 0.5        # Courier jobs are 50/50 night outside Core Collapse (Core is always night)
 const NIGHT_MIN_SKULLS := 2              # never night at 1 skull...
 const NIGHT_MIN_CLEARS := 3              # ...or before the first 3 clears
+# #76's job rules (approved by Cameron 2026-11-05). Precedence: Missions.night_chance().
+const NIGHT_LEAN_SURVIVE_HUNT := 0.25    # Survive and Hunt: + this to the district chance (cap 1.0)
+const NIGHT_ESCORT_MIN_SKULLS := 5       # Escort: day below this, always night at it and above
+const NIGHT_OB_SURE_SKULLS := 4          # Outer Blocks Survive and Hunt at this many skulls: always night
 const NIGHT_ZOMBIE_SPEED_MULT := 1.10     # approved by Cameron 2026-11-05 (was 1.15); shambler 75 -> ~83, far below the starter rig (495)
 const NIGHT_HUNTER_SPEED_MULT := 1.10     # 250 -> 275
 const NIGHT_ZOMBIE_DPS_MULT := 1.10       # approved by Cameron 2026-11-05; zombies and Hunters, on top of ENEMY_DAMAGE_BY_SKULL

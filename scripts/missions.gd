@@ -181,25 +181,43 @@ static func district_index(district: String) -> int:
 	return 0
 
 
-## Chance this job is a night job, before gating. Courier is 50/50 outside Core Collapse.
+## Chance this job is a night job, before gating (roll_night). First match:
+##   1. Escort: 0 below NIGHT_ESCORT_MIN_SKULLS, 1 at 5-6 (any district, Core too)
+##   2. Courier: 1 in Core Collapse, else NIGHT_CHANCE_COURIER (50/50)
+##   3. Outer Blocks Survive / Hunt at NIGHT_OB_SURE_SKULLS (4): 1
+##   4. District chance (NIGHT_CHANCE_BY_DISTRICT), + NIGHT_LEAN_SURVIVE_HUNT
+##      for Survive / Hunt, capped at 1.0
+## The tutorial, 1 skull and the first 3 clears win over all of these.
 static func night_chance(mission: Dictionary) -> float:
-	var chance := float(T.NIGHT_CHANCE_BY_DISTRICT[district_index(district_of(mission))])
-	if str(mission.get("type", "")) == "courier" and chance < 1.0:
-		return T.NIGHT_CHANCE_COURIER   # 50/50 outside Core; Core Couriers stay always-night
+	var type := str(mission.get("type", ""))
+	var level := skulls(mission)
+	var district := district_of(mission)
+	var chance := float(T.NIGHT_CHANCE_BY_DISTRICT[district_index(district)])
+	if type == "escort":
+		return 1.0 if level >= T.NIGHT_ESCORT_MIN_SKULLS else 0.0
+	if type == "courier":
+		return 1.0 if chance >= 1.0 else T.NIGHT_CHANCE_COURIER
+	if type == "survive" or type == "hunt":
+		if district == "outer_blocks" and level == T.NIGHT_OB_SURE_SKULLS:
+			return 1.0
+		return minf(chance + T.NIGHT_LEAN_SURVIVE_HUNT, 1.0)
 	return chance
 
 
 ## Rolls night from the job's seed (Comms, the mission and a relaunch agree).
 ## Never at 1 skull or before the player's first T.NIGHT_MIN_CLEARS clears.
 static func roll_night(mission: Dictionary, clears: int) -> bool:
-	if skulls(mission) < T.NIGHT_MIN_SKULLS or clears < T.NIGHT_MIN_CLEARS:
+	if bool(mission.get("tutorial", false)) or skulls(mission) < T.NIGHT_MIN_SKULLS or clears < T.NIGHT_MIN_CLEARS:
 		return false
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash("helriders-night-%d" % int(mission.get("seed", 0)))
 	return rng.randf() < night_chance(mission)
 
 
+## The tutorial is always day, whatever the dict says.
 static func is_night(mission: Dictionary) -> bool:
+	if bool(mission.get("tutorial", false)):
+		return false
 	return bool(mission.get("night", false))
 
 

@@ -17,6 +17,7 @@ const Missions := preload("res://scripts/missions.gd")
 const Loadout := preload("res://scripts/loadout.gd")
 const Parts := preload("res://scripts/parts.gd")
 const T := preload("res://scripts/tuning.gd")
+const Layouts := preload("res://scripts/layouts.gd")
 
 const TARGET := [15.0, 13.0, 11.0, 9.0, 7.5, 6.0]
 const LIMIT := 120.0   # stop a run after this many seconds alive
@@ -219,6 +220,32 @@ func _report() -> void:
 	_report_night(pays)
 
 
+## Share of a district's board that's night (after 3 clears): every job
+## type alike, skulls weighted by SKULL_WEIGHTS, 1 skull never night, using
+## Missions.night_chance (the district, Courier, Escort and Survive/Hunt rules).
+func _night_share(i: int) -> float:
+	var dist: Dictionary = T.DISTRICTS[i]
+	var lo := int(dist.skulls[0])
+	var hi := int(dist.skulls[1])
+	var sum := 0.0
+	var wsum := 0.0
+	for type: String in Missions.TYPES:
+		var layout := ""
+		for id: String in Layouts.LAYOUTS:
+			if str(Layouts.LAYOUTS[id].get("district", "")) == str(dist.id) and (Layouts.LAYOUTS[id].jobs as Array).has(type):
+				layout = id
+				break
+		if layout == "":
+			continue
+		for s in range(lo, hi + 1):
+			var w := float(T.SKULL_WEIGHTS[mini(s - lo, T.SKULL_WEIGHTS.size() - 1)])
+			var job := Missions.make(type, s, 1)
+			job["layout"] = layout
+			wsum += w
+			sum += w * (Missions.night_chance(job) if s >= T.NIGHT_MIN_SKULLS else 0.0)
+	return sum / maxf(wsum, 1.0)
+
+
 func _mean(key: String) -> float:
 	var list: Array = results.get(key, [])
 	var sum := 0.0
@@ -252,7 +279,7 @@ func _report_night(pays: Array[float]) -> void:
 		var dist: Dictionary = T.DISTRICTS[i]
 		var lo := int(dist.skulls[0])
 		var hi := int(dist.skulls[1])
-		var chance := float(T.NIGHT_CHANCE_BY_DISTRICT[i])
+		var chance := _night_share(i)
 		for b: String in BUILDS:
 			var wsum := 0.0
 			var dt := 0.0

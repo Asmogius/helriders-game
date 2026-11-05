@@ -36,6 +36,8 @@ func _initialize() -> void:
 	_check_rolls()
 	_check_gating()
 	_check_saved()
+	_check_job_rules()
+	_check_fallback()
 	_check_surge()
 	_check_rewards()
 	_start(false)
@@ -106,6 +108,68 @@ func _check_saved() -> void:
 	_check(active.has("night") and bool(active.night) == bool(a[0].night), "the chosen job keeps its night roll (saved)")
 	var round_trip: Dictionary = profile.call("_clean_mission", JSON.parse_string(JSON.stringify({"type": "clear", "skulls": 3, "seed": 5, "reward": 84, "night": true})))
 	_check(bool(round_trip.get("night", false)), "a loaded save keeps the night flag")
+
+
+func _job(type: String, skulls: int, district: String, job_seed := 7) -> Dictionary:
+	var job := Missions.make(type, skulls, job_seed)
+	job["layout"] = _layout_in(district, type)
+	return job
+
+
+func _chance(type: String, skulls: int, district: String) -> float:
+	var job := _job(type, skulls, district)
+	if str(job.layout) == "":
+		return -1.0   # no layout of this type in the district: skip
+	return Missions.night_chance(job)
+
+
+## #76's rules (approved 2026-11-05) and how they stack with ours.
+func _check_job_rules() -> void:
+	var cases := [
+		["survive", 3, "midtown", 0.60], ["hunt", 5, "midtown", 0.60],
+		["survive", 6, "industrial", 0.85], ["hunt", 3, "industrial", 0.85],
+		["survive", 5, "core", 1.0], ["hunt", 6, "core", 1.0],
+		["survive", 4, "outer_blocks", 1.0], ["hunt", 4, "outer_blocks", 1.0],
+		["survive", 3, "outer_blocks", 0.35], ["hunt", 2, "outer_blocks", 0.35],
+		["escort", 4, "core", 0.0], ["escort", 4, "industrial", 0.0], ["escort", 5, "midtown", 1.0], ["escort", 6, "industrial", 1.0],
+		["courier", 5, "core", 1.0], ["courier", 3, "outer_blocks", 0.5], ["courier", 5, "industrial", 0.5],
+		["clear", 3, "midtown", 0.35], ["retrieve", 4, "core", 1.0],
+	]
+	for c: Array in cases:
+		var got := _chance(str(c[0]), int(c[1]), str(c[2]))
+		if got < 0.0:
+			print("  skip %s %d %s (no layout)" % c.slice(0, 3))
+			continue
+		_check(is_equal_approx(got, float(c[3])), "%s %d skulls in %s: night chance %.2f (want %.2f)" % [c[0], c[1], c[2], got, c[3]])
+	# The gates still win over the sure-night rules.
+	var esc := _job("escort", 6, "industrial")
+	_check(Missions.roll_night(esc, 3) and not Missions.roll_night(esc, 2), "6-skull Escort is night, but not before 3 clears")
+	var ob := _job("survive", 4, "outer_blocks")
+	_check(Missions.roll_night(ob, 3), "Outer Blocks 4-skull Survive rolls night")
+	var core1 := _job("courier", 1, "core")
+	_check(not Missions.roll_night(core1, 50), "a 1-skull Core Courier is still day")
+	var tut := _job("clear", 4, "core")
+	tut["tutorial"] = true
+	_check(not Missions.roll_night(tut, 50), "the tutorial never rolls night")
+	tut["night"] = true
+	_check(not Missions.is_night(tut), "the tutorial is day even if the flag says night")
+
+
+## Old saves (no night flag) roll once on load, from the same seed.
+func _check_fallback() -> void:
+	var raw := _job("clear", 4, "industrial", 4242)
+	raw.erase("night")
+	var loaded: Dictionary = profile.call("_clean_mission", JSON.parse_string(JSON.stringify(raw)), 5)
+	_check(loaded.has("night") and bool(loaded.night) == Missions.roll_night(raw, 5), "an old save's job rolls night on load from its seed")
+	var core := _job("clear", 4, "core", 11)
+	core.erase("night")
+	var c_loaded: Dictionary = profile.call("_clean_mission", JSON.parse_string(JSON.stringify(core)), 5)
+	_check(bool(c_loaded.get("night", false)), "an old Core job loads as night")
+	var gated: Dictionary = profile.call("_clean_mission", JSON.parse_string(JSON.stringify(core)), 0)
+	_check(not bool(gated.get("night", true)), "an old save before 3 clears loads as day")
+	core["night"] = false
+	var kept: Dictionary = profile.call("_clean_mission", JSON.parse_string(JSON.stringify(core)), 5)
+	_check(not bool(kept.night), "a saved night flag wins over the roll")
 
 
 func _check_surge() -> void:

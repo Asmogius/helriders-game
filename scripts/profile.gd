@@ -1442,10 +1442,10 @@ func apply_data(data: Dictionary) -> bool:
 	day = maxi(1, int(data.get("day", 1)))
 	board = []
 	for m: Variant in data.get("board", []):
-		var clean := _clean_mission(m)
+		var clean := _clean_mission(m, int(record.clears))
 		if not clean.is_empty():
 			board.append(clean)
-	active_mission = _clean_mission(data.get("active_mission", {}))
+	active_mission = _clean_mission(data.get("active_mission", {}), int(record.clears))
 	run_active = bool(data.get("run_active", false))
 	discovered = {}
 	var saved_found: Dictionary = data.get("discovered", {})
@@ -1575,7 +1575,8 @@ static func _clean_member(raw: Variant) -> Dictionary:
 
 
 ## JSON turns ints into floats; put a mission back in shape, or {} if unusable.
-static func _clean_mission(raw: Variant) -> Dictionary:
+## `clears`: the save's clear count, for jobs saved before night existed.
+static func _clean_mission(raw: Variant, clears := 0) -> Dictionary:
 	if not raw is Dictionary:
 		return {}
 	var d: Dictionary = raw
@@ -1598,7 +1599,11 @@ static func _clean_mission(raw: Variant) -> Dictionary:
 	if Layouts.LAYOUTS.has(str(d.get("layout", ""))):
 		out["layout"] = str(d.layout)
 	if d.has("night"):
-		out["night"] = bool(d.night)   # the job's saved night roll (PR #69)
+		out["night"] = bool(d.night)   # the job's saved night roll (PR #69); a saved flag wins
+	else:
+		# Saved before night existed: roll once now from the same seed
+		# (helriders-night-<seed>); the next save keeps it.
+		out["night"] = Missions.roll_night(out, clears)
 	return out
 
 
