@@ -230,7 +230,7 @@ Make the home base a place with distinct areas you move between: lit, animated a
 
 **Looks:**
 - [ ] **V5.1 Ground from tiles, baked once.** Add `tools/art/tiles.py`: asphalt, cracked concrete, dirt, broken pavement, grass through cracks, road markings, manholes, puddles. Each tile is 64 px with 4 variants. At job start `arena.gd` paints the ground from tiles into one Image, then one texture, so it costs a single draw. Roads get lane lines, crosswalks and potholes.
-- [ ] **V5.2 Buildings with height.** Render buildings as voxel blocks at the 30° tilt (`tools/art/buildings.py`): rooftops with clutter, and the south walls visible with windows, doors, signs, fire escapes and a few lit windows. Use modular pieces (roof tiles, wall segments, corners) so each building size in `layouts.gd` can be assembled. Buildings then read as solid blocks instead of lighter squares.
+- [ ] **V5.2 Buildings with height.** Render buildings as voxel blocks at the 45° tilt (`tools/art/buildings.py`; was 30°, now the Ebbtide camera): rooftops with clutter, and the south walls visible with windows, doors, signs, fire escapes and a few lit windows. Use modular pieces (roof tiles, wall segments, corners) so each building size in `layouts.gd` can be assembled. Buildings then read as solid blocks instead of lighter squares.
 - [ ] **V5.3 Props as voxel sprites:**
   - wrecked cars (several models, burnt and rusty);
   - buses, dumpsters, barriers, fences, streetlights (with light pools), burning barrels;

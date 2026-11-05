@@ -1,22 +1,48 @@
 """Outer Blocks low houses (VISUAL_PLAN V5.2/V5.5, P4 style sample).
 Modular pieces so any building rect from layouts.gd can be assembled by
 scripts/map_art.gd: shingle roof tiles (north slope lit, south slope dark),
-a south wall strip (siding, windows, a door, a few lit windows) seen at the
-30 degree tilt, and a chimney. Writes art/map/outer_house.png + .json.
+a south wall strip (siding, windows, a door, a few lit windows) and a chimney.
+The strips were painted for a 30 degree camera and are scaled to the current
+tilt (45 degrees: a vertical face grows by sin(45)/sin(30)). Roof tiles stay a
+top-down fill of the footprint. Writes art/map/outer_house.png + .json.
 
   python3 tools/art/buildings.py
 """
-import json, os, random
+import json, math, os, random
 import numpy as np
 from PIL import Image
 from palette import tuning_color, PALETTE, OUTLINE
+from voxel_render import TILT_DEG
 
 OUT = os.path.join(os.path.dirname(__file__), "..", "..", "art", "map")
 ROOF = np.array(tuning_color("COL_OB_ROOF"), float)
 SIDING = np.array(tuning_color("COL_OB_SIDING"), float)
 ORANGE = np.array(PALETTE["orange"], float)
 GLASS = np.array(PALETTE["glass"], float)
-RT, WH, WW = 32, 30, 32   # roof tile, wall height, wall piece width
+# Reference strip heights at 30 degrees. Screen px = voxels * sin(tilt), and
+# those strips were 30 px and 46 px, i.e. 60 and 92 voxels.
+REF_TILT = 30.0
+REF_WH, REF_WH2, REF_CHIM = 30, 46, 18
+RT, WW = 32, 32
+
+
+def project_px(ref_px):
+    vox = ref_px / math.sin(math.radians(REF_TILT))
+    return int(round(vox * math.sin(math.radians(TILT_DEG))))
+
+
+def scale_h(img, new_h):
+    """Nearest-neighbour vertical scale so a 30 degree strip matches the tilt."""
+    h = img.shape[0]
+    if new_h == h:
+        return img
+    idx = np.clip(np.rint(np.linspace(0, h - 1, new_h)).astype(int), 0, h - 1)
+    return np.ascontiguousarray(img[idx])
+
+
+WH = project_px(REF_WH)          # 42 at 45 degrees
+WH2 = project_px(REF_WH2)        # 65 at 45 degrees
+CHIM_H = project_px(REF_CHIM)
 
 ROOFS = [ROOF, ROOF * np.array([0.8, 0.9, 1.05]), ROOF * np.array([0.85, 1.05, 0.85])]  # brown, slate, moss
 SIDINGS = [SIDING, SIDING * np.array([0.85, 0.95, 1.08]), SIDING * np.array([0.95, 1.02, 0.85])]
@@ -47,7 +73,7 @@ def shingles(rng, col, lit):
 
 
 def wall(rng, col, kind):
-    t = np.tile(col * 0.78, (WH, WW, 1))
+    t = np.tile(col * 0.78, (REF_WH, WW, 1))
     t[::3, :] *= 0.88               # horizontal siding boards
     t[:3, :] = col * 0.45            # eave shadow
     t[-3:, :] = col * 0.4            # foundation
@@ -63,18 +89,15 @@ def wall(rng, col, kind):
         t[8:27, 11:21] = np.array(OUTLINE[:3])
         t[9:27, 12:20] = np.array(PALETTE["rust"]) * 0.8
         t[17, 18] = (200, 190, 150)
-    return rgba(t)
+    return scale_h(rgba(t), WH)
 
 
 def chimney(rng):
-    t = np.tile(np.array(PALETTE["rust"]) * 0.75, (18, 14, 1))
+    t = np.tile(np.array(PALETTE["rust"]) * 0.75, (REF_CHIM, 14, 1))
     t[::4, :] *= 0.8
     t[:3, :] = np.array(OUTLINE[:3]) + 20
     t[:, -4:] *= 0.65
-    return rgba(t)
-
-
-WH2 = 46   # two-storey south wall (flat-roof block)
+    return scale_h(rgba(t), CHIM_H)
 
 
 def gravel(rng):
@@ -90,14 +113,15 @@ def gravel(rng):
 
 
 def parapet(length):
-    t = np.tile(np.array(PALETTE["steel"], float) * 0.95, (5, length, 1))
+    ref = 5
+    t = np.tile(np.array(PALETTE["steel"], float) * 0.95, (ref, length, 1))
     t[0, :] *= 1.2; t[-1, :] *= 0.55
-    return rgba(t)
+    return scale_h(rgba(t), project_px(ref))
 
 
 def wall2(rng, col, kind):
     """Two storeys: upper windows plus a ground floor piece (shop front)."""
-    t = np.tile(col * 0.74, (WH2, WW, 1))
+    t = np.tile(col * 0.74, (REF_WH2, WW, 1))
     t[::4, :] *= 0.9                     # block courses
     t[:3, :] = col * 0.42
     t[-3:, :] = col * 0.38
@@ -117,7 +141,7 @@ def wall2(rng, col, kind):
         t[25:43, 11:21] = np.array(OUTLINE[:3]); t[26:43, 12:20] = np.array(PALETTE["steel_dark"])
     else:
         t[26:38, 6:26] = np.array(OUTLINE[:3]); t[27:37, 7:25] = g * 0.9
-    return rgba(t)
+    return scale_h(rgba(t), WH2)
 
 
 def main():
@@ -139,11 +163,13 @@ def main():
     W = 256
     x = y = row = 0
     regions = {}
-    sheet = np.zeros((256, W, 4), np.uint8)
+    sheet = np.zeros((512, W, 4), np.uint8)
     for k, t in pieces.items():
         h, w = t.shape[:2]
         if x + w > W:
             x, y, row = 0, y + row + 1, 0
+        if y + h > sheet.shape[0]:
+            raise SystemExit("outer_house sheet exceeds %d" % sheet.shape[0])
         sheet[y:y + h, x:x + w] = t
         regions[k] = [x, y, w, h]
         x += w + 1; row = max(row, h)

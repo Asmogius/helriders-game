@@ -1,10 +1,12 @@
 """Outer Blocks street decor (VISUAL_PLAN V5.3/V5.5, P4 style sample).
-Voxel props rendered with voxel_render.render_frame at the same 30 degree tilt
-as the rigs (top plus the visible south face), and flat decals (cracks,
-potholes, puddles, oil, blood, trash, weeds, graffiti, scorch). Everything is
-baked by scripts/map_art.gd into the corner texture: decor only, never
-collision. Colours derive from tuning.gd COL_* / palette.PALETTE and are kept
-muted and away from the zombie greens (see check_readability()).
+Voxel props rendered with voxel_render.render_frame at the same 45 degree tilt
+as the rigs (top plus the visible south face), plus a cast shadow from
+render_shadow (team sun, opaque SHADOW_RGB, alpha 0.5) aligned to the sprite's
+ground centre. Flat decals (cracks, potholes, puddles, oil, blood, trash,
+weeds, graffiti, scorch) have no shadow. Everything is baked by
+scripts/map_art.gd into the map chunks: decor only, never collision. Colours
+derive from tuning.gd COL_* / palette.PALETTE and are kept muted and away from
+the zombie greens (see check_readability()).
 Writes art/map/outer_props.png + .json.
 
   python3 tools/art/props.py
@@ -13,7 +15,7 @@ import json, os, random
 import numpy as np
 from PIL import Image
 from palette import tuning_color, PALETTE, OUTLINE
-from voxel_render import render_frame
+from voxel_render import render_frame, render_shadow, canvas_for, shadow_canvas, SHADOW_ALPHA
 
 OUT = os.path.join(os.path.dirname(__file__), "..", "..", "art", "map")
 f = lambda c, m=1.0: tuple(int(min(255, v * m)) for v in c[:3])
@@ -168,15 +170,33 @@ def dumpster():
     return g
 
 
+def _tight(img):
+    ys, xs = np.where(img[:, :, 3] > 0)
+    if len(xs) == 0:
+        return img[:1, :1].copy(), (0, 0)
+    y0, y1 = int(ys.min()), int(ys.max()) + 1
+    x0, x1 = int(xs.min()), int(xs.max()) + 1
+    return img[y0:y1, x0:x1].copy(), (x0, y0)
+
+
 def sprite(g, heading=0, burnt=False):
-    img = render_frame(g, BURNT if burnt else COLORS, heading, canvas=max(g.shape[:2]) + g.shape[2] + 8)
-    a = img[:, :, 3] > 0
-    ys, xs = np.where(a)
-    img = img[ys.min():ys.max() + 1, xs.min():xs.max() + 1].copy()
+    """Cropped prop sprite, plus its cast shadow and the shadow's top-left
+    relative to the sprite's top-left (both anchored on the ground centre)."""
+    sc = canvas_for(g.shape)
+    img = render_frame(g, BURNT if burnt else COLORS, heading, canvas=sc)
+    img, origin = _tight(img)
     rgb = img[..., :3].astype(float)   # decor rule: desaturate 35% and dim 10%
     lum = rgb @ np.array([0.3, 0.59, 0.11])
     img[..., :3] = np.clip((rgb * 0.65 + lum[..., None] * 0.35) * 0.9, 0, 255).astype(np.uint8)
-    return img
+    shc = shadow_canvas(g.shape)
+    sh = render_shadow(g, heading, canvas=shc)
+    sh[..., 3] = np.where(sh[..., 3] > 0, int(round(SHADOW_ALPHA * 255)), 0).astype(np.uint8)
+    sh, sorigin = _tight(sh)
+    # Ground centre pixel in each crop. map_art draws the shadow at sprite + ofs.
+    sg = (sc // 2 - origin[0], sc // 2 - origin[1])
+    hg = (shc // 2 - sorigin[0], shc // 2 - sorigin[1])
+    ofs = (int(sg[0] - hg[0]), int(sg[1] - hg[1]))
+    return img, sh, ofs
 
 
 # --- decals: flat, partly transparent ------------------------------------
@@ -293,17 +313,24 @@ def graffiti(rng, w=40, h=16):
     return rgba(col, a)
 
 
-def pack(items, W=512):
+def pack(items, W=512, limit=2048):
+    """items: name -> image. Stays within `limit` so the Compatibility renderer
+    can upload the atlas (bake-time only; the map itself is chunked to 2048)."""
     x = y = row = 0
     regions = {}
-    sheet = np.zeros((1024, W, 4), np.uint8)
+    sheet = np.zeros((limit, W, 4), np.uint8)
     for k, t in items.items():
         h, w = t.shape[:2]
+        if w > W or h > limit:
+            raise SystemExit("prop %s is %dx%d, over the atlas limit" % (k, w, h))
         if x + w > W:
             x, y, row = 0, y + row + 1, 0
+        if y + h > limit:
+            raise SystemExit("props sheet exceeds %d px" % limit)
         sheet[y:y + h, x:x + w] = t
-        regions[k] = [x, y, w, h]
-        x += w + 1; row = max(row, h)
+        regions[k] = [int(x), int(y), int(w), int(h)]
+        x += w + 1
+        row = max(row, h)
     return sheet[:y + row + 1], regions
 
 
@@ -328,30 +355,37 @@ def check_readability(items, near=18.0, share=0.12):
     return bad
 
 
+def add(it, shadows, name, grid, heading, burnt=False):
+    img, sh, ofs = sprite(grid, heading, burnt)
+    it[name] = img
+    shadows[name] = (sh, ofs)
+
+
 def main():
     rng = random.Random(6061)
     it = {}
+    shadows = {}
     paints = ["paint0", "paint1", "paint2"]
     for i, p in enumerate(paints):
         g = car(p, rng)
-        it["car%d_h" % i] = sprite(g, 0)
-        it["car%d_v" % i] = sprite(g, 90)
-        it["car%d_a" % i] = sprite(g, 200)
+        add(it, shadows, "car%d_h" % i, g, 0)
+        add(it, shadows, "car%d_v" % i, g, 90)
+        add(it, shadows, "car%d_a" % i, g, 200)
     for i in range(2):
         g = car(paints[i], rng)
-        it["burnt%d_h" % i] = sprite(g, 0 if i == 0 else 160, burnt=True)
-        it["burnt%d_v" % i] = sprite(g, 90 if i == 0 else 290, burnt=True)
-    it["jersey_h"] = sprite(jersey(), 0); it["jersey_v"] = sprite(jersey(), 90)
-    it["sandbags_h"] = sprite(sandbags(), 0); it["sandbags_v"] = sprite(sandbags(), 90)
-    it["fence_h"] = sprite(fence(), 0); it["fence_v"] = sprite(fence(), 90)
-    it["wfence_h"] = sprite(fence(48, True), 0); it["wfence_v"] = sprite(fence(48, True), 90)
-    it["light_e"] = sprite(streetlight(), 0); it["light_w"] = sprite(streetlight(), 180)
-    it["light_s"] = sprite(streetlight(), 90); it["light_n"] = sprite(streetlight(), 270)
-    it["stop"] = sprite(stop_sign(), 0)
-    it["ac"] = sprite(ac_unit(), 0); it["vent"] = sprite(vent(), 0); it["tank"] = sprite(water_tank(), 0)
-    it["dumpster"] = sprite(dumpster(), 0); it["tyres"] = sprite(tyres(), 0)
+        add(it, shadows, "burnt%d_h" % i, g, 0 if i == 0 else 160, burnt=True)
+        add(it, shadows, "burnt%d_v" % i, g, 90 if i == 0 else 290, burnt=True)
+    add(it, shadows, "jersey_h", jersey(), 0); add(it, shadows, "jersey_v", jersey(), 90)
+    add(it, shadows, "sandbags_h", sandbags(), 0); add(it, shadows, "sandbags_v", sandbags(), 90)
+    add(it, shadows, "fence_h", fence(), 0); add(it, shadows, "fence_v", fence(), 90)
+    add(it, shadows, "wfence_h", fence(48, True), 0); add(it, shadows, "wfence_v", fence(48, True), 90)
+    add(it, shadows, "light_e", streetlight(), 0); add(it, shadows, "light_w", streetlight(), 180)
+    add(it, shadows, "light_s", streetlight(), 90); add(it, shadows, "light_n", streetlight(), 270)
+    add(it, shadows, "stop", stop_sign(), 0)
+    add(it, shadows, "ac", ac_unit(), 0); add(it, shadows, "vent", vent(), 0); add(it, shadows, "tank", water_tank(), 0)
+    add(it, shadows, "dumpster", dumpster(), 0); add(it, shadows, "tyres", tyres(), 0)
     for i in range(3):
-        it["debris_%d" % i] = sprite(debris(rng), 0)
+        add(it, shadows, "debris_%d" % i, debris(rng), 0)
     for i in range(4):
         it["crack_%d" % i] = crack(rng)
         it["trash_%d" % i] = trash(rng)
@@ -368,11 +402,25 @@ def main():
     bad = check_readability(it)
     if bad:
         raise SystemExit("decor too close to zombie colours: %s" % bad)
-    sheet, regions = pack(it)
+    # Shadows pack after the sprites so a missing shadow sheet never shifts a
+    # sprite region that map_art already found by name. Alpha is already 0.5.
+    packed = dict(it)
+    for name, (sh, _ofs) in shadows.items():
+        packed["@shadow/" + name] = sh
+    sheet, regions = pack(packed)
+    shadow_meta = {}
+    for name, (_sh, ofs) in shadows.items():
+        shadow_meta[name] = {"rect": regions.pop("@shadow/" + name), "ofs": [int(ofs[0]), int(ofs[1])]}
+    if sheet.shape[0] > 2048 or sheet.shape[1] > 2048:
+        raise SystemExit("props atlas %s exceeds 2048" % (sheet.shape,))
     os.makedirs(OUT, exist_ok=True)
     Image.fromarray(sheet, "RGBA").save(os.path.join(OUT, "outer_props.png"))
-    json.dump({"regions": regions}, open(os.path.join(OUT, "outer_props.json"), "w"), indent=1)
-    print("outer_props:", sheet.shape, len(regions), "regions; readability ok")
+    json.dump({"regions": regions, "shadows": shadow_meta,
+               "shadow_rgb": [20, 11, 6], "shadow_alpha": SHADOW_ALPHA},
+              open(os.path.join(OUT, "outer_props.json"), "w"), indent=1)
+    lamp = shadow_meta["light_e"]
+    print("outer_props:", sheet.shape, len(regions), "regions;", len(shadow_meta),
+          "shadows; light_e ofs", lamp["ofs"], "rect", lamp["rect"], "; readability ok")
 
 
 if __name__ == "__main__":

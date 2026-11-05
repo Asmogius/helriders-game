@@ -3,6 +3,10 @@ Writes art/map/outer_tiles.png + outer_tiles.json ({"regions": {id: [x,y,w,h]}})
 for scripts/art_atlas.gd. 64 px tiles, 4 variants each, seeded (same output
 every run). Colours come from tuning.gd via palette.tuning_color.
 
+Ground fills and the tree/bush canopy blobs are top-down (the 45 degree camera
+is the voxel props and the south-wall strips, not these tiles). Canopy blobs
+are lit from the upper left, the same sun as voxel_render.LIGHT.
+
   python3 tools/art/tiles.py
 """
 import json, os, random

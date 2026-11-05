@@ -30,6 +30,7 @@ class Canvas extends RefCounted:
 	var view: Rect2i      # this image's rect inside the bake area
 	var size: Vector2i    # whole bake area (what the painters see)
 	var sil_cache := {}   # drop-shadow silhouettes, shared by one bake's chunks
+	var prop_shadows: Dictionary = {}   # id -> {rect, ofs} from outer_props.json
 
 	func _init(area: Vector2i, v: Rect2i) -> void:
 		size = area
@@ -120,7 +121,8 @@ static func load_sources() -> Dictionary:
 		return {}
 	var props: RefCounted = ArtAtlas.load_atlas(PROPS)
 	var pi: Image = _image_of(props.texture) if props.ok() else null
-	return {"tiles": tiles, "house": house, "props": props, "ti": ti, "hi": hi, "pi": pi}
+	return {"tiles": tiles, "house": house, "props": props, "ti": ti, "hi": hi, "pi": pi,
+		"shadows": _prop_shadows()}
 
 
 ## Plain-data copy of what the bake reads, safe to hand to a worker thread.
@@ -193,10 +195,30 @@ static func seed_for(arena: Variant) -> int:
 	key += str(arena.buildings) + str(arena.props) + str(arena.checkpoints)
 	return hash(key)
 const TILE := 64
-const WALL_H := 30
+## South wall in screen px at 45° (was 30 / 46 at 30°). A vertical face of
+## WALL_VOX voxels is WALL_VOX * sin(45°) px, rounded. Keep these equal to
+## art/map/outer_house.json wall_h / wall2_h (tools/art/buildings.py).
+const WALL_VOX := 60.0
+const WALL2_VOX := 92.0
+const WING_VOX := 40.0     # the garage wing was a 20 px strip at 30°
+const WALL_H := 42
+const WALL2_H := 65        # two-storey flat-roof block
+const WING_H := 28
 const ROOF_TILE := 32
 const SIDEWALK := 30
-const WALL2_H := 46       # two-storey flat-roof block
+## Flat canopy blobs (tiles.py) are top-down, so their height is chosen here:
+## a street tree between a lamp (~30 vox) and a house (60), a bush much lower.
+const TREE_VOX := 48.0
+const BUSH_VOX := 14.0
+const STOP_VOX := 4.0      # wheel stop, a low kerb
+## Team sun on screen at 45°: (+0.643, +0.556) px per voxel of height.
+## voxel_render.SHADOW_DIR is (0.643, 0.786) on the ground; y is multiplied by
+## cos(45°). RGB matches voxel_render.SHADOW_RGB. UI may later add COL_SHADOW
+## (20, 11, 6); until then this stays a Maps constant.
+const SUN_DX := 0.643
+const SUN_DY := 0.556
+const SHADOW_RGB := Color8(20, 11, 6)
+const SHADOW_A := 0.5
 const CURB_R := 24        # curb return radius at junction corners
 const XWALK := 44         # crosswalk depth
 const XGAP := 8           # gap between junction box and crosswalk
@@ -227,6 +249,8 @@ static func _paint(img: Canvas, arena: Variant, corner: Rect2, src: Dictionary) 
 	var ti: Image = src.ti
 	var hi: Image = src.hi
 	var pi: Variant = src.pi
+	var sh: Variant = src.get("shadows", {})
+	img.prop_shadows = sh if sh is Dictionary else {}
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_for(arena)
 	var off := corner.position
@@ -328,8 +352,9 @@ static func _paint(img: Canvas, arena: Variant, corner: Rect2, src: Dictionary) 
 		var box := Rect2(at, reg.size)
 		if _hits(box, green_off) or _near(box.get_center(), points, 70.0 + reg.size.x * 0.5):
 			continue
-		var sil := _silhouette(img.sil_cache, ti, Rect2i(reg), 0.32)
-		img.blend_rect(sil, Rect2i(Vector2i.ZERO, sil.get_size()), Vector2i(at + Vector2(8, 6)))
+		var sil := _silhouette(img.sil_cache, ti, Rect2i(reg), SHADOW_A)
+		var drop := _sun(TREE_VOX if tree else BUSH_VOX)
+		img.blend_rect(sil, Rect2i(Vector2i.ZERO, sil.get_size()), Vector2i(int(round(at.x + drop.x)), int(round(at.y + drop.y))))
 		img.blend_rect(ti, Rect2i(reg), Vector2i(at))
 		green_off.append(box)
 		keep_off.append(box)
@@ -480,7 +505,7 @@ static func _parking(img: Canvas, ti: Image, tiles: RefCounted, pi: Image, props
 					var box := Rect2(at, reg.size)
 					if rng.randf() < 0.12 or _hits(box, keep_off) or _near(box.get_center(), points, 60.0):
 						continue
-					_shadow(img, box, Vector2(2, 2), 0.3)
+					_shadow(img, box, _sun(STOP_VOX), SHADOW_A)
 					_blend_sub(img, ti, Rect2i(reg), at)
 			x += STALL
 	if pi == null:
@@ -631,14 +656,27 @@ static func _decal(img: Canvas, pi: Image, atlas: RefCounted, id: String, at: Ve
 	_blend_sub(img, pi, Rect2i(atlas.region(id)), at)
 
 
-## A voxel prop sprite with its soft shadow. `at` is the sprite's top-left.
-static func _sprite(img: Canvas, pi: Image, atlas: RefCounted, id: String, at: Vector2, shadow := 0.3) -> Rect2:
+## A voxel prop sprite with its cast shadow. `at` is the sprite's top-left.
+## `shadow` > 0 draws one: the baked render_shadow region when the atlas has
+## it (alpha already 0.5), otherwise a silhouette shifted by the sun.
+static func _sprite(img: Canvas, pi: Image, atlas: RefCounted, id: String, at: Vector2, shadow := 0.5) -> Rect2:
 	if not atlas.has(id):
 		return Rect2()
 	var reg := Rect2i(atlas.region(id))
 	if shadow > 0.0:
-		var sil := _silhouette(img.sil_cache, pi, reg, shadow)
-		_blend_sub(img, sil, Rect2i(Vector2i.ZERO, sil.get_size()), at + Vector2(6, 4))
+		var baked: Variant = img.prop_shadows.get(id, null)
+		if baked is Dictionary:
+			var rect: Array = (baked as Dictionary).get("rect", [])
+			var ofs: Array = (baked as Dictionary).get("ofs", [])
+			if rect.size() == 4:
+				var sr := Rect2i(int(rect[0]), int(rect[1]), int(rect[2]), int(rect[3]))
+				var dx := float(ofs[0]) if ofs.size() > 0 else 0.0
+				var dy := float(ofs[1]) if ofs.size() > 1 else 0.0
+				_blend_sub(img, pi, sr, at + Vector2(dx, dy))
+		else:
+			var sil := _silhouette(img.sil_cache, pi, reg, SHADOW_A)
+			var drop := _sun(maxf(8.0, float(reg.size.y) / 0.707106781))
+			_blend_sub(img, sil, Rect2i(Vector2i.ZERO, sil.get_size()), at + drop)
 	_blend_sub(img, pi, reg, at)
 	return Rect2(at, Vector2(reg.size))
 
@@ -781,13 +819,14 @@ static func _fill(img: Canvas, src: Image, atlas: RefCounted, prefix: String, re
 ## One building filling footprint `b` (collision unchanged). Styles vary the
 ## roof and height: a wide lot becomes a two-storey flat-roof block with
 ## rooftop clutter; houses alternate a hip roof with a lower flat garage wing
-## and a gable turned north-south. All seen at the 30 degree tilt: roof from
-## above, south wall below it.
+## and a gable turned north-south. All seen at the 45 degree tilt: roof from
+## above, south wall below it. The cast shadow is the footprint shifted
+## down-right by the wall's voxel height, so a taller block casts a longer one.
 static func _building(img: Canvas, src: Image, atlas: RefCounted, pi: Image, props: RefCounted, b: Rect2, style: int, rng: RandomNumberGenerator) -> void:
-	_shadow(img, b, Vector2(14, 10), 0.38)
 	var roof_v := rng.randi_range(0, 2)
 	var wall_v := rng.randi_range(0, 2)
 	if b.size.x >= 480.0 and atlas.has("gravel_0"):
+		_shadow(img, b, _sun(WALL2_VOX), SHADOW_A)
 		var roof := Rect2(b.position, Vector2(b.size.x, b.size.y - WALL2_H))
 		_roof_flat(img, src, atlas, roof, rng)
 		_wall2(img, src, atlas, b.position.x, b.size.x, roof.end.y, rng)
@@ -800,6 +839,7 @@ static func _building(img: Canvas, src: Image, atlas: RefCounted, pi: Image, pro
 	if b.size.x >= 360.0 and atlas.has("gravel_0"):
 		wing_w = floorf(b.size.x * 0.32 / 32.0) * 32.0
 	var main := Rect2(b.position, Vector2(b.size.x - wing_w, b.size.y))
+	_shadow(img, main, _sun(WALL_VOX), SHADOW_A)
 	var roof := Rect2(main.position, Vector2(main.size.x, main.size.y - WALL_H))
 	if style % 2 == 0 and roof.size.x >= roof.size.y:   # tall lots get the north-south gable
 		_roof_hip(img, src, atlas, roof, roof_v, rng)
@@ -810,13 +850,13 @@ static func _building(img: Canvas, src: Image, atlas: RefCounted, pi: Image, pro
 	_wall(img, src, atlas, main.position.x, main.size.x, roof.end.y, WALL_H, wall_v, rng)
 	if wing_w > 0.0:
 		# Lower garage wing: shorter wall, flat roof, shaded by the main house.
-		var wh := 20
 		var wing := Rect2(main.end.x, b.position.y + 26, wing_w, b.size.y - 26)
-		var wroof := Rect2(wing.position, Vector2(wing.size.x, wing.size.y - wh))
+		_shadow(img, wing, _sun(WING_VOX), SHADOW_A)
+		var wroof := Rect2(wing.position, Vector2(wing.size.x, wing.size.y - WING_H))
 		_fill(img, src, atlas, "pave_", Rect2(wing.position.x, b.position.y, wing_w, 26), rng)   # yard strip behind it
 		_roof_flat(img, src, atlas, wroof, rng)
-		_shadow(img, Rect2(wroof.position, Vector2(10, wroof.size.y)), Vector2.ZERO, 0.35)
-		_wall(img, src, atlas, wing.position.x, wing_w, wroof.end.y, wh, (wall_v + 1) % 3, rng, true)
+		_shadow(img, Rect2(wroof.position, Vector2(10, wroof.size.y)), Vector2.ZERO, SHADOW_A)
+		_wall(img, src, atlas, wing.position.x, wing_w, wroof.end.y, WING_H, (wall_v + 1) % 3, rng, true)
 		if pi != null:
 			_rooftop(img, pi, props, wroof, rng, false)
 			_decal(img, pi, props, "graffiti_1", Vector2(wing.position.x + 6, wroof.end.y + 4))
@@ -873,7 +913,7 @@ static func _roof_flat(img: Canvas, src: Image, atlas: RefCounted, roof: Rect2, 
 	_rect(img, Rect2(roof.end.x - 4, roof.position.y, 4, roof.size.y), lip.darkened(0.25))
 	_rect(img, Rect2(roof.position.x, roof.end.y - 4, roof.size.x, 4), lip.darkened(0.15))
 	_rect(img, Rect2(roof.position.x + 4, roof.position.y + 4, roof.size.x - 8, 2), Color(0, 0, 0, 0.0))
-	_shadow(img, Rect2(roof.position + Vector2(4, 4), Vector2(roof.size.x - 8, 3)), Vector2.ZERO, 0.3)
+	_shadow(img, Rect2(roof.position + Vector2(4, 4), Vector2(roof.size.x - 8, 3)), Vector2.ZERO, SHADOW_A)
 	_frame(img, roof, _outline())
 
 
@@ -971,12 +1011,15 @@ static func _shadow(img: Canvas, r: Rect2, by: Vector2, alpha: float) -> void:
 	if s.size.x <= 0 or s.size.y <= 0:
 		return
 	var sh := Image.create(int(s.size.x), int(s.size.y), false, Image.FORMAT_RGBA8)
-	sh.fill(Color(0, 0, 0, alpha))
+	var ink := SHADOW_RGB
+	ink.a = alpha
+	sh.fill(ink)
 	img.blend_rect(sh, Rect2i(Vector2i.ZERO, sh.get_size()), Vector2i(s.position))
 
 
-## A soft drop shadow shaped like the sprite (alpha only). Bake time only;
-## cached per bake on the Canvas (no static state: bakes run on workers).
+## A cast-shadow silhouette in SHADOW_RGB (trees and the prop fallback).
+## Bake time only; cached per bake on the Canvas (no static state: bakes run
+## on workers). Voxel props use their pre-baked shadow instead.
 static func _silhouette(cache: Dictionary, src: Image, r: Rect2i, alpha: float) -> Image:
 	var key := "%d:%s:%.2f" % [src.get_instance_id(), str(r), alpha]
 	if cache.has(key):
@@ -984,11 +1027,42 @@ static func _silhouette(cache: Dictionary, src: Image, r: Rect2i, alpha: float) 
 	if cache.size() > 256:
 		cache.clear()
 	var out := src.get_region(r)
+	var ink := SHADOW_RGB
 	for y in out.get_height():
 		for x in out.get_width():
 			var a := out.get_pixel(x, y).a
-			out.set_pixel(x, y, Color(0, 0, 0, a * alpha))
+			out.set_pixel(x, y, Color(ink.r, ink.g, ink.b, a * alpha))
 	cache[key] = out
+	return out
+
+
+## Screen offset of a point `vox` voxels up, at the 45° camera.
+static func _sun(vox: float) -> Vector2:
+	return Vector2(round(vox * SUN_DX), round(vox * SUN_DY))
+
+
+## Baked prop shadows from outer_props.json ("shadows": {id: {rect, ofs}}).
+## Plain data, read on the main thread and handed to the bake worker.
+static func _prop_shadows() -> Dictionary:
+	var path := PROPS + ".json"
+	if not FileAccess.file_exists(path):
+		return {}
+	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+	if typeof(data) != TYPE_DICTIONARY:
+		return {}
+	var raw: Variant = (data as Dictionary).get("shadows", {})
+	if typeof(raw) != TYPE_DICTIONARY:
+		return {}
+	var table: Dictionary = raw
+	var out := {}
+	for id: String in table:
+		var spec: Variant = table[id]
+		if typeof(spec) != TYPE_DICTIONARY:
+			continue
+		var rect: Variant = (spec as Dictionary).get("rect", [])
+		var ofs: Variant = (spec as Dictionary).get("ofs", [])
+		if typeof(rect) == TYPE_ARRAY and (rect as Array).size() == 4 and typeof(ofs) == TYPE_ARRAY and (ofs as Array).size() == 2:
+			out[id] = {"rect": rect, "ofs": ofs}
 	return out
 
 

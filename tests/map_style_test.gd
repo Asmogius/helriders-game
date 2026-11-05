@@ -32,6 +32,7 @@ func _run() -> void:
 	var profile := root.get_node("Profile")
 	profile.persist = false
 	profile.new_game()
+	_atlas_lock()
 	Arena.set_outer_blocks_style(false)
 	var a := _arena("lots", 3)
 	_check(not a.is_baking() and not a.is_styled(), "flag off: no bake, code-drawn")
@@ -94,6 +95,29 @@ func _run() -> void:
 	await _mission_hold()
 	print("MAP STYLE TEST PASSED" if failures == 0 else "MAP STYLE TEST FAILED (%d)" % failures)
 	quit(0 if failures == 0 else 1)
+
+
+## Wall strips and prop shadows stay locked to the 45° atlas (outer_house.json / outer_props.json).
+func _atlas_lock() -> void:
+	var house: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://art/map/outer_house.json"))
+	_check(house is Dictionary, "outer_house.json reads")
+	if house is Dictionary:
+		var h: Dictionary = house
+		_check(int(h.get("wall_h", -1)) == MapArt.WALL_H, "wall_h is the 45 deg south wall (%s)" % str(h.get("wall_h")))
+		_check(int(h.get("wall2_h", -1)) == MapArt.WALL2_H, "wall2_h is the 45 deg two-storey wall (%s)" % str(h.get("wall2_h")))
+	var props: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://art/map/outer_props.json"))
+	_check(props is Dictionary, "outer_props.json reads")
+	if props is Dictionary:
+		var shadows: Variant = (props as Dictionary).get("shadows", {})
+		_check(shadows is Dictionary and (shadows as Dictionary).has("light_e"), "streetlight cast shadow is baked")
+		if shadows is Dictionary and (shadows as Dictionary).has("light_e"):
+			var lamp: Variant = (shadows as Dictionary)["light_e"]
+			var rect: Array = (lamp as Dictionary).get("rect", []) if lamp is Dictionary else []
+			var ofs: Array = (lamp as Dictionary).get("ofs", []) if lamp is Dictionary else []
+			# A 30-voxel lamp's cast is a long silhouette, drawn down from the sprite
+			# (the old contact blob was a 6,4 px nudge of the sprite itself).
+			_check(rect.size() == 4 and float(rect[2]) >= 24.0 and float(rect[3]) >= 16.0, "streetlight shadow is a cast, not a contact blob (%s)" % str(rect))
+			_check(ofs.size() == 2 and float(ofs[1]) > 10.0, "streetlight shadow sits down-screen of the lamp (%s)" % str(ofs))
 
 
 ## The job start waits behind the loading screen while the styled map bakes.
