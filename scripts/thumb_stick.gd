@@ -143,9 +143,10 @@ func _draw() -> void:
 			return
 		var rest := Vector2(170.0, size.y - 160.0) if left_side else Vector2(size.x - 170.0, size.y - 160.0)
 		var pad := get_node_or_null("/root/Pad")
-		if pad == null or not bool(pad.get("kbm")):   # V6.4: no touch sticks in mouse-and-keyboard mode
-			_draw_rest(rest, accent)
-		_draw_gauges(rest)   # ammo and heat rings stay in every mode
+		if pad != null and bool(pad.get("kbm")):
+			return   # playtest #10: no rest stick / gauge rings on KBM
+		_draw_rest(rest, accent)
+		_draw_gauges(rest)
 		return
 	draw_circle(_base, radius, Color(0.0, 0.0, 0.0, 0.25))
 	_draw_gauges(_base)

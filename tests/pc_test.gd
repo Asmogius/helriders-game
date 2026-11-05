@@ -138,9 +138,12 @@ func _process(_delta: float) -> bool:
 			main.kbm_fire_override = 0
 			var hud: Variant = main.get("hud")
 			_check(hud._ability_buttons[0].pad_badge == "Q" and hud._crew_button.pad_badge == "TAB" and str(hud._hint.text).begins_with("WASD"), "HUD shows key badges and the WASD control line")
+			# Playtest #10: touch stick chrome hidden on KBM (keys still work).
+			hud.set_lock_available(true)
+			_check(not hud._lock_button.visible and not hud._crew_button.visible, "LOCK and CREW buttons hide on KBM")
+			_check(bool(root.get_node("Pad").get("kbm")), "still in KBM mode")
 			_key(KEY_Q)
 			_check(float(main.vehicle.abilities[0].ready_in) > 0.0, "Q fires the first utility")
-			hud._lock_button.visible = true
 			var lock: bool = hud._lock_button.on
 			_click(MOUSE_BUTTON_RIGHT)
 			_check(hud._lock_button.on != lock, "right click toggles LOCK")

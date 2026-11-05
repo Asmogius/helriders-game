@@ -168,7 +168,7 @@ func _process(_delta: float) -> bool:
 				_button(JOY_BUTTON_X)
 				_check(float(ab[0].ready_in) > 0.0, "Square uses the first utility")
 			var lock: bool = _hud()._lock_button.on
-			_hud()._lock_button.visible = true
+			_hud().set_lock_available(true)   # starter apply_rig has no targeting; force LOCK for the pad check
 			_button(JOY_BUTTON_RIGHT_SHOULDER)
 			_check(_hud()._lock_button.on != lock, "R1 toggles LOCK")
 		30:
@@ -217,6 +217,7 @@ func _process(_delta: float) -> bool:
 		42:
 			var hud: Variant = _hud()
 			_check(hud._ability_buttons[0].pad_badge == "R1" and hud._lock_button.pad_badge == "square" and hud._crew_button.pad_badge == "L2", "HUD badges follow the new buttons")
+			hud.set_lock_available(true)
 			var lock: bool = hud._lock_button.on
 			_button(JOY_BUTTON_X)
 			_check(hud._lock_button.on != lock, "Square now toggles LOCK")
