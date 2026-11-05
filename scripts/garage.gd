@@ -956,9 +956,14 @@ static func effect_text(part: Dictionary) -> String:
 
 ## Up to four "+/-" changes this swap would make, worst first so costs show.
 ## Same numbers as the stat sheet, so speed and accel include any overload.
+## When the only speed/accel change is the overload multiplier (base stats
+## unchanged), show the mobility % so the card matches the OVERLOAD banner
+## (playtest: Riot Plating showed SPD -8 next to "OVERLOAD -1%").
 func _deltas(now_stats: Dictionary, after_stats: Dictionary) -> Array:
 	var now := StatSheet.values(now_stats)
 	var after := StatSheet.values(after_stats)
+	var m_now := float(now.mobility)
+	var m_after := float(after.mobility)
 	var out: Array = []
 	var rows := [
 		["PWR", "load", false, 0],
@@ -977,7 +982,19 @@ func _deltas(now_stats: Dictionary, after_stats: Dictionary) -> Array:
 		if absf(d) < 0.05:
 			continue
 		var better := (d > 0.0) == bool(r[2])
-		var text := ("%s %+.1f" if int(r[3]) == 1 else "%s %+d") % [r[0], d if int(r[3]) == 1 else roundi(d)]
+		var text := ""
+		# Pure overload hit on SPD/ACCEL: base max_speed / acceleration match,
+		# only mobility changed — report the same % the footer uses.
+		if str(r[1]) == "speed" or str(r[1]) == "accel":
+			var base_key := "max_speed" if str(r[1]) == "speed" else "acceleration"
+			var base_same := is_equal_approx(float(now_stats.get(base_key, 0.0)), float(after_stats.get(base_key, 0.0)))
+			if base_same and absf(m_after - m_now) > 0.001:
+				var pct := roundi((m_after - m_now) * 100.0)
+				if pct == 0:
+					pct = -1 if m_after < m_now else 1
+				text = "%s %+d%%" % [r[0], pct]
+		if text == "":
+			text = ("%s %+.1f" if int(r[3]) == 1 else "%s %+d") % [r[0], d if int(r[3]) == 1 else roundi(d)]
 		out.append([text, better])
 	var lock_now := float(now.lock) > 0.0
 	var lock_after := float(after.lock) > 0.0
