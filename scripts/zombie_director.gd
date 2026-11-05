@@ -7,6 +7,8 @@ extends Node2D
 ## zombies in bile or near a marked rig.
 
 signal zombie_killed(at: Vector2, kind: String)
+signal surge_warned        # night: the howl, NIGHT_SURGE_WARN s before a surge
+signal surge_started
 
 const T := preload("res://scripts/tuning.gd")
 const Zombie := preload("res://scripts/zombie.gd")
@@ -34,11 +36,57 @@ var damage_mult := 1.0                   # the skull's enemy damage, given to ea
 var pool_size := 0                       # zombies built up front; 0 = cap
 var start_count := T.ZOMBIE_START        # alive at the start
 var ramp_seconds := T.ZOMBIE_RAMP_SECONDS  # +1 allowed alive every N seconds
+# Night (approved 2026-11-04, PR #69); apply_night() sets these.
+var night := false
+var night_speed := 1.0
+var horde_size := T.HORDE_SIZE
+var tank_earliest := T.TANK_EARLIEST
+var tank_pack_chance := T.TANK_PACK_CHANCE
+var bile_mark_range := T.BILE_MARK_RANGE
+var surge_clock := 0.0                   # seconds into the current surge cycle
+var surge_count := 0                     # tests
+var _warned := false
 
 var _pool: Array[Zombie] = []
 var _active: Array[Zombie] = []
 var _elapsed := 0.0
 var _spawn_timer := 0.0
+
+
+## Night job: call after the mission has set cap, damage_mult, start_count
+## and ramp_seconds, before the director enters the tree.
+func apply_night() -> void:
+	night = true
+	night_speed = T.NIGHT_ZOMBIE_SPEED_MULT
+	damage_mult *= T.NIGHT_ZOMBIE_DPS_MULT
+	start_count += T.NIGHT_ZOMBIE_START_BONUS
+	ramp_seconds *= T.NIGHT_RAMP_SECONDS / T.ZOMBIE_RAMP_SECONDS
+	horde_size = T.NIGHT_HORDE_SIZE
+	tank_earliest = T.NIGHT_TANK_EARLIEST
+	tank_pack_chance = T.NIGHT_TANK_PACK_CHANCE
+	bile_mark_range = T.NIGHT_BILE_MARK_RANGE
+
+
+## Night surge: the whole horde frenzies for NIGHT_SURGE_TIME at the end of
+## every NIGHT_SURGE_EVERY-second cycle.
+func surge_active() -> bool:
+	return night and surge_clock >= T.NIGHT_SURGE_EVERY
+
+
+func _tick_surge(delta: float) -> void:
+	if not night:
+		return
+	var was := surge_active()
+	surge_clock += delta
+	if not _warned and surge_clock >= T.NIGHT_SURGE_EVERY - T.NIGHT_SURGE_WARN:
+		_warned = true
+		surge_warned.emit()
+	if not was and surge_active():
+		surge_count += 1
+		surge_started.emit()
+	if surge_clock >= T.NIGHT_SURGE_EVERY + T.NIGHT_SURGE_TIME:
+		surge_clock -= T.NIGHT_SURGE_EVERY + T.NIGHT_SURGE_TIME
+		_warned = false
 
 
 func _ready() -> void:
@@ -116,6 +164,7 @@ func clear_all() -> void:
 
 func _physics_process(delta: float) -> void:
 	_elapsed += delta
+	_tick_surge(delta)
 	_spawn_timer -= delta
 	var allowed := mini(cap, start_count + int(_elapsed / ramp_seconds))
 	if _spawn_timer <= 0.0 and _active.size() < allowed and spawn_budget > 0:
@@ -133,7 +182,8 @@ func _steer(delta: float) -> void:
 	var sep_dist := T.SHAMBLER_SEPARATION
 	var sep_dist2 := sep_dist * sep_dist
 	var marked := hazards != null and hazards.is_marked(target)
-	var mark_range2 := T.BILE_MARK_RANGE * T.BILE_MARK_RANGE
+	var mark_range2 := bile_mark_range * bile_mark_range
+	var surging := surge_active()
 	var count := _active.size()
 	if bait_left > 0.0:
 		bait_left -= delta
@@ -191,6 +241,8 @@ func _steer(delta: float) -> void:
 				if zombie.slime_timer <= 0.0:
 					zombie.slime_timer = T.SLIME_DROP_EVERY
 					hazards.add_slime(zombie.position, T.SLIME_RADIUS)
+		if surging:
+			zombie.frenzy = true
 		zombie.step(delta, desired * speed_bonus, chase)
 	# Boomers that reached the rig pop now, and burning / toxic damage lands,
 	# outside the loop over _active (a death there would shift the list).
@@ -210,8 +262,8 @@ func _spawn_pack(limit: int) -> void:
 	if spawn_points.is_empty():
 		return
 	var at := pick_spawn_point()
-	var size := randi_range(T.HORDE_SIZE.x, T.HORDE_SIZE.y)
-	var tank := tanks_left > 0 and _elapsed >= T.TANK_EARLIEST and randf() < T.TANK_PACK_CHANCE
+	var size := randi_range(horde_size.x, horde_size.y)
+	var tank := tanks_left > 0 and _elapsed >= tank_earliest and randf() < tank_pack_chance
 	for i in size:
 		if spawn_budget <= 0 or _active.size() >= limit:
 			return
@@ -228,6 +280,7 @@ func _spawn_pack(limit: int) -> void:
 			tanks_left -= 1
 		zombie.activate(at + Vector2(randf_range(-6.0, 6.0), randf_range(-6.0, 6.0)), kind)
 		zombie.damage_mult = damage_mult
+		zombie.speed *= night_speed
 		_active.append(zombie)
 		spawn_budget -= 1
 
@@ -238,6 +291,7 @@ func spawn_at(at: Vector2, kind := "shambler") -> Zombie:
 		if not candidate.active:
 			candidate.activate(at, kind)
 			candidate.damage_mult = damage_mult
+			candidate.speed *= night_speed
 			candidate.highlight = highlight
 			_active.append(candidate)
 			return candidate
