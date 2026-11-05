@@ -75,7 +75,7 @@ var _load_layer: CanvasLayer
 var abandoned := false          # ABANDON JOB was used (tests)
 var _restarting := false         # RESTART keeps the baked map cached; leaving drops it
 var spec := {}                   # the mission being run
-var night := false               # a night job (spec.night): zombies only, PR #69
+var night := false               # a night job (Missions.is_night): zombie rules and the world grade
 var mission_type := "clear"
 var skulls := 3                  # difficulty, 1 to 6
 
@@ -315,6 +315,7 @@ func _ready() -> void:
 	camera.target = vehicle
 	reticle.rig = vehicle
 	markers.mission = self
+	_apply_night_tint()
 
 	# Tree order is also physics order:
 	# inputs (here) -> zombies -> player rig -> enemy rigs -> hunters -> bullets.
@@ -400,6 +401,20 @@ func _ready() -> void:
 	else:
 		_start_banner()
 	_refresh_hud()
+
+
+## World grade only. Whether the job is night is Content's (Missions.is_night,
+## already stored on `night`). A day job is left alone, so the tutorial's
+## brighter street stays. Rigs, hazards, tracers and FX are not in this list.
+func _apply_night_tint() -> void:
+	if not night:
+		return
+	var tint := T.COL_NIGHT_WORLD
+	arena.modulate = tint
+	splats.modulate = tint
+	zombies.modulate = tint
+	for h: Hunter in hunters:
+		h.modulate = tint
 
 
 func _start_banner() -> void:
