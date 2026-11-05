@@ -314,6 +314,7 @@ const ArtAtlas := preload("res://scripts/art_atlas.gd")   # P0 atlas loader
 const ZOMBIE_ATLAS := "res://art/zombies/zombies"         # .png + .json
 const ART_META := &"zombie_art"   # root meta: {"meta": kinds / poses / variants, "atlas": regions "<kind>/<row>/<heading>"}
 var art_pose_override := ""      # captures and tests: force a pose row (e.g. "lunge_1")
+var art_variant := -1            # <0: instance id; else shambler look, wrapped into the sheet
 var _art_t := 0.0                # walk cycle phase, advanced by distance walked
 var _art_last := Vector2.ZERO
 var _art_key := -1
@@ -370,9 +371,16 @@ func art_row() -> String:
 	if art_pose_override != "":
 		pose = art_pose_override
 	if kind == "shambler" and pose != "flash":
-		var info: Dictionary = art_atlas().kinds.shambler
-		return "v%d_%s" % [get_instance_id() % int(info.variants), pose]   # no RNG: seeded spawns stay put
+		return "v%d_%s" % [_shambler_variant(), pose]   # no RNG: seeded spawns stay put
 	return pose
+
+
+## Shambler look 0..variants-1. A stored index of 3-5 (the old 6-look sheet) wraps.
+func _shambler_variant() -> int:
+	var info: Dictionary = art_atlas().kinds.shambler
+	var n := maxi(int(info.get("variants", 1)), 1)
+	var i := art_variant if art_variant >= 0 else get_instance_id()
+	return posmod(i, n)
 
 
 ## The frame art_row() would pick, as a small int (0-9), so _process can tell

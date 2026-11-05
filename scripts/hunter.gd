@@ -10,6 +10,7 @@ enum State { CHASE, WINDUP, POUNCE, LATCHED, RECOVER }
 
 const Rig := preload("res://scripts/vehicle.gd")
 const NavGrid := preload("res://scripts/nav_grid.gd")
+const Zombie := preload("res://scripts/zombie.gd")
 
 const HULL_HALF := Vector2(30.0, 17.0)   # where it clings, in rig-local space
 
@@ -30,6 +31,7 @@ var _detour := Vector2.ZERO
 var _detour_time := 0.0
 var _detour_sign := 1.0
 var _anim := 0.0
+var _sheet_flash := 0.0
 var _nav_timer := 0.0
 var _nav_point := Vector2.ZERO
 var _ray := PhysicsRayQueryParameters2D.new()
@@ -103,6 +105,7 @@ func _physics_process(delta: float) -> void:
 		return
 	_anim += delta
 	_flash = maxf(_flash - delta * 5.0, 0.0)
+	_sheet_flash = maxf(_sheet_flash - delta * 5.0, 0.0)
 	tick_status(delta)
 	_knock = _knock.move_toward(Vector2.ZERO, 900.0 * delta)
 	match state:
@@ -267,11 +270,57 @@ func _detach() -> void:
 
 func _on_hit(_damage: float, impulse: Vector2) -> void:
 	_flash = 1.0
+	_sheet_flash = 1.0
 	if state != State.LATCHED:
 		_knock += impulse
 
 
+func has_art() -> bool:
+	return (Zombie.art_atlas().get("kinds", {}) as Dictionary).has("hunter")
+
+
+func _art_row() -> String:
+	if _sheet_flash > 0.5:
+		return "flash"
+	match state:
+		State.WINDUP:
+			return "windup"
+		State.POUNCE:
+			return "pounce"
+		_:
+			return "walk_%d" % (int(_anim * 8.0) % 4)
+
+
+func _art_heading() -> int:
+	var n: int = int(Zombie.art_atlas().get("headings", 16))
+	return posmod(int(round(global_rotation / (TAU / float(n)))), n)
+
+
+func _draw_sheet() -> void:
+	if texture_filter != CanvasItem.TEXTURE_FILTER_NEAREST:
+		texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	var info: Dictionary = Zombie.art_atlas().kinds.hunter
+	var fw: float = info.frame_w
+	var fh: float = info.frame_h
+	draw_set_transform(Vector2.ZERO, -rotation, Vector2.ONE)
+	var sd: Dictionary = info.get("shadow", {})
+	var atlas := Zombie._art().atlas as RefCounted
+	if not sd.is_empty():
+		var sw: float = sd.frame_w
+		var sh: float = sd.frame_h
+		var sa: float = float(sd.get("alpha", 0.5))
+		atlas.draw(self, "hunter/shadow/%d" % _art_heading(), Rect2(Vector2(-sw, -sh) * 0.5, Vector2(sw, sh)), Color(1.0, 1.0, 1.0, sa))
+	atlas.draw(self, "hunter/%s/%d" % [_art_row(), _art_heading()], Rect2(Vector2(-fw, -fh) * 0.5, Vector2(fw, fh)))
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
 func _draw() -> void:
+	if has_art():
+		_draw_sheet()
+		if state == State.WINDUP:
+			draw_arc(Vector2.ZERO, 28.0, 0.0, TAU, 24, Color(T.COL_ENEMY, 0.4 + 0.5 * _flash), 3.0)
+		draw_status(24.0)
+		return
 	var skin := T.COL_HUNTER.lerp(Color(1.0, 0.92, 0.88), clampf(_flash, 0.0, 1.0) * 0.7)
 	var dark := T.COL_HUNTER.darkened(0.45)
 	var stretch := 1.0
