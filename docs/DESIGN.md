@@ -26,7 +26,7 @@ Tone is harsh, industrial, and opportunistic. Vehicles are scavenged and weaponi
 
 4. Launch. Top-down combat against zombies + enemy vehicles.
 
-5. Success: return with scrap, parts, crew XP (possible injuries). Failure (vehicle destroyed): dramatic wreck, scrap penalty scaled to build cost, assigned crew permanently lost.
+5. Success: return with scrap, parts, crew XP (possible injuries). Failure (vehicle destroyed): dramatic wreck, rig and its parts lost (rebuild it), assigned crew permanently lost. No scrap penalty (removed 2026-11-05).
 
 6. Land in garage. Upgrade parts via Research, manage roster/injuries/expeditions, upgrade stations, prepare next day.
 
@@ -62,7 +62,7 @@ Max level by rarity: Common 5, Uncommon 8, Rare 12, Epic 16, Legendary 20. Uniqu
 
 Agreed details: a level belongs to the schematic, so every copy you build has it and a wreck never removes it. Each level past 1 adds +4% to the part's main stats (internals grow their modifier, utilities cool down faster); power draw and weight never change. A level costs a rarity base (Common 15, Uncommon 30, Rare 60, Epic 110, Legendary 180) x the level being bought. Levelling is instant, capped at 3 levels per day. Station upgrades: Bench Discount (-10% per step, 3 steps) and Second Shift (+1 level per day, 2 steps). Levels don't change build cost or the wreck penalty.
 
-Vehicle loss applies a scrap penalty scaled to the cost of the lost build. Chassis/ability to reassemble remains. Parts on the destroyed vehicle are lost (or heavily reduced).
+Vehicle loss costs no scrap (the penalty was removed 2026-11-05; T.WRECK_PENALTY = 0). Chassis/ability to reassemble remains. Parts on the destroyed vehicle are lost (or heavily reduced).
 
 # 5. Garage Systems and UI
 

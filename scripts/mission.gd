@@ -2751,7 +2751,7 @@ func _on_wrecked() -> void:
 	var aboard: Array[String] = []
 	for m in profile.seated_crew():
 		aboard.append(str(m.name))
-	var penalty := profile.record_wreck()
+	profile.record_wreck()
 	var deposit := 0
 	if vehicle.has_sp("sp_safe_deposit") and gold_rush_scrap >= 1.0:
 		deposit = int(gold_rush_scrap)   # Safe Deposit: Gold Rush scrap survives the wreck
@@ -2773,8 +2773,6 @@ func _on_wrecked() -> void:
 			lines += "\nThey may turn up at the Saloon again: %s." % ", ".join(back)
 	if not saved.is_empty():
 		lines += "\nLast Rites: %s pulled through, resting %d days." % [", ".join(saved), T.LAST_RITES_REST]
-	if penalty > 0:
-		lines += "\nWreck penalty: -%d scrap." % penalty
 	if deposit > 0:
 		lines += "\nSafe Deposit: %d Gold Rush scrap kept." % deposit
 	if scrap >= 1.0 or not salvage.is_empty():
