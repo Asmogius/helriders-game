@@ -20,24 +20,32 @@ const DANGER := T.COL_UI_DANGER
 const OK := T.COL_UI_OK
 
 
-# --- Fonts (P7 / V6.1) -----------------------------------------------------------
-# Black Ops One (SIL OFL 1.1, see docs/ART_CREDITS.md), the owner's pick for the
-# whole interface. If the file is missing the engine font stays (fallback rule).
+# --- Fonts (P7 / V6.1 + Ebbtide body) -------------------------------------------
+# Black Ops One for titles and big numbers; Inter for body text (both SIL OFL
+# 1.1, see docs/ART_CREDITS.md). Missing files keep the engine font (fallback).
 const FONT_PATH := "res://art/ui/fonts/BlackOpsOne-Regular.ttf"
+const FONT_BODY_PATH := "res://art/ui/fonts/Inter-Regular.ttf"
 
 
-## The interface font, or the engine default if the art file is missing.
+## Display font (Black Ops One): titles, HP value, weapon / ability labels.
 static func font() -> Font:
 	if ResourceLoader.exists(FONT_PATH):
 		return load(FONT_PATH)
 	return ThemeDB.fallback_font
 
 
+## Body font (Inter): default theme font for labels, hints, card body text.
+static func font_body() -> Font:
+	if ResourceLoader.exists(FONT_BODY_PATH):
+		return load(FONT_BODY_PATH)
+	return font()   # fall back to the display font, then the engine default
+
+
 ## Makes every Control and every custom _draw that asks ThemeDB.fallback_font
-## use the interface font. Runs once, from the first make() (garage, menus) or
+## use the body font. Runs once, from the first make() (garage, menus) or
 ## the fight HUD's _ready, whichever comes first; later calls do nothing.
 static func apply_fonts() -> void:
-	var f := font()
+	var f := font_body()
 	if ThemeDB.fallback_font == f:
 		return   # already applied
 	ThemeDB.fallback_font = f
@@ -77,8 +85,8 @@ static func icons() -> RefCounted:
 static func make() -> Theme:
 	apply_fonts()
 	var th := Theme.new()
-	th.default_font = font()
-	th.default_font_size = 22
+	th.default_font = font_body()
+	th.default_font_size = 18
 	th.set_color("font_color", "Label", TEXT)
 	th.set_color("font_outline_color", "Label", Color(0, 0, 0, 0.8))
 	th.set_constant("outline_size", "Label", 4)
@@ -171,6 +179,8 @@ static func label(text: String, size := 22, color := TEXT) -> Label:
 	var l := Label.new()
 	l.text = text
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Titles / big numbers stay on Black Ops One; body text uses Inter.
+	l.add_theme_font_override("font", font() if size >= 26 else font_body())
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", color)
 	return l

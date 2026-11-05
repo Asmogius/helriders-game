@@ -53,7 +53,7 @@ So nobody is blocked, assume these; the owner can overrule any of them:
 2. **Garage navigation:** one panning panorama (V2.3).
 3. **Districts:** as written in V5.5; landmarks as listed in V5.7.
 4. **Breakable cover:** not built until the owner says yes.
-5. **Fonts:** a condensed, readable display font with a light stencil feel; numbers in a clean font. Readability on a phone beats grit.
+5. **Fonts:** Black Ops One for titles / big numbers; Inter for body (Ebbtide, Cameron 2026-11-04). Readability on a phone beats grit.
 
 ### Ebbtide UI decisions (Cameron, 2026-11-04)
 
@@ -263,7 +263,7 @@ Make the home base a place with distinct areas you move between: lit, animated a
 
 ## V6. Interface polish (supports all of the above)
 
-- [x] **V6.1 Fonts.** Pick one display font (condensed, stencil-like) for titles and one clean font for numbers. Both must have open licences; log them like `AUDIO_CREDITS.md`. Swap them in `ui_theme.gd`. *(One interface font for now; a separate numbers font is pending the owner's decision.)*
+- [x] **V6.1 Fonts.** Black Ops One for titles and big numbers (HP value, weapon labels); Inter (SIL OFL) as the theme default body font via `UI.font_body()`. Logged in `docs/ART_CREDITS.md`. *(Ebbtide decision 2026-11-04.)*
 - [x] **V6.2 Panels and buttons:** riveted steel panels with worn edges (generated 9-slice textures), buttons with pressed and focus states, gold accent lines (Ebbtide `#e1b441`; was cyan/orange). The controller focus ring and the rarity frames sit on top.
   - Layout grid (serves V6.2): panels and buttons share one spacing from `ui_theme.gd`: `MARGIN` 24, `GAP` 12, `GRID` 8, `BAR_H` 72, `MIN_TOUCH` 64, plus `safe_rect()` (display safe area) and `bottom_bar()` (action bar, buttons at least `MIN_TOUCH`). Capture: `layout_grid.png`.
 - [x] **V6.3 Icons:** a small generated icon set for stats (HP, armor, shield, speed, power, weight, DPS), statuses, part categories and crew classes. Use it in the stat sheet, cards and HUD instead of words where space is tight.
