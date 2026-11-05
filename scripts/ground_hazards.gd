@@ -1,7 +1,8 @@
 extends Node2D
 ## Slime, bile and oil on the ground, all in one node (packed arrays, one
 ## _draw). Oil comes from Scrappers and the Oil Slick utility: rigs on it slide
-## like on slime, zombies in it slow down.
+## like on slime, zombies in it slow down. Oil is team-tagged: your Oil Slick
+## catches enemies only (enemy rigs and zombies), never your own rig.
 ## Slimers drop slime blobs as they walk and a puddle where they die; rigs on
 ## slime lose grip. Boomers burst into bile pools; zombies in a pool frenzy.
 ## Fixed capacity: the oldest blob is overwritten when the pool is full.
