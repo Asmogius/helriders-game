@@ -131,7 +131,7 @@ func _check_job_rules() -> void:
 		["survive", 5, "core", 1.0], ["hunt", 6, "core", 1.0],
 		["survive", 4, "outer_blocks", 1.0], ["hunt", 4, "outer_blocks", 1.0],
 		["survive", 3, "outer_blocks", 0.35], ["hunt", 2, "outer_blocks", 0.35],
-		["escort", 4, "core", 0.0], ["escort", 4, "industrial", 0.0], ["escort", 5, "midtown", 1.0], ["escort", 6, "industrial", 1.0],
+		["escort", 4, "core", 1.0], ["escort", 5, "core", 1.0], ["escort", 4, "industrial", 0.0], ["escort", 5, "midtown", 1.0], ["escort", 6, "industrial", 1.0],
 		["courier", 5, "core", 1.0], ["courier", 3, "outer_blocks", 0.5], ["courier", 5, "industrial", 0.5],
 		["clear", 3, "midtown", 0.35], ["retrieve", 4, "core", 1.0],
 	]

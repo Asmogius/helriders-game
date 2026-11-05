@@ -182,8 +182,9 @@ static func district_index(district: String) -> int:
 
 
 ## Chance this job is a night job, before gating (roll_night). First match:
-##   1. Escort: 0 below NIGHT_ESCORT_MIN_SKULLS, 1 at 5-6 (any district, Core too)
-##   2. Courier: 1 in Core Collapse, else NIGHT_CHANCE_COURIER (50/50)
+##   1. Core Collapse (district chance 1.0): always night, every job type
+##   2. Escort: 0 below NIGHT_ESCORT_MIN_SKULLS, 1 at 5-6
+##   2b. Courier: NIGHT_CHANCE_COURIER (50/50) outside Core
 ##   3. Outer Blocks Survive / Hunt at NIGHT_OB_SURE_SKULLS (4): 1
 ##   4. District chance (NIGHT_CHANCE_BY_DISTRICT), + NIGHT_LEAN_SURVIVE_HUNT
 ##      for Survive / Hunt, capped at 1.0
@@ -193,6 +194,8 @@ static func night_chance(mission: Dictionary) -> float:
 	var level := skulls(mission)
 	var district := district_of(mission)
 	var chance := float(T.NIGHT_CHANCE_BY_DISTRICT[district_index(district)])
+	if chance >= 1.0:
+		return 1.0   # Core Collapse is always night, every job type (Cameron, outranks Escort)
 	if type == "escort":
 		return 1.0 if level >= T.NIGHT_ESCORT_MIN_SKULLS else 0.0
 	if type == "courier":
