@@ -142,7 +142,7 @@ func new_game() -> void:
 	day = 1
 	active_mission = {}
 	run_active = false
-	board = Missions.make_board(day, board_size(), 0)
+	board = Missions.make_board(day, board_size(), 0, board_district())
 	_starter_crew()
 	saloon_day = 0
 	ensure_saloon()
@@ -374,7 +374,7 @@ func board_size() -> int:
 
 func ensure_board() -> void:
 	if board.size() != board_size():
-		board = Missions.make_board(day, board_size(), int(upgrades.get("quality", 0)))
+		board = Missions.make_board(day, board_size(), int(upgrades.get("quality", 0)), board_district())
 
 
 func choose_mission(index: int) -> void:
@@ -398,7 +398,7 @@ func finish_day() -> void:
 	day += 1
 	research_today = 0
 	active_mission = {}
-	board = Missions.make_board(day, board_size(), int(upgrades.get("quality", 0)))
+	board = Missions.make_board(day, board_size(), int(upgrades.get("quality", 0)), board_district())
 	_advance_lost()
 	ensure_saloon()
 	_advance_expeditions()
@@ -480,6 +480,16 @@ func research(id: String) -> bool:
 	save_game()
 	changed.emit()
 	return true
+
+
+## The furthest district open: the board rolls its skull band and may use
+## layouts from it and every district before it.
+func board_district() -> String:
+	var id := str(T.DISTRICTS[0].id)
+	for i in T.DISTRICTS.size():
+		if is_district_open(i):
+			id = str(T.DISTRICTS[i].id)
+	return id
 
 
 func is_district_open(index: int) -> bool:
@@ -1215,7 +1225,7 @@ func buy_upgrade(key: String) -> bool:
 	upgrades[key] = upgrade_level(key) + 1
 	if key == "choices" or key == "quality":
 		# Same seed, so today's missions stay; more of them, or better paid.
-		board = Missions.make_board(day, board_size(), int(upgrades.quality))
+		board = Missions.make_board(day, board_size(), int(upgrades.quality), board_district())
 	if key == "back_room":
 		ensure_saloon()
 	if key == "seasoned_hands":

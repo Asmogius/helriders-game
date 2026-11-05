@@ -104,6 +104,7 @@ godot --headless --fixed-fps 60 --path . -s res://tests/garage_layout_test.gd # 
 godot --headless --fixed-fps 60 --path . -s res://tests/fx_sample_test.gd # must end "FX SAMPLE TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/tracer_styles_test.gd # must end "TRACER STYLES TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/transitions_test.gd # must end "TRANSITIONS TEST PASSED"
+godot --headless --fixed-fps 60 --path . -s res://tests/kill_loops_test.gd   # must end "KILL LOOPS TEST PASSED" (one blast hits every zombie in range)
 godot --headless --fixed-fps 60 --path . -s res://tests/wreck_and_swarm_test.gd   # must end "WRECK AND SWARM TEST PASSED" (shove through a pack, wreck freezes the fight, free hires match their card)
 ```
 
