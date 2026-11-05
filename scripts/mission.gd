@@ -684,7 +684,7 @@ func _physics_process(delta: float) -> void:
 func _process(_delta: float) -> void:
 	_pass_mark()
 	zombies.contagion = vehicle.has_sp("sp_contagion")
-	if vehicle.strip_pending > 0.0:
+	if vehicle.strip_pending > 0.0 and state != State.WRECKED:
 		scrap += vehicle.strip_pending   # Strip Mine
 		vehicle.strip_pending = 0.0
 	# Bars, numbers and the status line at ~15 Hz (they allocate strings and
@@ -2051,6 +2051,8 @@ func _type_color() -> Color:
 # --- Kills and drops -----------------------------------------------------------
 
 func _add_kill(points: int, rig := false) -> void:
+	if state == State.WRECKED:
+		return   # the rig's gone: kills behind the wreck pay nothing (hand playtest)
 	kills += 1
 	var mult := profile.salvage_mult() * float(vehicle.crew_mod("scrap"))
 	if rig:
@@ -2730,6 +2732,10 @@ func _on_wrecked() -> void:
 		lines += "."
 	await _wreck_sequence(aboard)
 	hud.show_result("WRECKED", lines, "BACK TO THE YARD", T.COL_ORANGE)
+	# Freeze the fight behind the result (hand playtest: it kept running and the
+	# horde kept chewing). The overlay runs while paused; leaving unpauses (_exit_tree).
+	if is_inside_tree():
+		get_tree().paused = true
 
 
 class CourierMarkers extends Node2D:

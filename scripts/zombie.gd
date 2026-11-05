@@ -290,6 +290,15 @@ func is_stumbling() -> bool:
 	return kind == "tank" and charge == Charge.STUMBLE
 
 
+## The player's rig pushing through slowly (vehicle.gd): knocked aside, no damage.
+func shove(v: Vector2) -> void:
+	if not active:
+		return
+	global_position += v * get_physics_process_delta_time()   # out of the way this tick
+	if _knock.length_squared() < v.length_squared():
+		_knock = v
+
+
 func _on_hit(_damage: float, impulse: Vector2) -> void:
 	_knock += impulse * float(_stats.knock)
 	_flash = 1.0

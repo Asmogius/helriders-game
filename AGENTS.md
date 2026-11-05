@@ -105,6 +105,7 @@ godot --headless --fixed-fps 60 --path . -s res://tests/fx_sample_test.gd # must
 godot --headless --fixed-fps 60 --path . -s res://tests/tracer_styles_test.gd # must end "TRACER STYLES TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/transitions_test.gd # must end "TRANSITIONS TEST PASSED"
 godot --headless --fixed-fps 60 --path . -s res://tests/kill_loops_test.gd   # must end "KILL LOOPS TEST PASSED" (one blast hits every zombie in range)
+godot --headless --fixed-fps 60 --path . -s res://tests/wreck_and_swarm_test.gd   # must end "WRECK AND SWARM TEST PASSED" (shove through a pack, wreck freezes the fight, free hires match their card)
 godot --headless --fixed-fps 60 --path . -s res://tests/tutorial_readability_test.gd # must end "TUTORIAL READABILITY TEST PASSED" (Training Run brightens the arena and rings zombies)
 ```
 
@@ -122,3 +123,10 @@ https://github.com/Asmogius/helriders-game/releases/download/latest-build/helrid
 The same run also exports a Windows build (preset "Windows" in `export_presets.cfg`, one self-contained .exe) and attaches `helriders-windows.zip` to the release; that step is `continue-on-error`, so a Windows failure never blocks the APK. Each build is stamped version 0.1.<run number>. A signed release APK (`helriders-release.apk`) is also built once the repository secrets `ANDROID_RELEASE_KEYSTORE_BASE64`, `ANDROID_RELEASE_KEY_ALIAS` and `ANDROID_RELEASE_KEY_PASSWORD` exist; never commit a release key.
 
 If the workflow fails, the owner gets no build. Check the run and fix it before moving on.
+
+## Cursor Cloud
+
+- `godot` on `PATH` is Godot 4.7.2 (`/usr/local/bin/godot`). Verify with the headless commands above.
+- Import may print `Unable to open Android 'build-tools' directory`. The Android SDK is not installed here. That line is a warning: import still succeeds, and the headless tests do not need the SDK. APK and Windows export stay on GitHub Actions.
+- Rendered checks use the installed `xvfb`: `xvfb-run -a godot --rendering-driver opengl3 --path . ...`. There is no sound card; Godot falls back to the dummy audio driver.
+- `python3` has numpy and Pillow, and `ffmpeg` encodes Vorbis, for `tools/art` and `tools/audio/synth.py`.
