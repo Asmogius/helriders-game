@@ -2158,7 +2158,7 @@
   "sheet": "bulwark__shadow.png",
   "frame_w": 144,
   "frame_h": 144,
-  "alpha": 0.5,
+  "alpha": 0.82,
   "sun": [
    -0.45,
    -0.55,

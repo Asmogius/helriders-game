@@ -1881,7 +1881,7 @@
   "sheet": "torcher__shadow.png",
   "frame_w": 110,
   "frame_h": 110,
-  "alpha": 0.5,
+  "alpha": 0.82,
   "sun": [
    -0.45,
    -0.55,

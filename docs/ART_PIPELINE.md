@@ -169,5 +169,7 @@ the leading edge only; spikes heat to enemy red. Stub:
 ## Baked cast shadows (Ebbtide plan phase 1, Cameron 2026-11-04)
 - One team sun: `voxel_render.LIGHT = (-0.45, -0.55, 0.70)` (screen x right, y down, z up): light from the upper-left, shadows fall down-right.
 - Ground offset per voxel of height: `SHADOW_DIR = (0.643, 0.786)`; on screen at 45 deg tilt that is (+0.643, +0.556) px per voxel.
-- Every model with a `chassis` chunk gets `<name>__shadow.png`: same 32-heading, 8-column layout, its own square frame (`meta.shadow.frame_w`), centre = ground centre, opaque `SHADOW_RGB (20,11,6)`, drawn at `meta.shadow.alpha` 0.5.
+- Every model with a `chassis` chunk gets `<name>__shadow.png`: same 32-heading, 8-column layout, its own square frame (`meta.shadow.frame_w`), centre = ground centre, `SHADOW_RGB (20,11,6)`.
+- Strength (Cameron, 2026-11-05): the contact — voxels within `CONTACT_Z` (2) of the ground, plus one screen voxel around that footprint — is solid in the sheet and drawn at `meta.shadow.alpha` 0.82. Across `CAST_FALLOFF` (14) screen voxels the sheet eases to alpha 215, and the outer pixel of that tail is a softer lip (`FAR_LIP` 0.58). The runtime alpha multiplies the sheet, so the contact reads at 0.82 and the far lip nearer 0.4. Same sun; turrets and weapons still have no sheet of their own.
+- Rebake shadows without touching the other sheets: `python3 tools/art/voxel_render.py --shadows-only` and `--shadows-only --garage-hd`.
 - `directional_sprite.gd` adds it as a `Shadow` child (`show_behind_parent`), synced to the frame. Turrets and weapons have none (they sit on the hull, inside its shadow).
