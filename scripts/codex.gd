@@ -41,7 +41,7 @@ const HAZARDS := [
 	["slime", "Slime", "Rigs on it lose grip; zombies wade through."],
 	["bile", "Bile", "A Boomer's burst. It marks you for the horde."],
 	["acid", "Acid Puddle", "Acid on the ground. Plates corrode while you sit in it."],
-	["oil", "Oil Slick", "Slippery. Fire or an explosion lights it, and burning oil hurts everyone."],
+	["oil", "Oil Slick", "Slippery. Fire or an explosion lights it, and burning oil only hurts enemies."],
 	["spikes", "Spike Strip", "Rigs crossing it slow down; zombies on it bleed."],
 	["fire", "Burning Ground", "Builds BURNING on anything standing in it."],
 	["status_shock", "STUNNED", "Shock buildup: no driving, firing or turning turrets for a moment."],
