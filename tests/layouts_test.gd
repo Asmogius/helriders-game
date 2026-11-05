@@ -1,13 +1,19 @@
 extends SceneTree
-## Headless test for the map layouts: twelve layouts (three per district,
-## each with a landmark, an open arena, a choke point, two or more routes
-## and barrel clusters, checked in every variation), at least four per job
-## type, every spot (start, stops, barrel spots, spawn points, the Escort
+## Headless test for the map layouts: twelve district layouts (three per
+## district, each with a landmark, an open arena, a choke point, two or more
+## routes and barrel clusters, checked in every variation), at least four per
+## job type, every spot (start, stops, barrel spots, spawn points, the Escort
 ## truck) on open ground and reachable from the start in each layout as
 ## drawn and in 25 seeded variations (mirrored, props nudged, roads
 ## barricaded, fewer spawn sides), variations repeat for the same seed, the
 ## board hands out layouts its jobs can use, saves keep them, and a real job
-## runs on every layout.
+## runs on every district layout.
+##
+## Quickplay canvases (QP2) are extra and stay off that board: blank_s / 
+## blank_m / blank_l are density tiers on the same T.WORLD_SIZE (emptier
+## building lists stand in for a smaller or larger canvas until world-size
+## Q1), and endless is the longer-session shell. They share the build() shape
+## and the open/reachable spot check. Real multi-size worlds are a follow-up.
 ##
 ## Run:  godot --headless --fixed-fps 60 --path . -s res://tests/layouts_test.gd
 
@@ -17,7 +23,11 @@ const Layouts := preload("res://scripts/layouts.gd")
 const Arena := preload("res://scripts/arena.gd")
 const NavGrid := preload("res://scripts/nav_grid.gd")
 const ProfileScript := preload("res://scripts/profile.gd")
+const Codex := preload("res://scripts/codex.gd")
 const T := preload("res://scripts/tuning.gd")
+
+## Sandbox blanks and the Endless shell. Not district maps.
+const QUICKPLAY: Array[String] = ["blank_s", "blank_m", "blank_l", "endless"]
 
 const RUNS := {"crossroads": "clear", "main_drag": "courier", "lots": "survive", "alleys": "retrieve", "rail_yard": "escort", "plaza": "hunt",
 	"gas_station": "escort", "overpass": "courier", "stadium_gate": "hunt", "factory_yard": "survive", "rail_bridge": "retrieve", "crater_rim": "clear"}
@@ -33,19 +43,29 @@ func _initialize() -> void:
 	profile = root.get_node("Profile")
 	profile.persist = false
 	profile.new_game()
-	_check(Layouts.LAYOUTS.size() == 12, "twelve layouts")
+	_check(Layouts.LAYOUTS.size() == 12 + QUICKPLAY.size(), "twelve district layouts plus four quickplay canvases")
 	var per_district := {}
+	var campaign := 0
 	for id: String in Layouts.LAYOUTS:
+		_check(str(Layouts.LAYOUTS[id].get("landmark", "")) != "", "%s has a landmark" % id)
+		if QUICKPLAY.has(id):
+			continue
+		campaign += 1
 		var d := str(Layouts.LAYOUTS[id].get("district", ""))
 		per_district[d] = int(per_district.get(d, 0)) + 1
-		_check(str(Layouts.LAYOUTS[id].get("landmark", "")) != "", "%s has a landmark" % id)
+	_check(campaign == 12, "twelve district layouts")
 	for d: Dictionary in T.DISTRICTS:
 		_check(int(per_district.get(str(d.id), 0)) == 3, "%s has three layouts" % str(d.name))
-	_check(per_district.size() == T.DISTRICTS.size(), "every layout sits in a known district")
+	_check(per_district.size() == T.DISTRICTS.size(), "every district layout sits in a known district")
 	for type: String in T.MISSIONS:
 		_check(Layouts.ids_for(type).size() >= 4, "%s has %d layouts (4+)" % [type, Layouts.ids_for(type).size()])
+		for qid: String in QUICKPLAY:
+			_check(not Layouts.ids_for(type).has(qid), "%s stays off the %s board" % [qid, type])
 	for id: String in Layouts.LAYOUTS:
+		if QUICKPLAY.has(id):
+			continue
 		_check_layout(id)
+	_check_quickplay()
 	_check(JSON.stringify(Layouts.build("alleys", 77)) == JSON.stringify(Layouts.build("alleys", 77)), "the same job seed builds the same map")
 	_check(JSON.stringify(Layouts.build("alleys", 77)) != JSON.stringify(Layouts.build("alleys", 78)), "another seed varies it")
 	var used := {}
@@ -61,6 +81,146 @@ func _initialize() -> void:
 	_check(str(ProfileScript._clean_mission(JSON.parse_string(JSON.stringify(job))).get("layout", "")) == str(job.layout), "saves keep a job's layout")
 	for id: String in RUNS:
 		queue.append(id)
+
+
+## QP2 canvases: same build() shape as a district layout, same world size,
+## spawn rails on the edges, and every spot open and reachable across the
+## same 26 variations. Building footprints get emptier from S to L. Endless
+## is more open still and paints a longer drive. No campaign barricades.
+func _check_quickplay() -> void:
+	var peer: Dictionary = Layouts.build("crossroads")
+	for id: String in QUICKPLAY:
+		_check(Layouts.LAYOUTS.has(id), "quickplay canvas %s is in LAYOUTS" % id)
+	# Copy first. Indexing the const table with a missing literal key is a parse
+	# error, so a canvas that has not landed yet has to be a runtime miss.
+	var layouts: Dictionary = Layouts.LAYOUTS
+	var ready := true
+	for id: String in QUICKPLAY:
+		ready = ready and layouts.has(id)
+	if not ready:
+		return
+	var known: Array[String] = []
+	for d: Dictionary in T.DISTRICTS:
+		known.append(str(d.id))
+	var rail: Array = (layouts["blank_s"] as Dictionary).spawn_points
+	var mid: Array = (layouts["blank_m"] as Dictionary).spawn_points
+	var large: Array = (layouts["blank_l"] as Dictionary).spawn_points
+	var lap: Array = (layouts["endless"] as Dictionary).spawn_points
+	_check(mid == rail and large == rail, "blank canvases share one spawn rail")
+	_check(lap == rail, "endless uses that same outer spawn rail")
+	var cover_s := _footprint("blank_s")
+	var cover_m := _footprint("blank_m")
+	var cover_l := _footprint("blank_l")
+	var cover_e := _footprint("endless")
+	_check(cover_s > cover_m and cover_m > cover_l and cover_l > 0.0, "blank canvases get emptier S > M > L (%.0f > %.0f > %.0f)" % [cover_s, cover_m, cover_l])
+	_check(cover_e < cover_l, "endless leaves more open floor than the large yard (%.0f < %.0f)" % [cover_e, cover_l])
+	_check(_road_area("endless") > _road_area("blank_l"), "endless paints a longer drive than the large yard")
+	for id: String in QUICKPLAY:
+		var src: Dictionary = Layouts.LAYOUTS[id]
+		_check(str(src.get("district", "")) == "quickplay" and not known.has("quickplay"), "%s sits in the quickplay district, off the campaign list" % id)
+		_check((src.jobs as Array).is_empty(), "%s has no campaign jobs" % id)
+		_check((src.blocks as Array).is_empty(), "%s has no campaign barricade list" % id)
+		var built: Dictionary = Layouts.build(id)
+		var missing: Array[String] = []
+		for k: String in peer:
+			if not built.has(k):
+				missing.append(k)
+		_check(str(built.id) == id and str(built.district) == "quickplay" and missing.is_empty(), "%s build matches a district layout (%s)" % [id, ", ".join(missing)])
+		_check(JSON.stringify(Layouts.build(id, 77)) == JSON.stringify(Layouts.build(id, 77)), "%s repeats a variation seed" % id)
+		_check(JSON.stringify(Layouts.build(id, 77)) != JSON.stringify(Layouts.build(id, 0)), "%s variation seed changes the draw" % id)
+		var sides := {"left": 0, "right": 0, "top": 0, "bottom": 0}
+		var walled: Array[String] = []
+		for p: Vector2 in src.spawn_points:
+			var edge := _edge_of(p)
+			if sides.has(edge):
+				sides[edge] = int(sides[edge]) + 1
+			if p.x < 54.0 or p.y < 54.0 or p.x > T.WORLD_SIZE.x - 54.0 or p.y > T.WORLD_SIZE.y - 54.0:
+				walled.append(str(p))
+		var thin: Array[String] = []
+		for edge: String in sides:
+			if int(sides[edge]) < 2:
+				thin.append("%s %d" % [edge, int(sides[edge])])
+		_check(walled.is_empty() and thin.is_empty(), "%s spawn rail clears the wall, two points a side%s" % [id, "" if walled.is_empty() and thin.is_empty() else ": " + ", ".join(walled) + " " + ", ".join(thin)])
+		var on_rail: Array[String] = []
+		for b: Rect2 in src.buildings:
+			if b.position.x < 200.0 or b.position.y < 200.0 or b.end.x > T.WORLD_SIZE.x - 200.0 or b.end.y > T.WORLD_SIZE.y - 200.0:
+				on_rail.append(str(b))
+		_check(on_rail.is_empty(), "%s buildings stay off the edge rail%s" % [id, "" if on_rail.is_empty() else ": " + ", ".join(on_rail)])
+		_check_open(id)
+		var named := false
+		for row: Array in Codex.entries("places"):
+			if str(row[0]) == "map_" + id:
+				named = true
+				_check(not str(row[2]).contains("for  jobs") and str(row[2]) != "", "%s database blurb names the canvas (%s)" % [id, str(row[2])])
+		_check(named, "%s is in the Database places list" % id)
+
+
+## Building coverage. Density tiers until world size can change: less cover
+## means a larger-feeling floor on the same T.WORLD_SIZE.
+func _footprint(id: String) -> float:
+	var area := 0.0
+	for b: Rect2 in Layouts.LAYOUTS[id].buildings:
+		area += b.size.x * b.size.y
+	return area
+
+
+func _road_area(id: String) -> float:
+	var area := 0.0
+	for r: Rect2 in Layouts.LAYOUTS[id].roads:
+		area += r.size.x * r.size.y
+	return area
+
+
+func _edge_of(p: Vector2) -> String:
+	var w := T.WORLD_SIZE
+	if p.x <= 120.0:
+		return "left"
+	if w.x - p.x <= 120.0:
+		return "right"
+	if p.y <= 120.0:
+		return "top"
+	if w.y - p.y <= 120.0:
+		return "bottom"
+	return ""
+
+
+## Start, stops, barrels and spawns on open ground and reachable, as drawn
+## and in 25 variations. Quickplay canvases do not barricade roads.
+func _check_open(id: String) -> void:
+	var bad: Array[String] = []
+	var world := Rect2(Vector2.ZERO, T.WORLD_SIZE)
+	for vary in range(0, 26):
+		var built: Dictionary = Layouts.build(id, vary)
+		var arena := Arena.new()
+		arena.setup(built)
+		var nav := NavGrid.new(arena)
+		var start: Vector2 = arena.player_start
+		var spots: Array = [["start", start]]
+		for p: Vector2 in arena.checkpoints:
+			spots.append(["stop", p])
+		for p: Vector2 in arena.barrel_spots:
+			spots.append(["barrel", p])
+		for p: Vector2 in arena.spawn_points:
+			spots.append(["spawn", p])
+		if not world.has_point(start):
+			bad.append("start outside the world (vary %d)" % vary)
+		for b: Rect2 in arena.buildings:
+			if not world.encloses(b):
+				bad.append("building %s outside the world (vary %d)" % [str(b), vary])
+		for s: Array in spots:
+			var p: Vector2 = s[1]
+			if not world.has_point(p):
+				bad.append("%s %s outside the world (vary %d)" % [s[0], str(p), vary])
+			elif nav._blocked(p):
+				bad.append("%s %s blocked (vary %d)" % [s[0], str(p), vary])
+			elif nav.astar.get_id_path(nav.cell_of(start), nav.cell_of(p)).is_empty():
+				bad.append("%s %s cut off (vary %d)" % [s[0], str(p), vary])
+		if arena.spawn_points.size() < 4:
+			bad.append("only %d spawn points (vary %d)" % [arena.spawn_points.size(), vary])
+		if arena.props.size() != (Layouts.LAYOUTS[id].props as Array).size():
+			bad.append("variation added props (vary %d)" % vary)
+		arena.free()
+	_check(bad.is_empty(), "%s: every spot open and reachable in 26 variations%s" % [id, "" if bad.is_empty() else ": " + str(bad.slice(0, 6))])
 
 
 func _check_layout(id: String) -> void:

@@ -82,7 +82,11 @@ static func entries(category: String) -> Array:
 				out.append([str(d.id), str(d.name), "%s Jobs at %d-%d skulls." % [str(PLACE_TEXT.get(str(d.id), "")), int(d.skulls[0]), int(d.skulls[1])]])
 			for id: String in Layouts.LAYOUTS:
 				var l: Dictionary = Layouts.LAYOUTS[id]
-				out.append(["map_" + id, "Map: %s" % str(l.name), "A layout for %s jobs." % ", ".join((l.jobs as Array).map(func(j: String) -> String: return str(T.MISSIONS[j].label).capitalize()))])
+				var jobs: Array = l.jobs
+				var about := "A layout for %s jobs." % ", ".join(jobs.map(func(j: String) -> String: return str(T.MISSIONS[j].label).capitalize()))
+				if jobs.is_empty():
+					about = str(l.get("landmark", "A Quickplay canvas."))
+				out.append(["map_" + id, "Map: %s" % str(l.name), about])
 		"jobs":
 			for type: String in T.MISSIONS:
 				out.append([type, str(T.MISSIONS[type].label), str(T.MISSIONS[type].get("brief", ""))])
