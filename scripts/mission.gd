@@ -989,14 +989,25 @@ func _open_spot(dist: float) -> Vector2:
 	var q := PhysicsPointQueryParameters2D.new()
 	q.collision_mask = T.LAYER_WORLD
 	var start := randf() * TAU
+	# Try the full distance first, then closer rings, so the marker never ends
+	# up inside a building or past the map edge (playtest: a push with no
+	# reachable circle).
+	for scale: float in [1.0, 0.8, 0.6, 0.45]:
+		for k in 16:
+			var at := vehicle.global_position + Vector2.RIGHT.rotated(start + TAU * k / 16.0) * dist * scale
+			if at.x < 80.0 or at.y < 80.0 or at.x > T.WORLD_SIZE.x - 80.0 or at.y > T.WORLD_SIZE.y - 80.0:
+				continue
+			q.position = at
+			if space.intersect_point(q, 1).is_empty() and vehicle._has_los(at):
+				return at
+	# Last resort: any open point on the ring, line of sight or not.
 	for k in 16:
 		var at := vehicle.global_position + Vector2.RIGHT.rotated(start + TAU * k / 16.0) * dist
-		if at.x < 80.0 or at.y < 80.0 or at.x > T.WORLD_SIZE.x - 80.0 or at.y > T.WORLD_SIZE.y - 80.0:
-			continue
+		at = at.clamp(Vector2(80, 80), T.WORLD_SIZE - Vector2(80, 80))
 		q.position = at
-		if space.intersect_point(q, 1).is_empty() and vehicle._has_los(at):
+		if space.intersect_point(q, 1).is_empty():
 			return at
-	return vehicle.global_position + Vector2.RIGHT.rotated(start) * dist
+	return vehicle.global_position.clamp(Vector2(80, 80), T.WORLD_SIZE - Vector2(80, 80))
 
 
 ## Leave the Training Run from the pause menu: back to the garage, no tour.
@@ -2948,9 +2959,42 @@ class CourierMarkers extends Node2D:
 		if state == 1 and beacon != Vector2.INF:
 			draw_circle(beacon, T.PUSH_RADIUS, Color(T.COL_ORANGE, 0.10 + 0.08 * pulse))
 			draw_arc(beacon, T.PUSH_RADIUS, 0.0, TAU, 48, Color(T.COL_ORANGE, 0.9), 4.0)
+			_edge_arrow(beacon, T.COL_ORANGE, "PUSH", pulse)
 		if (state == 1 or state == 3) and ex != Vector2.INF and str(mission.get("mission_type")) != "retrieve":
 			draw_circle(ex, T.PUSH_RADIUS, Color(T.COL_CYAN, 0.10 + 0.08 * pulse))
 			draw_arc(ex, T.PUSH_RADIUS, 0.0, TAU, 48, Color(T.COL_CYAN, 0.9), 4.0)
+			_edge_arrow(ex, T.COL_CYAN, "EXTRACT", pulse)
+
+	## A marker off the screen gets an arrow on the screen's edge pointing at it,
+	## with its name and distance (playtest: the push beacon spawned out of view).
+	func _edge_arrow(target: Vector2, color: Color, text: String, pulse: float) -> void:
+		var vp := get_viewport()
+		var view: Rect2 = vp.get_canvas_transform().affine_inverse() * vp.get_visible_rect()
+		var zoom := vp.get_canvas_transform().get_scale().x
+		var inset := 90.0 / maxf(zoom, 0.01)
+		var inner := view.grow(-inset)
+		if inner.size.x <= 0.0 or inner.size.y <= 0.0 or view.grow(-T.PUSH_RADIUS * 0.5).has_point(target):
+			return
+		var c := inner.get_center()
+		var dir := (target - c).normalized()
+		var t := INF
+		if dir.x != 0.0:
+			t = minf(t, ((inner.end.x if dir.x > 0.0 else inner.position.x) - c.x) / dir.x)
+		if dir.y != 0.0:
+			t = minf(t, ((inner.end.y if dir.y > 0.0 else inner.position.y) - c.y) / dir.y)
+		var at := c + dir * t
+		var s := 1.0 / maxf(zoom, 0.01)
+		var tip := at + dir * 40.0 * s
+		var side := dir.orthogonal() * 28.0 * s
+		var back := at - dir * 12.0 * s
+		var col := Color(color, 0.75 + 0.25 * pulse)
+		draw_colored_polygon(PackedVector2Array([tip, back + side, back - side]), col)
+		draw_polyline(PackedVector2Array([tip, back + side, back - side, tip]), Color(0, 0, 0, 0.8), 3.0 * s)
+		var font := ThemeDB.fallback_font
+		var label := "%s %dm" % [text, int(mission.get("vehicle").global_position.distance_to(target) / 10.0)]
+		var fs := int(28.0 * s)
+		draw_string_outline(font, back - dir * 44.0 * s + Vector2(-100.0 * s, 10.0 * s), label, HORIZONTAL_ALIGNMENT_CENTER, 200.0 * s, fs, int(6.0 * s), Color(0, 0, 0, 0.85))
+		draw_string(font, back - dir * 44.0 * s + Vector2(-100.0 * s, 10.0 * s), label, HORIZONTAL_ALIGNMENT_CENTER, 200.0 * s, fs, col)
 
 	func _draw_retrieve() -> void:
 		var pulse := 0.5 + 0.5 * sin(_t * 4.0)
