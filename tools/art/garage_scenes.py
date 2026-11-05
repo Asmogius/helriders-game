@@ -46,7 +46,7 @@ SAMPLE_COLOURS = {
     "GARAGE_OIL": (24, 23, 24),
     "GARAGE_PEGBOARD": (74, 60, 44),
     "GARAGE_WALL": (46, 48, 52),        # corrugated sheet
-    "GARAGE_STREET_NIGHT": (30, 34, 44),# outside the roll-up door
+    "GARAGE_STREET_NIGHT": (81, 43, 17),# outside the roll-up door (#512b11, = COL_NIGHT_WORLD)
     "GARAGE_GAS_RED": (110, 40, 34),    # welding cylinders (muted, not enemy red)
 }
 C.update({k.lower(): v for k, v in SAMPLE_COLOURS.items()})
