@@ -510,8 +510,9 @@ func show_result(title: String, subtitle: String, button_text: String, accent: C
 		c.queue_free()
 	_button.text = button_text
 	_overlay.visible = true
+	_overlay.process_mode = Node.PROCESS_MODE_ALWAYS   # usable when the mission pauses behind it (wreck)
 	_overlay.modulate.a = 0.0
-	create_tween().tween_property(_overlay, "modulate:a", 1.0, 0.35)
+	_overlay.create_tween().tween_property(_overlay, "modulate:a", 1.0, 0.35)   # on the overlay: runs while paused
 	preload("res://scripts/ui_transitions.gd").tick_numbers(_subtitle)   # V6.5: counters tick up
 
 

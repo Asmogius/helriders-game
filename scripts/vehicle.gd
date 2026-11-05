@@ -35,6 +35,8 @@ const REVERSE_ANGLE := 2.27        # ~130 degrees: stick this far behind = rever
 const AIM_DEADZONE := 0.2
 const FIRE_THRESHOLD := 0.5
 const RAM_MIN_SPEED := 150.0       # impact speed needed to hurt anything
+const SHOVE_MIN_IMPACT := 10.0     # slower pushes into a zombie shove it aside instead (no damage)
+const SHOVE_SPEED := 260.0         # px/s the shoved zombie is knocked away at
 const WALL_DAMAGE_SPEED := 300.0   # impact speed before walls hurt you
 const LOCK_FIRE_CONE := 0.15       # radians: turret must be this close to fire on lock
 
@@ -1065,6 +1067,19 @@ func _resolve_collisions(pre_velocity: Vector2) -> void:
 		var impact := -pre_velocity.dot(collision.get_normal())
 		if other is Hostile:
 			var hostile := other as Hostile
+			if impact < RAM_MIN_SPEED and impact > SHOVE_MIN_IMPACT and not already_hit.has(hostile) and hostile.has_method("shove"):
+				# Too slow to ram: push the zombie aside so a packed horde (a
+				# Slimer swarm) can't pin the rig in place (hand playtest 0.1.75).
+				already_hit.append(hostile)
+				# Mostly sideways off the rig's line (straight ahead would just pack
+				# the horde tighter), a little forward.
+				var ahead := pre_velocity.normalized()
+				var to_z := hostile.global_position - global_position
+				var lateral := to_z - ahead * to_z.dot(ahead)
+				if lateral.length_squared() < 1.0:
+					lateral = ahead.orthogonal() * (1.0 if hostile.get_instance_id() % 2 == 0 else -1.0)
+				hostile.call("shove", (lateral.normalized() * 0.9 + ahead * 0.3).normalized() * SHOVE_SPEED)
+				continue
 			if already_hit.has(hostile) or impact < RAM_MIN_SPEED:
 				continue
 			already_hit.append(hostile)
