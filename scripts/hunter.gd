@@ -16,6 +16,7 @@ const HULL_HALF := Vector2(30.0, 17.0)   # where it clings, in rig-local space
 var target: Rig                           # the player's rig
 var nav: NavGrid
 var damage_mult := 1.0     # the skull's enemy damage (the mission sets it)
+var night_speed := 1.0     # T.NIGHT_HUNTER_SPEED_MULT on night jobs (the mission sets it)
 var state := State.CHASE
 
 var _shape: CollisionShape2D
@@ -150,10 +151,10 @@ func _chase(delta: float) -> void:
 	var to_point := _nav_point - global_position
 	if nav == null or _nav_point.distance_squared_to(target.global_position) < 1.0:
 		to_point = to_target  # in sight: go straight for it
-	var desired := to_point.normalized() * T.HUNTER_SPEED * speed_mult()
+	var desired := to_point.normalized() * T.HUNTER_SPEED * night_speed * speed_mult()
 	if _detour_time > 0.0:
 		_detour_time -= delta
-		desired = _detour * T.HUNTER_SPEED * speed_mult()
+		desired = _detour * T.HUNTER_SPEED * night_speed * speed_mult()
 	velocity = desired + _knock
 	rotation = lerp_angle(rotation, desired.angle(), 1.0 - exp(-10.0 * delta))
 	move_and_slide()
