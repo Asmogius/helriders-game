@@ -20,6 +20,7 @@ var right_stick: ThumbStick
 
 var _root: Control
 var _armor_bar: ArmorBar
+var _hp_value: Label
 var _rig_icon: RigIcon
 var _status_strip: StatusStrip
 var _power_bar: PowerBar
@@ -69,6 +70,19 @@ func _ready() -> void:
 	_armor_bar.position = Vector2(94, 18)
 	_armor_bar.size = Vector2(300, 16)
 	_root.add_child(_armor_bar)
+
+	# Big HP number (Black Ops One), fitted to the strip beside the bar on a phone HUD.
+	_hp_value = Label.new()
+	_hp_value.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_hp_value.add_theme_font_override("font", UI.font())
+	_hp_value.add_theme_font_size_override("font_size", 22)
+	_hp_value.add_theme_color_override("font_color", Color(0.92, 0.9, 0.86))
+	_hp_value.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+	_hp_value.add_theme_constant_override("outline_size", 4)
+	_hp_value.position = Vector2(404, 10)
+	_hp_value.size = Vector2(120, 32)
+	_hp_value.text = "100"
+	_root.add_child(_hp_value)
 
 	_power_bar = PowerBar.new()
 	_power_bar.position = Vector2(94, 38)
@@ -333,6 +347,12 @@ func press_ability(index: int) -> void:
 
 func set_armor(ratio: float) -> void:
 	_armor_bar.set_ratio(ratio)
+	if _hp_value != null:
+		var text := str(clampi(roundi(ratio * 100.0), 0, 100))
+		_hp_value.text = text
+		# Keep the number readable on a phone strip (~120 px wide).
+		var f := UI.font()
+		_hp_value.add_theme_font_size_override("font_size", UI.fit_size(f, text, 110.0, 22, 16))
 
 
 ## The rig icon (§14): shield ring, each facing's plate, the HP block. All
@@ -340,6 +360,11 @@ func set_armor(ratio: float) -> void:
 func set_defense(shield_ratio: float, facings: PackedFloat32Array, hp_ratio: float) -> void:
 	_rig_icon.set_values(shield_ratio, facings, hp_ratio)
 	_armor_bar.set_shield(shield_ratio)   # V6.4 shield rail on the armor gauge
+	if _hp_value != null:
+		var text := str(clampi(roundi(hp_ratio * 100.0), 0, 100))
+		_hp_value.text = text
+		var f := UI.font()
+		_hp_value.add_theme_font_size_override("font_size", UI.fit_size(f, text, 110.0, 22, 16))
 
 
 ## Status buildup (0..100 per bar) and seconds left on each active status
@@ -622,6 +647,8 @@ func _build_overlay() -> void:
 func _label(font_size: int, color: Color) -> Label:
 	var label := Label.new()
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Titles / big numbers: Black Ops One; body copy: Inter.
+	label.add_theme_font_override("font", UI.font() if font_size >= 26 else UI.font_body())
 	label.add_theme_font_size_override("font_size", font_size)
 	label.add_theme_color_override("font_color", color)
 	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
@@ -698,8 +725,7 @@ class LockButton extends Control:
 			draw_line(p, p - Vector2(0.0, corner.y * 9.0), accent, 3.0)
 		if on and has_target:
 			draw_circle(c, 5.0, accent)
-		var font := ThemeDB.fallback_font
-		UI.draw_fit(self, font, Vector2(0.0, size.y + 18.0), "LOCK", HORIZONTAL_ALIGNMENT_CENTER, size.x, 18, Color(accent, 0.9))
+		UI.draw_fit(self, UI.font(), Vector2(0.0, size.y + 18.0), "LOCK", HORIZONTAL_ALIGNMENT_CENTER, size.x, 18, Color(accent, 0.9))
 		if pad_badge != "":
 			PadGlyph.draw(self, Vector2(size.x - 8.0, 8.0), pad_badge)
 
@@ -836,11 +862,11 @@ class AbilityButton extends Control:
 					c + Vector2(-5, 20), c + Vector2(10, -4), c + Vector2(1, -4)]), tint)
 		if disabled:
 			draw_line(c + Vector2(-r * 0.6, -r * 0.6), c + Vector2(r * 0.6, r * 0.6), T.COL_ENEMY, 3.0)
-		var font := ThemeDB.fallback_font
 		var label: String = LABELS.get(kind, kind.to_upper())
 		if disabled:
 			label = "INJURED"
-		UI.draw_fit(self, font, Vector2(-8.0, size.y + 18.0), label, HORIZONTAL_ALIGNMENT_CENTER, size.x + 16.0, 15, Color(tint, 0.9))
+		# Black Ops One + fit_size: longest labels ("HARD LINE", "OVERCHARGE") must fit a phone thumb button.
+		UI.draw_fit(self, UI.font(), Vector2(-8.0, size.y + 18.0), label, HORIZONTAL_ALIGNMENT_CENTER, size.x + 16.0, 15, Color(tint, 0.9))
 		if pad_badge != "":
 			PadGlyph.draw(self, Vector2(size.x - 8.0, 8.0), pad_badge)
 
@@ -901,8 +927,7 @@ class CrewButton extends Control:
 			draw_rect(Rect2(p + Vector2(-6.0, 7.0), Vector2(12.0, 7.0)), tint)
 		if has_ready and cooldown <= 0.0:
 			draw_circle(c + Vector2(r * 0.65, -r * 0.65), 8.0, T.COL_ORANGE)
-		var font := ThemeDB.fallback_font
-		UI.draw_fit(self, font, Vector2(-8.0, size.y + 18.0), "CREW", HORIZONTAL_ALIGNMENT_CENTER, size.x + 16.0, 15, Color(tint, 0.9))
+		UI.draw_fit(self, UI.font(), Vector2(-8.0, size.y + 18.0), "CREW", HORIZONTAL_ALIGNMENT_CENTER, size.x + 16.0, 15, Color(tint, 0.9))
 		if pad_badge != "":
 			PadGlyph.draw(self, Vector2(size.x - 8.0, 8.0), pad_badge)
 
@@ -986,6 +1011,7 @@ class PowerBar extends Control:
 	## Thin bar under armor: power in use / engine output. Overload (power or
 	## weight) spills past the end in orange with a label.
 	const T := preload("res://scripts/tuning.gd")
+	const UI := preload("res://scripts/ui_theme.gd")
 	var used := 0.0
 	var output := 0.0
 	var weight := 0.0
@@ -1010,13 +1036,14 @@ class PowerBar extends Control:
 		var fill := minf(used / output, 1.0) * inner
 		var color := T.COL_ORANGE if over or heavy else Color(0.95, 0.85, 0.4)
 		draw_rect(Rect2(Vector2(2, 2), Vector2(fill, size.y - 4.0)), color)
-		var font := ThemeDB.fallback_font
+		var font := UI.font()   # Black Ops: power / overload readout
 		var text := "PWR %d/%d" % [roundi(used), roundi(output)]
 		if heavy:
 			text += "  WT %d/%d" % [roundi(weight), roundi(capacity)]
 		if over or heavy:
 			text += "  OVERLOAD"
-		draw_string(font, Vector2(size.x + 10.0, size.y + 1.0), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, color)
+		# Fit on a phone-width HUD (bar is 300 px; leave room beside it).
+		UI.draw_fit(self, font, Vector2(size.x + 10.0, size.y + 1.0), text, HORIZONTAL_ALIGNMENT_LEFT, 360.0, 16, color)
 
 
 class StatusStrip extends Control:

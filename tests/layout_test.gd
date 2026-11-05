@@ -45,6 +45,15 @@ func _process(_delta: float) -> bool:
 	_check(second.theme == bar.theme and bar.theme == UI.shared_theme(), "bottom_bar reuses one cached theme")
 	for c: Node in bar.get_children():
 		_check((c as Button).size.y >= UI.MIN_TOUCH, "button at least MIN_TOUCH tall")
+	# Ebbtide fonts: Inter body default, Black Ops One for titles / big numbers.
+	var body: Font = UI.font_body()
+	var display: Font = UI.font()
+	_check(body != null and display != null, "body and display fonts load")
+	_check(ResourceLoader.exists("res://art/ui/fonts/Inter-Regular.ttf"), "Inter-Regular.ttf is in the tree")
+	_check(UI.shared_theme().default_font == body or UI.make().default_font == body, "theme default font is the body font")
+	# Phone HUD: longest weapon label and a 3-digit HP value fit Black Ops One.
+	_check(UI.fit_size(display, "HARD LINE", 120.0, 15, 10) >= 10, "HARD LINE fits a thumb button width")
+	_check(UI.fit_size(display, "100", 110.0, 22, 16) >= 16, "HP value 100 fits the HUD strip")
 	if failures.is_empty():
 		print("LAYOUT TEST PASSED")
 		quit(0)
